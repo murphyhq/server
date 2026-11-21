@@ -35,13 +35,12 @@ A service owns one domain. It states what it needs as interfaces, so the same lo
 
 ## Implementations
 
-Databases, message brokers, notification providers and secret stores are interchangeable. Adding one never changes the services that use it.
+Databases, message brokers and notification providers are interchangeable. Adding one never changes the services that use it.
 
 1. A new implementation MUST implement an existing interface.
 2. Its client MUST live in `internal/`, and the implementation next to the interface's other implementations.
 3. It MUST pass the interface's shared test suite unchanged, against the real service in a container or an emulator.
 4. It MUST be selectable by configuration, and every external endpoint it uses MUST be configurable.
-5. It MUST accept secrets as references (`env://`, `file://`, `aws-ssm://`) and MUST NOT accept secret values.
 
 ## Configuration and lifecycle
 
