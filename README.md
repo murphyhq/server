@@ -23,6 +23,26 @@ Murphy runs as six small components: `ingest` receives webhooks, `api` serves th
 
 The [architecture overview](docs/architecture.md) explains each component and shows how an alert becomes a page.
 
+## Running locally
+
+Requires Docker.
+
+| Command | Starts |
+|---|---|
+| `docker compose --profile murphy up` | everything: PostgreSQL, NATS, LocalStack, Grafana, and every component built from source |
+| `docker compose --profile murphy watch` | the same, restarting components when the code changes |
+| `docker compose up` | the services only, to run a component yourself |
+
+Logs, traces and metrics are in Grafana at http://localhost:3000 (Explore → Loki, Tempo or Prometheus).
+
+To run one component yourself against those services, with Go installed:
+
+```
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 go run ./cmd/api
+```
+
+Each component reports its health at `http://localhost:9000/healthz` and `/readyz`.
+
 ## License
 
 [AGPL-3.0](LICENSE). Contributions are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md).
