@@ -7,6 +7,7 @@ import (
 	"github.com/murphyhq/server/internal/config"
 	"github.com/murphyhq/server/internal/lifecycle"
 	"github.com/murphyhq/server/internal/logger"
+	"github.com/murphyhq/server/internal/telemetry"
 )
 
 type settings struct {
@@ -16,7 +17,7 @@ type settings struct {
 func main() {
 	ctx := context.Background()
 	if err := run(ctx); err != nil {
-		logger.Error(ctx, "notifier stopped", logger.WithError(err))
+		logger.Error(ctx, "notifier stopped", telemetry.WithError(err))
 		os.Exit(1)
 	}
 }

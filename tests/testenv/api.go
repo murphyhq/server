@@ -28,9 +28,7 @@ func API(t *testing.T) (*client.ClientWithResponses, string) {
 	require.NoError(t, err)
 	t.Cleanup(a.Close)
 
-	handler, err := httpserver.Handler(a.Handler)
-	require.NoError(t, err)
-	server := httptest.NewServer(handler)
+	server := httptest.NewServer(httpserver.Handler(a.Handler))
 	t.Cleanup(server.Close)
 
 	api, err := client.NewClientWithResponses(server.URL)

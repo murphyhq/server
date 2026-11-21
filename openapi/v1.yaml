@@ -344,3 +344,6 @@ components:
           type: integer
         detail:
           type: string
+        trace_id:
+          type: string
+          description: The trace of this request, to find it in your tracing backend.

@@ -11,6 +11,8 @@ import (
 
 	"github.com/murphyhq/server/internal/httpserver"
 	"github.com/murphyhq/server/internal/logger"
+	"github.com/murphyhq/server/internal/telemetry"
+	"github.com/murphyhq/server/internal/tracer"
 )
 
 const (
@@ -46,25 +48,25 @@ func Middleware(store Store, ttl time.Duration) func(http.Handler) http.Handler 
 				return
 			}
 			if len(key) > maxKeyLength {
-				httpserver.WriteProblem(w, http.StatusBadRequest, "Idempotency-Key must be at most 255 characters")
+				httpserver.WriteProblem(w, r, http.StatusBadRequest, "Idempotency-Key must be at most 255 characters")
 				return
 			}
 
 			body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxBodySize))
 			if err != nil {
-				httpserver.WriteProblem(w, http.StatusBadRequest, "request body could not be read")
+				httpserver.WriteProblem(w, r, http.StatusBadRequest, "request body could not be read")
 				return
 			}
 			r.Body = io.NopCloser(bytes.NewReader(body))
 			fingerprint := fingerprintOf(r, body)
 
-			existing, err := store.Reserve(r.Context(), key, Record{Fingerprint: fingerprint}, lease)
+			existing, err := reserve(r.Context(), store, key, fingerprint)
 			if err != nil {
 				httpserver.WriteError(w, r, err)
 				return
 			}
 			if existing != nil {
-				replay(w, existing, fingerprint)
+				replay(w, r, existing, fingerprint)
 				return
 			}
 
@@ -84,19 +86,44 @@ func Middleware(store Store, ttl time.Duration) func(http.Handler) http.Handler 
 			}
 			record := Record{Fingerprint: fingerprint, Status: recorder.status, ContentType: recorder.Header().Get("Content-Type"), Body: recorder.body.Bytes()}
 			if err := store.Complete(context.WithoutCancel(r.Context()), key, record, ttl); err != nil {
-				logger.Error(r.Context(), "store idempotent response", logger.WithError(err))
+				logger.Error(r.Context(), "store idempotent response", telemetry.WithError(err))
 				release(r.Context(), store, key)
 			}
 		})
 	}
 }
 
-func replay(w http.ResponseWriter, existing *Record, fingerprint string) {
+func reserve(ctx context.Context, store Store, key, fingerprint string) (_ *Record, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	existing, err := store.Reserve(ctx, key, Record{Fingerprint: fingerprint}, lease)
+	if err != nil {
+		return nil, err
+	}
+	span.Set(ctx, telemetry.WithField("idempotency.outcome", outcome(existing, fingerprint)))
+	return existing, nil
+}
+
+func outcome(existing *Record, fingerprint string) string {
+	switch {
+	case existing == nil:
+		return "reserved"
+	case existing.Fingerprint != fingerprint:
+		return "mismatch"
+	case !existing.completed():
+		return "in_progress"
+	default:
+		return "replayed"
+	}
+}
+
+func replay(w http.ResponseWriter, r *http.Request, existing *Record, fingerprint string) {
 	switch {
 	case existing.Fingerprint != fingerprint:
-		httpserver.WriteProblem(w, http.StatusUnprocessableEntity, "Idempotency-Key was already used for a different request")
+		httpserver.WriteProblem(w, r, http.StatusUnprocessableEntity, "Idempotency-Key was already used for a different request")
 	case !existing.completed():
-		httpserver.WriteProblem(w, http.StatusConflict, "a request with this Idempotency-Key is still in progress")
+		httpserver.WriteProblem(w, r, http.StatusConflict, "a request with this Idempotency-Key is still in progress")
 	default:
 		if existing.ContentType != "" {
 			w.Header().Set("Content-Type", existing.ContentType)
@@ -109,7 +136,7 @@ func replay(w http.ResponseWriter, existing *Record, fingerprint string) {
 
 func release(ctx context.Context, store Store, key string) {
 	if err := store.Release(context.WithoutCancel(ctx), key); err != nil {
-		logger.Error(ctx, "release idempotency key", logger.WithError(err))
+		logger.Error(ctx, "release idempotency key", telemetry.WithError(err))
 	}
 }
 

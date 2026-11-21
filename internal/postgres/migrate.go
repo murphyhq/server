@@ -12,6 +12,7 @@ import (
 	"github.com/pressly/goose/v3/database"
 
 	"github.com/murphyhq/server/internal/logger"
+	"github.com/murphyhq/server/internal/telemetry"
 	"github.com/murphyhq/server/internal/tracer"
 )
 
@@ -37,7 +38,7 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool, sets ...Migrations) (err e
 
 func migrate(ctx context.Context, db *sql.DB, set Migrations) (err error) {
 	ctx, span := tracer.Span(ctx)
-	ctx = span.Set(ctx, logger.WithField("service", set.Service))
+	ctx = span.Set(ctx, telemetry.WithField("service", set.Service))
 	defer span.End(&err)
 
 	store, err := database.NewStore(database.DialectPostgres, set.Service+"_migrations")
@@ -52,6 +53,6 @@ func migrate(ctx context.Context, db *sql.DB, set Migrations) (err error) {
 	if err != nil {
 		return fmt.Errorf("apply migrations for %s: %w", set.Service, err)
 	}
-	logger.Info(ctx, "migrations applied", logger.WithField("count", len(results)))
+	logger.Info(ctx, "migrations applied", telemetry.WithField("count", len(results)))
 	return nil
 }

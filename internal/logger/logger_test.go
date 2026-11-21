@@ -43,7 +43,7 @@ func captureRaw(t *testing.T, level string) (func() []map[string]any, *bytes.Buf
 func TestFieldsArePrefixedOnce(t *testing.T) {
 	lines := capture(t)
 
-	logger.Info(context.Background(), "paging", logger.WithField("incident.id", "inc-1"), logger.WithField("murphy.step", 2))
+	logger.Info(context.Background(), "paging", telemetry.WithField("incident.id", "inc-1"), telemetry.WithField("murphy.step", 2))
 
 	got := lines()[0]
 	assert.Equal(t, "inc-1", got["murphy.incident.id"])
@@ -53,9 +53,9 @@ func TestFieldsArePrefixedOnce(t *testing.T) {
 func TestContextFieldsAppearOnEveryLogLine(t *testing.T) {
 	lines := capture(t)
 
-	ctx := logger.With(context.Background(), logger.WithField("incident.id", "inc-1"))
+	ctx := telemetry.With(context.Background(), telemetry.WithField("incident.id", "inc-1"))
 	logger.Info(ctx, "paging")
-	logger.Error(ctx, "page failed", logger.WithError(errors.New("provider timeout")))
+	logger.Error(ctx, "page failed", telemetry.WithError(errors.New("provider timeout")))
 	logger.Info(context.Background(), "idle")
 
 	got := lines()
@@ -85,8 +85,8 @@ func TestLogLinesInsideASpanCarryTraceIDs(t *testing.T) {
 func TestRepeatedFieldsReplaceEachOther(t *testing.T) {
 	lines, raw := captureRaw(t, "debug")
 
-	ctx := logger.With(context.Background(), logger.WithField("incident.id", "inc-1"))
-	ctx = logger.With(ctx, logger.WithField("incident.id", "inc-2"))
+	ctx := telemetry.With(context.Background(), telemetry.WithField("incident.id", "inc-1"))
+	ctx = telemetry.With(ctx, telemetry.WithField("incident.id", "inc-2"))
 	logger.Info(ctx, "paging")
 
 	assert.Equal(t, "inc-2", lines()[0]["murphy.incident.id"])

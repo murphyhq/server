@@ -10,40 +10,48 @@ import (
 
 	"github.com/murphyhq/server"
 	"github.com/murphyhq/server/internal/logger"
+	"github.com/murphyhq/server/internal/telemetry"
+	"github.com/murphyhq/server/internal/tracer"
 )
 
 type problem struct {
-	Title  string `json:"title"`
-	Status int    `json:"status"`
-	Detail string `json:"detail,omitempty"`
+	Title   string `json:"title"`
+	Status  int    `json:"status"`
+	Detail  string `json:"detail,omitempty"`
+	TraceID string `json:"trace_id,omitempty"`
 }
 
-func WriteProblem(w http.ResponseWriter, status int, detail string) {
+func WriteProblem(w http.ResponseWriter, r *http.Request, status int, detail string) {
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(problem{Title: http.StatusText(status), Status: status, Detail: detail})
+	_ = json.NewEncoder(w).Encode(problem{
+		Title:   http.StatusText(status),
+		Status:  status,
+		Detail:  detail,
+		TraceID: tracer.TraceID(r.Context()),
+	})
 }
 
-func BadRequest(w http.ResponseWriter, _ *http.Request, err error) {
-	WriteProblem(w, http.StatusBadRequest, err.Error())
+func BadRequest(w http.ResponseWriter, r *http.Request, err error) {
+	WriteProblem(w, r, http.StatusBadRequest, err.Error())
 }
 
 func WriteError(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
 	case errors.Is(err, murphy.ErrInvalid):
-		WriteProblem(w, http.StatusBadRequest, strings.ReplaceAll(err.Error(), "\n", "; "))
+		WriteProblem(w, r, http.StatusBadRequest, strings.ReplaceAll(err.Error(), "\n", "; "))
 	case errors.Is(err, murphy.ErrNotFound):
 		var notFound *murphy.NotFoundError
 		detail := ""
 		if errors.As(err, &notFound) {
 			detail = notFound.Error()
 		}
-		WriteProblem(w, http.StatusNotFound, detail)
+		WriteProblem(w, r, http.StatusNotFound, detail)
 	case errors.Is(err, murphy.ErrConflict):
-		WriteProblem(w, http.StatusConflict, "conflicts with an existing resource")
+		WriteProblem(w, r, http.StatusConflict, "conflicts with an existing resource")
 	default:
-		logger.Error(r.Context(), "request failed", logger.WithError(err))
-		WriteProblem(w, http.StatusInternalServerError, "")
+		logger.Error(r.Context(), "request failed", telemetry.WithError(err))
+		WriteProblem(w, r, http.StatusInternalServerError, "")
 	}
 }
 
@@ -66,43 +74,11 @@ func RejectUnknownParameters(spec *openapi3.T) func(http.Handler) http.Handler {
 			allowed := routes[r.Pattern]
 			for name := range r.URL.Query() {
 				if !allowed[name] {
-					WriteProblem(w, http.StatusBadRequest, "unknown query parameter "+name)
+					WriteProblem(w, r, http.StatusBadRequest, "unknown query parameter "+name)
 					return
 				}
 			}
 			next.ServeHTTP(w, r)
 		})
 	}
-}
-
-func problemsForUnmatched(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		next.ServeHTTP(&unmatchedWriter{ResponseWriter: w, request: r}, r)
-	})
-}
-
-type unmatchedWriter struct {
-	http.ResponseWriter
-	request  *http.Request
-	replaced bool
-}
-
-func (u *unmatchedWriter) WriteHeader(status int) {
-	if u.request.Pattern == "" && (status == http.StatusNotFound || status == http.StatusMethodNotAllowed) {
-		u.replaced = true
-		WriteProblem(u.ResponseWriter, status, "")
-		return
-	}
-	u.ResponseWriter.WriteHeader(status)
-}
-
-func (u *unmatchedWriter) Write(p []byte) (int, error) {
-	if u.replaced {
-		return len(p), nil
-	}
-	return u.ResponseWriter.Write(p)
-}
-
-func (u *unmatchedWriter) Unwrap() http.ResponseWriter {
-	return u.ResponseWriter
 }

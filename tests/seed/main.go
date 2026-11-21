@@ -8,6 +8,7 @@ import (
 	"github.com/murphyhq/server/client"
 	"github.com/murphyhq/server/internal/config"
 	"github.com/murphyhq/server/internal/logger"
+	"github.com/murphyhq/server/internal/telemetry"
 )
 
 type settings struct {
@@ -17,7 +18,7 @@ type settings struct {
 func main() {
 	ctx := context.Background()
 	if err := run(ctx); err != nil {
-		logger.Error(ctx, "seed failed", logger.WithError(err))
+		logger.Error(ctx, "seed failed", telemetry.WithError(err))
 		os.Exit(1)
 	}
 	logger.Info(ctx, "seeded")

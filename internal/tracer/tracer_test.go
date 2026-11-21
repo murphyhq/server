@@ -3,6 +3,7 @@ package tracer_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -12,7 +13,8 @@ import (
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 
-	"github.com/murphyhq/server/internal/logger"
+	"github.com/murphyhq/server"
+	"github.com/murphyhq/server/internal/telemetry"
 	"github.com/murphyhq/server/internal/tracer"
 )
 
@@ -77,12 +79,42 @@ func TestEndRecordsErrors(t *testing.T) {
 	assert.Equal(t, codes.Unset, got[1].Status().Code)
 }
 
+func (*service) Find(ctx context.Context) (err error) {
+	_, span := tracer.Span(ctx)
+	defer span.End(&err)
+	return fmt.Errorf("find incident: %w", &murphy.NotFoundError{Entity: "incident"})
+}
+
+func TestExpectedErrorsAreRecordedWithoutFailingTheSpan(t *testing.T) {
+	spans := record(t)
+
+	_ = (&service{}).Find(context.Background())
+
+	got := spans.GetSpans().Snapshots()
+	require.Len(t, got, 1)
+	assert.Equal(t, codes.Unset, got[0].Status().Code)
+	require.NotEmpty(t, got[0].Events())
+	assert.Equal(t, "exception", got[0].Events()[0].Name)
+}
+
+func TestStandardFieldsKeepTheirNames(t *testing.T) {
+	spans := record(t)
+
+	ctx := telemetry.With(context.Background(), telemetry.Standard("http.route", "/v1/services/{id}"), telemetry.WithField("service.id", "svc-1"))
+	_, span := tracer.Span(ctx)
+	span.End(nil)
+
+	got := attrs(spans.GetSpans().Snapshots()[0])
+	assert.Equal(t, "/v1/services/{id}", got["http.route"])
+	assert.Equal(t, "svc-1", got["murphy.service.id"])
+}
+
 func TestContextFieldsAppearOnEverySpan(t *testing.T) {
 	spans := record(t)
 
-	ctx := logger.With(context.Background(), logger.WithField("incident.id", "inc-1"))
+	ctx := telemetry.With(context.Background(), telemetry.WithField("incident.id", "inc-1"))
 	ctx, parent := tracer.Span(ctx)
-	ctx = logger.With(ctx, logger.WithField("escalation.step", 2))
+	ctx = telemetry.With(ctx, telemetry.WithField("escalation.step", 2))
 	_, child := tracer.Span(ctx)
 	child.End(nil)
 	parent.End(nil)
@@ -100,12 +132,12 @@ func TestSetAddsFieldsToTheRunningSpanAndWhatFollows(t *testing.T) {
 	spans := record(t)
 
 	ctx, parent := tracer.Span(context.Background())
-	ctx = parent.Set(ctx, logger.WithField("incident.id", "inc-1"))
+	ctx = parent.Set(ctx, telemetry.WithField("incident.id", "inc-1"))
 	_, child := tracer.Span(ctx)
 	child.End(nil)
 	parent.End(nil)
 
-	assert.Equal(t, "inc-1", logger.Fields(ctx)[0].Value)
+	assert.Equal(t, "inc-1", telemetry.Fields(ctx)[0].Value)
 	got := spans.GetSpans().Snapshots()
 	require.Len(t, got, 2)
 	assert.Equal(t, "inc-1", attrs(got[1])["murphy.incident.id"], "running span")
