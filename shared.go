@@ -3,7 +3,10 @@ package murphy
 import (
 	"errors"
 	"strings"
+	"time"
 	"uuid"
+
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 var (
@@ -35,6 +38,29 @@ func (e *NotFoundError) Error() string {
 
 func (e *NotFoundError) Is(target error) bool {
 	return target == ErrNotFound
+}
+
+func NewID() string {
+	return uuid.NewV7().String()
+}
+
+func Now() *timestamppb.Timestamp {
+	return timestamppb.New(time.Now().UTC().Truncate(time.Microsecond))
+}
+
+func LookupID(entity, id string) error {
+	if _, err := uuid.Parse(id); err != nil {
+		return &NotFoundError{Entity: entity}
+	}
+	return nil
+}
+
+func Or[T comparable](value, fallback T) T {
+	var zero T
+	if value == zero {
+		return fallback
+	}
+	return value
 }
 
 func invalid(field, reason string) error {
