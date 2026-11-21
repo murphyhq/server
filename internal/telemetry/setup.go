@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net/http"
 	"os"
 	"runtime/debug"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"go.opentelemetry.io/contrib/bridges/otelslog"
 	"go.opentelemetry.io/otel"
@@ -44,9 +46,11 @@ func Setup(ctx context.Context, component, level string, stdout io.Writer) (func
 		return nil, fmt.Errorf("describe telemetry resource: %w", err)
 	}
 
+	client := exportClient()
+
 	tracerOptions := []sdktrace.TracerProviderOption{sdktrace.WithResource(res)}
 	if exporting("TRACES") {
-		exporter, err := otlptracehttp.New(ctx)
+		exporter, err := otlptracehttp.New(ctx, otlptracehttp.WithHTTPClient(client))
 		if err != nil {
 			return nil, fmt.Errorf("create trace exporter: %w", err)
 		}
@@ -55,7 +59,7 @@ func Setup(ctx context.Context, component, level string, stdout io.Writer) (func
 
 	meterOptions := []sdkmetric.Option{sdkmetric.WithResource(res)}
 	if exporting("METRICS") {
-		exporter, err := otlpmetrichttp.New(ctx)
+		exporter, err := otlpmetrichttp.New(ctx, otlpmetrichttp.WithHTTPClient(client))
 		if err != nil {
 			return nil, fmt.Errorf("create metric exporter: %w", err)
 		}
@@ -64,7 +68,7 @@ func Setup(ctx context.Context, component, level string, stdout io.Writer) (func
 
 	loggerOptions := []sdklog.LoggerProviderOption{sdklog.WithResource(res)}
 	if exporting("LOGS") {
-		exporter, err := otlploghttp.New(ctx)
+		exporter, err := otlploghttp.New(ctx, otlploghttp.WithHTTPClient(client))
 		if err != nil {
 			return nil, fmt.Errorf("create log exporter: %w", err)
 		}
@@ -84,6 +88,11 @@ func Setup(ctx context.Context, component, level string, stdout io.Writer) (func
 		slog.String("service.name", serviceName(res, component)),
 		slog.String("service.version", version()),
 	})
+	failures := slog.New(levelHandler{Handler: stdoutHandler, minimum: minimum})
+	otel.SetErrorHandler(otel.ErrorHandlerFunc(func(err error) {
+		failures.Warn("telemetry export failed", "murphy.error", err.Error())
+	}))
+
 	logs := &logState{stdout: stdoutHandler, provider: loggers, minimum: minimum}
 	current.Store(logs)
 	slog.SetDefault(logs.logger(instrumentation))
@@ -91,6 +100,12 @@ func Setup(ctx context.Context, component, level string, stdout io.Writer) (func
 	return func(ctx context.Context) error {
 		return errors.Join(tracers.Shutdown(ctx), meters.Shutdown(ctx), loggers.Shutdown(ctx))
 	}, nil
+}
+
+func exportClient() *http.Client {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.IdleConnTimeout = 30 * time.Second
+	return &http.Client{Transport: transport}
 }
 
 func exporting(signal string) bool {
