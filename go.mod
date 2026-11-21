@@ -35,7 +35,7 @@ require (
 	go.opentelemetry.io/otel/sdk/log v1.47.0
 	go.opentelemetry.io/otel/sdk/metric v1.47.0
 	go.opentelemetry.io/otel/trace v1.47.0
-	google.golang.org/protobuf v1.36.13-0.20261016172727-e9ee2a76ab8e
+	google.golang.org/protobuf v1.37.0-rc.1
 )
 
 require (
