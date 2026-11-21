@@ -1,6 +1,6 @@
 # Architecture overview
 
-Murphy is a set of small components that talk through a message broker and share a database.
+Murphy is a set of small components that talk through a message broker and keep their state in databases.
 
 ```mermaid
 flowchart LR
@@ -31,6 +31,7 @@ flowchart LR
 
     subgraph data [Data]
       db[(database)]
+      kv[(key-value store)]
     end
   end
 
@@ -47,6 +48,7 @@ flowchart LR
   broker <--> notifier
 
   api --> db
+  api --> kv
   engine --> db
   scheduler --> db
 
@@ -55,7 +57,7 @@ flowchart LR
   classDef infra fill:#fdf0d5,stroke:#b7791f,color:#3d2a06
   class mon,providers_in,clients,providers_out outside
   class ingest,api,scheduler,engine,notifier component
-  class broker,db infra
+  class broker,db,kv infra
 
   style external fill:none,stroke:#9ca3af,stroke-dasharray:4 3
   style murphy fill:none,stroke:#3b6fb6
@@ -93,9 +95,11 @@ Applies database schema changes. It runs once before the other components start,
 
 ## Infrastructure
 
-Murphy depends on what it needs from a message broker and a database, never on a specific product. Each product is an implementation chosen by configuration, and every implementation passes the same test suite against the real service. Supporting another product means adding an implementation that passes it, without touching the components.
+Murphy depends on what it needs from a message broker, a database and a key-value store, never on a specific product. Each product is an implementation chosen by configuration, and every implementation passes the same test suite against the real service. Supporting another product means adding an implementation that passes it, without touching the components.
 
 The message broker keeps every message until it is processed, delivers it at least once, keeps one incident's messages in order, and can hand the same message to several consumers. It never has to delay a message, because timers live in the database. The implementations are SNS with SQS, and NATS JetStream.
+
+A key-value store keeps the `Idempotency-Key` of every request that creates something, with its response, for 24 hours, so `api` answers a retry without doing the work twice. The implementation is Redis.
 
 The database provides transactions, so changes that belong together are applied together, and row locking, so two `scheduler` instances never claim the same timer. The implementation is PostgreSQL.
 
