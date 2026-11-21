@@ -22,7 +22,7 @@ func main() {
 
 func run(ctx context.Context) error {
 	var s settings
-	if err := config.Load(ctx, &s); err != nil {
+	if err := config.Load(&s); err != nil {
 		return err
 	}
 	return lifecycle.Run(ctx, s.Lifecycle, lifecycle.UntilStopped)

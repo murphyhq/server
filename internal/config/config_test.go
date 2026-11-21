@@ -1,9 +1,6 @@
 package config_test
 
 import (
-	"context"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -16,20 +13,12 @@ type nested struct {
 }
 
 type settings struct {
-	Name    string        `env:"NAME" required:"true"`
-	Port    int           `env:"PORT" default:"8080"`
-	Debug   bool          `env:"DEBUG"`
-	Timeout time.Duration `env:"TIMEOUT" default:"5s"`
-	Token   string        `env:"TOKEN" secret:"true"`
-	Plain   string        `env:"PLAIN"`
-	Nested  nested
-}
-
-func load(t *testing.T) (settings, error) {
-	t.Helper()
-	var s settings
-	err := config.Load(context.Background(), &s)
-	return s, err
+	Name     string        `env:"NAME" required:"true"`
+	Port     int           `env:"PORT" default:"8080"`
+	Debug    bool          `env:"DEBUG"`
+	Timeout  time.Duration `env:"TIMEOUT" default:"5s"`
+	Password string        `env:"PASSWORD"`
+	Nested   nested
 }
 
 func TestLoadAppliesValuesAndDefaults(t *testing.T) {
@@ -37,8 +26,8 @@ func TestLoadAppliesValuesAndDefaults(t *testing.T) {
 	t.Setenv("MURPHY_DEBUG", "true")
 	t.Setenv("MURPHY_ADDR", ":9000")
 
-	s, err := load(t)
-	if err != nil {
+	var s settings
+	if err := config.Load(&s); err != nil {
 		t.Fatalf("load: %v", err)
 	}
 	if s.Name != "murphy" || !s.Debug || s.Nested.Addr != ":9000" {
@@ -53,7 +42,8 @@ func TestLoadReportsEveryProblem(t *testing.T) {
 	t.Setenv("MURPHY_PORT", "eighty")
 	t.Setenv("MURPHY_TIMEOUT", "soon")
 
-	_, err := load(t)
+	var s settings
+	err := config.Load(&s)
 	if err == nil {
 		t.Fatal("expected an error")
 	}
@@ -64,76 +54,23 @@ func TestLoadReportsEveryProblem(t *testing.T) {
 	}
 }
 
-func TestLoadResolvesEnvReferences(t *testing.T) {
+func TestLoadNeverPutsValuesInErrors(t *testing.T) {
 	t.Setenv("MURPHY_NAME", "murphy")
-	t.Setenv("MURPHY_TOKEN", "env://REAL_TOKEN")
-	t.Setenv("REAL_TOKEN", "s3cr3t")
+	t.Setenv("MURPHY_PORT", "s3cr3t")
 
-	s, err := load(t)
-	if err != nil {
-		t.Fatalf("load: %v", err)
-	}
-	if s.Token != "s3cr3t" {
-		t.Errorf("token = %q, want the referenced value", s.Token)
-	}
-}
-
-func TestLoadResolvesFileReferences(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "token")
-	if err := os.WriteFile(path, []byte("s3cr3t\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	t.Setenv("MURPHY_NAME", "murphy")
-	t.Setenv("MURPHY_TOKEN", "file://"+path)
-
-	s, err := load(t)
-	if err != nil {
-		t.Fatalf("load: %v", err)
-	}
-	if s.Token != "s3cr3t" {
-		t.Errorf("token = %q, want the file content without its trailing newline", s.Token)
-	}
-}
-
-func TestLoadRejectsSecretsThatAreNotReferences(t *testing.T) {
-	t.Setenv("MURPHY_NAME", "murphy")
-	t.Setenv("MURPHY_TOKEN", "s3cr3t")
-
-	_, err := load(t)
+	var s settings
+	err := config.Load(&s)
 	if err == nil {
 		t.Fatal("expected an error")
 	}
 	if strings.Contains(err.Error(), "s3cr3t") {
-		t.Errorf("error %q leaks the secret value", err)
-	}
-}
-
-func TestLoadRejectsUnknownSchemes(t *testing.T) {
-	t.Setenv("MURPHY_NAME", "murphy")
-	t.Setenv("MURPHY_TOKEN", "vault://secret/token")
-
-	_, err := load(t)
-	if err == nil || !strings.Contains(err.Error(), `unsupported secret reference scheme "vault"`) {
-		t.Errorf("error = %v, want an unsupported scheme error", err)
-	}
-}
-
-func TestLoadLeavesNonSecretFieldsAsTheyAre(t *testing.T) {
-	t.Setenv("MURPHY_NAME", "murphy")
-	t.Setenv("MURPHY_PLAIN", "env://NOT_A_REFERENCE")
-
-	s, err := load(t)
-	if err != nil {
-		t.Fatalf("load: %v", err)
-	}
-	if s.Plain != "env://NOT_A_REFERENCE" {
-		t.Errorf("plain = %q, want it unchanged", s.Plain)
+		t.Errorf("error %q contains the value", err)
 	}
 }
 
 func TestLoadRequiresAPointerToAStruct(t *testing.T) {
 	var s settings
-	if err := config.Load(context.Background(), s); err == nil {
+	if err := config.Load(s); err == nil {
 		t.Error("expected an error for a non-pointer destination")
 	}
 }
