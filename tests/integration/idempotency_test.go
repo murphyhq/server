@@ -17,7 +17,7 @@ import (
 )
 
 func TestRedisIdempotencyStore(t *testing.T) {
-	store, err := redis.Open(testenv.RedisURL())
+	store, err := redis.Open(t.Context(), testenv.RedisURL())
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = store.Close() })
 	storetest.Run(t, store)

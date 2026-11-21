@@ -20,7 +20,7 @@ type Store struct {
 	client *goredis.Client
 }
 
-func Open(url string) (*Store, error) {
+func Open(_ context.Context, url string) (*Store, error) {
 	client, err := redis.Open(redis.Config{URL: url})
 	if err != nil {
 		return nil, err

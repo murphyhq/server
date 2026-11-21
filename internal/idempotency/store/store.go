@@ -15,11 +15,11 @@ type Store interface {
 	Close() error
 }
 
-func Open(url string) (Store, error) {
+func Open(ctx context.Context, url string) (Store, error) {
 	scheme, _, _ := strings.Cut(url, "://")
 	switch scheme {
 	case "redis", "rediss":
-		return redis.Open(url)
+		return redis.Open(ctx, url)
 	default:
 		return nil, errors.New("unsupported store")
 	}

@@ -42,7 +42,7 @@ func run(ctx context.Context) error {
 	}
 	defer catalogStorage.Close()
 
-	keys, err := idempotencystore.Open(s.IdempotencyStoreURL)
+	keys, err := idempotencystore.Open(ctx, s.IdempotencyStoreURL)
 	if err != nil {
 		return fmt.Errorf("MURPHY_IDEMPOTENCY_STORE_URL: %w", err)
 	}

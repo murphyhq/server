@@ -40,7 +40,7 @@ Databases, message brokers and notification providers are interchangeable. Addin
 1. A new implementation MUST implement an existing interface.
 2. Its client MUST live in `internal/`, and the implementation next to the interface's other implementations.
 3. It MUST pass the interface's shared test suite unchanged, against the real service in a container or an emulator.
-4. It MUST be chosen by the scheme of its URL (`postgres://`, `redis://`), in one `Open` next to the interface's implementations. Components MUST pass that URL in and MUST NOT name an implementation, so adding one changes no component.
+4. It MUST be chosen by the scheme of its URL (`postgres://`, `redis://`), in one `Open(ctx, url)` next to the interface's implementations; every implementation's `Open` takes the same parameters, even when it does no I/O yet. Components MUST pass that URL in and MUST NOT name an implementation, so adding one changes no component.
 5. Every external endpoint it uses MUST be configurable, and its setting MUST be named after its purpose, never its product (`MURPHY_CATALOG_DATABASE_URL`, not `MURPHY_POSTGRES_URL`).
 
 ## Configuration and lifecycle
