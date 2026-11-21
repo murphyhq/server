@@ -4,7 +4,6 @@ package integration
 
 import (
 	"net/http"
-	"net/http/httptest"
 	"testing"
 	"uuid"
 
@@ -12,16 +11,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/murphyhq/server/client"
-	"github.com/murphyhq/server/cmd/api/router"
-	"github.com/murphyhq/server/internal/httpserver"
-	idempotencystore "github.com/murphyhq/server/internal/idempotency/store"
-	"github.com/murphyhq/server/services/catalog"
-	catalogdb "github.com/murphyhq/server/services/catalog/db"
 	"github.com/murphyhq/server/tests/testenv"
 )
 
 func TestCatalogServicesAndIntegrations(t *testing.T) {
-	api, _ := startAPI(t)
+	api, _ := testenv.API(t)
 	ctx := t.Context()
 
 	created, err := api.CreateServiceWithResponse(ctx, nil, newService("checkout-api"))
@@ -58,7 +52,7 @@ func TestCatalogServicesAndIntegrations(t *testing.T) {
 }
 
 func TestCatalogListsServicesNewestFirst(t *testing.T) {
-	api, _ := startAPI(t)
+	api, _ := testenv.API(t)
 	ctx := t.Context()
 
 	var ids []string
@@ -88,7 +82,7 @@ func TestCatalogListsServicesNewestFirst(t *testing.T) {
 }
 
 func TestCatalogRejectsInvalidRequests(t *testing.T) {
-	api, base := startAPI(t)
+	api, base := testenv.API(t)
 	ctx := t.Context()
 
 	medium := client.Urgency("medium")
@@ -106,7 +100,7 @@ func TestCatalogRejectsInvalidRequests(t *testing.T) {
 }
 
 func TestCatalogNotFoundResponses(t *testing.T) {
-	api, base := startAPI(t)
+	api, base := testenv.API(t)
 	ctx := t.Context()
 
 	missing, err := api.CreateIntegrationWithResponse(ctx, uuid.NewV7().String(), nil, client.IntegrationCreate{Name: "x", Type: client.Generic})
@@ -130,30 +124,6 @@ func TestCatalogNotFoundResponses(t *testing.T) {
 		assert.Equal(t, request.status, resp.StatusCode, request.path)
 		assert.Equal(t, "application/problem+json", resp.Header.Get("Content-Type"), request.path)
 	}
-}
-
-func startAPI(t *testing.T) (*client.ClientWithResponses, string) {
-	ctx := t.Context()
-
-	storage, err := catalogdb.Open(ctx, testenv.Database(t))
-	require.NoError(t, err)
-	t.Cleanup(storage.Close)
-	require.NoError(t, storage.Migrate(ctx))
-
-	keys, err := idempotencystore.Open(ctx, testenv.RedisURL())
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = keys.Close() })
-
-	routes, err := router.New(catalog.New(storage), keys)
-	require.NoError(t, err)
-	handler, err := httpserver.Handler(routes)
-	require.NoError(t, err)
-	server := httptest.NewServer(handler)
-	t.Cleanup(server.Close)
-
-	api, err := client.NewClientWithResponses(server.URL)
-	require.NoError(t, err)
-	return api, server.URL
 }
 
 func newService(name string) client.ServiceInput {

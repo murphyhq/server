@@ -24,7 +24,7 @@ func TestRedisIdempotencyStore(t *testing.T) {
 }
 
 func TestCreatesAreIdempotent(t *testing.T) {
-	api, _ := startAPI(t)
+	api, _ := testenv.API(t)
 	ctx := t.Context()
 	key := &client.CreateServiceParams{IdempotencyKey: new(uuid.NewV4().String())}
 	input := newService("checkout-api")

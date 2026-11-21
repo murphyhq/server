@@ -13,7 +13,7 @@ Every piece of code has one obvious place, so anyone can find it and nothing lea
 | root package `murphy` | Domain types generated from `proto/`, and hand-written methods on them |
 | `services/<domain>/` | One service per domain: its business logic, the interfaces it needs, and its storage under `db/`, one folder per engine |
 | `internal/` | Thin clients and helpers with no domain logic: connections, provider clients, configuration loading, telemetry, serving HTTP |
-| `cmd/<component>/` | One executable per component: `main.go`, its `config/`, and its entry code (HTTP routes or message handlers) |
+| `cmd/<component>/` | One executable per component: `main.go`, its `app/` (its settings and wiring), and its entry code (HTTP routes or message handlers) |
 | `openapi/` | OpenAPI specs |
 | `proto/` | Protobuf definitions of the domain entities and the messages that carry them |
 | `client/` | Go client generated from the OpenAPI specs |
@@ -31,7 +31,7 @@ A service owns one domain. It states what it needs as interfaces, so the same lo
 1. A service MUST declare the interfaces it needs next to the code that uses them.
 2. Interfaces MUST describe what the service needs in domain terms (acknowledge an incident), never a generic capability (run a query).
 3. A service's repository MUST live in the service's `db/<engine>/` folder and use only the service's own queries and generated code.
-4. A component's `main.go` MUST build the clients from `internal/`, pass them into repositories and services, and start the component's entry code. Nothing else wires dependencies.
+4. A component's `app` MUST build its clients, repositories and services from its settings, and its `main.go` MUST only load configuration and run it. Nothing else wires dependencies: tests use the same `app`, so they run the wiring production runs.
 
 ## Implementations
 
