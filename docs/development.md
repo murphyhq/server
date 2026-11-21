@@ -11,7 +11,7 @@ Every piece of code has one obvious place, so anyone can find it and nothing lea
 | Path | Contains |
 |---|---|
 | root package `murphy` | Domain types generated from `proto/`, and hand-written methods on them |
-| `services/<domain>/` | One service per domain: its business logic, the interfaces it needs, and its storage under `db/`: `db/db.go` opens the engine its URL names, and `db/<engine>/` holds that engine's migrations, queries, generated code and repository |
+| `services/<domain>/` | One service per domain: its business logic, the interfaces it needs, and its storage under `db/`, one folder per engine |
 | `internal/` | Thin clients and helpers with no domain logic: connections, provider clients, configuration loading, telemetry, serving HTTP |
 | `cmd/<component>/` | One executable per component: `main.go`, its `config/`, and its entry code (HTTP routes or message handlers) |
 | `openapi/` | OpenAPI specs |
@@ -40,7 +40,7 @@ Databases, message brokers and notification providers are interchangeable. Addin
 1. A new implementation MUST implement an existing interface.
 2. Its client MUST live in `internal/`, and the implementation next to the interface's other implementations.
 3. It MUST pass the interface's shared test suite unchanged, against the real service in a container or an emulator.
-4. It MUST be chosen by the scheme of its URL (`postgres://`, `redis://`), in one `Open(ctx, url)` next to the interface's implementations; every implementation's `Open` takes the same parameters, even when it does no I/O yet. Components MUST pass that URL in and MUST NOT name an implementation, so adding one changes no component.
+4. It MUST be chosen by the scheme of its URL (`postgres://`, `redis://`). Components MUST pass that URL in and MUST NOT name an implementation, so adding one changes no component.
 5. Every external endpoint it uses MUST be configurable, and its setting MUST be named after its purpose, never its product (`MURPHY_CATALOG_DATABASE_URL`, not `MURPHY_POSTGRES_URL`).
 
 ## Configuration and lifecycle
@@ -86,7 +86,7 @@ A page must never be lost or sent twice. The broker delivers at least once and a
 Murphy is a modular monolith: services share one database, and each service owns its tables. Ownership keeps services independent; the rules on migrations keep upgrades safe while old and new components run side by side.
 
 1. Each domain MUST have its own database. Its URL is configured in the component that hosts the domain (`MURPHY_<DOMAIN>_DATABASE_URL`) and passed to the domain's `db.Open`, which never reads configuration itself. Every database a component uses MUST be part of its readiness check.
-2. A service's storage for an engine MUST live in `services/<domain>/db/<engine>/`: its migrations, its queries, the code generated from them and its repository, which also applies the migrations and reports readiness.
+2. A service's storage for an engine MUST live in `services/<domain>/db/<engine>/`: its migrations, its queries, the code generated from them and its repository.
 3. Only the owning service MUST read or write its tables. Other services MUST reach that data through the owning service, never through SQL.
 4. Services MUST refer to each other's data by ID. There MUST NOT be foreign keys between tables of different services.
 5. A transaction MUST NOT span services. Anything that must change in one transaction belongs to one service; services coordinate through events.
@@ -109,8 +109,8 @@ The API is the public way to build on Murphy, so its behaviour is predictable ac
 4. Lists MUST come in a stable order, newest first unless the endpoint documents otherwise.
 5. Filters MUST be query parameters named after the field they filter (`status=triggered`). A repeated parameter matches any of its values, and time ranges MUST use `<field>_after` and `<field>_before`.
 6. Unknown parameters MUST be rejected, never ignored.
-7. Errors MUST be answered as `application/problem+json`, through `internal/httpserver`, and MUST NOT expose internal details. Unexpected failures MUST be logged and answered with `500`.
-8. Every request that creates something or triggers an action MUST accept an `Idempotency-Key` header, handled by `internal/idempotency`. A retry with the same key and the same request MUST return the original response without doing the work again; the same key with a different request MUST be rejected. Keys MUST be kept for 24 hours.
+7. Errors MUST be answered as `application/problem+json` and MUST NOT expose internal details. Unexpected failures MUST be logged and answered with `500`.
+8. Every request that creates something or triggers an action MUST accept an `Idempotency-Key` header. A retry with the same key and the same request MUST return the original response without doing the work again; the same key with a different request MUST be rejected. Keys MUST be kept for 24 hours.
 
 ## Tracing, logs and metrics
 
@@ -143,7 +143,7 @@ Every kind of failure Murphy guards against is tested, without changing the code
 
 1. Tests MUST get their infrastructure from `compose.yaml`, locally and in CI, so they always run against the same versions and settings as development. `tests/testenv/` MUST provide the rest of the test environment: components started from configuration, stub notification providers (they record what was sent, fail on demand and send callbacks), and traffic generators that send alerts in each monitoring tool's format.
 2. Tests MUST change behaviour only through configuration. Components MUST NOT contain test-only code paths.
-3. Interfaces MUST be mocked with `testify/mock` mocks generated by `mockery` (configured in `.mockery.yaml`) into a `mocks_test.go` next to the tests. Tests MUST check outcomes (what was returned, what reached a dependency), not restate how the code is implemented.
+3. Interfaces MUST be mocked with generated mocks. Tests MUST check outcomes (what was returned, what reached a dependency), not restate how the code is implemented.
 4. Tests MUST use `testify`: `require` for anything the rest of the test depends on, `assert` for the checks themselves.
 5. Every consumer MUST have tests for a crash between each step of its delivery handling.
 6. `tests/seed/` MUST give a fresh local stack realistic data, created only through the API and safe to run again. Every domain MUST add its data there in the PR that adds the domain.
@@ -155,11 +155,11 @@ Every kind of failure Murphy guards against is tested, without changing the code
 2. `context.Context` MUST be the first parameter of anything that does I/O.
 3. Errors MUST be wrapped with what was being done.
 4. Secrets MUST NOT appear in logs or errors.
-5. OpenAPI specs, Protobuf definitions and SQL queries MUST change first, followed by regeneration with `buf generate`, `sqlc generate`, `mockery` and `oapi-codegen` (configured at the repository root). Generated code MUST be committed and MUST NOT be edited by hand; CI fails when it is out of date.
+5. OpenAPI specs, Protobuf definitions and SQL queries MUST change first, followed by regeneration. Generated code MUST be committed and MUST NOT be edited by hand.
 
 ## Tooling
 
-1. The Go toolchain MUST be pinned with the `toolchain` directive, and tools (`sqlc`, `oapi-codegen`, `buf`, `protoc-gen-go`, `mockery`, `goose`, `govulncheck`) with `tool` directives in `go.mod`, all on their latest stable versions. `ko` is pinned the same way in its own module, `tools/ko/go.mod`, because its dependencies conflict with the other tools'.
+1. The Go toolchain MUST be pinned with the `toolchain` directive, and tools (`sqlc`, `oapi-codegen`, `buf`, `protoc-gen-go`, `mockery`, `goose`, `ko`, `govulncheck`) with `tool` directives, all on their latest stable versions.
 2. `gofmt`, `go vet`, `golangci-lint`, `buf lint` and `govulncheck` MUST pass.
 3. `compose.yaml` MUST provide every service the components depend on (PostgreSQL, Redis, NATS, LocalStack, and Grafana's LGTM stack for telemetry at `localhost:3000`), MUST create every domain's database on every start, and MUST run every component from source in its `murphy` profile: `docker compose up` starts the services only, `docker compose --profile murphy up` starts everything, and `docker compose --profile murphy watch` also restarts the components when code changes.
 4. Container images MUST be built with `ko`, one per component, from `.ko.yaml`. The release workflow publishes them to `ghcr.io/murphyhq/<component>` for every `v*` tag.
