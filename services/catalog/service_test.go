@@ -6,6 +6,7 @@ import (
 	"uuid"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 
@@ -14,7 +15,13 @@ import (
 )
 
 func TestCreateServiceAppliesDefaults(t *testing.T) {
-	repo := newFakeRepository()
+	repo := NewMockRepository(t)
+	var stored *murphy.Service
+	repo.EXPECT().CreateService(mock.Anything, mock.Anything).RunAndReturn(func(_ context.Context, service *murphy.Service) error {
+		stored = service
+		return nil
+	})
+
 	service, err := catalog.New(repo).CreateService(t.Context(), validService())
 	require.NoError(t, err)
 
@@ -22,50 +29,59 @@ func TestCreateServiceAppliesDefaults(t *testing.T) {
 	assert.Equal(t, murphy.ServiceStatus_SERVICE_STATUS_ACTIVE, service.GetStatus())
 	assert.NotEmpty(t, service.GetId())
 	assert.NotNil(t, service.GetCreatedAt())
-	assert.True(t, proto.Equal(service, repo.services[service.GetId()]))
+	assert.True(t, proto.Equal(service, stored))
 }
 
 func TestCreateServiceRejectsInvalidInput(t *testing.T) {
-	repo := newFakeRepository()
+	repo := NewMockRepository(t)
+
 	_, err := catalog.New(repo).CreateService(t.Context(), &murphy.Service{TeamId: "not-a-uuid"})
 
 	require.ErrorIs(t, err, murphy.ErrInvalid)
 	for _, field := range []string{"name", "team_id", "escalation_policy_id"} {
 		assert.ErrorContains(t, err, field)
 	}
-	assert.Empty(t, repo.services)
 }
 
 func TestUpdateServiceKeepsIdentityAndUnsetFields(t *testing.T) {
-	repo := newFakeRepository()
-	svc := catalog.New(repo)
-	in := validService()
-	in.Urgency = murphy.Urgency_URGENCY_LOW
-	created, err := svc.CreateService(t.Context(), in)
-	require.NoError(t, err)
+	repo := NewMockRepository(t)
+	current := validService()
+	current.Id = murphy.NewID()
+	current.Urgency = murphy.Urgency_URGENCY_LOW
+	current.Status = murphy.ServiceStatus_SERVICE_STATUS_ACTIVE
+	current.CreatedAt = murphy.Now()
+	repo.EXPECT().GetService(mock.Anything, current.GetId()).Return(current, nil)
+	var stored *murphy.Service
+	repo.EXPECT().UpdateService(mock.Anything, mock.Anything).RunAndReturn(func(_ context.Context, service *murphy.Service) error {
+		stored = service
+		return nil
+	})
 
 	update := validService()
-	update.Id = created.GetId()
+	update.Id = current.GetId()
 	update.Name = "payments-api"
-	updated, err := svc.UpdateService(t.Context(), update)
+	updated, err := catalog.New(repo).UpdateService(t.Context(), update)
 	require.NoError(t, err)
 
 	assert.Equal(t, "payments-api", updated.GetName())
 	assert.Equal(t, murphy.Urgency_URGENCY_LOW, updated.GetUrgency())
-	assert.True(t, proto.Equal(created.GetCreatedAt(), updated.GetCreatedAt()))
-	assert.True(t, proto.Equal(updated, repo.services[created.GetId()]))
+	assert.True(t, proto.Equal(current.GetCreatedAt(), updated.GetCreatedAt()))
+	assert.True(t, proto.Equal(updated, stored))
 }
 
 func TestCreateIntegrationRequiresExistingService(t *testing.T) {
-	repo := newFakeRepository()
+	repo := NewMockRepository(t)
+	serviceID := murphy.NewID()
+	repo.EXPECT().GetService(mock.Anything, serviceID).Return(nil, &murphy.NotFoundError{Entity: "service"})
+
 	_, err := catalog.New(repo).CreateIntegration(t.Context(), &murphy.Integration{
-		ServiceId: uuid.NewV7().String(),
+		ServiceId: serviceID,
 		Name:      "alertmanager",
 		Type:      murphy.IntegrationType_INTEGRATION_TYPE_ALERTMANAGER,
 	})
 
 	require.ErrorIs(t, err, murphy.ErrNotFound)
-	assert.Empty(t, repo.integrations)
+	assert.ErrorContains(t, err, "service not found")
 }
 
 func validService() *murphy.Service {
@@ -74,70 +90,4 @@ func validService() *murphy.Service {
 		TeamId:             uuid.NewV7().String(),
 		EscalationPolicyId: uuid.NewV7().String(),
 	}
-}
-
-type fakeRepository struct {
-	services     map[string]*murphy.Service
-	integrations map[string]*murphy.Integration
-}
-
-func newFakeRepository() *fakeRepository {
-	return &fakeRepository{services: map[string]*murphy.Service{}, integrations: map[string]*murphy.Integration{}}
-}
-
-func (f *fakeRepository) CreateService(_ context.Context, service *murphy.Service) error {
-	f.services[service.GetId()] = service
-	return nil
-}
-
-func (f *fakeRepository) GetService(_ context.Context, id string) (*murphy.Service, error) {
-	service, ok := f.services[id]
-	if !ok {
-		return nil, murphy.ErrNotFound
-	}
-	return service, nil
-}
-
-func (f *fakeRepository) ListServices(context.Context, string, int) ([]*murphy.Service, error) {
-	return nil, nil
-}
-
-func (f *fakeRepository) UpdateService(_ context.Context, service *murphy.Service) error {
-	if _, ok := f.services[service.GetId()]; !ok {
-		return murphy.ErrNotFound
-	}
-	f.services[service.GetId()] = service
-	return nil
-}
-
-func (f *fakeRepository) DeleteService(_ context.Context, id string) error {
-	delete(f.services, id)
-	return nil
-}
-
-func (f *fakeRepository) CreateIntegration(_ context.Context, integration *murphy.Integration) error {
-	f.integrations[integration.GetId()] = integration
-	return nil
-}
-
-func (f *fakeRepository) GetIntegration(_ context.Context, id string) (*murphy.Integration, error) {
-	integration, ok := f.integrations[id]
-	if !ok {
-		return nil, murphy.ErrNotFound
-	}
-	return integration, nil
-}
-
-func (f *fakeRepository) ListIntegrations(context.Context, string, string, int) ([]*murphy.Integration, error) {
-	return nil, nil
-}
-
-func (f *fakeRepository) UpdateIntegration(_ context.Context, integration *murphy.Integration) error {
-	f.integrations[integration.GetId()] = integration
-	return nil
-}
-
-func (f *fakeRepository) DeleteIntegration(_ context.Context, id string) error {
-	delete(f.integrations, id)
-	return nil
 }
