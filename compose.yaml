@@ -24,9 +24,8 @@ x-component: &component
       condition: service_healthy
   develop:
     watch:
-      - action: sync+restart
+      - action: restart
         path: .
-        target: /src
         ignore:
           - .git/
 

@@ -116,18 +116,19 @@ The API is the public way to build on Murphy, so its behaviour is predictable ac
 
 Every page must be explainable afterwards: what happened, in which order, and why. Murphy traces its own work, continues the traces it receives, and measures how it performs.
 
-1. Every unit of work MUST be traced with `internal/tracer`: handling a request, a message or a timer, a database query, and every call to another system. Functions that run for the life of the process, such as a component's main loop, and health checks are not traced themselves.
-2. Span names MUST come from the function name, never typed by hand.
-3. A function's error MUST be recorded on its span, and the span marked as failed.
-4. Logs MUST be written with `internal/logger`, and every log line MUST carry the current trace and span IDs.
-5. Fields MUST describe what is being worked on, and MUST NOT contain secrets or contact details. Murphy's prefix is added automatically (`incident.id` becomes `murphy.incident.id`).
-6. Fields that apply to everything below a point, such as the incident being handled, MUST be added to the context once: with `logger.With` before a span starts, or with the span's `Set` once the value is known. They then appear on every log line and span beneath it, and a field added again with the same key replaces the earlier one.
-7. Metrics MUST be recorded with `internal/metrics`. Their dimensions MUST be passed explicitly and MUST have few possible values (a channel, a provider), never per-item values such as an incident ID; context fields are never added to metrics.
+1. Protocols MUST be traced by their standard OpenTelemetry instrumentation: every incoming request, every database query, and every call to Redis, a broker or another service. Business logic MUST be traced with `internal/tracer`: every service method, and every message or timer a component handles. Functions that run for the life of the process and health checks are not traced.
+2. Our span names MUST come from the function name, never typed by hand. Instrumented spans follow OpenTelemetry's conventions (`GET /v1/services/{id}`).
+3. A function's error MUST be recorded on its span. Only unexpected errors mark the span as failed: invalid input, something not found and conflicts are expected outcomes, and HTTP requests fail only with a `5xx`.
+4. Logs MUST be written with `internal/logger`, and every log line MUST carry the current trace and span IDs. Every HTTP request MUST be logged once, with its method, route, status and duration.
+5. Fields MUST describe what is being worked on, and MUST NOT contain secrets or contact details. Murphy's prefix is added to our own fields (`service.id` becomes `murphy.service.id`); standard OpenTelemetry attributes keep their names (`http.route`).
+6. Fields that apply to everything below a point, such as the incident being handled, MUST be added to the context once: with `telemetry.With` before a span starts, or with the span's `Set` once the value is known. They then appear on every log line and span beneath it, and a field added again with the same key replaces the earlier one.
+7. Metrics MUST be recorded with `internal/metrics` or come from instrumentation. Their dimensions MUST have few possible values (a route, a channel, a provider), never per-item values such as an incident ID; context fields are never added to metrics.
 8. Incoming requests and messages MUST continue the caller's trace, and outgoing calls and published messages MUST carry it on.
-9. Traces, metrics and logs MUST be exported over OTLP when an endpoint is configured. Without one, nothing is exported and the component runs normally.
-10. Everything a component emits MUST carry its name and version (`service.name`, `service.version`). The version comes from the build: the release tag, or a pseudo-version for untagged builds.
-11. The log level MUST be set with `MURPHY_LOG_LEVEL` (`debug`, `info`, `warn` or `error`; `info` by default), and applies to every log destination.
-12. Only `internal/logger`, `internal/tracer`, `internal/metrics` and `internal/telemetry` MAY import OpenTelemetry packages or `log/slog`. Everything else uses their APIs.
+9. Every HTTP response MUST carry its trace ID (`X-Trace-Id` and `traceresponse`), and every error body MUST include it as `trace_id`.
+10. Traces, metrics and logs MUST be exported over OTLP when an endpoint is configured. Without one, nothing is exported and the component runs normally.
+11. Everything a component emits MUST identify it: `service.namespace` (`murphy`), `service.name`, `service.version` and a `service.instance.id` unique to the process, plus the host and container it runs on. The version comes from the build: the release tag, or a pseudo-version for untagged builds.
+12. The log level MUST be set with `MURPHY_LOG_LEVEL` (`debug`, `info`, `warn` or `error`; `info` by default), and applies to every log destination.
+13. Only `internal/logger`, `internal/tracer`, `internal/metrics` and `internal/telemetry` MAY import OpenTelemetry packages or `log/slog`, plus the thin clients in `internal/` that install their library's instrumentation. Everything else uses their APIs.
 
 ## Testing
 

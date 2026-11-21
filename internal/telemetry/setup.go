@@ -12,8 +12,10 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"uuid"
 
 	"go.opentelemetry.io/contrib/bridges/otelslog"
+	otelruntime "go.opentelemetry.io/contrib/instrumentation/runtime"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp"
@@ -36,9 +38,14 @@ func Setup(ctx context.Context, component, level string, stdout io.Writer) (func
 
 	res, err := resource.New(ctx,
 		resource.WithAttributes(
+			attribute.String("service.namespace", "murphy"),
 			attribute.String("service.name", component),
 			attribute.String("service.version", version()),
+			attribute.String("service.instance.id", uuid.NewV4().String()),
 		),
+		resource.WithHost(),
+		resource.WithContainer(),
+		resource.WithOS(),
 		resource.WithFromEnv(),
 		resource.WithTelemetrySDK(),
 	)
@@ -78,6 +85,10 @@ func Setup(ctx context.Context, component, level string, stdout io.Writer) (func
 	tracers := sdktrace.NewTracerProvider(tracerOptions...)
 	meters := sdkmetric.NewMeterProvider(meterOptions...)
 	loggers := sdklog.NewLoggerProvider(loggerOptions...)
+
+	if err := otelruntime.Start(otelruntime.WithMeterProvider(meters)); err != nil {
+		return nil, fmt.Errorf("record runtime metrics: %w", err)
+	}
 
 	otel.SetTracerProvider(tracers)
 	otel.SetMeterProvider(meters)

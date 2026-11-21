@@ -48,7 +48,7 @@ func Run(ctx context.Context, component string, cfg Config, run func(context.Con
 		_ = health.Serve(listener)
 	}()
 
-	logger.Info(ctx, "started", logger.WithField("health_addr", listener.Addr().String()))
+	logger.Info(ctx, "started", telemetry.WithField("health_addr", listener.Addr().String()))
 	defer logger.Info(context.WithoutCancel(ctx), "stopped")
 
 	done := make(chan error, 1)

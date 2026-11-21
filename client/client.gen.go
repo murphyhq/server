@@ -140,6 +140,9 @@ type Problem struct {
 	Detail *string `json:"detail,omitempty"`
 	Status int     `json:"status"`
 	Title  string  `json:"title"`
+
+	// TraceId The trace of this request, to find it in your tracing backend.
+	TraceId *string `json:"trace_id,omitempty"`
 }
 
 // Service defines model for Service.

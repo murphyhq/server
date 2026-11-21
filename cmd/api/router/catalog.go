@@ -5,13 +5,9 @@ import (
 
 	"github.com/murphyhq/server"
 	"github.com/murphyhq/server/internal/pagination"
-	"github.com/murphyhq/server/internal/tracer"
 )
 
 func (s *Server) ListServices(ctx context.Context, request ListServicesRequestObject) (_ ListServicesResponseObject, err error) {
-	ctx, span := tracer.Span(ctx)
-	defer span.End(&err)
-
 	services, next, err := s.catalog.ListServices(ctx, page(request.Params.Limit, request.Params.Cursor))
 	if err != nil {
 		return nil, err
@@ -24,9 +20,6 @@ func (s *Server) ListServices(ctx context.Context, request ListServicesRequestOb
 }
 
 func (s *Server) CreateService(ctx context.Context, request CreateServiceRequestObject) (_ CreateServiceResponseObject, err error) {
-	ctx, span := tracer.Span(ctx)
-	defer span.End(&err)
-
 	service, err := s.catalog.CreateService(ctx, fromServiceInput("", request.Body))
 	if err != nil {
 		return nil, err
@@ -35,9 +28,6 @@ func (s *Server) CreateService(ctx context.Context, request CreateServiceRequest
 }
 
 func (s *Server) GetService(ctx context.Context, request GetServiceRequestObject) (_ GetServiceResponseObject, err error) {
-	ctx, span := tracer.Span(ctx)
-	defer span.End(&err)
-
 	service, err := s.catalog.GetService(ctx, request.Id)
 	if err != nil {
 		return nil, err
@@ -46,9 +36,6 @@ func (s *Server) GetService(ctx context.Context, request GetServiceRequestObject
 }
 
 func (s *Server) UpdateService(ctx context.Context, request UpdateServiceRequestObject) (_ UpdateServiceResponseObject, err error) {
-	ctx, span := tracer.Span(ctx)
-	defer span.End(&err)
-
 	service, err := s.catalog.UpdateService(ctx, fromServiceInput(request.Id, request.Body))
 	if err != nil {
 		return nil, err
@@ -57,9 +44,6 @@ func (s *Server) UpdateService(ctx context.Context, request UpdateServiceRequest
 }
 
 func (s *Server) DeleteService(ctx context.Context, request DeleteServiceRequestObject) (_ DeleteServiceResponseObject, err error) {
-	ctx, span := tracer.Span(ctx)
-	defer span.End(&err)
-
 	if err := s.catalog.DeleteService(ctx, request.Id); err != nil {
 		return nil, err
 	}
@@ -67,9 +51,6 @@ func (s *Server) DeleteService(ctx context.Context, request DeleteServiceRequest
 }
 
 func (s *Server) ListIntegrations(ctx context.Context, request ListIntegrationsRequestObject) (_ ListIntegrationsResponseObject, err error) {
-	ctx, span := tracer.Span(ctx)
-	defer span.End(&err)
-
 	integrations, next, err := s.catalog.ListIntegrations(ctx, request.Id, page(request.Params.Limit, request.Params.Cursor))
 	if err != nil {
 		return nil, err
@@ -82,9 +63,6 @@ func (s *Server) ListIntegrations(ctx context.Context, request ListIntegrationsR
 }
 
 func (s *Server) CreateIntegration(ctx context.Context, request CreateIntegrationRequestObject) (_ CreateIntegrationResponseObject, err error) {
-	ctx, span := tracer.Span(ctx)
-	defer span.End(&err)
-
 	integration, err := s.catalog.CreateIntegration(ctx, &murphy.Integration{
 		ServiceId: request.Id,
 		Name:      request.Body.Name,
@@ -98,9 +76,6 @@ func (s *Server) CreateIntegration(ctx context.Context, request CreateIntegratio
 }
 
 func (s *Server) GetIntegration(ctx context.Context, request GetIntegrationRequestObject) (_ GetIntegrationResponseObject, err error) {
-	ctx, span := tracer.Span(ctx)
-	defer span.End(&err)
-
 	integration, err := s.catalog.GetIntegration(ctx, request.Id)
 	if err != nil {
 		return nil, err
@@ -109,9 +84,6 @@ func (s *Server) GetIntegration(ctx context.Context, request GetIntegrationReque
 }
 
 func (s *Server) UpdateIntegration(ctx context.Context, request UpdateIntegrationRequestObject) (_ UpdateIntegrationResponseObject, err error) {
-	ctx, span := tracer.Span(ctx)
-	defer span.End(&err)
-
 	integration, err := s.catalog.UpdateIntegration(ctx, &murphy.Integration{
 		Id:     request.Id,
 		Name:   request.Body.Name,
@@ -124,9 +96,6 @@ func (s *Server) UpdateIntegration(ctx context.Context, request UpdateIntegratio
 }
 
 func (s *Server) DeleteIntegration(ctx context.Context, request DeleteIntegrationRequestObject) (_ DeleteIntegrationResponseObject, err error) {
-	ctx, span := tracer.Span(ctx)
-	defer span.End(&err)
-
 	if err := s.catalog.DeleteIntegration(ctx, request.Id); err != nil {
 		return nil, err
 	}

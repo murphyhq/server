@@ -10,8 +10,8 @@ import (
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 
-	"github.com/murphyhq/server/internal/logger"
 	"github.com/murphyhq/server/internal/metrics"
+	"github.com/murphyhq/server/internal/telemetry"
 )
 
 type collected struct {
@@ -43,7 +43,7 @@ func TestCounterRecordsWithItsDimensionsOnly(t *testing.T) {
 	counter, err := metrics.NewCounter("pages.sent", "Pages sent")
 	require.NoError(t, err)
 
-	ctx := logger.With(context.Background(), logger.WithField("incident.id", "inc-1"))
+	ctx := telemetry.With(context.Background(), telemetry.WithField("incident.id", "inc-1"))
 	counter.Add(ctx, 2, metrics.Dimension{Name: "channel", Value: "sms"})
 
 	got := read()["murphy.pages.sent"]

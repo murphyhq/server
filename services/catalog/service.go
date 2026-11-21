@@ -6,6 +6,8 @@ import (
 
 	"github.com/murphyhq/server"
 	"github.com/murphyhq/server/internal/pagination"
+	"github.com/murphyhq/server/internal/telemetry"
+	"github.com/murphyhq/server/internal/tracer"
 )
 
 type Repository interface {
@@ -29,7 +31,10 @@ func New(repo Repository) *Service {
 	return &Service{repo: repo}
 }
 
-func (s *Service) CreateService(ctx context.Context, in *murphy.Service) (*murphy.Service, error) {
+func (s *Service) CreateService(ctx context.Context, in *murphy.Service) (_ *murphy.Service, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
 	now := murphy.Now()
 	service := &murphy.Service{
 		Id:                 murphy.NewID(),
@@ -42,6 +47,7 @@ func (s *Service) CreateService(ctx context.Context, in *murphy.Service) (*murph
 		CreatedAt:          now,
 		UpdatedAt:          now,
 	}
+	ctx = span.Set(ctx, telemetry.WithField("service.id", service.GetId()))
 	if err := service.Validate(); err != nil {
 		return nil, err
 	}
@@ -51,7 +57,11 @@ func (s *Service) CreateService(ctx context.Context, in *murphy.Service) (*murph
 	return service, nil
 }
 
-func (s *Service) GetService(ctx context.Context, id string) (*murphy.Service, error) {
+func (s *Service) GetService(ctx context.Context, id string) (_ *murphy.Service, err error) {
+	ctx, span := tracer.Span(ctx)
+	ctx = span.Set(ctx, telemetry.WithField("service.id", id))
+	defer span.End(&err)
+
 	if err := murphy.LookupID("service", id); err != nil {
 		return nil, err
 	}
@@ -62,7 +72,10 @@ func (s *Service) GetService(ctx context.Context, id string) (*murphy.Service, e
 	return service, nil
 }
 
-func (s *Service) ListServices(ctx context.Context, page pagination.Page) ([]*murphy.Service, string, error) {
+func (s *Service) ListServices(ctx context.Context, page pagination.Page) (_ []*murphy.Service, _ string, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
 	window, err := pagination.Resolve(page)
 	if err != nil {
 		return nil, "", err
@@ -75,7 +88,11 @@ func (s *Service) ListServices(ctx context.Context, page pagination.Page) ([]*mu
 	return items, next, nil
 }
 
-func (s *Service) UpdateService(ctx context.Context, in *murphy.Service) (*murphy.Service, error) {
+func (s *Service) UpdateService(ctx context.Context, in *murphy.Service) (_ *murphy.Service, err error) {
+	ctx, span := tracer.Span(ctx)
+	ctx = span.Set(ctx, telemetry.WithField("service.id", in.GetId()))
+	defer span.End(&err)
+
 	current, err := s.GetService(ctx, in.GetId())
 	if err != nil {
 		return nil, err
@@ -100,7 +117,11 @@ func (s *Service) UpdateService(ctx context.Context, in *murphy.Service) (*murph
 	return service, nil
 }
 
-func (s *Service) DeleteService(ctx context.Context, id string) error {
+func (s *Service) DeleteService(ctx context.Context, id string) (err error) {
+	ctx, span := tracer.Span(ctx)
+	ctx = span.Set(ctx, telemetry.WithField("service.id", id))
+	defer span.End(&err)
+
 	if err := murphy.LookupID("service", id); err != nil {
 		return err
 	}
@@ -110,7 +131,11 @@ func (s *Service) DeleteService(ctx context.Context, id string) error {
 	return nil
 }
 
-func (s *Service) CreateIntegration(ctx context.Context, in *murphy.Integration) (*murphy.Integration, error) {
+func (s *Service) CreateIntegration(ctx context.Context, in *murphy.Integration) (_ *murphy.Integration, err error) {
+	ctx, span := tracer.Span(ctx)
+	ctx = span.Set(ctx, telemetry.WithField("service.id", in.GetServiceId()))
+	defer span.End(&err)
+
 	now := murphy.Now()
 	integration := &murphy.Integration{
 		Id:         murphy.NewID(),
@@ -122,6 +147,7 @@ func (s *Service) CreateIntegration(ctx context.Context, in *murphy.Integration)
 		CreatedAt:  now,
 		UpdatedAt:  now,
 	}
+	ctx = span.Set(ctx, telemetry.WithField("integration.id", integration.GetId()))
 	if err := integration.Validate(); err != nil {
 		return nil, err
 	}
@@ -134,7 +160,11 @@ func (s *Service) CreateIntegration(ctx context.Context, in *murphy.Integration)
 	return integration, nil
 }
 
-func (s *Service) GetIntegration(ctx context.Context, id string) (*murphy.Integration, error) {
+func (s *Service) GetIntegration(ctx context.Context, id string) (_ *murphy.Integration, err error) {
+	ctx, span := tracer.Span(ctx)
+	ctx = span.Set(ctx, telemetry.WithField("integration.id", id))
+	defer span.End(&err)
+
 	if err := murphy.LookupID("integration", id); err != nil {
 		return nil, err
 	}
@@ -145,7 +175,11 @@ func (s *Service) GetIntegration(ctx context.Context, id string) (*murphy.Integr
 	return integration, nil
 }
 
-func (s *Service) ListIntegrations(ctx context.Context, serviceID string, page pagination.Page) ([]*murphy.Integration, string, error) {
+func (s *Service) ListIntegrations(ctx context.Context, serviceID string, page pagination.Page) (_ []*murphy.Integration, _ string, err error) {
+	ctx, span := tracer.Span(ctx)
+	ctx = span.Set(ctx, telemetry.WithField("service.id", serviceID))
+	defer span.End(&err)
+
 	window, err := pagination.Resolve(page)
 	if err != nil {
 		return nil, "", err
@@ -161,7 +195,11 @@ func (s *Service) ListIntegrations(ctx context.Context, serviceID string, page p
 	return items, next, nil
 }
 
-func (s *Service) UpdateIntegration(ctx context.Context, in *murphy.Integration) (*murphy.Integration, error) {
+func (s *Service) UpdateIntegration(ctx context.Context, in *murphy.Integration) (_ *murphy.Integration, err error) {
+	ctx, span := tracer.Span(ctx)
+	ctx = span.Set(ctx, telemetry.WithField("integration.id", in.GetId()))
+	defer span.End(&err)
+
 	current, err := s.GetIntegration(ctx, in.GetId())
 	if err != nil {
 		return nil, err
@@ -186,7 +224,11 @@ func (s *Service) UpdateIntegration(ctx context.Context, in *murphy.Integration)
 	return integration, nil
 }
 
-func (s *Service) DeleteIntegration(ctx context.Context, id string) error {
+func (s *Service) DeleteIntegration(ctx context.Context, id string) (err error) {
+	ctx, span := tracer.Span(ctx)
+	ctx = span.Set(ctx, telemetry.WithField("integration.id", id))
+	defer span.End(&err)
+
 	if err := murphy.LookupID("integration", id); err != nil {
 		return err
 	}
