@@ -137,11 +137,11 @@ Every kind of failure Murphy guards against is tested, without changing the code
 |---|---|---|
 | Unit | `*_test.go` next to the code | the code under test, with generated mocks of its interfaces |
 | Shared suites | next to each interface | every implementation of that interface, against the real service |
-| Integration | `tests/integration/` | one component with real infrastructure in containers |
+| Integration | `tests/integration/` | one component's handlers, served in-process, against real infrastructure |
 | End-to-end | `tests/e2e/` | the whole system from `compose.yaml` (`--profile murphy`), as an API client |
 | Load | `tests/load/` | all components, under generated traffic |
 
-1. Tests MUST get their infrastructure from `compose.yaml`, locally and in CI, so they always run against the same versions and settings as development. `tests/testenv/` MUST provide the rest of the test environment: components started from configuration, stub notification providers (they record what was sent, fail on demand and send callbacks), and traffic generators that send alerts in each monitoring tool's format.
+1. Tests MUST get their infrastructure from `compose.yaml`, locally and in CI, so they always run against the same versions and settings as development. `tests/testenv/` MUST provide what tests need on top of it: a throwaway database per test, stub notification providers (they record what was sent, fail on demand and send callbacks), and traffic generators that send alerts in each monitoring tool's format.
 2. Tests MUST change behaviour only through configuration. Components MUST NOT contain test-only code paths.
 3. Interfaces MUST be mocked with generated mocks. Tests MUST check outcomes (what was returned, what reached a dependency), not restate how the code is implemented.
 4. Tests MUST use `testify`: `require` for anything the rest of the test depends on, `assert` for the checks themselves.

@@ -19,8 +19,16 @@ type Config struct {
 	ShutdownTimeout time.Duration
 }
 
-func Serve(ctx context.Context, cfg Config, handler http.Handler) error {
+func Handler(handler http.Handler) (http.Handler, error) {
 	duration, err := metrics.NewHistogram("http.server.request.duration", "Time taken to answer HTTP requests.", "s")
+	if err != nil {
+		return nil, err
+	}
+	return tracer.ContinueHTTP(measure(duration, problemsForUnmatched(handler))), nil
+}
+
+func Serve(ctx context.Context, cfg Config, handler http.Handler) error {
+	handler, err := Handler(handler)
 	if err != nil {
 		return err
 	}
@@ -29,7 +37,7 @@ func Serve(ctx context.Context, cfg Config, handler http.Handler) error {
 	if err != nil {
 		return fmt.Errorf("listen for HTTP on %s: %w", cfg.Addr, err)
 	}
-	server := &http.Server{Handler: tracer.ContinueHTTP(measure(duration, problemsForUnmatched(handler))), ReadHeaderTimeout: 10 * time.Second}
+	server := &http.Server{Handler: handler, ReadHeaderTimeout: 10 * time.Second}
 	errs := make(chan error, 1)
 	go func() { errs <- server.Serve(listener) }()
 	logger.Info(ctx, "serving HTTP", logger.WithField("http_addr", listener.Addr().String()))

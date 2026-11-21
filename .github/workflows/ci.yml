@@ -43,7 +43,7 @@ jobs:
         with:
           go-version-file: go.mod
       - run: docker compose up -d --wait postgres redis
-      - run: go test -tags integration ./...
+      - run: go test -race -tags integration ./...
 
   vulncheck:
     runs-on: ubuntu-latest
