@@ -1,0 +1,25 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  images:
+    runs-on: ubuntu-latest
+    env:
+      KO_DOCKER_REPO: ghcr.io/murphyhq
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+
+      - run: echo "${{ github.token }}" | go tool ko login ghcr.io --username "${{ github.actor }}" --password-stdin
+
+      - run: go tool ko build --base-import-paths --tags "${GITHUB_REF_NAME},latest" ./cmd/ingest ./cmd/api ./cmd/engine ./cmd/scheduler ./cmd/notifier ./cmd/migrate

@@ -140,8 +140,11 @@ Every kind of failure Murphy guards against is tested, without changing the code
 
 ## Tooling
 
-1. The Go toolchain MUST be pinned with the `toolchain` directive, and code generators (`sqlc`, `oapi-codegen`, `buf`, `goose`) with `tool` directives in `go.mod`, all on their latest stable versions.
+1. The Go toolchain MUST be pinned with the `toolchain` directive, and tools (`sqlc`, `oapi-codegen`, `buf`, `goose`, `ko`) with `tool` directives in `go.mod`, all on their latest stable versions.
 2. `gofmt`, `go vet`, `golangci-lint` and `buf lint` MUST pass.
+3. `compose.yaml` MUST provide every service the components depend on (PostgreSQL, NATS and LocalStack), so `docker compose up` is enough to run Murphy locally.
+4. Container images MUST be built with `ko`, one per component, from `.ko.yaml`. The release workflow publishes them to `ghcr.io/murphyhq/<component>` for every `v*` tag.
+5. Dependencies MUST be kept current through Dependabot, for Go modules, GitHub Actions and the images in `compose.yaml`.
 
 ## Docs and comments
 

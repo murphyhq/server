@@ -1,0 +1,19 @@
+defaultBaseImage: gcr.io/distroless/static-debian12:nonroot
+
+defaultPlatforms:
+  - linux/amd64
+  - linux/arm64
+
+builds:
+  - id: ingest
+    main: ./cmd/ingest
+  - id: api
+    main: ./cmd/api
+  - id: engine
+    main: ./cmd/engine
+  - id: scheduler
+    main: ./cmd/scheduler
+  - id: notifier
+    main: ./cmd/notifier
+  - id: migrate
+    main: ./cmd/migrate
