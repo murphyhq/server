@@ -37,32 +37,12 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:19.0
-        env:
-          POSTGRES_USER: murphy
-          POSTGRES_PASSWORD: murphy
-          POSTGRES_DB: murphy
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U murphy"
-          --health-interval 2s
-          --health-retries 30
-      redis:
-        image: redis:8.10.3-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 2s
-          --health-retries 30
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
+      - run: docker compose up -d --wait postgres redis
       - run: go test -tags integration ./...
 
   vulncheck:
