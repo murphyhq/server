@@ -11,7 +11,11 @@ x-component: &component
     interval: 5s
     start_period: 120s
     retries: 3
+  environment:
+    OTEL_EXPORTER_OTLP_ENDPOINT: http://lgtm:4318
   depends_on:
+    lgtm:
+      condition: service_started
     migrate:
       condition: service_completed_successfully
     nats:
@@ -64,12 +68,21 @@ services:
       interval: 2s
       retries: 30
 
+  lgtm:
+    image: grafana/otel-lgtm:0.41.1
+    ports:
+      - "3000:3000"
+      - "4317:4317"
+      - "4318:4318"
+
   migrate:
     <<: *component
     command: ["sh", "-c", "go build -o /tmp/migrate ./cmd/migrate && exec /tmp/migrate"]
     healthcheck:
       disable: true
     depends_on:
+      lgtm:
+        condition: service_started
       postgres:
         condition: service_healthy
     develop: {}

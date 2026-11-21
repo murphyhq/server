@@ -2,11 +2,11 @@ package main
 
 import (
 	"context"
-	"log/slog"
 	"os"
 
 	"github.com/murphyhq/server/internal/config"
 	"github.com/murphyhq/server/internal/lifecycle"
+	"github.com/murphyhq/server/internal/logger"
 )
 
 type settings struct {
@@ -14,8 +14,9 @@ type settings struct {
 }
 
 func main() {
-	if err := run(context.Background()); err != nil {
-		slog.Error("notifier stopped", "error", err)
+	ctx := context.Background()
+	if err := run(ctx); err != nil {
+		logger.Error(ctx, "notifier stopped", logger.WithError(err))
 		os.Exit(1)
 	}
 }
@@ -25,5 +26,5 @@ func run(ctx context.Context) error {
 	if err := config.Load(&s); err != nil {
 		return err
 	}
-	return lifecycle.Run(ctx, s.Lifecycle, lifecycle.UntilStopped)
+	return lifecycle.Run(ctx, "notifier", s.Lifecycle, lifecycle.UntilStopped)
 }

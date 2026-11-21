@@ -10,18 +10,34 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/murphyhq/server/internal/logger"
+	"github.com/murphyhq/server/internal/telemetry"
 )
 
 type Config struct {
 	HealthAddr      string        `env:"HEALTH_ADDR" default:":9000"`
 	ShutdownTimeout time.Duration `env:"SHUTDOWN_TIMEOUT" default:"30s"`
+	LogLevel        string        `env:"LOG_LEVEL" default:"info"`
 }
 
 type Check func(ctx context.Context) error
 
-func Run(ctx context.Context, cfg Config, run func(context.Context) error, ready ...Check) error {
+func Run(ctx context.Context, component string, cfg Config, run func(context.Context) error, ready ...Check) (err error) {
 	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
+	flush, err := telemetry.Setup(ctx, component, cfg.LogLevel, os.Stdout)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
+		defer cancel()
+		if flushErr := flush(ctx); flushErr != nil {
+			err = errors.Join(err, fmt.Errorf("flush telemetry: %w", flushErr))
+		}
+	}()
 
 	listener, err := net.Listen("tcp", cfg.HealthAddr)
 	if err != nil {
@@ -31,6 +47,9 @@ func Run(ctx context.Context, cfg Config, run func(context.Context) error, ready
 	go func() {
 		_ = health.Serve(listener)
 	}()
+
+	logger.Info(ctx, "started", logger.WithField("health_addr", listener.Addr().String()))
+	defer logger.Info(context.WithoutCancel(ctx), "stopped")
 
 	done := make(chan error, 1)
 	go func() {
