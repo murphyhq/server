@@ -29,11 +29,11 @@ Requires Docker.
 
 | Command | Starts |
 |---|---|
-| `docker compose --profile murphy up` | everything: PostgreSQL, NATS, LocalStack, Grafana, and every component built from source |
+| `docker compose --profile murphy up` | everything: PostgreSQL, Redis, NATS, LocalStack, Grafana, and every component built from source |
 | `docker compose --profile murphy watch` | the same, restarting components when the code changes |
 | `docker compose up` | the services only, to run a component yourself |
 
-Logs, traces and metrics are in Grafana at http://localhost:3000 (Explore → Loki, Tempo or Prometheus).
+The API is at http://localhost:8080, described by [`openapi/v1.yaml`](openapi/v1.yaml), and a fresh stack is seeded with example data. Logs, traces and metrics are in Grafana at http://localhost:3000 (Explore → Loki, Tempo or Prometheus).
 
 To run one component yourself against those services, with Go installed:
 
@@ -42,6 +42,12 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 go run ./cmd/api
 ```
 
 Each component reports its health at `http://localhost:9000/healthz` and `/readyz`.
+
+Integration tests run against the PostgreSQL from `docker compose up`:
+
+```
+go test -tags integration ./...
+```
 
 ## License
 

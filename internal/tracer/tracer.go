@@ -3,10 +3,12 @@ package tracer
 import (
 	"context"
 	"fmt"
+	"net/http"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/murphyhq/server/internal/logger"
@@ -61,4 +63,11 @@ func attributeOf(key string, v any) attribute.KeyValue {
 	default:
 		return attribute.String(key, fmt.Sprint(v))
 	}
+}
+
+func ContinueHTTP(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx := otel.GetTextMapPropagator().Extract(r.Context(), propagation.HeaderCarrier(r.Header))
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
 }

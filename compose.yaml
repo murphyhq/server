@@ -82,6 +82,15 @@ services:
       postgres:
         condition: service_healthy
 
+  redis:
+    image: redis:8.10.3-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      retries: 30
+
   lgtm:
     image: grafana/otel-lgtm:0.41.1
     ports:
@@ -104,6 +113,18 @@ services:
         condition: service_completed_successfully
     develop: {}
 
+  seed:
+    <<: *component
+    command: ["sh", "-c", "go build -o /tmp/seed ./tests/seed && exec /tmp/seed"]
+    environment:
+      MURPHY_SEED_API_URL: http://api:8080
+    healthcheck:
+      disable: true
+    depends_on:
+      api:
+        condition: service_healthy
+    develop: {}
+
   ingest:
     <<: *component
     command: ["sh", "-c", "go build -o /tmp/ingest ./cmd/ingest && exec /tmp/ingest"]
@@ -111,6 +132,23 @@ services:
   api:
     <<: *component
     command: ["sh", "-c", "go build -o /tmp/api ./cmd/api && exec /tmp/api"]
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://lgtm:4318
+      MURPHY_CATALOG_DATABASE_URL: postgres://murphy:murphy@postgres:5432/catalog?sslmode=disable
+      MURPHY_IDEMPOTENCY_STORE_URL: redis://redis:6379/0
+    ports:
+      - "8080:8080"
+    depends_on:
+      lgtm:
+        condition: service_started
+      migrate:
+        condition: service_completed_successfully
+      nats:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
   engine:
     <<: *component

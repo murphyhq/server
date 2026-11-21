@@ -1,0 +1,346 @@
+openapi: 3.0.3
+info:
+  title: Murphy API
+  version: v1
+  license:
+    name: AGPL-3.0
+paths:
+  /v1/services:
+    get:
+      operationId: listServices
+      tags: [catalog]
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: Services, newest first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServicePage"
+        "400":
+          $ref: "#/components/responses/Problem"
+    post:
+      operationId: createService
+      tags: [catalog]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ServiceInput"
+      responses:
+        "201":
+          description: The created service.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Service"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "409":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+  /v1/services/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    get:
+      operationId: getService
+      tags: [catalog]
+      responses:
+        "200":
+          description: The service.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Service"
+        "404":
+          $ref: "#/components/responses/Problem"
+    put:
+      operationId: updateService
+      tags: [catalog]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ServiceInput"
+      responses:
+        "200":
+          description: The updated service.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Service"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "409":
+          $ref: "#/components/responses/Problem"
+    delete:
+      operationId: deleteService
+      tags: [catalog]
+      responses:
+        "204":
+          description: The service and its integrations were deleted.
+        "404":
+          $ref: "#/components/responses/Problem"
+  /v1/services/{id}/integrations:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    get:
+      operationId: listIntegrations
+      tags: [catalog]
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: The service's integrations, newest first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntegrationPage"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+    post:
+      operationId: createIntegration
+      tags: [catalog]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IntegrationCreate"
+      responses:
+        "201":
+          description: The created integration.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Integration"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "409":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+  /v1/integrations/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    get:
+      operationId: getIntegration
+      tags: [catalog]
+      responses:
+        "200":
+          description: The integration.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Integration"
+        "404":
+          $ref: "#/components/responses/Problem"
+    put:
+      operationId: updateIntegration
+      tags: [catalog]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IntegrationUpdate"
+      responses:
+        "200":
+          description: The updated integration.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Integration"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+    delete:
+      operationId: deleteIntegration
+      tags: [catalog]
+      responses:
+        "204":
+          description: The integration was deleted.
+        "404":
+          $ref: "#/components/responses/Problem"
+components:
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      description: Makes retries safe. A retry with the same key and request returns the original response for 24 hours; the same key with a different request is rejected with 422, and a retry while the first request is still running gets 409.
+      schema:
+        type: string
+        maxLength: 255
+    ID:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+    Limit:
+      name: limit
+      in: query
+      description: Items per page, 50 by default and at most 100.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+    Cursor:
+      name: cursor
+      in: query
+      description: The next_cursor of the previous page.
+      schema:
+        type: string
+  responses:
+    Problem:
+      description: The request failed.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+  schemas:
+    Urgency:
+      type: string
+      enum: [high, low]
+    ServiceStatus:
+      type: string
+      enum: [active, disabled]
+    IntegrationType:
+      type: string
+      enum: [generic, alertmanager, grafana, datadog]
+    IntegrationStatus:
+      type: string
+      enum: [active, disabled]
+    Service:
+      type: object
+      required: [id, name, description, team_id, escalation_policy_id, urgency, status, created_at, updated_at]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        team_id:
+          type: string
+        escalation_policy_id:
+          type: string
+        urgency:
+          $ref: "#/components/schemas/Urgency"
+        status:
+          $ref: "#/components/schemas/ServiceStatus"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    ServiceInput:
+      type: object
+      required: [name, team_id, escalation_policy_id]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        team_id:
+          type: string
+        escalation_policy_id:
+          type: string
+        urgency:
+          $ref: "#/components/schemas/Urgency"
+        status:
+          $ref: "#/components/schemas/ServiceStatus"
+    ServicePage:
+      type: object
+      required: [items, next_cursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Service"
+        next_cursor:
+          type: string
+          description: Empty on the last page.
+    Integration:
+      type: object
+      required: [id, service_id, name, type, key_version, status, created_at, updated_at]
+      properties:
+        id:
+          type: string
+        service_id:
+          type: string
+        name:
+          type: string
+        type:
+          $ref: "#/components/schemas/IntegrationType"
+        key_version:
+          type: integer
+          format: int32
+        previous_key_valid_until:
+          type: string
+          format: date-time
+        status:
+          $ref: "#/components/schemas/IntegrationStatus"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    IntegrationCreate:
+      type: object
+      required: [name, type]
+      properties:
+        name:
+          type: string
+        type:
+          $ref: "#/components/schemas/IntegrationType"
+        status:
+          $ref: "#/components/schemas/IntegrationStatus"
+    IntegrationUpdate:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        status:
+          $ref: "#/components/schemas/IntegrationStatus"
+    IntegrationPage:
+      type: object
+      required: [items, next_cursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Integration"
+        next_cursor:
+          type: string
+          description: Empty on the last page.
+    Problem:
+      type: object
+      required: [title, status]
+      properties:
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string

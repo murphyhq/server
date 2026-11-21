@@ -30,6 +30,8 @@ jobs:
           go tool buf generate
           go tool sqlc generate
           go tool mockery
+          go tool oapi-codegen -config oapi-codegen.server.yaml openapi/v1.yaml
+          go tool oapi-codegen -config oapi-codegen.client.yaml openapi/v1.yaml
           git diff --exit-code
           test -z "$(git status --porcelain)"
 
@@ -40,7 +42,8 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
-      - run: go test ./...
+      - run: docker compose up -d --wait postgres redis
+      - run: go test -race -tags integration ./...
 
   vulncheck:
     runs-on: ubuntu-latest
