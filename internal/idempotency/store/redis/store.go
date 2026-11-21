@@ -36,7 +36,7 @@ func (s *Store) Close() error {
 	return s.client.Close()
 }
 
-func (s *Store) Reserve(ctx context.Context, key string, record idempotency.Record, ttl time.Duration) (_ *idempotency.Record, err error) {
+func (s *Store) Reserve(ctx context.Context, key string, record idempotency.Record, lease time.Duration) (_ *idempotency.Record, err error) {
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
@@ -45,7 +45,7 @@ func (s *Store) Reserve(ctx context.Context, key string, record idempotency.Reco
 		return nil, fmt.Errorf("encode idempotency record: %w", err)
 	}
 	for range 3 {
-		err := s.client.SetArgs(ctx, prefix+key, data, goredis.SetArgs{Mode: "NX", TTL: ttl}).Err()
+		err := s.client.SetArgs(ctx, prefix+key, data, goredis.SetArgs{Mode: "NX", TTL: lease}).Err()
 		if err == nil {
 			return nil, nil
 		}
@@ -69,7 +69,7 @@ func (s *Store) Reserve(ctx context.Context, key string, record idempotency.Reco
 	return nil, errors.New("reserve idempotency key: it kept expiring while being read")
 }
 
-func (s *Store) Complete(ctx context.Context, key string, record idempotency.Record) (err error) {
+func (s *Store) Complete(ctx context.Context, key string, record idempotency.Record, ttl time.Duration) (err error) {
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
@@ -77,7 +77,7 @@ func (s *Store) Complete(ctx context.Context, key string, record idempotency.Rec
 	if err != nil {
 		return fmt.Errorf("encode idempotency record: %w", err)
 	}
-	err = s.client.SetArgs(ctx, prefix+key, data, goredis.SetArgs{Mode: "XX", KeepTTL: true}).Err()
+	err = s.client.SetArgs(ctx, prefix+key, data, goredis.SetArgs{Mode: "XX", TTL: ttl}).Err()
 	if errors.Is(err, goredis.Nil) {
 		return errors.New("complete idempotency key: it expired before the request finished")
 	}

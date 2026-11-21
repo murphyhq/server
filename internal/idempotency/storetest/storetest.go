@@ -29,7 +29,7 @@ func Run(t *testing.T, store idempotency.Store) {
 		_, err := store.Reserve(t.Context(), key, idempotency.Record{Fingerprint: "a"}, time.Minute)
 		require.NoError(t, err)
 		response := idempotency.Record{Fingerprint: "a", Status: 201, ContentType: "application/json", Body: []byte(`{"id":"1"}`)}
-		require.NoError(t, store.Complete(t.Context(), key, response))
+		require.NoError(t, store.Complete(t.Context(), key, response, time.Minute))
 
 		existing, err := store.Reserve(t.Context(), key, idempotency.Record{Fingerprint: "a"}, time.Minute)
 		require.NoError(t, err)
@@ -48,7 +48,21 @@ func Run(t *testing.T, store idempotency.Store) {
 		assert.Nil(t, existing)
 	})
 
-	t.Run("forgets a key after its time to live", func(t *testing.T) {
+	t.Run("keeps a completed response after its lease", func(t *testing.T) {
+		key := uuid.NewV4().String()
+		_, err := store.Reserve(t.Context(), key, idempotency.Record{Fingerprint: "a"}, 200*time.Millisecond)
+		require.NoError(t, err)
+		response := idempotency.Record{Fingerprint: "a", Status: 201}
+		require.NoError(t, store.Complete(t.Context(), key, response, time.Minute))
+
+		time.Sleep(500 * time.Millisecond)
+		existing, err := store.Reserve(t.Context(), key, idempotency.Record{Fingerprint: "a"}, time.Minute)
+		require.NoError(t, err)
+		require.NotNil(t, existing)
+		assert.Equal(t, response, *existing)
+	})
+
+	t.Run("frees an abandoned reservation after its lease", func(t *testing.T) {
 		key := uuid.NewV4().String()
 		_, err := store.Reserve(t.Context(), key, idempotency.Record{Fingerprint: "a"}, 200*time.Millisecond)
 		require.NoError(t, err)

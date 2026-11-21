@@ -15,6 +15,7 @@ import (
 
 const (
 	header       = "Idempotency-Key"
+	lease        = time.Minute
 	maxKeyLength = 255
 	maxBodySize  = 1 << 20
 )
@@ -31,8 +32,8 @@ func (r *Record) completed() bool {
 }
 
 type Store interface {
-	Reserve(ctx context.Context, key string, record Record, ttl time.Duration) (*Record, error)
-	Complete(ctx context.Context, key string, record Record) error
+	Reserve(ctx context.Context, key string, record Record, lease time.Duration) (*Record, error)
+	Complete(ctx context.Context, key string, record Record, ttl time.Duration) error
 	Release(ctx context.Context, key string) error
 }
 
@@ -57,7 +58,7 @@ func Middleware(store Store, ttl time.Duration) func(http.Handler) http.Handler 
 			r.Body = io.NopCloser(bytes.NewReader(body))
 			fingerprint := fingerprintOf(r, body)
 
-			existing, err := store.Reserve(r.Context(), key, Record{Fingerprint: fingerprint}, ttl)
+			existing, err := store.Reserve(r.Context(), key, Record{Fingerprint: fingerprint}, lease)
 			if err != nil {
 				httpserver.WriteError(w, r, err)
 				return
@@ -82,7 +83,7 @@ func Middleware(store Store, ttl time.Duration) func(http.Handler) http.Handler 
 				return
 			}
 			record := Record{Fingerprint: fingerprint, Status: recorder.status, ContentType: recorder.Header().Get("Content-Type"), Body: recorder.body.Bytes()}
-			if err := store.Complete(context.WithoutCancel(r.Context()), key, record); err != nil {
+			if err := store.Complete(context.WithoutCancel(r.Context()), key, record, ttl); err != nil {
 				logger.Error(r.Context(), "store idempotent response", logger.WithError(err))
 				release(r.Context(), store, key)
 			}
