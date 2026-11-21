@@ -1,0 +1,52 @@
+syntax = "proto3";
+
+package murphy.v1;
+
+import "google/protobuf/timestamp.proto";
+import "murphy/v1/shared.proto";
+
+option go_package = "github.com/murphyhq/server;murphy";
+
+message Service {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  string team_id = 4;
+  string escalation_policy_id = 5;
+  Urgency urgency = 6;
+  ServiceStatus status = 7;
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp updated_at = 9;
+}
+
+enum ServiceStatus {
+  SERVICE_STATUS_UNSPECIFIED = 0;
+  SERVICE_STATUS_ACTIVE = 1;
+  SERVICE_STATUS_DISABLED = 2;
+}
+
+message Integration {
+  string id = 1;
+  string service_id = 2;
+  string name = 3;
+  IntegrationType type = 4;
+  int32 key_version = 5;
+  google.protobuf.Timestamp previous_key_valid_until = 6;
+  IntegrationStatus status = 7;
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp updated_at = 9;
+}
+
+enum IntegrationType {
+  INTEGRATION_TYPE_UNSPECIFIED = 0;
+  INTEGRATION_TYPE_GENERIC = 1;
+  INTEGRATION_TYPE_ALERTMANAGER = 2;
+  INTEGRATION_TYPE_GRAFANA = 3;
+  INTEGRATION_TYPE_DATADOG = 4;
+}
+
+enum IntegrationStatus {
+  INTEGRATION_STATUS_UNSPECIFIED = 0;
+  INTEGRATION_STATUS_ACTIVE = 1;
+  INTEGRATION_STATUS_DISABLED = 2;
+}

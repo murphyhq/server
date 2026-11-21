@@ -1,0 +1,22 @@
+version: "2"
+overrides:
+  go:
+    overrides:
+      - db_type: uuid
+        go_type: string
+      - db_type: timestamptz
+        go_type: time.Time
+      - db_type: timestamptz
+        nullable: true
+        go_type:
+          type: time.Time
+          pointer: true
+sql:
+  - engine: postgresql
+    schema: services/catalog/db/postgres/migrations
+    queries: services/catalog/db/postgres/queries.sql
+    gen:
+      go:
+        package: postgres
+        out: services/catalog/db/postgres
+        sql_package: pgx/v5

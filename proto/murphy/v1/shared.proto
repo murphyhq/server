@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package murphy.v1;
+
+option go_package = "github.com/murphyhq/server;murphy";
+
+enum Urgency {
+  URGENCY_UNSPECIFIED = 0;
+  URGENCY_HIGH = 1;
+  URGENCY_LOW = 2;
+}
