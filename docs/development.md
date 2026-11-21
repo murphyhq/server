@@ -116,7 +116,7 @@ The API is the public way to build on Murphy, so its behaviour is predictable ac
 
 Every page must be explainable afterwards: what happened, in which order, and why. Murphy traces its own work, continues the traces it receives, and measures how it performs.
 
-1. Protocols MUST be traced by their standard OpenTelemetry instrumentation: every incoming request, every database query, and every call to Redis, a broker or another service. Business logic MUST be traced with `internal/tracer`: every service method, and every message or timer a component handles. Functions that run for the life of the process and health checks are not traced.
+1. Every method on a layer we write MUST be traced with `internal/tracer`: HTTP handlers, services, repositories and stores, and every message or timer handler. Beneath them, protocols MUST be traced by their standard OpenTelemetry instrumentation: incoming requests, database queries, and calls to Redis, a broker or another service. Functions that run for the life of the process and health checks are not traced.
 2. Our span names MUST come from the function name, never typed by hand. Instrumented spans follow OpenTelemetry's conventions (`GET /v1/services/{id}`).
 3. A function's error MUST be recorded on its span. Only unexpected errors mark the span as failed: invalid input, something not found and conflicts are expected outcomes, and HTTP requests fail only with a `5xx`.
 4. Logs MUST be written with `internal/logger`, and every log line MUST carry the current trace and span IDs. Every HTTP request MUST be logged once, with its method, route, status and duration.

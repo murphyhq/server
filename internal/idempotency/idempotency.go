@@ -12,6 +12,7 @@ import (
 	"github.com/murphyhq/server/internal/httpserver"
 	"github.com/murphyhq/server/internal/logger"
 	"github.com/murphyhq/server/internal/telemetry"
+	"github.com/murphyhq/server/internal/tracer"
 )
 
 const (
@@ -59,7 +60,7 @@ func Middleware(store Store, ttl time.Duration) func(http.Handler) http.Handler 
 			r.Body = io.NopCloser(bytes.NewReader(body))
 			fingerprint := fingerprintOf(r, body)
 
-			existing, err := store.Reserve(r.Context(), key, Record{Fingerprint: fingerprint}, lease)
+			existing, err := reserve(r.Context(), store, key, fingerprint)
 			if err != nil {
 				httpserver.WriteError(w, r, err)
 				return
@@ -89,6 +90,31 @@ func Middleware(store Store, ttl time.Duration) func(http.Handler) http.Handler 
 				release(r.Context(), store, key)
 			}
 		})
+	}
+}
+
+func reserve(ctx context.Context, store Store, key, fingerprint string) (_ *Record, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	existing, err := store.Reserve(ctx, key, Record{Fingerprint: fingerprint}, lease)
+	if err != nil {
+		return nil, err
+	}
+	span.Set(ctx, telemetry.WithField("idempotency.outcome", outcome(existing, fingerprint)))
+	return existing, nil
+}
+
+func outcome(existing *Record, fingerprint string) string {
+	switch {
+	case existing == nil:
+		return "reserved"
+	case existing.Fingerprint != fingerprint:
+		return "mismatch"
+	case !existing.completed():
+		return "in_progress"
+	default:
+		return "replayed"
 	}
 }
 

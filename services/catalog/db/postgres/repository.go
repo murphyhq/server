@@ -15,6 +15,7 @@ import (
 
 	"github.com/murphyhq/server"
 	murphypostgres "github.com/murphyhq/server/internal/postgres"
+	"github.com/murphyhq/server/internal/tracer"
 )
 
 //go:embed migrations/*.sql
@@ -50,6 +51,9 @@ func (r *Repository) Close() {
 }
 
 func (r *Repository) CreateService(ctx context.Context, service *murphy.Service) (err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
 	return storeError("service", r.queries.CreateService(ctx, CreateServiceParams{
 		ID:                 service.GetId(),
 		Name:               service.GetName(),
@@ -64,6 +68,9 @@ func (r *Repository) CreateService(ctx context.Context, service *murphy.Service)
 }
 
 func (r *Repository) GetService(ctx context.Context, id string) (_ *murphy.Service, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
 	row, err := r.queries.GetService(ctx, id)
 	if err != nil {
 		return nil, storeError("service", err)
@@ -72,6 +79,9 @@ func (r *Repository) GetService(ctx context.Context, id string) (_ *murphy.Servi
 }
 
 func (r *Repository) ListServices(ctx context.Context, before string, limit int) (_ []*murphy.Service, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
 	rows, err := r.queries.ListServices(ctx, ListServicesParams{Before: before, MaxRows: int32(limit)})
 	if err != nil {
 		return nil, storeError("service", err)
@@ -84,6 +94,9 @@ func (r *Repository) ListServices(ctx context.Context, before string, limit int)
 }
 
 func (r *Repository) UpdateService(ctx context.Context, service *murphy.Service) (err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
 	rows, err := r.queries.UpdateService(ctx, UpdateServiceParams{
 		ID:                 service.GetId(),
 		Name:               service.GetName(),
@@ -98,11 +111,17 @@ func (r *Repository) UpdateService(ctx context.Context, service *murphy.Service)
 }
 
 func (r *Repository) DeleteService(ctx context.Context, id string) (err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
 	rows, err := r.queries.DeleteService(ctx, id)
 	return changed("service", rows, err)
 }
 
 func (r *Repository) CreateIntegration(ctx context.Context, integration *murphy.Integration) (err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
 	return storeError("integration", r.queries.CreateIntegration(ctx, CreateIntegrationParams{
 		ID:                    integration.GetId(),
 		ServiceID:             integration.GetServiceId(),
@@ -117,6 +136,9 @@ func (r *Repository) CreateIntegration(ctx context.Context, integration *murphy.
 }
 
 func (r *Repository) GetIntegration(ctx context.Context, id string) (_ *murphy.Integration, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
 	row, err := r.queries.GetIntegration(ctx, id)
 	if err != nil {
 		return nil, storeError("integration", err)
@@ -125,6 +147,9 @@ func (r *Repository) GetIntegration(ctx context.Context, id string) (_ *murphy.I
 }
 
 func (r *Repository) ListIntegrations(ctx context.Context, serviceID, before string, limit int) (_ []*murphy.Integration, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
 	rows, err := r.queries.ListIntegrations(ctx, ListIntegrationsParams{ServiceID: serviceID, Before: before, MaxRows: int32(limit)})
 	if err != nil {
 		return nil, storeError("integration", err)
@@ -137,6 +162,9 @@ func (r *Repository) ListIntegrations(ctx context.Context, serviceID, before str
 }
 
 func (r *Repository) UpdateIntegration(ctx context.Context, integration *murphy.Integration) (err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
 	rows, err := r.queries.UpdateIntegration(ctx, UpdateIntegrationParams{
 		ID:        integration.GetId(),
 		Name:      integration.GetName(),
@@ -147,6 +175,9 @@ func (r *Repository) UpdateIntegration(ctx context.Context, integration *murphy.
 }
 
 func (r *Repository) DeleteIntegration(ctx context.Context, id string) (err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
 	rows, err := r.queries.DeleteIntegration(ctx, id)
 	return changed("integration", rows, err)
 }

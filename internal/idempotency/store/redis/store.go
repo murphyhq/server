@@ -11,6 +11,7 @@ import (
 
 	"github.com/murphyhq/server/internal/idempotency"
 	"github.com/murphyhq/server/internal/redis"
+	"github.com/murphyhq/server/internal/tracer"
 )
 
 const prefix = "murphy:idempotency:"
@@ -36,6 +37,9 @@ func (s *Store) Close() error {
 }
 
 func (s *Store) Reserve(ctx context.Context, key string, record idempotency.Record, lease time.Duration) (_ *idempotency.Record, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
 	data, err := json.Marshal(record)
 	if err != nil {
 		return nil, fmt.Errorf("encode idempotency record: %w", err)
@@ -66,6 +70,9 @@ func (s *Store) Reserve(ctx context.Context, key string, record idempotency.Reco
 }
 
 func (s *Store) Complete(ctx context.Context, key string, record idempotency.Record, ttl time.Duration) (err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
 	data, err := json.Marshal(record)
 	if err != nil {
 		return fmt.Errorf("encode idempotency record: %w", err)
@@ -81,6 +88,9 @@ func (s *Store) Complete(ctx context.Context, key string, record idempotency.Rec
 }
 
 func (s *Store) Release(ctx context.Context, key string) (err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
 	if err := s.client.Del(ctx, prefix+key).Err(); err != nil {
 		return fmt.Errorf("release idempotency key: %w", err)
 	}
