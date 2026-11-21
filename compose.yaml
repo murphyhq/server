@@ -6,6 +6,11 @@ x-component: &component
     - .:/src
     - go-mod:/go/pkg/mod
     - go-build:/root/.cache/go-build
+  healthcheck:
+    test: ["CMD", "curl", "-sf", "http://localhost:9000/readyz"]
+    interval: 5s
+    start_period: 120s
+    retries: 3
   depends_on:
     migrate:
       condition: service_completed_successfully
@@ -61,7 +66,9 @@ services:
 
   migrate:
     <<: *component
-    command: ["go", "run", "./cmd/migrate"]
+    command: ["sh", "-c", "go build -o /tmp/migrate ./cmd/migrate && exec /tmp/migrate"]
+    healthcheck:
+      disable: true
     depends_on:
       postgres:
         condition: service_healthy
@@ -69,23 +76,23 @@ services:
 
   ingest:
     <<: *component
-    command: ["go", "run", "./cmd/ingest"]
+    command: ["sh", "-c", "go build -o /tmp/ingest ./cmd/ingest && exec /tmp/ingest"]
 
   api:
     <<: *component
-    command: ["go", "run", "./cmd/api"]
+    command: ["sh", "-c", "go build -o /tmp/api ./cmd/api && exec /tmp/api"]
 
   engine:
     <<: *component
-    command: ["go", "run", "./cmd/engine"]
+    command: ["sh", "-c", "go build -o /tmp/engine ./cmd/engine && exec /tmp/engine"]
 
   scheduler:
     <<: *component
-    command: ["go", "run", "./cmd/scheduler"]
+    command: ["sh", "-c", "go build -o /tmp/scheduler ./cmd/scheduler && exec /tmp/scheduler"]
 
   notifier:
     <<: *component
-    command: ["go", "run", "./cmd/notifier"]
+    command: ["sh", "-c", "go build -o /tmp/notifier ./cmd/notifier && exec /tmp/notifier"]
 
 volumes:
   postgres:

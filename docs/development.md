@@ -35,13 +35,22 @@ A service owns one domain. It states what it needs as interfaces, so the same lo
 
 ## Implementations
 
-Databases, message brokers, notification providers and secret stores are interchangeable. Adding one never changes the services that use it.
+Databases, message brokers and notification providers are interchangeable. Adding one never changes the services that use it.
 
 1. A new implementation MUST implement an existing interface.
 2. Its client MUST live in `internal/`, and the implementation next to the interface's other implementations.
 3. It MUST pass the interface's shared test suite unchanged, against the real service in a container or an emulator.
 4. It MUST be selectable by configuration, and every external endpoint it uses MUST be configurable.
-5. It MUST accept secrets as references (`env://`, `file://`, `aws-ssm://`) and MUST NOT accept secret values.
+
+## Configuration and lifecycle
+
+Every component starts, reports its health and stops the same way, so it behaves predictably in Docker Compose, Kubernetes or anywhere else it runs.
+
+1. Configuration MUST come only from environment variables prefixed `MURPHY_`, loaded at startup through `internal/config`.
+2. A missing or invalid setting MUST stop the component at startup, with an error naming every variable at fault and never its value.
+3. Every component MUST run through `internal/lifecycle`. On `SIGTERM` or `SIGINT` it stops taking new work and finishes what it has within `MURPHY_SHUTDOWN_TIMEOUT`.
+4. Every component MUST serve `/healthz` and `/readyz` on `MURPHY_HEALTH_ADDR`. `/healthz` answers whether the process is alive; `/readyz` answers whether it can do its work, and MUST check every dependency it needs.
+5. Health responses MUST NOT include error details.
 
 ## Domain and events
 
