@@ -11,7 +11,7 @@ Every piece of code has one obvious place, so anyone can find it and nothing lea
 | Path | Contains |
 |---|---|
 | root package `murphy` | Domain types generated from `proto/`, and hand-written methods on them |
-| `services/<domain>/` | One service per domain: its business logic, the interfaces it needs, and its storage under `db/<engine>/` (migrations, queries, generated code, repository) |
+| `services/<domain>/` | One service per domain: its business logic, the interfaces it needs, and its storage under `db/`: `db/db.go` opens the engine its URL names, and `db/<engine>/` holds that engine's migrations, queries, generated code and repository |
 | `internal/` | Thin clients and helpers with no domain logic: connections, provider clients, configuration loading, telemetry |
 | `cmd/<component>/` | One executable per component: `main.go`, its `config/`, and its entry code (HTTP routes or message handlers) |
 | `openapi/` | OpenAPI specs |
@@ -40,7 +40,8 @@ Databases, message brokers and notification providers are interchangeable. Addin
 1. A new implementation MUST implement an existing interface.
 2. Its client MUST live in `internal/`, and the implementation next to the interface's other implementations.
 3. It MUST pass the interface's shared test suite unchanged, against the real service in a container or an emulator.
-4. It MUST be selectable by configuration, and every external endpoint it uses MUST be configurable.
+4. It MUST be chosen by the scheme of its URL (`postgres://`, `redis://`), in one `Open` next to the interface's implementations. Components MUST pass that URL in and MUST NOT name an implementation, so adding one changes no component.
+5. Every external endpoint it uses MUST be configurable, and its setting MUST be named after its purpose, never its product (`MURPHY_CATALOG_DATABASE_URL`, not `MURPHY_POSTGRES_URL`).
 
 ## Configuration and lifecycle
 
@@ -56,8 +57,8 @@ Every component starts, reports its health and stops the same way, so it behaves
 
 The domain is defined once, in Protobuf, so every component, and later every client, agrees on what an incident or a notification is. Components communicate only through events: facts about entities that anyone can react to.
 
-1. Domain entities MUST be defined in Protobuf under `proto/murphy/v1/`. The Go types in the root package MUST be generated from them and used everywhere; there MUST NOT be a second, hand-written model.
-2. Behaviour on an entity MUST live in hand-written files in the root package, next to the generated code.
+1. Domain entities MUST be defined in Protobuf under `proto/murphy/v1/`, in one `<domain>.proto` per domain. Types used by several domains MUST go in `shared.proto`. The Go types in the root package MUST be generated from them and used everywhere; there MUST NOT be a second, hand-written model.
+2. Behaviour on an entity MUST live in the root package, in the hand-written `<domain>.go` next to the generated `<domain>.pb.go`. Behaviour shared by several domains goes in `shared.go`.
 3. Generated types MUST be passed by pointer and MUST NOT be copied.
 4. Every message MUST be an event named `<Entity><PastTenseVerb>`. The verb MUST be `Created`, `Updated`, `Deleted` or a change of state in the domain (`Acknowledged`, `Resolved`, `Delivered`, `Expired`).
 5. A message MUST NOT ask a specific component to do something.
@@ -84,8 +85,8 @@ A page must never be lost or sent twice. The broker delivers at least once and a
 
 Murphy is a modular monolith: services share one database, and each service owns its tables. Ownership keeps services independent; the rules on migrations keep upgrades safe while old and new components run side by side.
 
-1. Each domain MUST have its own database. Its connection URL is configured in the component that hosts the domain and injected into `internal/postgres`, which never reads configuration itself. Every database a component uses MUST be part of its readiness check.
-2. A service's storage MUST live in `services/<domain>/db/<engine>/`: its migrations, its queries, the code generated from them and its repository.
+1. Each domain MUST have its own database. Its URL is configured in the component that hosts the domain (`MURPHY_<DOMAIN>_DATABASE_URL`) and passed to the domain's `db.Open`, which never reads configuration itself. Every database a component uses MUST be part of its readiness check.
+2. A service's storage for an engine MUST live in `services/<domain>/db/<engine>/`: its migrations, its queries, the code generated from them and its repository, which also applies the migrations and reports readiness.
 3. Only the owning service MUST read or write its tables. Other services MUST reach that data through the owning service, never through SQL.
 4. Services MUST refer to each other's data by ID. There MUST NOT be foreign keys between tables of different services.
 5. A transaction MUST NOT span services. Anything that must change in one transaction belongs to one service; services coordinate through events.
@@ -152,13 +153,13 @@ Every kind of failure Murphy guards against is tested, without changing the code
 2. `context.Context` MUST be the first parameter of anything that does I/O.
 3. Errors MUST be wrapped with what was being done.
 4. Secrets MUST NOT appear in logs or errors.
-5. OpenAPI specs and Protobuf definitions MUST change first, followed by regeneration. Generated code MUST be committed and MUST NOT be edited by hand.
+5. OpenAPI specs, Protobuf definitions and SQL queries MUST change first, followed by regeneration with `buf generate` and `sqlc generate` (configured at the repository root). Generated code MUST be committed and MUST NOT be edited by hand; CI fails when it is out of date.
 
 ## Tooling
 
 1. The Go toolchain MUST be pinned with the `toolchain` directive, and tools (`sqlc`, `oapi-codegen`, `buf`, `protoc-gen-go`, `goose`, `govulncheck`) with `tool` directives in `go.mod`, all on their latest stable versions. `ko` is pinned the same way in its own module, `tools/ko/go.mod`, because its dependencies conflict with the other tools'.
 2. `gofmt`, `go vet`, `golangci-lint`, `buf lint` and `govulncheck` MUST pass.
-3. `compose.yaml` MUST provide every service the components depend on (PostgreSQL, NATS, LocalStack, and Grafana's LGTM stack for telemetry at `localhost:3000`) and MUST run every component from source in its `murphy` profile: `docker compose up` starts the services only, `docker compose --profile murphy up` starts everything, and `docker compose --profile murphy watch` also restarts the components when code changes.
+3. `compose.yaml` MUST provide every service the components depend on (PostgreSQL, NATS, LocalStack, and Grafana's LGTM stack for telemetry at `localhost:3000`), MUST create every domain's database on every start, and MUST run every component from source in its `murphy` profile: `docker compose up` starts the services only, `docker compose --profile murphy up` starts everything, and `docker compose --profile murphy watch` also restarts the components when code changes.
 4. Container images MUST be built with `ko`, one per component, from `.ko.yaml`. The release workflow publishes them to `ghcr.io/murphyhq/<component>` for every `v*` tag.
 5. Dependencies MUST be kept current through Dependabot, for Go modules, GitHub Actions and the images in `compose.yaml`.
 

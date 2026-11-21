@@ -68,6 +68,20 @@ services:
       interval: 2s
       retries: 30
 
+  databases:
+    image: postgres:19.0
+    command: ["/databases.sh"]
+    environment:
+      PGHOST: postgres
+      PGUSER: murphy
+      PGPASSWORD: murphy
+      PGDATABASE: murphy
+    volumes:
+      - ./compose/postgres/databases.sh:/databases.sh:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   lgtm:
     image: grafana/otel-lgtm:0.41.1
     ports:
@@ -78,13 +92,16 @@ services:
   migrate:
     <<: *component
     command: ["sh", "-c", "go build -o /tmp/migrate ./cmd/migrate && exec /tmp/migrate"]
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://lgtm:4318
+      MURPHY_CATALOG_DATABASE_URL: postgres://murphy:murphy@postgres:5432/catalog?sslmode=disable
     healthcheck:
       disable: true
     depends_on:
       lgtm:
         condition: service_started
-      postgres:
-        condition: service_healthy
+      databases:
+        condition: service_completed_successfully
     develop: {}
 
   ingest:

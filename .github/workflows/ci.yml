@@ -24,6 +24,13 @@ jobs:
       - uses: golangci/golangci-lint-action@v9
         with:
           version: v2.15.0
+      - run: go tool buf lint
+      - name: Check generated code is current
+        run: |
+          go tool buf generate
+          go tool sqlc generate
+          git diff --exit-code
+          test -z "$(git status --porcelain)"
 
   test:
     runs-on: ubuntu-latest
