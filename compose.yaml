@@ -1,0 +1,27 @@
+services:
+  postgres:
+    image: postgres:19.0
+    environment:
+      POSTGRES_USER: murphy
+      POSTGRES_PASSWORD: murphy
+      POSTGRES_DB: murphy
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "murphy"]
+      interval: 2s
+      retries: 30
+
+  nats:
+    image: nats:2.15.3
+    command: ["-js", "-m", "8222"]
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+
+  localstack:
+    image: localstack/localstack:4.14.0
+    environment:
+      SERVICES: sqs,sns,ssm
+    ports:
+      - "4566:4566"
