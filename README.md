@@ -1,8 +1,8 @@
 # Murphy
 
-[![CI](https://github.com/murphyhq/server/actions/workflows/ci.yml/badge.svg)](https://github.com/murphyhq/server/actions/workflows/ci.yml) [![Go version](https://img.shields.io/github/go-mod/go-version/murphyhq/server)](go.mod) [![License: AGPL-3.0](https://img.shields.io/github/license/murphyhq/server)](LICENSE) [![Self-hosted](https://img.shields.io/badge/self--hosted-yes-2ea44f)](docs/architecture.md)
+[![CI](https://github.com/murphyhq/server/actions/workflows/ci.yml/badge.svg)](https://github.com/murphyhq/server/actions/workflows/ci.yml) [![License: AGPL-3.0](https://img.shields.io/github/license/murphyhq/server)](LICENSE) [![Self-hosted](https://img.shields.io/badge/self--hosted-yes-2ea44f)](docs/architecture.md)
 
-[![Go](https://img.shields.io/badge/Go-00ADD8?logo=go&logoColor=white)](https://go.dev) [![OpenTelemetry](https://img.shields.io/badge/OpenTelemetry-000000?logo=opentelemetry&logoColor=white)](https://opentelemetry.io) [![OpenAPI](https://img.shields.io/badge/OpenAPI-6BA539?logo=openapiinitiative&logoColor=white)](https://www.openapis.org) [![Conventional Commits](https://img.shields.io/badge/Conventional%20Commits-1.0.0-FE5196?logo=conventionalcommits&logoColor=white)](https://www.conventionalcommits.org)
+[![Go version](https://img.shields.io/github/go-mod/go-version/murphyhq/server)](go.mod) [![Go](https://img.shields.io/badge/Go-00ADD8?logo=go&logoColor=white)](https://go.dev) [![OpenTelemetry](https://img.shields.io/badge/OpenTelemetry-000000?logo=opentelemetry&logoColor=white)](https://opentelemetry.io) [![OpenAPI](https://img.shields.io/badge/OpenAPI-6BA539?logo=openapiinitiative&logoColor=white)](https://www.openapis.org) [![Conventional Commits](https://img.shields.io/badge/Conventional%20Commits-1.0.0-FE5196?logo=conventionalcommits&logoColor=white)](https://www.conventionalcommits.org)
 
 Anything that can go wrong will go wrong, and Murphy makes sure someone hears about it.
 
