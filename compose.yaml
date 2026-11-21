@@ -1,3 +1,26 @@
+x-component: &component
+  image: golang:1.27.4
+  profiles: [murphy]
+  working_dir: /src
+  volumes:
+    - .:/src
+    - go-mod:/go/pkg/mod
+    - go-build:/root/.cache/go-build
+  depends_on:
+    migrate:
+      condition: service_completed_successfully
+    nats:
+      condition: service_healthy
+    localstack:
+      condition: service_healthy
+  develop:
+    watch:
+      - action: sync+restart
+        path: .
+        target: /src
+        ignore:
+          - .git/
+
 services:
   postgres:
     image: postgres:19.0
@@ -7,17 +30,23 @@ services:
       POSTGRES_DB: murphy
     ports:
       - "5432:5432"
+    volumes:
+      - postgres:/var/lib/postgresql
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "murphy"]
       interval: 2s
       retries: 30
 
   nats:
-    image: nats:2.15.3
+    image: nats:2.15.3-alpine
     command: ["-js", "-m", "8222"]
     ports:
       - "4222:4222"
       - "8222:8222"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8222/healthz"]
+      interval: 2s
+      retries: 30
 
   localstack:
     image: localstack/localstack:4.14.0
@@ -25,3 +54,40 @@ services:
       SERVICES: sqs,sns,ssm
     ports:
       - "4566:4566"
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:4566/_localstack/health"]
+      interval: 2s
+      retries: 30
+
+  migrate:
+    <<: *component
+    command: ["go", "run", "./cmd/migrate"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    develop: {}
+
+  ingest:
+    <<: *component
+    command: ["go", "run", "./cmd/ingest"]
+
+  api:
+    <<: *component
+    command: ["go", "run", "./cmd/api"]
+
+  engine:
+    <<: *component
+    command: ["go", "run", "./cmd/engine"]
+
+  scheduler:
+    <<: *component
+    command: ["go", "run", "./cmd/scheduler"]
+
+  notifier:
+    <<: *component
+    command: ["go", "run", "./cmd/notifier"]
+
+volumes:
+  postgres:
+  go-mod:
+  go-build:
