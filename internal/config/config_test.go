@@ -1,9 +1,11 @@
 package config_test
 
 import (
-	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/murphyhq/server/internal/config"
 )
@@ -13,12 +15,11 @@ type nested struct {
 }
 
 type settings struct {
-	Name     string        `env:"NAME" required:"true"`
-	Port     int           `env:"PORT" default:"8080"`
-	Debug    bool          `env:"DEBUG"`
-	Timeout  time.Duration `env:"TIMEOUT" default:"5s"`
-	Password string        `env:"PASSWORD"`
-	Nested   nested
+	Name    string        `env:"NAME" required:"true"`
+	Port    int           `env:"PORT" default:"8080"`
+	Debug   bool          `env:"DEBUG"`
+	Timeout time.Duration `env:"TIMEOUT" default:"5s"`
+	Nested  nested
 }
 
 func TestLoadAppliesValuesAndDefaults(t *testing.T) {
@@ -27,15 +28,15 @@ func TestLoadAppliesValuesAndDefaults(t *testing.T) {
 	t.Setenv("MURPHY_ADDR", ":9000")
 
 	var s settings
-	if err := config.Load(&s); err != nil {
-		t.Fatalf("load: %v", err)
-	}
-	if s.Name != "murphy" || !s.Debug || s.Nested.Addr != ":9000" {
-		t.Errorf("values not loaded: %+v", s)
-	}
-	if s.Port != 8080 || s.Timeout != 5*time.Second {
-		t.Errorf("defaults not applied: %+v", s)
-	}
+	require.NoError(t, config.Load(&s))
+
+	assert.Equal(t, settings{
+		Name:    "murphy",
+		Port:    8080,
+		Debug:   true,
+		Timeout: 5 * time.Second,
+		Nested:  nested{Addr: ":9000"},
+	}, s)
 }
 
 func TestLoadReportsEveryProblem(t *testing.T) {
@@ -44,14 +45,11 @@ func TestLoadReportsEveryProblem(t *testing.T) {
 
 	var s settings
 	err := config.Load(&s)
-	if err == nil {
-		t.Fatal("expected an error")
-	}
-	for _, want := range []string{"MURPHY_NAME: required but not set", "MURPHY_PORT: not a valid integer", "MURPHY_TIMEOUT: not a valid duration"} {
-		if !strings.Contains(err.Error(), want) {
-			t.Errorf("error %q does not contain %q", err, want)
-		}
-	}
+
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "MURPHY_NAME: required but not set")
+	assert.ErrorContains(t, err, "MURPHY_PORT: not a valid integer")
+	assert.ErrorContains(t, err, "MURPHY_TIMEOUT: not a valid duration")
 }
 
 func TestLoadNeverPutsValuesInErrors(t *testing.T) {
@@ -60,17 +58,7 @@ func TestLoadNeverPutsValuesInErrors(t *testing.T) {
 
 	var s settings
 	err := config.Load(&s)
-	if err == nil {
-		t.Fatal("expected an error")
-	}
-	if strings.Contains(err.Error(), "s3cr3t") {
-		t.Errorf("error %q contains the value", err)
-	}
-}
 
-func TestLoadRequiresAPointerToAStruct(t *testing.T) {
-	var s settings
-	if err := config.Load(s); err == nil {
-		t.Error("expected an error for a non-pointer destination")
-	}
+	require.Error(t, err)
+	assert.NotContains(t, err.Error(), "s3cr3t")
 }

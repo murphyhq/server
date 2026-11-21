@@ -46,9 +46,9 @@ Databases, message brokers and notification providers are interchangeable. Addin
 
 Every component starts, reports its health and stops the same way, so it behaves predictably in Docker Compose, Kubernetes or anywhere else it runs.
 
-1. Configuration MUST come only from environment variables prefixed `MURPHY_`, loaded at startup through `internal/config`.
+1. Configuration MUST come only from environment variables prefixed `MURPHY_`, loaded at startup through `internal/config`. The only exception is the standard OpenTelemetry variables (`OTEL_*`), which configure telemetry.
 2. A missing or invalid setting MUST stop the component at startup, with an error naming every variable at fault and never its value.
-3. Every component MUST run through `internal/lifecycle`. On `SIGTERM` or `SIGINT` it stops taking new work and finishes what it has within `MURPHY_SHUTDOWN_TIMEOUT`.
+3. Every component MUST run through `internal/lifecycle`, which sets up telemetry first. On `SIGTERM` or `SIGINT` it stops taking new work, finishes what it has and flushes telemetry, all within `MURPHY_SHUTDOWN_TIMEOUT`.
 4. Every component MUST serve `/healthz` and `/readyz` on `MURPHY_HEALTH_ADDR`. `/healthz` answers whether the process is alive; `/readyz` answers whether it can do its work, and MUST check every dependency it needs.
 5. Health responses MUST NOT include error details.
 
@@ -109,17 +109,22 @@ The API is the public way to build on Murphy, so its behaviour is predictable ac
 6. Unknown parameters MUST be rejected, never ignored.
 7. Every request that creates something or triggers an action MUST accept an `Idempotency-Key` header. A retry with the same key and the same request MUST return the original response without doing the work again; the same key with a different request MUST be rejected. Keys MUST be kept for 24 hours.
 
-## Tracing and logs
+## Tracing, logs and metrics
 
-Every page must be explainable afterwards: what happened, in which order, and why. Murphy traces its own work and continues the traces it receives.
+Every page must be explainable afterwards: what happened, in which order, and why. Murphy traces its own work, continues the traces it receives, and measures how it performs.
 
-1. Every function that takes a `context.Context` MUST be traced, through the shared helper in `internal/telemetry`.
+1. Every unit of work MUST be traced with `internal/tracer`: handling a request, a message or a timer, a database query, and every call to another system. Functions that run for the life of the process, such as a component's main loop, and health checks are not traced themselves.
 2. Span names MUST come from the function name, never typed by hand.
 3. A function's error MUST be recorded on its span, and the span marked as failed.
-4. Attributes MUST describe what the function worked on, with Murphy's prefix (`murphy.incident.id`). They MUST NOT contain secrets or contact details.
-5. Incoming requests and messages MUST continue the caller's trace, and outgoing calls and published messages MUST carry it on.
-6. Every log line MUST carry the current trace and span IDs.
-7. Traces, metrics and logs MUST be exported over OTLP.
+4. Logs MUST be written with `internal/logger`, and every log line MUST carry the current trace and span IDs.
+5. Fields MUST describe what is being worked on, and MUST NOT contain secrets or contact details. Murphy's prefix is added automatically (`incident.id` becomes `murphy.incident.id`).
+6. Fields that apply to everything below a point, such as the incident being handled, MUST be added to the context once: with `logger.With` before a span starts, or with the span's `Set` once the value is known. They then appear on every log line and span beneath it, and a field added again with the same key replaces the earlier one.
+7. Metrics MUST be recorded with `internal/metrics`. Their dimensions MUST be passed explicitly and MUST have few possible values (a channel, a provider), never per-item values such as an incident ID; context fields are never added to metrics.
+8. Incoming requests and messages MUST continue the caller's trace, and outgoing calls and published messages MUST carry it on.
+9. Traces, metrics and logs MUST be exported over OTLP when an endpoint is configured. Without one, nothing is exported and the component runs normally.
+10. Everything a component emits MUST carry its name and version (`service.name`, `service.version`). The version comes from the build: the release tag, or a pseudo-version for untagged builds.
+11. The log level MUST be set with `MURPHY_LOG_LEVEL` (`debug`, `info`, `warn` or `error`; `info` by default), and applies to every log destination.
+12. Only `internal/logger`, `internal/tracer`, `internal/metrics` and `internal/telemetry` MAY import OpenTelemetry packages or `log/slog`. Everything else uses their APIs.
 
 ## Testing
 
@@ -136,12 +141,13 @@ Every kind of failure Murphy guards against is tested, without changing the code
 1. `tests/testenv/` MUST provide the test environment: infrastructure in containers, components started from configuration, stub notification providers (they record what was sent, fail on demand and send callbacks), and traffic generators that send alerts in each monitoring tool's format.
 2. Tests MUST change behaviour only through configuration. Components MUST NOT contain test-only code paths.
 3. Fakes MUST be hand-written, and tests MUST check outcomes (what was sent, what was stored), not which methods were called.
-4. Every consumer MUST have tests for a crash between each step of its delivery handling.
-5. `go test ./...` MUST run the unit tests without Docker or network access. Tests under `tests/` MUST use the `integration` build tag.
+4. Tests MUST use `testify`: `require` for anything the rest of the test depends on, `assert` for the checks themselves.
+5. Every consumer MUST have tests for a crash between each step of its delivery handling.
+6. `go test ./...` MUST run the unit tests without Docker or network access. Tests under `tests/` MUST use the `integration` build tag.
 
 ## Code
 
-1. Code MUST use the standard library first: no web framework, no ORM, and no dependency for what a few lines of code can do.
+1. Code MUST use the standard library first: no web framework, no ORM, and no dependency for what a few lines of code can do. Tests are the one exception: they use `testify`.
 2. `context.Context` MUST be the first parameter of anything that does I/O.
 3. Errors MUST be wrapped with what was being done.
 4. Secrets MUST NOT appear in logs or errors.
@@ -151,7 +157,7 @@ Every kind of failure Murphy guards against is tested, without changing the code
 
 1. The Go toolchain MUST be pinned with the `toolchain` directive, and tools (`sqlc`, `oapi-codegen`, `buf`, `goose`, `ko`) with `tool` directives in `go.mod`, all on their latest stable versions.
 2. `gofmt`, `go vet`, `golangci-lint` and `buf lint` MUST pass.
-3. `compose.yaml` MUST provide every service the components depend on (PostgreSQL, NATS and LocalStack) and MUST run every component from source in its `murphy` profile: `docker compose up` starts the services only, `docker compose --profile murphy up` starts everything, and `docker compose --profile murphy watch` also restarts the components when code changes.
+3. `compose.yaml` MUST provide every service the components depend on (PostgreSQL, NATS, LocalStack, and Grafana's LGTM stack for telemetry at `localhost:3000`) and MUST run every component from source in its `murphy` profile: `docker compose up` starts the services only, `docker compose --profile murphy up` starts everything, and `docker compose --profile murphy watch` also restarts the components when code changes.
 4. Container images MUST be built with `ko`, one per component, from `.ko.yaml`. The release workflow publishes them to `ghcr.io/murphyhq/<component>` for every `v*` tag.
 5. Dependencies MUST be kept current through Dependabot, for Go modules, GitHub Actions and the images in `compose.yaml`.
 
