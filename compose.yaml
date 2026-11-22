@@ -198,13 +198,10 @@ services:
   db-viewer:
     image: dbgate/dbgate:7.3.4
     environment:
-      CONNECTIONS: catalog,incidents
-      LABEL_catalog: Catalog
-      LABEL_incidents: Incidents
-      ENGINE_catalog: postgres@dbgate-plugin-postgres
-      ENGINE_incidents: postgres@dbgate-plugin-postgres
-      URL_catalog: postgres://murphy:murphy@postgres:5432/catalog?sslmode=disable
-      URL_incidents: postgres://murphy:murphy@postgres:5432/incidents?sslmode=disable
+      CONNECTIONS: murphy
+      LABEL_murphy: Murphy
+      ENGINE_murphy: postgres@dbgate-plugin-postgres
+      URL_murphy: postgres://murphy:murphy@postgres:5432/postgres?sslmode=disable
     ports:
       - "8082:3000"
     depends_on:
