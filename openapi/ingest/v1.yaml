@@ -32,18 +32,30 @@ paths:
           $ref: "#/components/responses/Problem"
         "401":
           $ref: "#/components/responses/Problem"
-  /v1/alerts/alertmanager:
+  /v1/alerts/{source}:
     post:
-      operationId: receiveAlertmanagerAlerts
-      summary: Receive alerts from Prometheus Alertmanager
-      description: Accepts Alertmanager's webhook payload. Each alert in the group becomes one message; the group is one incident.
+      operationId: receiveSourceAlerts
+      summary: Receive alerts from a monitoring tool
+      description: "Accepts a monitoring tool's own webhook payload, chosen by source: Alertmanager and Grafana groups (each alert in a group becomes one message, the group one incident), Murphy's Datadog template, CloudWatch alarms through an SNS HTTPS subscription (whose subscription it confirms), and Google Cloud Monitoring incidents (schema 1.2)."
       tags: [alerts]
+      parameters:
+        - name: source
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [alertmanager, grafana, datadog, cloudwatch, google-cloud]
       requestBody:
         required: true
         content:
-          application/json:
+          "*/*":
             schema:
-              $ref: "#/components/schemas/AlertmanagerWebhook"
+              oneOf:
+                - $ref: "#/components/schemas/AlertmanagerWebhook"
+                - $ref: "#/components/schemas/GrafanaWebhook"
+                - $ref: "#/components/schemas/DatadogAlert"
+                - $ref: "#/components/schemas/SNSMessage"
+                - $ref: "#/components/schemas/GoogleCloudWebhook"
       responses:
         "202":
           description: The alerts were accepted.
@@ -55,97 +67,7 @@ paths:
           $ref: "#/components/responses/Problem"
         "401":
           $ref: "#/components/responses/Problem"
-  /v1/alerts/grafana:
-    post:
-      operationId: receiveGrafanaAlerts
-      summary: Receive alerts from Grafana
-      description: Accepts Grafana Alerting's webhook payload. Each alert in the group becomes one message; the group is one incident.
-      tags: [alerts]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/GrafanaWebhook"
-      responses:
-        "202":
-          description: The alerts were accepted.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/BatchAccepted"
-        "400":
-          $ref: "#/components/responses/Problem"
-        "401":
-          $ref: "#/components/responses/Problem"
-  /v1/alerts/datadog:
-    post:
-      operationId: receiveDatadogAlert
-      summary: Receive an alert from Datadog
-      description: Accepts the payload of Murphy's Datadog webhook template.
-      tags: [alerts]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/DatadogAlert"
-      responses:
-        "202":
-          description: The alerts were accepted.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/BatchAccepted"
-        "400":
-          $ref: "#/components/responses/Problem"
-        "401":
-          $ref: "#/components/responses/Problem"
-  /v1/alerts/cloudwatch:
-    post:
-      operationId: receiveCloudWatchAlarm
-      summary: Receive a CloudWatch alarm through SNS
-      description: Accepts the messages of an SNS HTTPS subscription. It confirms the subscription, and turns alarm notifications into alerts.
-      tags: [alerts]
-      requestBody:
-        required: true
-        content:
-          text/plain:
-            schema:
-              type: string
-      responses:
-        "202":
-          description: The alerts were accepted.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/BatchAccepted"
-        "400":
-          $ref: "#/components/responses/Problem"
-        "401":
-          $ref: "#/components/responses/Problem"
-  /v1/alerts/google-cloud:
-    post:
-      operationId: receiveGoogleCloudIncident
-      summary: Receive an incident from Google Cloud Monitoring
-      description: Accepts Cloud Monitoring's webhook payload, schema version 1.2.
-      tags: [alerts]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/GoogleCloudWebhook"
-      responses:
-        "202":
-          description: The alerts were accepted.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/BatchAccepted"
-        "400":
-          $ref: "#/components/responses/Problem"
-        "401":
+        "404":
           $ref: "#/components/responses/Problem"
 components:
   securitySchemes:
@@ -351,6 +273,18 @@ components:
           type: object
           additionalProperties:
             type: string
+    SNSMessage:
+      type: object
+      description: An SNS message, sent as text/plain. A Notification's Message holds the CloudWatch alarm as JSON.
+      required: [Type]
+      properties:
+        Type:
+          type: string
+          enum: [SubscriptionConfirmation, Notification, UnsubscribeConfirmation]
+        Message:
+          type: string
+        SubscribeURL:
+          type: string
     GoogleCloudWebhook:
       type: object
       required: [version, incident]

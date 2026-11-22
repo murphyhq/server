@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"maps"
 	"net/http"
 	"net/url"
@@ -19,7 +20,25 @@ import (
 	"github.com/murphyhq/server/internal/tracer"
 )
 
-const maxDedupKey = 255
+const (
+	maxDedupKey = 255
+	maxBody     = 1 << 20
+)
+
+type translate func(ctx context.Context, s *Server, body []byte) ([]*murphy.Alert, error)
+
+type source struct {
+	integration murphy.IntegrationType
+	translate   translate
+}
+
+var sources = map[ReceiveSourceAlertsParamsSource]source{
+	Alertmanager: {murphy.IntegrationType_INTEGRATION_TYPE_ALERTMANAGER, fromAlertmanager},
+	Grafana:      {murphy.IntegrationType_INTEGRATION_TYPE_GRAFANA, fromGrafana},
+	Datadog:      {murphy.IntegrationType_INTEGRATION_TYPE_DATADOG, fromDatadog},
+	Cloudwatch:   {murphy.IntegrationType_INTEGRATION_TYPE_CLOUDWATCH, fromCloudWatch},
+	GoogleCloud:  {murphy.IntegrationType_INTEGRATION_TYPE_GOOGLE_CLOUD, fromGoogleCloud},
+}
 
 func (s *Server) ReceiveAlert(ctx context.Context, request ReceiveAlertRequestObject) (_ ReceiveAlertResponseObject, err error) {
 	ctx, span := tracer.Span(ctx)
@@ -38,6 +57,32 @@ func (s *Server) ReceiveAlert(ctx context.Context, request ReceiveAlertRequestOb
 		return nil, err
 	}
 	return ReceiveAlert202JSONResponse{Id: ids[0]}, nil
+}
+
+func (s *Server) ReceiveSourceAlerts(ctx context.Context, request ReceiveSourceAlertsRequestObject) (_ ReceiveSourceAlertsResponseObject, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	src, ok := sources[request.Source]
+	if !ok {
+		return nil, &murphy.NotFoundError{Entity: "alert source"}
+	}
+	body, err := io.ReadAll(io.LimitReader(request.Body, maxBody+1))
+	if err != nil {
+		return nil, fmt.Errorf("read the request body: %w", err)
+	}
+	if len(body) > maxBody {
+		return nil, invalid("body", "must be at most 1 MiB")
+	}
+	alerts, err := src.translate(ctx, s, body)
+	if err != nil {
+		return nil, err
+	}
+	ids, err := s.publish(ctx, src.integration, alerts...)
+	if err != nil {
+		return nil, err
+	}
+	return ReceiveSourceAlerts202JSONResponse{Ids: ids}, nil
 }
 
 func (s *Server) publish(ctx context.Context, source murphy.IntegrationType, alerts ...*murphy.Alert) (_ []string, err error) {
@@ -84,138 +129,111 @@ func (s *Server) publish(ctx context.Context, source murphy.IntegrationType, ale
 	return ids, nil
 }
 
-func dedupKey(key string) string {
-	if len(key) <= maxDedupKey {
-		return key
-	}
-	sum := sha256.Sum256([]byte(key))
-	return "sha256:" + hex.EncodeToString(sum[:])
+type groupedAlertPayload struct {
+	Status       string            `json:"status"`
+	Labels       map[string]string `json:"labels"`
+	Annotations  map[string]string `json:"annotations"`
+	StartsAt     time.Time         `json:"startsAt"`
+	GeneratorURL string            `json:"generatorURL"`
+	Fingerprint  string            `json:"fingerprint"`
+	SilenceURL   string            `json:"silenceURL"`
+	DashboardURL string            `json:"dashboardURL"`
+	PanelURL     string            `json:"panelURL"`
 }
 
-func firstOf(values ...string) string {
-	for _, value := range values {
-		if value != "" {
-			return value
+type groupPayload struct {
+	GroupKey          string                `json:"groupKey"`
+	Title             string                `json:"title"`
+	CommonAnnotations map[string]string     `json:"commonAnnotations"`
+	Alerts            []groupedAlertPayload `json:"alerts"`
+}
+
+func fromAlertmanager(_ context.Context, _ *Server, body []byte) ([]*murphy.Alert, error) {
+	return fromGroup(body)
+}
+
+func fromGrafana(_ context.Context, _ *Server, body []byte) ([]*murphy.Alert, error) {
+	return fromGroup(body)
+}
+
+func fromGroup(body []byte) ([]*murphy.Alert, error) {
+	var group groupPayload
+	if err := json.Unmarshal(body, &group); err != nil {
+		return nil, invalid("body", "must be a webhook payload")
+	}
+	if group.GroupKey == "" || len(group.Alerts) == 0 {
+		return nil, invalid("body", "must have a groupKey and at least one alert")
+	}
+	alerts := make([]*murphy.Alert, len(group.Alerts))
+	for i, a := range group.Alerts {
+		annotations := maps.Clone(a.Annotations)
+		if annotations == nil {
+			annotations = map[string]string{}
+		}
+		for name, link := range map[string]string{"generator_url": a.GeneratorURL, "dashboard_url": a.DashboardURL, "panel_url": a.PanelURL, "silence_url": a.SilenceURL} {
+			if link != "" {
+				annotations[name] = link
+			}
+		}
+		alerts[i] = &murphy.Alert{
+			DedupKey:    group.GroupKey,
+			Instance:    a.Fingerprint + "@" + a.StartsAt.UTC().Format(time.RFC3339Nano),
+			Status:      murphy.AlertStatusFromText(a.Status),
+			Summary:     firstOf(a.Annotations["summary"], a.Annotations["description"], group.CommonAnnotations["summary"], group.Title, a.Labels["alertname"]),
+			Labels:      maps.Clone(a.Labels),
+			Annotations: annotations,
 		}
 	}
-	return ""
+	return alerts, nil
 }
 
-func (s *Server) ReceiveAlertmanagerAlerts(ctx context.Context, request ReceiveAlertmanagerAlertsRequestObject) (_ ReceiveAlertmanagerAlertsResponseObject, err error) {
-	ctx, span := tracer.Span(ctx)
-	defer span.End(&err)
-
-	body := request.Body
-	alerts := make([]*murphy.Alert, len(body.Alerts))
-	for i, a := range body.Alerts {
-		alerts[i] = groupedAlert(body.GroupKey, string(a.Status), a.Fingerprint, a.StartsAt, a.Labels, a.Annotations, value(body.CommonAnnotations))
-		addLink(alerts[i], "generator_url", a.GeneratorURL)
-	}
-	ids, err := s.publish(ctx, murphy.IntegrationType_INTEGRATION_TYPE_ALERTMANAGER, alerts...)
-	if err != nil {
-		return nil, err
-	}
-	return ReceiveAlertmanagerAlerts202JSONResponse{Ids: ids}, nil
+type datadogPayload struct {
+	AlertID        string `json:"alert_id"`
+	AggregationKey string `json:"aggregation_key"`
+	CycleKey       string `json:"cycle_key"`
+	Transition     string `json:"transition"`
+	Title          string `json:"title"`
+	Message        string `json:"message"`
+	Priority       string `json:"priority"`
+	Link           string `json:"link"`
+	Tags           string `json:"tags"`
 }
 
-func groupedAlert(groupKey, status, fingerprint string, startsAt time.Time, labels, annotations, common map[string]string) *murphy.Alert {
-	alert := &murphy.Alert{
-		DedupKey:    groupKey,
-		Instance:    fingerprint + "@" + startsAt.UTC().Format(time.RFC3339Nano),
-		Status:      murphy.AlertStatusFromText(status),
-		Summary:     firstOf(annotations["summary"], annotations["description"], common["summary"], labels["alertname"]),
-		Labels:      maps.Clone(labels),
-		Annotations: maps.Clone(annotations),
+func fromDatadog(_ context.Context, _ *Server, body []byte) ([]*murphy.Alert, error) {
+	var payload datadogPayload
+	if err := json.Unmarshal(body, &payload); err != nil || payload.Transition == "" {
+		return nil, invalid("body", "must be Murphy's Datadog webhook template")
 	}
-	if alert.Annotations == nil {
-		alert.Annotations = map[string]string{}
-	}
-	return alert
-}
-
-func addLink(alert *murphy.Alert, name string, url *string) {
-	if url != nil && *url != "" {
-		alert.Annotations[name] = *url
-	}
-}
-
-func value[T any](pointer *T) T {
-	var zero T
-	if pointer == nil {
-		return zero
-	}
-	return *pointer
-}
-
-func (s *Server) ReceiveGrafanaAlerts(ctx context.Context, request ReceiveGrafanaAlertsRequestObject) (_ ReceiveGrafanaAlertsResponseObject, err error) {
-	ctx, span := tracer.Span(ctx)
-	defer span.End(&err)
-
-	body := request.Body
-	common := value(body.CommonAnnotations)
-	if title := value(body.Title); title != "" && common["summary"] == "" {
-		common = map[string]string{"summary": title}
-	}
-	alerts := make([]*murphy.Alert, len(body.Alerts))
-	for i, a := range body.Alerts {
-		alerts[i] = groupedAlert(body.GroupKey, string(a.Status), a.Fingerprint, a.StartsAt, a.Labels, a.Annotations, common)
-		addLink(alerts[i], "generator_url", a.GeneratorURL)
-		addLink(alerts[i], "dashboard_url", a.DashboardURL)
-		addLink(alerts[i], "panel_url", a.PanelURL)
-		addLink(alerts[i], "silence_url", a.SilenceURL)
-	}
-	ids, err := s.publish(ctx, murphy.IntegrationType_INTEGRATION_TYPE_GRAFANA, alerts...)
-	if err != nil {
-		return nil, err
-	}
-	return ReceiveGrafanaAlerts202JSONResponse{Ids: ids}, nil
-}
-
-const datadogRecovered = "Recovered"
-
-func (s *Server) ReceiveDatadogAlert(ctx context.Context, request ReceiveDatadogAlertRequestObject) (_ ReceiveDatadogAlertResponseObject, err error) {
-	ctx, span := tracer.Span(ctx)
-	defer span.End(&err)
-
-	body := request.Body
 	status := murphy.AlertStatus_ALERT_STATUS_FIRING
-	if body.Transition == datadogRecovered {
+	if payload.Transition == "Recovered" {
 		status = murphy.AlertStatus_ALERT_STATUS_RESOLVED
 	}
-	alert := &murphy.Alert{
-		DedupKey:    firstOf(value(body.AggregationKey), body.AlertId),
-		Instance:    value(body.CycleKey),
-		Status:      status,
-		Summary:     body.Title,
-		Labels:      datadogTags(value(body.Tags)),
-		Annotations: map[string]string{"transition": body.Transition},
-	}
-	for name, field := range map[string]*string{"link": body.Link, "priority": body.Priority, "message": body.Message} {
-		addLink(alert, name, field)
-	}
-	ids, err := s.publish(ctx, murphy.IntegrationType_INTEGRATION_TYPE_DATADOG, alert)
-	if err != nil {
-		return nil, err
-	}
-	return ReceiveDatadogAlert202JSONResponse{Ids: ids}, nil
-}
-
-func datadogTags(tags string) map[string]string {
 	labels := map[string]string{}
-	for tag := range strings.SplitSeq(tags, ",") {
-		tag = strings.TrimSpace(tag)
-		if tag == "" {
-			continue
+	for tag := range strings.SplitSeq(payload.Tags, ",") {
+		if tag = strings.TrimSpace(tag); tag != "" {
+			key, value, _ := strings.Cut(tag, ":")
+			labels[key] = value
 		}
-		key, value, _ := strings.Cut(tag, ":")
-		labels[key] = value
 	}
-	return labels
+	annotations := map[string]string{"transition": payload.Transition}
+	for name, value := range map[string]string{"link": payload.Link, "priority": payload.Priority, "message": payload.Message} {
+		if value != "" {
+			annotations[name] = value
+		}
+	}
+	return []*murphy.Alert{{
+		DedupKey:    firstOf(payload.AggregationKey, payload.AlertID),
+		Instance:    payload.CycleKey,
+		Status:      status,
+		Summary:     payload.Title,
+		Labels:      labels,
+		Annotations: annotations,
+	}}, nil
 }
 
 var snsHost = regexp.MustCompile(`^sns\.[a-z0-9-]+\.amazonaws\.com(\.cn)?$`)
 
-type snsMessage struct {
+type snsPayload struct {
 	Type         string `json:"Type"`
 	Message      string `json:"Message"`
 	SubscribeURL string `json:"SubscribeURL"`
@@ -233,28 +251,22 @@ type cloudWatchAlarm struct {
 	AlarmContributorAttributes map[string]string `json:"AlarmContributorAttributes"`
 }
 
-func (s *Server) ReceiveCloudWatchAlarm(ctx context.Context, request ReceiveCloudWatchAlarmRequestObject) (_ ReceiveCloudWatchAlarmResponseObject, err error) {
-	ctx, span := tracer.Span(ctx)
-	defer span.End(&err)
-
-	var message snsMessage
-	if err := json.Unmarshal([]byte(*request.Body), &message); err != nil {
-		return nil, &murphy.FieldError{Field: "body", Reason: "must be an SNS message"}
+func fromCloudWatch(ctx context.Context, s *Server, body []byte) ([]*murphy.Alert, error) {
+	var message snsPayload
+	if err := json.Unmarshal(body, &message); err != nil {
+		return nil, invalid("body", "must be an SNS message")
 	}
 	switch message.Type {
 	case "SubscriptionConfirmation":
-		if err := s.confirmSubscription(ctx, message.SubscribeURL); err != nil {
-			return nil, err
-		}
-		return ReceiveCloudWatchAlarm202JSONResponse{Ids: []string{}}, nil
+		return nil, s.confirmSubscription(ctx, message.SubscribeURL)
 	case "Notification":
 	default:
-		return ReceiveCloudWatchAlarm202JSONResponse{Ids: []string{}}, nil
+		return nil, nil
 	}
 
 	var alarm cloudWatchAlarm
 	if err := json.Unmarshal([]byte(message.Message), &alarm); err != nil || alarm.AlarmName == "" {
-		return nil, &murphy.FieldError{Field: "Message", Reason: "must be a CloudWatch alarm notification"}
+		return nil, invalid("Message", "must be a CloudWatch alarm notification")
 	}
 	var status murphy.AlertStatus
 	switch alarm.NewStateValue {
@@ -263,29 +275,21 @@ func (s *Server) ReceiveCloudWatchAlarm(ctx context.Context, request ReceiveClou
 	case "OK":
 		status = murphy.AlertStatus_ALERT_STATUS_RESOLVED
 	default:
-		return ReceiveCloudWatchAlarm202JSONResponse{Ids: []string{}}, nil
+		return nil, nil
 	}
-
 	dedup := firstOf(alarm.AlarmArn, alarm.AlarmName)
 	if alarm.AlarmContributorID != "" {
 		dedup += "/" + alarm.AlarmContributorID
 	}
 	labels := map[string]string{"alarm_name": alarm.AlarmName, "account_id": alarm.AWSAccountID, "region": alarm.Region}
-	for name, value := range alarm.AlarmContributorAttributes {
-		labels[name] = value
-	}
-	alert := &murphy.Alert{
+	maps.Copy(labels, alarm.AlarmContributorAttributes)
+	return []*murphy.Alert{{
 		DedupKey:    dedup,
 		Status:      status,
 		Summary:     firstOf(alarm.AlarmDescription, alarm.AlarmName),
 		Labels:      labels,
 		Annotations: map[string]string{"reason": alarm.NewStateReason, "alarm_arn": alarm.AlarmArn},
-	}
-	ids, err := s.publish(ctx, murphy.IntegrationType_INTEGRATION_TYPE_CLOUDWATCH, alert)
-	if err != nil {
-		return nil, err
-	}
-	return ReceiveCloudWatchAlarm202JSONResponse{Ids: ids}, nil
+	}}, nil
 }
 
 func (s *Server) confirmSubscription(ctx context.Context, subscribeURL string) (err error) {
@@ -294,7 +298,7 @@ func (s *Server) confirmSubscription(ctx context.Context, subscribeURL string) (
 
 	u, err := url.Parse(subscribeURL)
 	if err != nil || u.Scheme != "https" || !snsHost.MatchString(u.Hostname()) {
-		return &murphy.FieldError{Field: "SubscribeURL", Reason: "must be an https URL on an SNS endpoint"}
+		return invalid("SubscribeURL", "must be an https URL on an SNS endpoint")
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {
@@ -311,38 +315,72 @@ func (s *Server) confirmSubscription(ctx context.Context, subscribeURL string) (
 	return nil
 }
 
-func (s *Server) ReceiveGoogleCloudIncident(ctx context.Context, request ReceiveGoogleCloudIncidentRequestObject) (_ ReceiveGoogleCloudIncidentResponseObject, err error) {
-	ctx, span := tracer.Span(ctx)
-	defer span.End(&err)
+type googleCloudPayload struct {
+	Incident struct {
+		IncidentID    string `json:"incident_id"`
+		State         string `json:"state"`
+		Summary       string `json:"summary"`
+		URL           string `json:"url"`
+		PolicyName    string `json:"policy_name"`
+		ConditionName string `json:"condition_name"`
+		Severity      string `json:"severity"`
+		Resource      struct {
+			Labels map[string]string `json:"labels"`
+		} `json:"resource"`
+		Metric struct {
+			Labels map[string]string `json:"labels"`
+		} `json:"metric"`
+		PolicyUserLabels map[string]string `json:"policy_user_labels"`
+	} `json:"incident"`
+}
 
-	incident := request.Body.Incident
+func fromGoogleCloud(_ context.Context, _ *Server, body []byte) ([]*murphy.Alert, error) {
+	var payload googleCloudPayload
+	if err := json.Unmarshal(body, &payload); err != nil || payload.Incident.IncidentID == "" {
+		return nil, invalid("body", "must be a Cloud Monitoring incident")
+	}
+	incident := payload.Incident
 	status := murphy.AlertStatus_ALERT_STATUS_FIRING
-	if incident.State == Closed {
+	if incident.State == "closed" {
 		status = murphy.AlertStatus_ALERT_STATUS_RESOLVED
 	}
 	labels := map[string]string{}
-	if incident.Resource != nil {
-		maps.Copy(labels, value(incident.Resource.Labels))
+	maps.Copy(labels, incident.Resource.Labels)
+	maps.Copy(labels, incident.Metric.Labels)
+	maps.Copy(labels, incident.PolicyUserLabels)
+	annotations := map[string]string{}
+	for name, value := range map[string]string{"url": incident.URL, "policy_name": incident.PolicyName, "condition_name": incident.ConditionName, "severity": incident.Severity} {
+		if value != "" {
+			annotations[name] = value
+		}
 	}
-	if incident.Metric != nil {
-		maps.Copy(labels, value(incident.Metric.Labels))
-	}
-	maps.Copy(labels, value(incident.PolicyUserLabels))
-
-	alert := &murphy.Alert{
-		DedupKey:    incident.IncidentId,
-		Instance:    incident.IncidentId,
+	return []*murphy.Alert{{
+		DedupKey:    incident.IncidentID,
+		Instance:    incident.IncidentID,
 		Status:      status,
-		Summary:     firstOf(incident.Summary, value(incident.PolicyName)),
+		Summary:     firstOf(incident.Summary, incident.PolicyName),
 		Labels:      labels,
-		Annotations: map[string]string{},
+		Annotations: annotations,
+	}}, nil
+}
+
+func invalid(field, reason string) error {
+	return &murphy.FieldError{Field: field, Reason: reason}
+}
+
+func dedupKey(key string) string {
+	if len(key) <= maxDedupKey {
+		return key
 	}
-	for name, field := range map[string]*string{"url": incident.Url, "policy_name": incident.PolicyName, "condition_name": incident.ConditionName, "severity": incident.Severity} {
-		addLink(alert, name, field)
+	sum := sha256.Sum256([]byte(key))
+	return "sha256:" + hex.EncodeToString(sum[:])
+}
+
+func firstOf(values ...string) string {
+	for _, value := range values {
+		if value != "" {
+			return value
+		}
 	}
-	ids, err := s.publish(ctx, murphy.IntegrationType_INTEGRATION_TYPE_GOOGLE_CLOUD, alert)
-	if err != nil {
-		return nil, err
-	}
-	return ReceiveGoogleCloudIncident202JSONResponse{Ids: ids}, nil
+	return ""
 }

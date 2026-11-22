@@ -148,3 +148,12 @@ func TestCloudWatchSubscriptionsAndStatesWithoutAnAlert(t *testing.T) {
 	time.Sleep(time.Second)
 	assert.Nil(t, incidentFor(t, stack.API, serviceID))
 }
+
+func TestAnUnknownAlertSourceIsNotFound(t *testing.T) {
+	stack := testenv.Murphy(t, testenv.NATS(), testenv.PostgresDatabase)
+	_, _, key := integrationKey(t, stack.API)
+
+	status, _ := deliver(t, stack, "Bearer "+key, testenv.Webhook{Path: "/v1/alerts/zabbix", ContentType: "application/json", Body: []byte("{}")})
+
+	assert.Equal(t, http.StatusNotFound, status)
+}
