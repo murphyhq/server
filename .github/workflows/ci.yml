@@ -25,6 +25,7 @@ jobs:
         with:
           version: v2.15.0
       - run: go tool buf lint
+      - run: go tool buf breaking --against "https://github.com/${{ github.repository }}.git#branch=main"
       - name: Check generated code is current
         run: |
           go tool buf generate
