@@ -25,7 +25,7 @@ type Delivery struct {
 type Broker interface {
 	System() string
 	Publish(ctx context.Context, topic, id string, data []byte) error
-	Subscribe(ctx context.Context, group string, topics []string, handle func(context.Context, Delivery) error) (Subscription, error)
+	Subscribe(ctx context.Context, handle func(context.Context, Delivery) error) (Subscription, error)
 	Ping(ctx context.Context) error
 	Close() error
 }
@@ -51,6 +51,8 @@ func RetryAfter(attempt int) time.Duration {
 }
 
 type Handler func(ctx context.Context, envelope *murphy.Envelope) error
+
+type Handlers map[string]Handler
 
 var event = (&murphy.Envelope{}).ProtoReflect().Descriptor().Oneofs().ByName("event")
 
@@ -105,22 +107,22 @@ func (p *Publisher) Publish(ctx context.Context, envelope *murphy.Envelope) (err
 	return nil
 }
 
-func Subscribe(ctx context.Context, broker Broker, group string, handle Handler, topics ...string) (Subscription, error) {
+func Subscribe(ctx context.Context, broker Broker, group string, handlers Handlers) (Subscription, error) {
+	if len(handlers) == 0 {
+		return nil, errors.New("subscribe: no handlers")
+	}
 	known := map[string]bool{}
 	for _, topic := range Topics() {
 		known[topic] = true
 	}
-	if len(topics) == 0 {
-		return nil, errors.New("subscribe: no topics")
-	}
-	for _, topic := range topics {
+	for topic := range handlers {
 		if !known[topic] {
 			return nil, fmt.Errorf("subscribe: unknown topic %s", topic)
 		}
 	}
 
-	subscription, err := broker.Subscribe(ctx, group, topics, func(ctx context.Context, delivery Delivery) error {
-		return process(ctx, broker.System(), group, handle, delivery)
+	subscription, err := broker.Subscribe(ctx, func(ctx context.Context, delivery Delivery) error {
+		return process(ctx, broker.System(), group, handlers, delivery)
 	})
 	if err != nil {
 		return nil, fmt.Errorf("subscribe %s: %w", group, err)
@@ -128,7 +130,7 @@ func Subscribe(ctx context.Context, broker Broker, group string, handle Handler,
 	return subscription, nil
 }
 
-func process(ctx context.Context, system, group string, handle Handler, delivery Delivery) (err error) {
+func process(ctx context.Context, system, group string, handlers Handlers, delivery Delivery) (err error) {
 	started := time.Now()
 	envelope := &murphy.Envelope{}
 	if err := proto.Unmarshal(delivery.Data, envelope); err != nil {
@@ -144,7 +146,11 @@ func process(ctx context.Context, system, group string, handle Handler, delivery
 		telemetry.WithField("message.attempt", delivery.Attempt),
 	)...)
 
-	err = handle(ctx, envelope)
+	if handle, ok := handlers[topic]; ok {
+		err = handle(ctx, envelope)
+	} else {
+		err = Reject(fmt.Errorf("%s has no handler for %s", group, topic))
+	}
 	if err != nil && errors.Is(err, murphy.ErrInvalid) {
 		err = Reject(err)
 	}

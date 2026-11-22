@@ -6,6 +6,7 @@ import (
 
 	"github.com/murphyhq/server/internal/config"
 	"github.com/murphyhq/server/internal/logger"
+	"github.com/murphyhq/server/internal/messaging"
 	"github.com/murphyhq/server/internal/telemetry"
 	"github.com/murphyhq/server/tests/provision"
 )
@@ -39,8 +40,9 @@ func run(ctx context.Context) error {
 			return err
 		}
 	}
-	if err := provision.NATS(ctx, s.NATSURL, "events", topology); err != nil {
+	if err := provision.NATS(ctx, s.NATSURL, "events", topology, messaging.TopologyVersion); err != nil {
 		return err
 	}
-	return provision.SNS(ctx, "murphy", topology)
+	_, err := provision.SNS(ctx, "murphy", topology, messaging.TopologyVersion)
+	return err
 }

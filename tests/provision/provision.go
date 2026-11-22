@@ -5,17 +5,20 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
 	sdkaws "github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sns"
+	snstypes "github.com/aws/aws-sdk-go-v2/service/sns/types"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	sqstypes "github.com/aws/aws-sdk-go-v2/service/sqs/types"
 	"github.com/jackc/pgx/v5"
 	"github.com/nats-io/nats.go/jetstream"
 
 	"github.com/murphyhq/server/internal/aws"
+	"github.com/murphyhq/server/internal/messaging"
 	"github.com/murphyhq/server/internal/nats"
 )
 
@@ -41,7 +44,7 @@ func Database(ctx context.Context, adminURL, name string) error {
 	return nil
 }
 
-func NATS(ctx context.Context, serverURL, stream string, topology Topology) error {
+func NATS(ctx context.Context, serverURL, stream string, topology Topology, version int) error {
 	conn, js, err := nats.Open(nats.Config{URL: serverURL})
 	if err != nil {
 		return err
@@ -55,6 +58,7 @@ func NATS(ctx context.Context, serverURL, stream string, topology Topology) erro
 		Storage:    jetstream.FileStorage,
 		MaxAge:     7 * 24 * time.Hour,
 		Duplicates: 2 * time.Minute,
+		Metadata:   map[string]string{messaging.TopologyVersionKey: strconv.Itoa(version)},
 	})
 	if err != nil {
 		return fmt.Errorf("create stream %s: %w", stream, err)
@@ -70,6 +74,7 @@ func NATS(ctx context.Context, serverURL, stream string, topology Topology) erro
 			AckPolicy:      jetstream.AckExplicitPolicy,
 			AckWait:        30 * time.Second,
 			MaxAckPending:  64,
+			Metadata:       map[string]string{messaging.TopologyVersionKey: strconv.Itoa(version)},
 		})
 		if err != nil {
 			return fmt.Errorf("create consumer %s: %w", group, err)
@@ -78,36 +83,58 @@ func NATS(ctx context.Context, serverURL, stream string, topology Topology) erro
 	return nil
 }
 
-func SNS(ctx context.Context, prefix string, topology Topology) error {
+type SNSResources struct {
+	TopicARN string
+	Queues   map[string]string
+}
+
+func SNS(ctx context.Context, prefix string, topology Topology, version int) (SNSResources, error) {
 	cfg, err := aws.Config(ctx)
 	if err != nil {
-		return err
+		return SNSResources{}, err
 	}
 	snsClient, sqsClient := sns.NewFromConfig(cfg), sqs.NewFromConfig(cfg)
+	tag := strconv.Itoa(version)
 
 	topic, err := snsClient.CreateTopic(ctx, &sns.CreateTopicInput{Name: sdkaws.String(prefix + "-events")})
 	if err != nil {
-		return fmt.Errorf("create topic %s-events: %w", prefix, err)
+		return SNSResources{}, fmt.Errorf("create topic %s-events: %w", prefix, err)
 	}
+	if _, err := snsClient.TagResource(ctx, &sns.TagResourceInput{
+		ResourceArn: topic.TopicArn,
+		Tags:        []snstypes.Tag{{Key: sdkaws.String(messaging.TopologyVersionKey), Value: &tag}},
+	}); err != nil {
+		return SNSResources{}, fmt.Errorf("tag topic %s-events: %w", prefix, err)
+	}
+
+	resources := SNSResources{TopicARN: *topic.TopicArn, Queues: map[string]string{}}
 	for group, topics := range topology {
-		if err := queue(ctx, snsClient, sqsClient, *topic.TopicArn, prefix+"-"+group, topics); err != nil {
-			return err
+		queueURL, err := queue(ctx, snsClient, sqsClient, *topic.TopicArn, prefix+"-"+group, topics, tag)
+		if err != nil {
+			return SNSResources{}, err
 		}
+		resources.Queues[group] = queueURL
 	}
-	return nil
+	return resources, nil
 }
 
-func queue(ctx context.Context, snsClient *sns.Client, sqsClient *sqs.Client, topicARN, name string, topics []string) error {
+func queue(ctx context.Context, snsClient *sns.Client, sqsClient *sqs.Client, topicARN, name string, topics []string, version string) (string, error) {
 	created, err := sqsClient.CreateQueue(ctx, &sqs.CreateQueueInput{QueueName: &name})
 	if err != nil {
-		return fmt.Errorf("create queue %s: %w", name, err)
+		return "", fmt.Errorf("create queue %s: %w", name, err)
+	}
+	if _, err := sqsClient.TagQueue(ctx, &sqs.TagQueueInput{
+		QueueUrl: created.QueueUrl,
+		Tags:     map[string]string{messaging.TopologyVersionKey: version},
+	}); err != nil {
+		return "", fmt.Errorf("tag queue %s: %w", name, err)
 	}
 	attributes, err := sqsClient.GetQueueAttributes(ctx, &sqs.GetQueueAttributesInput{
 		QueueUrl:       created.QueueUrl,
 		AttributeNames: []sqstypes.QueueAttributeName{sqstypes.QueueAttributeNameQueueArn},
 	})
 	if err != nil {
-		return fmt.Errorf("read queue %s: %w", name, err)
+		return "", fmt.Errorf("read queue %s: %w", name, err)
 	}
 	queueARN := attributes.Attributes[string(sqstypes.QueueAttributeNameQueueArn)]
 
@@ -122,22 +149,22 @@ func queue(ctx context.Context, snsClient *sns.Client, sqsClient *sqs.Client, to
 		}},
 	})
 	if err != nil {
-		return err
+		return "", err
 	}
 	if _, err := sqsClient.SetQueueAttributes(ctx, &sqs.SetQueueAttributesInput{
 		QueueUrl:   created.QueueUrl,
 		Attributes: map[string]string{"Policy": string(policy)},
 	}); err != nil {
-		return fmt.Errorf("allow the topic to send to queue %s: %w", name, err)
+		return "", fmt.Errorf("allow the topic to send to queue %s: %w", name, err)
 	}
 
 	filter, err := json.Marshal(map[string][]string{"topic": topics})
 	if err != nil {
-		return err
+		return "", err
 	}
 	subscription, err := subscriptionOf(ctx, snsClient, topicARN, queueARN)
 	if err != nil {
-		return err
+		return "", err
 	}
 	if subscription == "" {
 		_, err = snsClient.Subscribe(ctx, &sns.SubscribeInput{
@@ -154,9 +181,9 @@ func queue(ctx context.Context, snsClient *sns.Client, sqsClient *sqs.Client, to
 		})
 	}
 	if err != nil {
-		return fmt.Errorf("subscribe queue %s: %w", name, err)
+		return "", fmt.Errorf("subscribe queue %s: %w", name, err)
 	}
-	return nil
+	return *created.QueueUrl, nil
 }
 
 func subscriptionOf(ctx context.Context, snsClient *sns.Client, topicARN, queueARN string) (string, error) {

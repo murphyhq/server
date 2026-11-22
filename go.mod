@@ -19,9 +19,6 @@ require (
 	github.com/aws/aws-sdk-go-v2/config v1.33.21
 	github.com/aws/aws-sdk-go-v2/service/sns v1.48.0
 	github.com/aws/aws-sdk-go-v2/service/sqs v1.53.0
-	github.com/aws/smithy-go v1.28.9
-	github.com/aws/smithy-go/metrics/smithyotelmetrics v1.0.37
-	github.com/aws/smithy-go/tracing/smithyoteltracing v1.0.37
 	github.com/exaring/otelpgx v0.13.0
 	github.com/getkin/kin-openapi v0.153.0
 	github.com/jackc/pgx/v5 v5.13.0
@@ -87,6 +84,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sso v1.39.5 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.44.5 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.53.0 // indirect
+	github.com/aws/smithy-go v1.28.9 // indirect
 	github.com/brunoga/deep v1.3.1 // indirect
 	github.com/bufbuild/buf v1.75.0 // indirect
 	github.com/bufbuild/protocompile v0.14.2-0.20261020145055-56248e843b50 // indirect

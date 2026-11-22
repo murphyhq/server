@@ -25,48 +25,46 @@ const (
 
 type Topology map[string][]string
 
+type Endpoints struct {
+	Publisher string
+	Consumers map[string]string
+}
+
 type Environment struct {
-	Provision func(t *testing.T, topology Topology) string
+	Provision func(t *testing.T, topology Topology, version int) Endpoints
 	Missing   func(t *testing.T) string
 }
 
 func Run(t *testing.T, env Environment) {
-	open := func(t *testing.T, topology Topology) messaging.Broker {
+	provision := func(t *testing.T, topology Topology) (messaging.Broker, func(group string) messaging.Broker) {
 		t.Helper()
-		b, err := broker.Open(t.Context(), env.Provision(t, topology))
-		require.NoError(t, err)
-		t.Cleanup(func() { _ = b.Close() })
-		return b
+		endpoints := env.Provision(t, topology, messaging.TopologyVersion)
+		return open(t, endpoints.Publisher), func(group string) messaging.Broker { return open(t, endpoints.Consumers[group]) }
 	}
 
 	t.Run("refuses to open without its infrastructure", func(t *testing.T) {
-		b, err := broker.Open(t.Context(), env.Missing(t))
-		if err == nil {
-			t.Cleanup(func() { _ = b.Close() })
-			err = b.Ping(t.Context())
-		}
+		_, err := broker.Open(t.Context(), env.Missing(t))
+		assert.Error(t, err)
+	})
+
+	t.Run("refuses infrastructure older than this release", func(t *testing.T) {
+		endpoints := env.Provision(t, Topology{"engine": {alert}}, messaging.TopologyVersion-1)
+
+		_, err := broker.Open(t.Context(), endpoints.Publisher)
 		assert.Error(t, err)
 	})
 
 	t.Run("is ready", func(t *testing.T) {
-		b := open(t, Topology{"engine": {alert}})
-		assert.NoError(t, b.Ping(t.Context()))
-	})
-
-	t.Run("refuses a group whose filter differs from its topics", func(t *testing.T) {
-		b := open(t, Topology{"engine": {alert}, "notifier": {alert, other}})
-
-		for group, topics := range map[string][]string{"engine": {alert, other}, "notifier": {alert}, "missing": {alert}} {
-			_, err := b.Subscribe(t.Context(), group, topics, func(context.Context, messaging.Delivery) error { return nil })
-			assert.Error(t, err, group)
-		}
+		publisher, consumer := provision(t, Topology{"engine": {alert}})
+		assert.NoError(t, publisher.Ping(t.Context()))
+		assert.NoError(t, consumer("engine").Ping(t.Context()))
 	})
 
 	t.Run("delivers a published message", func(t *testing.T) {
-		b := open(t, Topology{"engine": {alert}})
-		got := subscribe(t, b, "engine", []string{alert}, accept)
+		publisher, consumer := provision(t, Topology{"engine": {alert}})
+		got := subscribe(t, consumer("engine"), accept)
 
-		publish(t, b, alert, "a")
+		publish(t, publisher, alert, "a")
 
 		require.EventuallyWithT(t, func(c *assert.CollectT) {
 			assert.Equal(c, []string{"a"}, got.data())
@@ -75,11 +73,11 @@ func Run(t *testing.T, env Environment) {
 	})
 
 	t.Run("delivers each message to every group", func(t *testing.T) {
-		b := open(t, Topology{"engine": {alert}, "notifier": {alert}})
-		engine := subscribe(t, b, "engine", []string{alert}, accept)
-		notifier := subscribe(t, b, "notifier", []string{alert}, accept)
+		publisher, consumer := provision(t, Topology{"engine": {alert}, "notifier": {alert}})
+		engine := subscribe(t, consumer("engine"), accept)
+		notifier := subscribe(t, consumer("notifier"), accept)
 
-		publish(t, b, alert, "a")
+		publish(t, publisher, alert, "a")
 
 		require.EventuallyWithT(t, func(c *assert.CollectT) {
 			assert.Equal(c, []string{"a"}, engine.data())
@@ -88,14 +86,14 @@ func Run(t *testing.T, env Environment) {
 	})
 
 	t.Run("shares a group's messages between its subscribers", func(t *testing.T) {
-		b := open(t, Topology{"engine": {alert}})
-		first := subscribe(t, b, "engine", []string{alert}, accept)
-		second := subscribe(t, b, "engine", []string{alert}, accept)
+		publisher, consumer := provision(t, Topology{"engine": {alert}})
+		first := subscribe(t, consumer("engine"), accept)
+		second := subscribe(t, consumer("engine"), accept)
 
 		want := map[string]bool{}
 		for i := range 10 {
 			want[fmt.Sprint(i)] = true
-			publish(t, b, alert, fmt.Sprint(i))
+			publish(t, publisher, alert, fmt.Sprint(i))
 		}
 
 		require.EventuallyWithT(t, func(c *assert.CollectT) {
@@ -105,11 +103,11 @@ func Run(t *testing.T, env Environment) {
 	})
 
 	t.Run("delivers only the topics a group reads", func(t *testing.T) {
-		b := open(t, Topology{"engine": {alert}})
-		got := subscribe(t, b, "engine", []string{alert}, accept)
+		publisher, consumer := provision(t, Topology{"engine": {alert}})
+		got := subscribe(t, consumer("engine"), accept)
 
-		publish(t, b, other, "ignored")
-		publish(t, b, alert, "a")
+		publish(t, publisher, other, "ignored")
+		publish(t, publisher, alert, "a")
 
 		require.EventuallyWithT(t, func(c *assert.CollectT) {
 			assert.Equal(c, []string{"a"}, got.data())
@@ -119,15 +117,15 @@ func Run(t *testing.T, env Environment) {
 	})
 
 	t.Run("redelivers a message that failed", func(t *testing.T) {
-		b := open(t, Topology{"engine": {alert}})
-		got := subscribe(t, b, "engine", []string{alert}, func(d messaging.Delivery) error {
+		publisher, consumer := provision(t, Topology{"engine": {alert}})
+		got := subscribe(t, consumer("engine"), func(d messaging.Delivery) error {
 			if d.Attempt == 1 {
 				return errors.New("database unavailable")
 			}
 			return nil
 		})
 
-		publish(t, b, alert, "a")
+		publish(t, publisher, alert, "a")
 
 		require.EventuallyWithT(t, func(c *assert.CollectT) {
 			deliveries := got.all()
@@ -139,16 +137,16 @@ func Run(t *testing.T, env Environment) {
 	})
 
 	t.Run("never redelivers a rejected message", func(t *testing.T) {
-		b := open(t, Topology{"engine": {alert}})
-		got := subscribe(t, b, "engine", []string{alert}, func(d messaging.Delivery) error {
+		publisher, consumer := provision(t, Topology{"engine": {alert}})
+		got := subscribe(t, consumer("engine"), func(d messaging.Delivery) error {
 			if string(d.Data) == "invalid" {
 				return messaging.Reject(errors.New("invalid"))
 			}
 			return nil
 		})
 
-		publish(t, b, alert, "invalid")
-		publish(t, b, alert, "a")
+		publish(t, publisher, alert, "invalid")
+		publish(t, publisher, alert, "a")
 
 		require.EventuallyWithT(t, func(c *assert.CollectT) {
 			assert.ElementsMatch(c, []string{"invalid", "a"}, got.data())
@@ -158,15 +156,23 @@ func Run(t *testing.T, env Environment) {
 	})
 
 	t.Run("keeps a group's messages while nobody consumes them", func(t *testing.T) {
-		b := open(t, Topology{"engine": {alert}})
+		publisher, consumer := provision(t, Topology{"engine": {alert}})
 
-		publish(t, b, alert, "a")
-		got := subscribe(t, b, "engine", []string{alert}, accept)
+		publish(t, publisher, alert, "a")
+		got := subscribe(t, consumer("engine"), accept)
 
 		require.EventuallyWithT(t, func(c *assert.CollectT) {
 			assert.Equal(c, []string{"a"}, got.data())
 		}, wait, tick)
 	})
+}
+
+func open(t *testing.T, url string) messaging.Broker {
+	t.Helper()
+	b, err := broker.Open(t.Context(), url)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = b.Close() })
+	return b
 }
 
 type received struct {
@@ -202,10 +208,10 @@ func distinct(values []string) map[string]bool {
 	return set
 }
 
-func subscribe(t *testing.T, b messaging.Broker, group string, topics []string, handle func(messaging.Delivery) error) *received {
+func subscribe(t *testing.T, b messaging.Broker, handle func(messaging.Delivery) error) *received {
 	t.Helper()
 	got := &received{}
-	subscription, err := b.Subscribe(t.Context(), group, topics, func(_ context.Context, d messaging.Delivery) error {
+	subscription, err := b.Subscribe(t.Context(), func(_ context.Context, d messaging.Delivery) error {
 		got.add(d)
 		return handle(d)
 	})

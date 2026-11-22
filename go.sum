@@ -103,10 +103,6 @@ github.com/aws/aws-sdk-go-v2/service/sts v1.53.0 h1:my9Y6lxcqvPV5k4OTqnxr8XbiTDD
 github.com/aws/aws-sdk-go-v2/service/sts v1.53.0/go.mod h1:MG6N8U9+lY4LqchrlHPqCOSr7hyxw70XU0Et2YR3eNA=
 github.com/aws/smithy-go v1.28.9 h1:zkZ058OpNX0iGTK24b+ZUEQSMc11CBA6oO7xtKZfzkY=
 github.com/aws/smithy-go v1.28.9/go.mod h1:YE2RhdIuDbA5E5bTdciG9KrW3+TiEONeUWCqxX9i1Fc=
-github.com/aws/smithy-go/metrics/smithyotelmetrics v1.0.37 h1:+ludOlTIidjOpMQ3OGIX64WOVs34MwfdGBU9hEAgr3g=
-github.com/aws/smithy-go/metrics/smithyotelmetrics v1.0.37/go.mod h1:qwvlPy7GO1UwHcWxDXqCm+VEb1NQ3wN+cNaT1oH4Djo=
-github.com/aws/smithy-go/tracing/smithyoteltracing v1.0.37 h1:8FPWKmB4j7yydFv+nxboefs6Um53+GRBU89fO+1PPRY=
-github.com/aws/smithy-go/tracing/smithyoteltracing v1.0.37/go.mod h1:0wLbS19HW6XUpJyNj+H4HykgxjaPvdkrzBUkoyef2f8=
 github.com/benbjohnson/clock v1.1.0/go.mod h1:J11/hYXuz8f4ySSvYwY0FKfm+ezbsZBKZxNJlLklBHA=
 github.com/bmatcuk/doublestar v1.1.1 h1:YroD6BJCZBYx06yYFEWvUuKVWQn3vLLQAVmDmvTSaiQ=
 github.com/bmatcuk/doublestar v1.1.1/go.mod h1:UD6OnuiIn0yFxxA2le/rnRU1G4RaI4UvFv1sNto9p6w=

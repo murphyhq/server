@@ -5,10 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
-	"regexp"
-	"slices"
 	"strings"
-	"sync"
 
 	gonats "github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
@@ -20,17 +17,13 @@ import (
 	"github.com/murphyhq/server/internal/tracer"
 )
 
-const (
-	defaultStream = "events"
-	maxInFlight   = 64
-)
-
-var streamName = regexp.MustCompile(`^[a-z0-9_]+$`)
+const maxInFlight = 64
 
 type Broker struct {
-	conn   *gonats.Conn
-	js     jetstream.JetStream
-	stream string
+	conn     *gonats.Conn
+	js       jetstream.JetStream
+	stream   string
+	consumer string
 }
 
 func Open(ctx context.Context, rawURL string) (*Broker, error) {
@@ -40,20 +33,21 @@ func Open(ctx context.Context, rawURL string) (*Broker, error) {
 	}
 	stream := strings.Trim(u.Path, "/")
 	if stream == "" {
-		stream = defaultStream
-	}
-	if !streamName.MatchString(stream) {
-		return nil, errors.New("the stream name in the NATS URL path must be lower case letters, digits and underscores")
+		return nil, errors.New("the NATS URL must name the stream in its path, as in nats://host:4222/events")
 	}
 
 	conn, js, err := nats.Open(nats.Config{URL: rawURL})
 	if err != nil {
 		return nil, err
 	}
-	b := &Broker{conn: conn, js: js, stream: stream}
-	if err := b.Ping(ctx); err != nil {
+	b := &Broker{conn: conn, js: js, stream: stream, consumer: u.Query().Get("consumer")}
+	info, err := js.Stream(ctx, stream)
+	if err == nil {
+		err = messaging.CheckTopologyVersion("stream "+stream, info.CachedInfo().Config.Metadata[messaging.TopologyVersionKey])
+	}
+	if err != nil {
 		conn.Close()
-		return nil, err
+		return nil, fmt.Errorf("stream %s: %w", stream, err)
 	}
 	return b, nil
 }
@@ -66,37 +60,39 @@ func (b *Broker) Publish(ctx context.Context, topic, id string, data []byte) (er
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
-	if _, err := b.js.Publish(ctx, b.subject(topic), data, jetstream.WithMsgID(id)); err != nil {
+	if _, err := b.js.Publish(ctx, b.stream+"."+topic, data, jetstream.WithMsgID(id)); err != nil {
 		return fmt.Errorf("publish to %s: %w", topic, err)
 	}
 	return nil
 }
 
-func (b *Broker) Subscribe(ctx context.Context, group string, topics []string, handle func(context.Context, messaging.Delivery) error) (messaging.Subscription, error) {
-	consumer, err := b.js.Consumer(ctx, b.stream, group)
-	if err != nil {
-		return nil, fmt.Errorf("consumer %s on stream %s: %w", group, b.stream, err)
+func (b *Broker) Subscribe(ctx context.Context, handle func(context.Context, messaging.Delivery) error) (messaging.Subscription, error) {
+	if b.consumer == "" {
+		return nil, errors.New("the NATS URL must name the consumer, as in nats://host:4222/events?consumer=engine")
 	}
-	if err := b.check(group, consumer.CachedInfo().Config, topics); err != nil {
-		return nil, err
+	consumer, err := b.js.Consumer(ctx, b.stream, b.consumer)
+	if err == nil {
+		err = messaging.CheckTopologyVersion("consumer "+b.consumer, consumer.CachedInfo().Config.Metadata[messaging.TopologyVersionKey])
+	}
+	if err != nil {
+		return nil, fmt.Errorf("consumer %s: %w", b.consumer, err)
 	}
 
 	handlerCtx := context.WithoutCancel(ctx)
-	sub := &subscription{slots: make(chan struct{}, maxInFlight)}
+	sub := &subscription{pool: messaging.NewPool(maxInFlight)}
 	sub.consumeContext, err = consumer.Consume(func(msg jetstream.Msg) {
-		sub.slots <- struct{}{}
-		sub.handling.Go(func() {
-			defer func() { <-sub.slots }()
-			settle(handlerCtx, group, msg, handle)
+		sub.pool.Acquire(handlerCtx)
+		sub.pool.Go(func() {
+			b.settle(handlerCtx, msg, handle)
 		})
 	})
 	if err != nil {
-		return nil, fmt.Errorf("consume %s: %w", group, err)
+		return nil, fmt.Errorf("consume %s: %w", b.consumer, err)
 	}
 	return sub, nil
 }
 
-func settle(ctx context.Context, group string, msg jetstream.Msg, handle func(context.Context, messaging.Delivery) error) {
+func (b *Broker) settle(ctx context.Context, msg jetstream.Msg, handle func(context.Context, messaging.Delivery) error) {
 	attempt := 1
 	if metadata, err := msg.Metadata(); err == nil {
 		attempt = int(metadata.NumDelivered)
@@ -111,13 +107,18 @@ func settle(ctx context.Context, group string, msg jetstream.Msg, handle func(co
 		err = msg.NakWithDelay(messaging.RetryAfter(attempt))
 	}
 	if err != nil {
-		logger.Warn(ctx, "message settlement failed", telemetry.WithField("consumer.group", group), telemetry.WithError(err))
+		logger.Warn(ctx, "message settlement failed", telemetry.WithField("consumer", b.consumer), telemetry.WithError(err))
 	}
 }
 
 func (b *Broker) Ping(ctx context.Context) error {
 	if _, err := b.js.Stream(ctx, b.stream); err != nil {
 		return fmt.Errorf("stream %s: %w", b.stream, err)
+	}
+	if b.consumer != "" {
+		if _, err := b.js.Consumer(ctx, b.stream, b.consumer); err != nil {
+			return fmt.Errorf("consumer %s: %w", b.consumer, err)
+		}
 	}
 	return nil
 }
@@ -126,43 +127,13 @@ func (b *Broker) Close() error {
 	return b.conn.Drain()
 }
 
-func (b *Broker) check(group string, config jetstream.ConsumerConfig, topics []string) error {
-	if config.AckPolicy != jetstream.AckExplicitPolicy || config.DeliverSubject != "" {
-		return fmt.Errorf("consumer %s must be a pull consumer with explicit acknowledgements", group)
-	}
-	filters := config.FilterSubjects
-	if config.FilterSubject != "" {
-		filters = append(filters, config.FilterSubject)
-	}
-	want := make([]string, len(topics))
-	for i, topic := range topics {
-		want[i] = b.subject(topic)
-	}
-	if !sameSet(filters, want) {
-		return fmt.Errorf("consumer %s filters %v, but %s handles %v", group, filters, group, want)
-	}
-	return nil
-}
-
-func sameSet(a, b []string) bool {
-	a, b = slices.Clone(a), slices.Clone(b)
-	slices.Sort(a)
-	slices.Sort(b)
-	return slices.Equal(slices.Compact(a), slices.Compact(b))
-}
-
-func (b *Broker) subject(topic string) string {
-	return b.stream + "." + topic
-}
-
 type subscription struct {
 	consumeContext jetstream.ConsumeContext
-	slots          chan struct{}
-	handling       sync.WaitGroup
+	pool           *messaging.Pool
 }
 
 func (s *subscription) Stop() {
 	s.consumeContext.Drain()
 	<-s.consumeContext.Closed()
-	s.handling.Wait()
+	s.pool.Wait()
 }

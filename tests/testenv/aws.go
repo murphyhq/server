@@ -5,6 +5,7 @@ package testenv
 import (
 	"context"
 	"maps"
+	"net/url"
 	"os"
 	"slices"
 	"testing"
@@ -28,17 +29,31 @@ func SQS(t *testing.T) brokertest.Environment {
 	}
 
 	return brokertest.Environment{
-		Provision: func(t *testing.T, topology brokertest.Topology) string {
+		Provision: func(t *testing.T, topology brokertest.Topology, version int) brokertest.Endpoints {
 			t.Helper()
 			prefix := name()
 			t.Cleanup(func() {
 				_ = provision.DropSNS(context.Background(), prefix, slices.Collect(maps.Keys(topology)))
 			})
-			require.NoError(t, provision.SNS(t.Context(), prefix, provision.Topology(topology)))
-			return "sqs://" + prefix
+			resources, err := provision.SNS(t.Context(), prefix, provision.Topology(topology), version)
+			require.NoError(t, err)
+
+			endpoints := brokertest.Endpoints{Publisher: sqsURL(resources.TopicARN, ""), Consumers: map[string]string{}}
+			for group, queue := range resources.Queues {
+				endpoints.Consumers[group] = sqsURL(resources.TopicARN, queue)
+			}
+			return endpoints
 		},
 		Missing: func(t *testing.T) string {
-			return "sqs://" + name()
+			return sqsURL("arn:aws:sns:us-east-1:000000000000:"+name(), "")
 		},
 	}
+}
+
+func sqsURL(topicARN, queueURL string) string {
+	query := url.Values{"topic": {topicARN}}
+	if queueURL != "" {
+		query.Set("queue", queueURL)
+	}
+	return "sqs://?" + query.Encode()
 }
