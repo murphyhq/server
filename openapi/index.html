@@ -22,8 +22,18 @@
     <script>
       Scalar.createApiReference("#app", {
         sources: [
-          { title: "Murphy API", slug: "v1", url: "./v1.yaml" },
-          { title: "Ingest API", slug: "ingest", url: "./ingest/v1.yaml" },
+          {
+            title: "Murphy API",
+            slug: "v1",
+            url: "./v1.yaml",
+            baseServerURL: "http://localhost:8080",
+          },
+          {
+            title: "Ingest API",
+            slug: "ingest",
+            url: "./ingest/v1.yaml",
+            baseServerURL: "http://localhost:8081",
+          },
         ],
       });
     </script>
