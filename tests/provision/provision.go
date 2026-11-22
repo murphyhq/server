@@ -17,7 +17,6 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/nats-io/nats.go/jetstream"
 
-	"github.com/murphyhq/server/internal/aws"
 	"github.com/murphyhq/server/internal/messaging"
 	"github.com/murphyhq/server/internal/nats"
 )
@@ -88,11 +87,7 @@ type SNSResources struct {
 	Queues   map[string]string
 }
 
-func SNS(ctx context.Context, prefix string, topology Topology, version int) (SNSResources, error) {
-	cfg, err := aws.Config(ctx)
-	if err != nil {
-		return SNSResources{}, err
-	}
+func SNS(ctx context.Context, cfg sdkaws.Config, prefix string, topology Topology, version int) (SNSResources, error) {
 	snsClient, sqsClient := sns.NewFromConfig(cfg), sqs.NewFromConfig(cfg)
 	tag := strconv.Itoa(version)
 
@@ -211,11 +206,7 @@ func DropNATS(ctx context.Context, serverURL, stream string) error {
 	return js.DeleteStream(ctx, stream)
 }
 
-func DropSNS(ctx context.Context, prefix string, groups []string) error {
-	cfg, err := aws.Config(ctx)
-	if err != nil {
-		return err
-	}
+func DropSNS(ctx context.Context, cfg sdkaws.Config, prefix string, groups []string) error {
 	snsClient, sqsClient := sns.NewFromConfig(cfg), sqs.NewFromConfig(cfg)
 
 	var errs []error

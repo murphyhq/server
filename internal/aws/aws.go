@@ -11,9 +11,9 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
-func Config(ctx context.Context) (sdkaws.Config, error) {
+func Config(ctx context.Context, options ...func(*config.LoadOptions) error) (sdkaws.Config, error) {
 	client := &http.Client{Transport: otelhttp.NewTransport(awshttp.NewBuildableClient().GetTransport())}
-	cfg, err := config.LoadDefaultConfig(ctx, config.WithHTTPClient(client))
+	cfg, err := config.LoadDefaultConfig(ctx, append([]func(*config.LoadOptions) error{config.WithHTTPClient(client)}, options...)...)
 	if err != nil {
 		return sdkaws.Config{}, fmt.Errorf("load AWS configuration: %w", err)
 	}

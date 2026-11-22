@@ -12,6 +12,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/murphyhq/server/internal/aws"
 	"github.com/murphyhq/server/internal/messaging/brokertest"
 	"github.com/murphyhq/server/tests/provision"
 )
@@ -32,10 +33,12 @@ func SQS(t *testing.T) brokertest.Environment {
 		Provision: func(t *testing.T, topology brokertest.Topology, version int) brokertest.Endpoints {
 			t.Helper()
 			prefix := name()
+			cfg, err := aws.Config(t.Context())
+			require.NoError(t, err)
+			resources, err := provision.SNS(t.Context(), cfg, prefix, provision.Topology(topology), version)
 			t.Cleanup(func() {
-				_ = provision.DropSNS(context.Background(), prefix, slices.Collect(maps.Keys(topology)))
+				_ = provision.DropSNS(context.Background(), cfg, prefix, slices.Collect(maps.Keys(topology)))
 			})
-			resources, err := provision.SNS(t.Context(), prefix, provision.Topology(topology), version)
 			require.NoError(t, err)
 
 			endpoints := brokertest.Endpoints{Publisher: sqsURL(resources.TopicARN, ""), Consumers: map[string]string{}}
