@@ -34,10 +34,23 @@ type ingestFixture struct {
 	received chan *murphy.Envelope
 }
 
-func startIngest(t *testing.T) ingestFixture {
+var brokers = map[string]func(t *testing.T) brokertest.Environment{
+	"nats": func(*testing.T) brokertest.Environment { return testenv.NATS() },
+	"sqs":  testenv.SQS,
+}
+
+func eachBroker(t *testing.T, test func(t *testing.T, ingest ingestFixture)) {
+	for name, environment := range brokers {
+		t.Run(name, func(t *testing.T) {
+			test(t, startIngest(t, environment(t)))
+		})
+	}
+}
+
+func startIngest(t *testing.T, env brokertest.Environment) ingestFixture {
 	t.Helper()
 	ctx := t.Context()
-	endpoints := testenv.NATS().Provision(t, brokertest.Topology{"engine": {"murphy.v1.alert"}}, messaging.TopologyVersion)
+	endpoints := env.Provision(t, brokertest.Topology{"engine": {"murphy.v1.alert"}}, messaging.TopologyVersion)
 
 	subscription, err := broker.OpenSubscription(ctx, endpoints.Subscriptions["engine"])
 	require.NoError(t, err)
@@ -85,72 +98,74 @@ func basic(username, password string) string {
 var firing = map[string]any{"dedup_key": "disk-full", "status": "firing", "summary": "Disk almost full", "labels": map[string]string{"host": "db-1"}}
 
 func TestIngestPublishesAcceptedAlerts(t *testing.T) {
-	ingest := startIngest(t)
+	eachBroker(t, func(t *testing.T, ingest ingestFixture) {
+		for name, authorization := range map[string]string{
+			"bearer": "Bearer " + ingest.key,
+			"basic":  basic("murphy", ingest.key),
+		} {
+			t.Run(name, func(t *testing.T) {
+				resp, body := postAlert(t, ingest.url, authorization, firing)
+				require.Equal(t, http.StatusAccepted, resp.StatusCode)
 
-	for name, authorization := range map[string]string{
-		"bearer": "Bearer " + ingest.key,
-		"basic":  basic("murphy", ingest.key),
-	} {
-		t.Run(name, func(t *testing.T) {
-			resp, body := postAlert(t, ingest.url, authorization, firing)
-			require.Equal(t, http.StatusAccepted, resp.StatusCode)
-
-			select {
-			case envelope := <-ingest.received:
-				assert.Equal(t, body["id"], envelope.GetId())
-				alert := envelope.GetAlert().GetCurrent()
-				assert.Equal(t, murphy.AlertVerb_ALERT_VERB_RECEIVED, envelope.GetAlert().GetVerb())
-				assert.Equal(t, "disk-full", alert.GetDedupKey())
-				assert.Equal(t, murphy.AlertStatus_ALERT_STATUS_FIRING, alert.GetStatus())
-				assert.Equal(t, "Disk almost full", alert.GetSummary())
-				assert.Equal(t, map[string]string{"host": "db-1"}, alert.GetLabels())
-				assert.NotEmpty(t, alert.GetIntegrationId())
-				assert.NotEmpty(t, alert.GetServiceId())
-			case <-time.After(10 * time.Second):
-				t.Fatal("no message published")
-			}
-		})
-	}
+				select {
+				case envelope := <-ingest.received:
+					assert.Equal(t, body["id"], envelope.GetId())
+					alert := envelope.GetAlert().GetCurrent()
+					assert.Equal(t, murphy.AlertVerb_ALERT_VERB_RECEIVED, envelope.GetAlert().GetVerb())
+					assert.Equal(t, "disk-full", alert.GetDedupKey())
+					assert.Equal(t, murphy.AlertStatus_ALERT_STATUS_FIRING, alert.GetStatus())
+					assert.Equal(t, "Disk almost full", alert.GetSummary())
+					assert.Equal(t, map[string]string{"host": "db-1"}, alert.GetLabels())
+					assert.NotEmpty(t, alert.GetIntegrationId())
+					assert.NotEmpty(t, alert.GetServiceId())
+				case <-time.After(10 * time.Second):
+					t.Fatal("no message published")
+				}
+			})
+		}
+	})
 }
 
 func TestIngestRefusesRequestsWithoutAValidKey(t *testing.T) {
-	ingest := startIngest(t)
-	other, err := catalog.ParseKeyring("9:" + base64.StdEncoding.EncodeToString([]byte(strings.Repeat("x", 32))))
-	require.NoError(t, err)
-	forged, err := other.Sign(&murphy.Integration{Id: murphy.NewID(), ServiceId: murphy.NewID(), KeyVersion: 1})
-	require.NoError(t, err)
+	eachBroker(t, func(t *testing.T, ingest ingestFixture) {
+		other, err := catalog.ParseKeyring("9:" + base64.StdEncoding.EncodeToString([]byte(strings.Repeat("x", 32))))
+		require.NoError(t, err)
+		forged, err := other.Sign(&murphy.Integration{Id: murphy.NewID(), ServiceId: murphy.NewID(), KeyVersion: 1})
+		require.NoError(t, err)
 
-	for name, authorization := range map[string]string{
-		"missing":                "",
-		"key without scheme":     ingest.key,
-		"signed by another":      "Bearer " + forged,
-		"basic with other user":  basic("admin", ingest.key),
-		"basic with wrong value": basic("murphy", "nope"),
-	} {
-		t.Run(name, func(t *testing.T) {
-			resp, body := postAlert(t, ingest.url, authorization, firing)
+		for name, authorization := range map[string]string{
+			"missing":                "",
+			"key without scheme":     ingest.key,
+			"signed by another":      "Bearer " + forged,
+			"basic with other user":  basic("admin", ingest.key),
+			"basic with wrong value": basic("murphy", "nope"),
+		} {
+			t.Run(name, func(t *testing.T) {
+				resp, body := postAlert(t, ingest.url, authorization, firing)
 
-			assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
-			assert.Equal(t, "invalid integration key", body["detail"])
-		})
-	}
-	assert.Empty(t, ingest.received)
+				assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+				assert.Equal(t, "invalid integration key", body["detail"])
+			})
+		}
+		assert.Empty(t, ingest.received)
+	})
 }
 
 func TestIngestRefusesInvalidAlerts(t *testing.T) {
-	ingest := startIngest(t)
+	eachBroker(t, func(t *testing.T, ingest ingestFixture) {
 
-	for name, alert := range map[string]any{
-		"no dedup key":   map[string]any{"status": "firing", "summary": "s"},
-		"unknown status": map[string]any{"dedup_key": "k", "status": "burning", "summary": "s"},
-		"no summary":     map[string]any{"dedup_key": "k", "status": "resolved"},
-	} {
-		t.Run(name, func(t *testing.T) {
-			resp, _ := postAlert(t, ingest.url, "Bearer "+ingest.key, alert)
-			assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
-		})
-	}
-	assert.Empty(t, ingest.received)
+		for name, alert := range map[string]any{
+			"no dedup key":   map[string]any{"status": "firing", "summary": "s"},
+			"unknown status": map[string]any{"dedup_key": "k", "status": "burning", "summary": "s"},
+			"no summary":     map[string]any{"dedup_key": "k", "status": "resolved"},
+		} {
+			t.Run(name, func(t *testing.T) {
+				resp, _ := postAlert(t, ingest.url, "Bearer "+ingest.key, alert)
+				assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+			})
+		}
+		assert.Empty(t, ingest.received)
+	})
 }
 
 type lockedBuffer struct {
@@ -180,7 +195,7 @@ func TestIngestNeverRecordsTheKey(t *testing.T) {
 	otel.SetTracerProvider(sdktrace.NewTracerProvider(sdktrace.WithSyncer(spans)))
 	t.Cleanup(func() { otel.SetTracerProvider(previous) })
 
-	ingest := startIngest(t)
+	ingest := startIngest(t, testenv.NATS())
 	accepted, _ := postAlert(t, ingest.url, "Bearer "+ingest.key, firing)
 	require.Equal(t, http.StatusAccepted, accepted.StatusCode)
 	refused, _ := postAlert(t, ingest.url, basic("admin", ingest.key), firing)
