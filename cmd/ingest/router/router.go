@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/murphyhq/server"
+	"github.com/murphyhq/server/internal/httpclient"
 	"github.com/murphyhq/server/internal/httpserver"
 	"github.com/murphyhq/server/internal/messaging"
 	"github.com/murphyhq/server/services/catalog"
@@ -16,6 +18,7 @@ const basicUsername = "murphy"
 
 type Server struct {
 	publisher *messaging.Publisher
+	client    *http.Client
 }
 
 func New(publisher *messaging.Publisher, keys *catalog.Keyring) (http.Handler, error) {
@@ -23,7 +26,7 @@ func New(publisher *messaging.Publisher, keys *catalog.Keyring) (http.Handler, e
 	if err != nil {
 		return nil, fmt.Errorf("load OpenAPI spec: %w", err)
 	}
-	strict := NewStrictHandlerWithOptions(&Server{publisher: publisher}, nil, StrictHTTPServerOptions{
+	strict := NewStrictHandlerWithOptions(&Server{publisher: publisher, client: httpclient.New(10 * time.Second)}, nil, StrictHTTPServerOptions{
 		RequestErrorHandlerFunc:  httpserver.BadRequest,
 		ResponseErrorHandlerFunc: httpserver.WriteError,
 	})
@@ -43,7 +46,8 @@ func authenticate(keys *catalog.Keyring) MiddlewareFunc {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			claims, err := keys.Verify(credential(r))
 			if err != nil {
-				w.Header().Set("WWW-Authenticate", `Bearer, Basic realm="murphy"`)
+				w.Header().Add("WWW-Authenticate", `Basic realm="murphy"`)
+				w.Header().Add("WWW-Authenticate", `Bearer realm="murphy"`)
 				httpserver.WriteProblem(w, r, http.StatusUnauthorized, "invalid integration key")
 				return
 			}

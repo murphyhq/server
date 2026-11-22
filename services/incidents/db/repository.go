@@ -23,6 +23,7 @@ type Engine[T Tx] interface {
 	ListIncidents(ctx context.Context, statuses []murphy.IncidentStatus, before string, limit int) ([]*murphy.Incident, error)
 	ListTimeline(ctx context.Context, incidentID string) ([]*murphy.TimelineEntry, error)
 	LatestFiringAt(ctx context.Context, incidentID string) (time.Time, error)
+	OpenInstances(ctx context.Context, incidentID string) ([]string, error)
 	PurgeHandledMessages(ctx context.Context, before time.Time) (int64, error)
 	Transaction(ctx context.Context, work func(tx T) error) error
 	Migrate(ctx context.Context) error

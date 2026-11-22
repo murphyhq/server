@@ -150,6 +150,23 @@ func (r *Repository) LatestFiringAt(ctx context.Context, incidentID string) (_ t
 	return latest, nil
 }
 
+func (r *Repository) OpenInstances(ctx context.Context, incidentID string) (_ []string, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	instances, err := r.queries.OpenInstances(ctx, &incidentID)
+	if err != nil {
+		return nil, murphymysql.Error("alert", err)
+	}
+	out := make([]string, 0, len(instances))
+	for _, instance := range instances {
+		if instance != nil {
+			out = append(out, *instance)
+		}
+	}
+	return out, nil
+}
+
 func (r *Repository) PurgeHandledMessages(ctx context.Context, before time.Time) (_ int64, err error) {
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)

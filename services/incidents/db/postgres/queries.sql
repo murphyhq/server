@@ -35,8 +35,8 @@ ORDER BY id DESC
 LIMIT @max_rows;
 
 -- name: CreateAlert :exec
-INSERT INTO alerts (id, incident_id, integration_id, service_id, dedup_key, status, summary, labels, received_at, created_at)
-VALUES (@id, @incident_id, @integration_id, @service_id, @dedup_key, @status, @summary, @labels, @received_at, @created_at);
+INSERT INTO alerts (id, incident_id, integration_id, service_id, dedup_key, status, summary, labels, received_at, created_at, source, instance, annotations)
+VALUES (@id, @incident_id, @integration_id, @service_id, @dedup_key, @status, @summary, @labels, @received_at, @created_at, @source, @instance, @annotations);
 
 -- name: CreateTimelineEntry :exec
 INSERT INTO timeline_entries (id, incident_id, type, alert_id, summary, created_at)
@@ -52,3 +52,12 @@ ORDER BY id;
 SELECT COALESCE(max(received_at), 'epoch'::timestamptz)::timestamptz AS received_at
 FROM alerts
 WHERE incident_id = @incident_id AND status = 'firing';
+
+-- name: OpenInstances :many
+SELECT DISTINCT fired.instance::text AS instance
+FROM alerts AS fired
+WHERE fired.incident_id = @incident_id AND fired.status = 'firing' AND fired.instance IS NOT NULL
+  AND fired.instance NOT IN (
+    SELECT resolved.instance FROM alerts AS resolved
+    WHERE resolved.incident_id = fired.incident_id AND resolved.status = 'resolved' AND resolved.instance IS NOT NULL
+  );

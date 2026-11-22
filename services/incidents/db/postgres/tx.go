@@ -78,6 +78,10 @@ func (t *Tx) CreateAlert(ctx context.Context, alert *murphy.Alert, incidentID st
 	if err != nil {
 		return fmt.Errorf("encode labels: %w", err)
 	}
+	annotations, err := json.Marshal(alert.GetAnnotations())
+	if err != nil {
+		return fmt.Errorf("encode annotations: %w", err)
+	}
 	return murphypostgres.Error("alert", t.queries.CreateAlert(ctx, CreateAlertParams{
 		ID:            alert.GetId(),
 		IncidentID:    database.Text(incidentID),
@@ -87,6 +91,9 @@ func (t *Tx) CreateAlert(ctx context.Context, alert *murphy.Alert, incidentID st
 		Status:        alert.GetStatus().Text(),
 		Summary:       alert.GetSummary(),
 		Labels:        labels,
+		Source:        murphy.Or(alert.GetSource(), murphy.IntegrationType_INTEGRATION_TYPE_GENERIC).Text(),
+		Instance:      database.Text(alert.GetInstance()),
+		Annotations:   annotations,
 		ReceivedAt:    alert.GetReceivedAt().AsTime(),
 		CreatedAt:     time.Now().UTC(),
 	}))

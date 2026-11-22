@@ -20,6 +20,7 @@ type Repository interface {
 	ListIncidents(ctx context.Context, statuses []murphy.IncidentStatus, before string, limit int) ([]*murphy.Incident, error)
 	ListTimeline(ctx context.Context, incidentID string) ([]*murphy.TimelineEntry, error)
 	LatestFiringAt(ctx context.Context, incidentID string) (time.Time, error)
+	OpenInstances(ctx context.Context, incidentID string) ([]string, error)
 	PurgeHandledMessages(ctx context.Context, before time.Time) (int64, error)
 }
 
@@ -97,11 +98,11 @@ func (s *Service) AlertReceived(ctx context.Context, messageID string, alert *mu
 		outcome.Timeline = append(outcome.Timeline, entry(open, murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_ALERTED, alert, now))
 	case open != nil:
 		outcome.IncidentID = open.GetId()
-		latest, err := s.repo.LatestFiringAt(ctx, open.GetId())
+		firing, err := s.stillFiring(ctx, open, alert)
 		if err != nil {
-			return fmt.Errorf("find latest firing alert: %w", err)
+			return err
 		}
-		if alert.GetReceivedAt().AsTime().Sub(latest) <= clockSkew {
+		if firing {
 			open.UpdatedAt = now
 			outcome.Updated = open
 			outcome.Timeline = append(outcome.Timeline, entry(open, murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_ALERTED, alert, now))
@@ -123,6 +124,26 @@ func (s *Service) AlertReceived(ctx context.Context, messageID string, alert *mu
 	return nil
 }
 
+func (s *Service) stillFiring(ctx context.Context, incident *murphy.Incident, resolve *murphy.Alert) (bool, error) {
+	if resolve.GetInstance() != "" {
+		instances, err := s.repo.OpenInstances(ctx, incident.GetId())
+		if err != nil {
+			return false, fmt.Errorf("find open instances: %w", err)
+		}
+		for _, instance := range instances {
+			if instance != resolve.GetInstance() {
+				return true, nil
+			}
+		}
+		return false, nil
+	}
+	latest, err := s.repo.LatestFiringAt(ctx, incident.GetId())
+	if err != nil {
+		return false, fmt.Errorf("find latest firing alert: %w", err)
+	}
+	return resolve.GetReceivedAt().AsTime().Sub(latest) <= clockSkew, nil
+}
+
 func (s *Service) accept(ctx context.Context, alert *murphy.Alert) (*murphy.Service, error) {
 	integration, err := s.catalog.GetIntegration(ctx, alert.GetIntegrationId())
 	if errors.Is(err, murphy.ErrNotFound) {
@@ -133,6 +154,9 @@ func (s *Service) accept(ctx context.Context, alert *murphy.Alert) (*murphy.Serv
 	}
 	if integration.GetServiceId() != alert.GetServiceId() {
 		return nil, invalidKey("it belongs to another service")
+	}
+	if source := murphy.Or(alert.GetSource(), murphy.IntegrationType_INTEGRATION_TYPE_GENERIC); source != integration.GetType() {
+		return nil, invalidKey("it was sent in the " + source.Text() + " format, and the integration expects " + integration.GetType().Text())
 	}
 	if !integration.Accepts(alert.GetKeyVersion(), alert.GetReceivedAt().AsTime()) {
 		return nil, invalidKey("the integration is disabled, or the key was rotated")

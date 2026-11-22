@@ -151,10 +151,13 @@ services:
     environment:
       <<: *component-environment
       MURPHY_SEED_API_URL: http://api:8080
+      MURPHY_SEED_GRAFANA_URL: http://lgtm:3000
     healthcheck:
       disable: true
     depends_on:
       api:
+        condition: service_healthy
+      lgtm:
         condition: service_healthy
     develop: {}
 

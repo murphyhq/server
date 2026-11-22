@@ -12,7 +12,8 @@ import (
 )
 
 type settings struct {
-	APIURL string `env:"SEED_API_URL" default:"http://localhost:8080"`
+	APIURL  string `env:"SEED_API_URL" default:"http://localhost:8080"`
+	Dogfood dogfoodSettings
 }
 
 func main() {
@@ -33,5 +34,8 @@ func run(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("create API client: %w", err)
 	}
-	return seedCatalog(ctx, api)
+	if err := seedCatalog(ctx, api); err != nil {
+		return err
+	}
+	return seedDogfood(ctx, api, s.Dogfood)
 }

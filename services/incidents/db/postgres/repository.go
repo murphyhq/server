@@ -141,6 +141,17 @@ func (r *Repository) LatestFiringAt(ctx context.Context, incidentID string) (_ t
 	return latest, nil
 }
 
+func (r *Repository) OpenInstances(ctx context.Context, incidentID string) (_ []string, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	instances, err := r.queries.OpenInstances(ctx, &incidentID)
+	if err != nil {
+		return nil, murphypostgres.Error("alert", err)
+	}
+	return instances, nil
+}
+
 func (r *Repository) PurgeHandledMessages(ctx context.Context, before time.Time) (_ int64, err error) {
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)

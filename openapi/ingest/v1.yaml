@@ -32,6 +32,43 @@ paths:
           $ref: "#/components/responses/Problem"
         "401":
           $ref: "#/components/responses/Problem"
+  /v1/alerts/{source}:
+    post:
+      operationId: receiveSourceAlerts
+      summary: Receive alerts from a monitoring tool
+      description: "Accepts a monitoring tool's own webhook payload, chosen by source: Alertmanager and Grafana groups (each alert in a group becomes one message, the group one incident), Murphy's Datadog template, CloudWatch alarms through an SNS HTTPS subscription (whose subscription it confirms), and Google Cloud Monitoring incidents (schema 1.2)."
+      tags: [alerts]
+      parameters:
+        - name: source
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [alertmanager, grafana, datadog, cloudwatch, google-cloud]
+      requestBody:
+        required: true
+        content:
+          "*/*":
+            schema:
+              oneOf:
+                - $ref: "#/components/schemas/AlertmanagerWebhook"
+                - $ref: "#/components/schemas/GrafanaWebhook"
+                - $ref: "#/components/schemas/DatadogAlert"
+                - $ref: "#/components/schemas/SNSMessage"
+                - $ref: "#/components/schemas/GoogleCloudWebhook"
+      responses:
+        "202":
+          description: The alerts were accepted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchAccepted"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
 components:
   securitySchemes:
     integrationKey:
@@ -74,6 +111,188 @@ components:
         id:
           type: string
           description: The ID of the message the alert was published as.
+    BatchAccepted:
+      type: object
+      required: [ids]
+      properties:
+        ids:
+          type: array
+          description: The IDs of the messages the alerts were published as.
+          items:
+            type: string
+    AlertmanagerAlert:
+      type: object
+      required: [status, labels, annotations, startsAt, fingerprint]
+      properties:
+        status:
+          type: string
+          enum: [firing, resolved]
+        labels:
+          type: object
+          additionalProperties:
+            type: string
+        annotations:
+          type: object
+          additionalProperties:
+            type: string
+        startsAt:
+          type: string
+          format: date-time
+        endsAt:
+          type: string
+          format: date-time
+        generatorURL:
+          type: string
+        fingerprint:
+          type: string
+    AlertmanagerWebhook:
+      type: object
+      required: [groupKey, status, alerts]
+      properties:
+        version:
+          type: string
+        groupKey:
+          type: string
+        status:
+          type: string
+          enum: [firing, resolved]
+        receiver:
+          type: string
+        groupLabels:
+          type: object
+          additionalProperties:
+            type: string
+        commonLabels:
+          type: object
+          additionalProperties:
+            type: string
+        commonAnnotations:
+          type: object
+          additionalProperties:
+            type: string
+        externalURL:
+          type: string
+        alerts:
+          type: array
+          items:
+            $ref: "#/components/schemas/AlertmanagerAlert"
+    GrafanaAlert:
+      allOf:
+        - $ref: "#/components/schemas/AlertmanagerAlert"
+        - type: object
+          properties:
+            silenceURL:
+              type: string
+            dashboardURL:
+              type: string
+            panelURL:
+              type: string
+    GrafanaWebhook:
+      type: object
+      required: [groupKey, status, alerts]
+      properties:
+        groupKey:
+          type: string
+        status:
+          type: string
+          enum: [firing, resolved]
+        title:
+          type: string
+        commonAnnotations:
+          type: object
+          additionalProperties:
+            type: string
+        externalURL:
+          type: string
+        alerts:
+          type: array
+          items:
+            $ref: "#/components/schemas/GrafanaAlert"
+    DatadogAlert:
+      type: object
+      required: [alert_id, transition, title]
+      properties:
+        alert_id:
+          type: string
+        aggregation_key:
+          type: string
+        cycle_key:
+          type: string
+        transition:
+          type: string
+          description: "Datadog's $ALERT_TRANSITION. Recovered resolves the alert; every other transition fires it."
+        title:
+          type: string
+        message:
+          type: string
+        priority:
+          type: string
+        link:
+          type: string
+        tags:
+          type: string
+          description: "Datadog's $TAGS, comma-separated."
+    GoogleCloudIncident:
+      type: object
+      required: [incident_id, state, summary]
+      properties:
+        incident_id:
+          type: string
+        state:
+          type: string
+          enum: [open, closed]
+        summary:
+          type: string
+        url:
+          type: string
+        policy_name:
+          type: string
+        condition_name:
+          type: string
+        severity:
+          type: string
+        resource:
+          type: object
+          properties:
+            type:
+              type: string
+            labels:
+              type: object
+              additionalProperties:
+                type: string
+        metric:
+          type: object
+          properties:
+            type:
+              type: string
+            labels:
+              type: object
+              additionalProperties:
+                type: string
+        policy_user_labels:
+          type: object
+          additionalProperties:
+            type: string
+    SNSMessage:
+      type: object
+      description: An SNS message, sent as text/plain. A Notification's Message holds the CloudWatch alarm as JSON.
+      required: [Type]
+      properties:
+        Type:
+          type: string
+          enum: [SubscriptionConfirmation, Notification, UnsubscribeConfirmation]
+        Message:
+          type: string
+        SubscribeURL:
+          type: string
+    GoogleCloudWebhook:
+      type: object
+      required: [version, incident]
+      properties:
+        version:
+          type: string
+        incident:
+          $ref: "#/components/schemas/GoogleCloudIncident"
     Problem:
       type: object
       required: [title, status]

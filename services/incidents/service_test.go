@@ -31,6 +31,7 @@ func setup(t *testing.T) *fixture {
 			Id:         murphy.NewID(),
 			ServiceId:  murphy.NewID(),
 			KeyVersion: 2,
+			Type:       murphy.IntegrationType_INTEGRATION_TYPE_GENERIC,
 			Status:     murphy.IntegrationStatus_INTEGRATION_STATUS_ACTIVE,
 		},
 	}
@@ -133,6 +134,34 @@ func TestAResolvedAlertNotClearlyNewerThanTheLatestFiringKeepsTheIncidentOpen(t 
 	assert.Equal(t, murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_ALERTED, f.recorded.Timeline[0].GetType())
 }
 
+func TestAResolveForOneInstanceKeepsTheIncidentOpenWhileAnotherFires(t *testing.T) {
+	f := setup(t)
+	open := &murphy.Incident{Id: murphy.NewID(), Status: murphy.IncidentStatus_INCIDENT_STATUS_TRIGGERED, Version: 2}
+	f.open(open)
+	f.repo.EXPECT().OpenInstances(mock.Anything, open.GetId()).Return([]string{"a", "b"}, nil)
+	alert := f.alert(murphy.AlertStatus_ALERT_STATUS_RESOLVED)
+	alert.Instance = "a"
+
+	require.NoError(t, f.service.AlertReceived(t.Context(), "message-1", alert))
+
+	assert.Equal(t, murphy.IncidentStatus_INCIDENT_STATUS_TRIGGERED, f.recorded.Updated.GetStatus())
+	assert.Equal(t, murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_ALERTED, f.recorded.Timeline[0].GetType())
+}
+
+func TestTheResolveForTheLastInstanceResolvesTheIncident(t *testing.T) {
+	f := setup(t)
+	open := &murphy.Incident{Id: murphy.NewID(), Status: murphy.IncidentStatus_INCIDENT_STATUS_TRIGGERED, Version: 2}
+	f.open(open)
+	f.repo.EXPECT().OpenInstances(mock.Anything, open.GetId()).Return([]string{"b"}, nil)
+	alert := f.alert(murphy.AlertStatus_ALERT_STATUS_RESOLVED)
+	alert.Instance = "b"
+
+	require.NoError(t, f.service.AlertReceived(t.Context(), "message-1", alert))
+
+	assert.Equal(t, murphy.IncidentStatus_INCIDENT_STATUS_RESOLVED, f.recorded.Updated.GetStatus())
+	assert.Equal(t, murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_RESOLVED, f.recorded.Timeline[0].GetType())
+}
+
 func TestAResolvedAlertWithoutAnOpenIncidentIsOnlyRecorded(t *testing.T) {
 	f := setup(t)
 	f.noneOpen()
@@ -170,6 +199,9 @@ func TestKeysTheIntegrationNoLongerAcceptsAreRefused(t *testing.T) {
 		},
 		"key for another service": func(_ *fixture, alert *murphy.Alert) {
 			alert.ServiceId = murphy.NewID()
+		},
+		"another format than the integration's type": func(_ *fixture, alert *murphy.Alert) {
+			alert.Source = murphy.IntegrationType_INTEGRATION_TYPE_ALERTMANAGER
 		},
 	} {
 		t.Run(name, func(t *testing.T) {

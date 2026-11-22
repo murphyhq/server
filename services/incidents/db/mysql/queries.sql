@@ -33,8 +33,8 @@ ORDER BY id DESC
 LIMIT ?;
 
 -- name: CreateAlert :exec
-INSERT INTO alerts (id, incident_id, integration_id, service_id, dedup_key, status, summary, labels, received_at, created_at)
-VALUES (sqlc.arg(id), sqlc.narg(incident_id), sqlc.arg(integration_id), sqlc.arg(service_id), sqlc.arg(dedup_key), sqlc.arg(status), sqlc.arg(summary), sqlc.arg(labels), sqlc.arg(received_at), sqlc.arg(created_at));
+INSERT INTO alerts (id, incident_id, integration_id, service_id, dedup_key, status, summary, labels, received_at, created_at, source, instance, annotations)
+VALUES (sqlc.arg(id), sqlc.narg(incident_id), sqlc.arg(integration_id), sqlc.arg(service_id), sqlc.arg(dedup_key), sqlc.arg(status), sqlc.arg(summary), sqlc.arg(labels), sqlc.arg(received_at), sqlc.arg(created_at), sqlc.arg(source), sqlc.narg(instance), sqlc.arg(annotations));
 
 -- name: LatestFiringAt :one
 SELECT received_at
@@ -52,3 +52,12 @@ SELECT id, incident_id, type, alert_id, summary, created_at
 FROM timeline_entries
 WHERE incident_id = sqlc.arg(incident_id)
 ORDER BY id;
+
+-- name: OpenInstances :many
+SELECT DISTINCT fired.instance
+FROM alerts AS fired
+WHERE fired.incident_id = sqlc.arg(incident_id) AND fired.status = 'firing' AND fired.instance IS NOT NULL
+  AND fired.instance NOT IN (
+    SELECT resolved.instance FROM alerts AS resolved
+    WHERE resolved.incident_id = fired.incident_id AND resolved.status = 'resolved' AND resolved.instance IS NOT NULL
+  );

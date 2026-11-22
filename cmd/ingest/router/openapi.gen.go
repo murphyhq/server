@@ -12,10 +12,12 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/oapi-codegen/runtime"
@@ -23,16 +25,154 @@ import (
 
 // Defines values for AlertStatus.
 const (
-	Firing   AlertStatus = "firing"
-	Resolved AlertStatus = "resolved"
+	AlertStatusFiring   AlertStatus = "firing"
+	AlertStatusResolved AlertStatus = "resolved"
 )
 
 // Valid indicates whether the value is a known member of the AlertStatus enum.
 func (e AlertStatus) Valid() bool {
 	switch e {
-	case Firing:
+	case AlertStatusFiring:
 		return true
-	case Resolved:
+	case AlertStatusResolved:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AlertmanagerAlertStatus.
+const (
+	AlertmanagerAlertStatusFiring   AlertmanagerAlertStatus = "firing"
+	AlertmanagerAlertStatusResolved AlertmanagerAlertStatus = "resolved"
+)
+
+// Valid indicates whether the value is a known member of the AlertmanagerAlertStatus enum.
+func (e AlertmanagerAlertStatus) Valid() bool {
+	switch e {
+	case AlertmanagerAlertStatusFiring:
+		return true
+	case AlertmanagerAlertStatusResolved:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AlertmanagerWebhookStatus.
+const (
+	AlertmanagerWebhookStatusFiring   AlertmanagerWebhookStatus = "firing"
+	AlertmanagerWebhookStatusResolved AlertmanagerWebhookStatus = "resolved"
+)
+
+// Valid indicates whether the value is a known member of the AlertmanagerWebhookStatus enum.
+func (e AlertmanagerWebhookStatus) Valid() bool {
+	switch e {
+	case AlertmanagerWebhookStatusFiring:
+		return true
+	case AlertmanagerWebhookStatusResolved:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GoogleCloudIncidentState.
+const (
+	Closed GoogleCloudIncidentState = "closed"
+	Open   GoogleCloudIncidentState = "open"
+)
+
+// Valid indicates whether the value is a known member of the GoogleCloudIncidentState enum.
+func (e GoogleCloudIncidentState) Valid() bool {
+	switch e {
+	case Closed:
+		return true
+	case Open:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GrafanaAlertStatus.
+const (
+	GrafanaAlertStatusFiring   GrafanaAlertStatus = "firing"
+	GrafanaAlertStatusResolved GrafanaAlertStatus = "resolved"
+)
+
+// Valid indicates whether the value is a known member of the GrafanaAlertStatus enum.
+func (e GrafanaAlertStatus) Valid() bool {
+	switch e {
+	case GrafanaAlertStatusFiring:
+		return true
+	case GrafanaAlertStatusResolved:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GrafanaWebhookStatus.
+const (
+	GrafanaWebhookStatusFiring   GrafanaWebhookStatus = "firing"
+	GrafanaWebhookStatusResolved GrafanaWebhookStatus = "resolved"
+)
+
+// Valid indicates whether the value is a known member of the GrafanaWebhookStatus enum.
+func (e GrafanaWebhookStatus) Valid() bool {
+	switch e {
+	case GrafanaWebhookStatusFiring:
+		return true
+	case GrafanaWebhookStatusResolved:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SNSMessageType.
+const (
+	Notification             SNSMessageType = "Notification"
+	SubscriptionConfirmation SNSMessageType = "SubscriptionConfirmation"
+	UnsubscribeConfirmation  SNSMessageType = "UnsubscribeConfirmation"
+)
+
+// Valid indicates whether the value is a known member of the SNSMessageType enum.
+func (e SNSMessageType) Valid() bool {
+	switch e {
+	case Notification:
+		return true
+	case SubscriptionConfirmation:
+		return true
+	case UnsubscribeConfirmation:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ReceiveSourceAlertsParamsSource.
+const (
+	Alertmanager ReceiveSourceAlertsParamsSource = "alertmanager"
+	Cloudwatch   ReceiveSourceAlertsParamsSource = "cloudwatch"
+	Datadog      ReceiveSourceAlertsParamsSource = "datadog"
+	GoogleCloud  ReceiveSourceAlertsParamsSource = "google-cloud"
+	Grafana      ReceiveSourceAlertsParamsSource = "grafana"
+)
+
+// Valid indicates whether the value is a known member of the ReceiveSourceAlertsParamsSource enum.
+func (e ReceiveSourceAlertsParamsSource) Valid() bool {
+	switch e {
+	case Alertmanager:
+		return true
+	case Cloudwatch:
+		return true
+	case Datadog:
+		return true
+	case GoogleCloud:
+		return true
+	case Grafana:
 		return true
 	default:
 		return false
@@ -57,6 +197,118 @@ type Alert struct {
 // AlertStatus defines model for Alert.Status.
 type AlertStatus string
 
+// AlertmanagerAlert defines model for AlertmanagerAlert.
+type AlertmanagerAlert struct {
+	Annotations  map[string]string       `json:"annotations"`
+	EndsAt       *time.Time              `json:"endsAt,omitempty"`
+	Fingerprint  string                  `json:"fingerprint"`
+	GeneratorURL *string                 `json:"generatorURL,omitempty"`
+	Labels       map[string]string       `json:"labels"`
+	StartsAt     time.Time               `json:"startsAt"`
+	Status       AlertmanagerAlertStatus `json:"status"`
+}
+
+// AlertmanagerAlertStatus defines model for AlertmanagerAlert.Status.
+type AlertmanagerAlertStatus string
+
+// AlertmanagerWebhook defines model for AlertmanagerWebhook.
+type AlertmanagerWebhook struct {
+	Alerts            []AlertmanagerAlert       `json:"alerts"`
+	CommonAnnotations *map[string]string        `json:"commonAnnotations,omitempty"`
+	CommonLabels      *map[string]string        `json:"commonLabels,omitempty"`
+	ExternalURL       *string                   `json:"externalURL,omitempty"`
+	GroupKey          string                    `json:"groupKey"`
+	GroupLabels       *map[string]string        `json:"groupLabels,omitempty"`
+	Receiver          *string                   `json:"receiver,omitempty"`
+	Status            AlertmanagerWebhookStatus `json:"status"`
+	Version           *string                   `json:"version,omitempty"`
+}
+
+// AlertmanagerWebhookStatus defines model for AlertmanagerWebhook.Status.
+type AlertmanagerWebhookStatus string
+
+// BatchAccepted defines model for BatchAccepted.
+type BatchAccepted struct {
+	// Ids The IDs of the messages the alerts were published as.
+	Ids []string `json:"ids"`
+}
+
+// DatadogAlert defines model for DatadogAlert.
+type DatadogAlert struct {
+	AggregationKey *string `json:"aggregation_key,omitempty"`
+	AlertId        string  `json:"alert_id"`
+	CycleKey       *string `json:"cycle_key,omitempty"`
+	Link           *string `json:"link,omitempty"`
+	Message        *string `json:"message,omitempty"`
+	Priority       *string `json:"priority,omitempty"`
+
+	// Tags Datadog's $TAGS, comma-separated.
+	Tags  *string `json:"tags,omitempty"`
+	Title string  `json:"title"`
+
+	// Transition Datadog's $ALERT_TRANSITION. Recovered resolves the alert; every other transition fires it.
+	Transition string `json:"transition"`
+}
+
+// GoogleCloudIncident defines model for GoogleCloudIncident.
+type GoogleCloudIncident struct {
+	ConditionName *string `json:"condition_name,omitempty"`
+	IncidentId    string  `json:"incident_id"`
+	Metric        *struct {
+		Labels *map[string]string `json:"labels,omitempty"`
+		Type   *string            `json:"type,omitempty"`
+	} `json:"metric,omitempty"`
+	PolicyName       *string            `json:"policy_name,omitempty"`
+	PolicyUserLabels *map[string]string `json:"policy_user_labels,omitempty"`
+	Resource         *struct {
+		Labels *map[string]string `json:"labels,omitempty"`
+		Type   *string            `json:"type,omitempty"`
+	} `json:"resource,omitempty"`
+	Severity *string                  `json:"severity,omitempty"`
+	State    GoogleCloudIncidentState `json:"state"`
+	Summary  string                   `json:"summary"`
+	Url      *string                  `json:"url,omitempty"`
+}
+
+// GoogleCloudIncidentState defines model for GoogleCloudIncident.State.
+type GoogleCloudIncidentState string
+
+// GoogleCloudWebhook defines model for GoogleCloudWebhook.
+type GoogleCloudWebhook struct {
+	Incident GoogleCloudIncident `json:"incident"`
+	Version  string              `json:"version"`
+}
+
+// GrafanaAlert defines model for GrafanaAlert.
+type GrafanaAlert struct {
+	Annotations  map[string]string  `json:"annotations"`
+	DashboardURL *string            `json:"dashboardURL,omitempty"`
+	EndsAt       *time.Time         `json:"endsAt,omitempty"`
+	Fingerprint  string             `json:"fingerprint"`
+	GeneratorURL *string            `json:"generatorURL,omitempty"`
+	Labels       map[string]string  `json:"labels"`
+	PanelURL     *string            `json:"panelURL,omitempty"`
+	SilenceURL   *string            `json:"silenceURL,omitempty"`
+	StartsAt     time.Time          `json:"startsAt"`
+	Status       GrafanaAlertStatus `json:"status"`
+}
+
+// GrafanaAlertStatus defines model for GrafanaAlert.Status.
+type GrafanaAlertStatus string
+
+// GrafanaWebhook defines model for GrafanaWebhook.
+type GrafanaWebhook struct {
+	Alerts            []GrafanaAlert       `json:"alerts"`
+	CommonAnnotations *map[string]string   `json:"commonAnnotations,omitempty"`
+	ExternalURL       *string              `json:"externalURL,omitempty"`
+	GroupKey          string               `json:"groupKey"`
+	Status            GrafanaWebhookStatus `json:"status"`
+	Title             *string              `json:"title,omitempty"`
+}
+
+// GrafanaWebhookStatus defines model for GrafanaWebhook.Status.
+type GrafanaWebhookStatus string
+
 // Problem defines model for Problem.
 type Problem struct {
 	Detail *string `json:"detail,omitempty"`
@@ -67,6 +319,19 @@ type Problem struct {
 	TraceId *string `json:"trace_id,omitempty"`
 }
 
+// SNSMessage An SNS message, sent as text/plain. A Notification's Message holds the CloudWatch alarm as JSON.
+type SNSMessage struct {
+	Message      *string        `json:"Message,omitempty"`
+	SubscribeURL *string        `json:"SubscribeURL,omitempty"`
+	Type         SNSMessageType `json:"Type"`
+}
+
+// SNSMessageType defines model for SNSMessage.Type.
+type SNSMessageType string
+
+// ReceiveSourceAlertsParamsSource defines parameters for ReceiveSourceAlerts.
+type ReceiveSourceAlertsParamsSource string
+
 // ReceiveAlertJSONRequestBody defines body for ReceiveAlert for application/json ContentType.
 type ReceiveAlertJSONRequestBody = Alert
 
@@ -75,6 +340,9 @@ type ServerInterface interface {
 	// ReceiveAlert Receive an alert
 	// (POST /v1/alerts)
 	ReceiveAlert(w http.ResponseWriter, r *http.Request)
+	// ReceiveSourceAlerts Receive alerts from a monitoring tool
+	// (POST /v1/alerts/{source})
+	ReceiveSourceAlerts(w http.ResponseWriter, r *http.Request, source ReceiveSourceAlertsParamsSource)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -91,6 +359,32 @@ func (siw *ServerInterfaceWrapper) ReceiveAlert(w http.ResponseWriter, r *http.R
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ReceiveAlert(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ReceiveSourceAlerts operation middleware
+func (siw *ServerInterfaceWrapper) ReceiveSourceAlerts(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "source" -------------
+	var source ReceiveSourceAlertsParamsSource
+
+	err = runtime.BindStyledParameterWithOptions("simple", "source", r.PathValue("source"), &source, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "source", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ReceiveSourceAlerts(w, r, source)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -221,6 +515,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	}
 
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/alerts", wrapper.ReceiveAlert)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/alerts/{source}", wrapper.ReceiveSourceAlerts)
 
 	return m
 }
@@ -279,11 +574,82 @@ func (response ReceiveAlert401ApplicationProblemPlusJSONResponse) VisitReceiveAl
 	return err
 }
 
+type ReceiveSourceAlertsRequestObject struct {
+	Source      ReceiveSourceAlertsParamsSource `json:"source"`
+	ContentType string
+	Body        io.Reader
+}
+
+type ReceiveSourceAlertsResponseObject interface {
+	VisitReceiveSourceAlertsResponse(w http.ResponseWriter) error
+}
+
+type ReceiveSourceAlerts202JSONResponse BatchAccepted
+
+func (response ReceiveSourceAlerts202JSONResponse) VisitReceiveSourceAlertsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(202)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReceiveSourceAlerts400ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response ReceiveSourceAlerts400ApplicationProblemPlusJSONResponse) VisitReceiveSourceAlertsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReceiveSourceAlerts401ApplicationProblemPlusJSONResponse Problem
+
+func (response ReceiveSourceAlerts401ApplicationProblemPlusJSONResponse) VisitReceiveSourceAlertsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReceiveSourceAlerts404ApplicationProblemPlusJSONResponse Problem
+
+func (response ReceiveSourceAlerts404ApplicationProblemPlusJSONResponse) VisitReceiveSourceAlertsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 	// ReceiveAlert Receive an alert
 	// (POST /v1/alerts)
 	ReceiveAlert(ctx context.Context, request ReceiveAlertRequestObject) (ReceiveAlertResponseObject, error)
+	// ReceiveSourceAlerts Receive alerts from a monitoring tool
+	// (POST /v1/alerts/{source})
+	ReceiveSourceAlerts(ctx context.Context, request ReceiveSourceAlertsRequestObject) (ReceiveSourceAlertsResponseObject, error)
 }
 
 type StrictHandlerFunc func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error)
@@ -356,24 +722,68 @@ func (sh *strictHandler) ReceiveAlert(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// ReceiveSourceAlerts operation middleware
+func (sh *strictHandler) ReceiveSourceAlerts(w http.ResponseWriter, r *http.Request, source ReceiveSourceAlertsParamsSource) {
+	var request ReceiveSourceAlertsRequestObject
+
+	request.Source = source
+	request.ContentType = r.Header.Get("Content-Type")
+
+	request.Body = r.Body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ReceiveSourceAlerts(ctx, request.(ReceiveSourceAlertsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ReceiveSourceAlerts")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ReceiveSourceAlertsResponseObject); ok {
+		if err := validResponse.VisitReceiveSourceAlertsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // Base64 encoded, compressed with deflate, json marshaled OpenAPI spec.
 // Stored as a slice of fixed-width chunks rather than one concatenated
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"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",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,
