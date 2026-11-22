@@ -195,20 +195,26 @@ services:
     volumes:
       - ./openapi:/usr/share/nginx/html:ro
 
-  db-murphy:
-    image: sosedoff/pgweb:0.17.0
-    command: ["--bind=0.0.0.0", "--listen=8081", "--readonly", "--url=postgres://murphy:murphy@postgres:5432/murphy?sslmode=disable"]
+  db:
+    image: dbgate/dbgate:7.3.4
+    environment:
+      CONNECTIONS: murphy,catalog
+      LABEL_murphy: Murphy
+      LABEL_catalog: Catalog
+      ENGINE_murphy: postgres@dbgate-plugin-postgres
+      ENGINE_catalog: postgres@dbgate-plugin-postgres
+      SERVER_murphy: postgres
+      SERVER_catalog: postgres
+      PORT_murphy: "5432"
+      PORT_catalog: "5432"
+      USER_murphy: murphy
+      USER_catalog: murphy
+      PASSWORD_murphy: murphy
+      PASSWORD_catalog: murphy
+      DATABASE_murphy: murphy
+      DATABASE_catalog: catalog
     ports:
-      - "8082:8081"
-    depends_on:
-      postgres:
-        condition: service_healthy
-
-  db-catalog:
-    image: sosedoff/pgweb:0.17.0
-    command: ["--bind=0.0.0.0", "--listen=8081", "--readonly", "--url=postgres://murphy:murphy@postgres:5432/catalog?sslmode=disable"]
-    ports:
-      - "8083:8081"
+      - "8082:3000"
     depends_on:
       postgres:
         condition: service_healthy
