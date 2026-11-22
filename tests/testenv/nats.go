@@ -24,14 +24,14 @@ func NATS() brokertest.Environment {
 			t.Cleanup(func() { _ = provision.DropNATS(context.Background(), natsServer(), stream) })
 			require.NoError(t, provision.NATS(t.Context(), natsServer(), stream, provision.Topology(topology), version))
 
-			endpoints := brokertest.Endpoints{Publisher: natsURL(t, stream, ""), Consumers: map[string]string{}}
+			endpoints := brokertest.Endpoints{Topic: natsURL(t, stream), Subscriptions: map[string]string{}}
 			for group := range topology {
-				endpoints.Consumers[group] = natsURL(t, stream, group)
+				endpoints.Subscriptions[group] = natsURL(t, stream, group)
 			}
 			return endpoints
 		},
 		Missing: func(t *testing.T) string {
-			return natsURL(t, name(), "")
+			return natsURL(t, name())
 		},
 	}
 }
@@ -43,13 +43,10 @@ func natsServer() string {
 	return "nats://localhost:4222"
 }
 
-func natsURL(t *testing.T, stream, consumer string) string {
+func natsURL(t *testing.T, path ...string) string {
 	u, err := url.Parse(natsServer())
 	require.NoError(t, err)
-	u.Path = "/" + stream
-	if consumer != "" {
-		u.RawQuery = url.Values{"consumer": {consumer}}.Encode()
-	}
+	u.Path = "/" + strings.Join(path, "/")
 	return u.String()
 }
 

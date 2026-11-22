@@ -26,8 +26,8 @@ const (
 type Topology map[string][]string
 
 type Endpoints struct {
-	Publisher string
-	Consumers map[string]string
+	Topic         string
+	Subscriptions map[string]string
 }
 
 type Environment struct {
@@ -36,21 +36,25 @@ type Environment struct {
 }
 
 func Run(t *testing.T, env Environment) {
-	provision := func(t *testing.T, topology Topology) (messaging.Broker, func(group string) messaging.Broker) {
+	provision := func(t *testing.T, topology Topology) (messaging.Topic, func(group string) messaging.Subscription) {
 		t.Helper()
 		endpoints := env.Provision(t, topology, messaging.TopologyVersion)
-		return open(t, endpoints.Publisher), func(group string) messaging.Broker { return open(t, endpoints.Consumers[group]) }
+		return openTopic(t, endpoints.Topic), func(group string) messaging.Subscription {
+			return openSubscription(t, endpoints.Subscriptions[group])
+		}
 	}
 
 	t.Run("refuses to open without its infrastructure", func(t *testing.T) {
-		_, err := broker.Open(t.Context(), env.Missing(t))
+		_, err := broker.OpenTopic(t.Context(), env.Missing(t))
 		assert.Error(t, err)
 	})
 
 	t.Run("refuses infrastructure older than this release", func(t *testing.T) {
 		endpoints := env.Provision(t, Topology{"engine": {alert}}, messaging.TopologyVersion-1)
 
-		_, err := broker.Open(t.Context(), endpoints.Publisher)
+		_, err := broker.OpenTopic(t.Context(), endpoints.Topic)
+		assert.Error(t, err)
+		_, err = broker.OpenSubscription(t.Context(), endpoints.Subscriptions["engine"])
 		assert.Error(t, err)
 	})
 
@@ -167,12 +171,20 @@ func Run(t *testing.T, env Environment) {
 	})
 }
 
-func open(t *testing.T, url string) messaging.Broker {
+func openTopic(t *testing.T, url string) messaging.Topic {
 	t.Helper()
-	b, err := broker.Open(t.Context(), url)
+	topic, err := broker.OpenTopic(t.Context(), url)
 	require.NoError(t, err)
-	t.Cleanup(func() { _ = b.Close() })
-	return b
+	t.Cleanup(func() { _ = topic.Close() })
+	return topic
+}
+
+func openSubscription(t *testing.T, url string) messaging.Subscription {
+	t.Helper()
+	subscription, err := broker.OpenSubscription(t.Context(), url)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = subscription.Close() })
+	return subscription
 }
 
 type received struct {
@@ -208,21 +220,21 @@ func distinct(values []string) map[string]bool {
 	return set
 }
 
-func subscribe(t *testing.T, b messaging.Broker, handle func(messaging.Delivery) error) *received {
+func subscribe(t *testing.T, subscription messaging.Subscription, handle func(messaging.Delivery) error) *received {
 	t.Helper()
 	got := &received{}
-	subscription, err := b.Subscribe(t.Context(), func(_ context.Context, d messaging.Delivery) error {
+	consumer, err := subscription.Consume(t.Context(), func(_ context.Context, d messaging.Delivery) error {
 		got.add(d)
 		return handle(d)
 	})
 	require.NoError(t, err)
-	t.Cleanup(subscription.Stop)
+	t.Cleanup(consumer.Stop)
 	return got
 }
 
 func accept(messaging.Delivery) error { return nil }
 
-func publish(t *testing.T, b messaging.Broker, topic string, data string) {
+func publish(t *testing.T, to messaging.Topic, topic string, data string) {
 	t.Helper()
-	require.NoError(t, b.Publish(t.Context(), topic, uuid.NewV4().String(), []byte(data)))
+	require.NoError(t, to.Publish(t.Context(), topic, uuid.NewV4().String(), []byte(data)))
 }

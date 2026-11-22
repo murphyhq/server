@@ -7,17 +7,32 @@ import (
 
 	"github.com/murphyhq/server/internal/messaging"
 	"github.com/murphyhq/server/internal/messaging/broker/nats"
-	"github.com/murphyhq/server/internal/messaging/broker/sqs"
+	"github.com/murphyhq/server/internal/messaging/broker/snssqs"
 )
 
-func Open(ctx context.Context, url string) (messaging.Broker, error) {
-	scheme, _, _ := strings.Cut(url, "://")
-	switch scheme {
+func OpenTopic(ctx context.Context, url string) (messaging.Topic, error) {
+	switch scheme(url) {
 	case "nats", "tls":
-		return nats.Open(ctx, url)
-	case "sqs":
-		return sqs.Open(ctx, url)
+		return nats.OpenTopic(ctx, url)
+	case "awssns":
+		return snssqs.OpenTopic(ctx, url)
 	default:
-		return nil, errors.New("unsupported broker")
+		return nil, errors.New("unsupported topic URL")
 	}
+}
+
+func OpenSubscription(ctx context.Context, url string) (messaging.Subscription, error) {
+	switch scheme(url) {
+	case "nats", "tls":
+		return nats.OpenSubscription(ctx, url)
+	case "awssqs":
+		return snssqs.OpenSubscription(ctx, url)
+	default:
+		return nil, errors.New("unsupported subscription URL")
+	}
+}
+
+func scheme(url string) string {
+	scheme, _, _ := strings.Cut(url, "://")
+	return scheme
 }

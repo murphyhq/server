@@ -5,9 +5,9 @@ package testenv
 import (
 	"context"
 	"maps"
-	"net/url"
 	"os"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -41,22 +41,14 @@ func SQS(t *testing.T) brokertest.Environment {
 			})
 			require.NoError(t, err)
 
-			endpoints := brokertest.Endpoints{Publisher: sqsURL(resources.TopicARN, ""), Consumers: map[string]string{}}
+			endpoints := brokertest.Endpoints{Topic: "awssns:///" + resources.TopicARN, Subscriptions: map[string]string{}}
 			for group, queue := range resources.Queues {
-				endpoints.Consumers[group] = sqsURL(resources.TopicARN, queue)
+				endpoints.Subscriptions[group] = "awssqs://" + strings.TrimPrefix(strings.TrimPrefix(queue, "https://"), "http://")
 			}
 			return endpoints
 		},
 		Missing: func(t *testing.T) string {
-			return sqsURL("arn:aws:sns:us-east-1:000000000000:"+name(), "")
+			return "awssns:///arn:aws:sns:us-east-1:000000000000:" + name()
 		},
 	}
-}
-
-func sqsURL(topicARN, queueURL string) string {
-	query := url.Values{"topic": {topicARN}}
-	if queueURL != "" {
-		query.Set("queue", queueURL)
-	}
-	return "sqs://?" + query.Encode()
 }

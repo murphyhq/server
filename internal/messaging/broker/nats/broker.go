@@ -17,82 +17,111 @@ import (
 	"github.com/murphyhq/server/internal/tracer"
 )
 
-const maxInFlight = 64
+const (
+	system      = "nats"
+	maxInFlight = 64
+)
 
-type Broker struct {
-	conn     *gonats.Conn
-	js       jetstream.JetStream
-	stream   string
-	consumer string
+type Topic struct {
+	conn   *gonats.Conn
+	js     jetstream.JetStream
+	stream string
 }
 
-func Open(ctx context.Context, rawURL string) (*Broker, error) {
-	u, err := url.Parse(rawURL)
-	if err != nil {
-		return nil, errors.New("not a valid NATS URL")
-	}
-	stream := strings.Trim(u.Path, "/")
-	if stream == "" {
-		return nil, errors.New("the NATS URL must name the stream in its path, as in nats://host:4222/events")
-	}
-
-	conn, js, err := nats.Open(nats.Config{URL: rawURL})
+func OpenTopic(ctx context.Context, rawURL string) (*Topic, error) {
+	conn, js, path, err := connect(rawURL)
 	if err != nil {
 		return nil, err
 	}
-	b := &Broker{conn: conn, js: js, stream: stream, consumer: u.Query().Get("consumer")}
-	info, err := js.Stream(ctx, stream)
+	if len(path) != 1 {
+		conn.Close()
+		return nil, errors.New("a NATS topic URL names the stream, as in nats://host:4222/events")
+	}
+	stream, err := js.Stream(ctx, path[0])
 	if err == nil {
-		err = messaging.CheckTopologyVersion("stream "+stream, info.CachedInfo().Config.Metadata[messaging.TopologyVersionKey])
+		err = messaging.CheckTopologyVersion("stream "+path[0], stream.CachedInfo().Config.Metadata[messaging.TopologyVersionKey])
 	}
 	if err != nil {
 		conn.Close()
-		return nil, fmt.Errorf("stream %s: %w", stream, err)
+		return nil, fmt.Errorf("stream %s: %w", path[0], err)
 	}
-	return b, nil
+	return &Topic{conn: conn, js: js, stream: path[0]}, nil
 }
 
-func (b *Broker) System() string {
-	return "nats"
+func (t *Topic) System() string {
+	return system
 }
 
-func (b *Broker) Publish(ctx context.Context, topic, id string, data []byte) (err error) {
+func (t *Topic) Publish(ctx context.Context, topic, id string, data []byte) (err error) {
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
-	if _, err := b.js.Publish(ctx, b.stream+"."+topic, data, jetstream.WithMsgID(id)); err != nil {
+	if _, err := t.js.Publish(ctx, t.stream+"."+topic, data, jetstream.WithMsgID(id)); err != nil {
 		return fmt.Errorf("publish to %s: %w", topic, err)
 	}
 	return nil
 }
 
-func (b *Broker) Subscribe(ctx context.Context, handle func(context.Context, messaging.Delivery) error) (messaging.Subscription, error) {
-	if b.consumer == "" {
-		return nil, errors.New("the NATS URL must name the consumer, as in nats://host:4222/events?consumer=engine")
+func (t *Topic) Ping(ctx context.Context) error {
+	if _, err := t.js.Stream(ctx, t.stream); err != nil {
+		return fmt.Errorf("stream %s: %w", t.stream, err)
 	}
-	consumer, err := b.js.Consumer(ctx, b.stream, b.consumer)
+	return nil
+}
+
+func (t *Topic) Close() error {
+	return t.conn.Drain()
+}
+
+type Subscription struct {
+	conn     *gonats.Conn
+	consumer jetstream.Consumer
+	stream   string
+	name     string
+	js       jetstream.JetStream
+}
+
+func OpenSubscription(ctx context.Context, rawURL string) (*Subscription, error) {
+	conn, js, path, err := connect(rawURL)
+	if err != nil {
+		return nil, err
+	}
+	if len(path) != 2 {
+		conn.Close()
+		return nil, errors.New("a NATS subscription URL names the stream and the consumer, as in nats://host:4222/events/engine")
+	}
+	consumer, err := js.Consumer(ctx, path[0], path[1])
 	if err == nil {
-		err = messaging.CheckTopologyVersion("consumer "+b.consumer, consumer.CachedInfo().Config.Metadata[messaging.TopologyVersionKey])
+		err = messaging.CheckTopologyVersion("consumer "+path[1], consumer.CachedInfo().Config.Metadata[messaging.TopologyVersionKey])
 	}
 	if err != nil {
-		return nil, fmt.Errorf("consumer %s: %w", b.consumer, err)
+		conn.Close()
+		return nil, fmt.Errorf("consumer %s on stream %s: %w", path[1], path[0], err)
 	}
+	return &Subscription{conn: conn, consumer: consumer, js: js, stream: path[0], name: path[1]}, nil
+}
 
+func (s *Subscription) System() string {
+	return system
+}
+
+func (s *Subscription) Consume(ctx context.Context, handle func(context.Context, messaging.Delivery) error) (messaging.Consumer, error) {
 	handlerCtx := context.WithoutCancel(ctx)
-	sub := &subscription{pool: messaging.NewPool(maxInFlight)}
-	sub.consumeContext, err = consumer.Consume(func(msg jetstream.Msg) {
-		sub.pool.Acquire(handlerCtx)
-		sub.pool.Go(func() {
-			b.settle(handlerCtx, msg, handle)
+	c := &consumer{pool: messaging.NewPool(maxInFlight)}
+	var err error
+	c.consumeContext, err = s.consumer.Consume(func(msg jetstream.Msg) {
+		c.pool.Acquire(handlerCtx)
+		c.pool.Go(func() {
+			s.settle(handlerCtx, msg, handle)
 		})
 	})
 	if err != nil {
-		return nil, fmt.Errorf("consume %s: %w", b.consumer, err)
+		return nil, fmt.Errorf("consume %s: %w", s.name, err)
 	}
-	return sub, nil
+	return c, nil
 }
 
-func (b *Broker) settle(ctx context.Context, msg jetstream.Msg, handle func(context.Context, messaging.Delivery) error) {
+func (s *Subscription) settle(ctx context.Context, msg jetstream.Msg, handle func(context.Context, messaging.Delivery) error) {
 	attempt := 1
 	if metadata, err := msg.Metadata(); err == nil {
 		attempt = int(metadata.NumDelivered)
@@ -107,33 +136,44 @@ func (b *Broker) settle(ctx context.Context, msg jetstream.Msg, handle func(cont
 		err = msg.NakWithDelay(messaging.RetryAfter(attempt))
 	}
 	if err != nil {
-		logger.Warn(ctx, "message settlement failed", telemetry.WithField("consumer", b.consumer), telemetry.WithError(err))
+		logger.Warn(ctx, "message settlement failed", telemetry.WithField("consumer", s.name), telemetry.WithError(err))
 	}
 }
 
-func (b *Broker) Ping(ctx context.Context) error {
-	if _, err := b.js.Stream(ctx, b.stream); err != nil {
-		return fmt.Errorf("stream %s: %w", b.stream, err)
-	}
-	if b.consumer != "" {
-		if _, err := b.js.Consumer(ctx, b.stream, b.consumer); err != nil {
-			return fmt.Errorf("consumer %s: %w", b.consumer, err)
-		}
+func (s *Subscription) Ping(ctx context.Context) error {
+	if _, err := s.js.Consumer(ctx, s.stream, s.name); err != nil {
+		return fmt.Errorf("consumer %s: %w", s.name, err)
 	}
 	return nil
 }
 
-func (b *Broker) Close() error {
-	return b.conn.Drain()
+func (s *Subscription) Close() error {
+	return s.conn.Drain()
 }
 
-type subscription struct {
+type consumer struct {
 	consumeContext jetstream.ConsumeContext
 	pool           *messaging.Pool
 }
 
-func (s *subscription) Stop() {
-	s.consumeContext.Drain()
-	<-s.consumeContext.Closed()
-	s.pool.Wait()
+func (c *consumer) Stop() {
+	c.consumeContext.Drain()
+	<-c.consumeContext.Closed()
+	c.pool.Wait()
+}
+
+func connect(rawURL string) (*gonats.Conn, jetstream.JetStream, []string, error) {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return nil, nil, nil, errors.New("not a valid NATS URL")
+	}
+	var path []string
+	if trimmed := strings.Trim(u.Path, "/"); trimmed != "" {
+		path = strings.Split(trimmed, "/")
+	}
+	conn, js, err := nats.Open(nats.Config{URL: rawURL})
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	return conn, js, path, nil
 }

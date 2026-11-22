@@ -22,15 +22,21 @@ type Delivery struct {
 	Attempt int
 }
 
-type Broker interface {
+type Topic interface {
 	System() string
 	Publish(ctx context.Context, topic, id string, data []byte) error
-	Subscribe(ctx context.Context, handle func(context.Context, Delivery) error) (Subscription, error)
 	Ping(ctx context.Context) error
 	Close() error
 }
 
 type Subscription interface {
+	System() string
+	Consume(ctx context.Context, handle func(context.Context, Delivery) error) (Consumer, error)
+	Ping(ctx context.Context) error
+	Close() error
+}
+
+type Consumer interface {
 	Stop()
 }
 
@@ -56,7 +62,7 @@ type Handlers map[string]Handler
 
 var event = (&murphy.Envelope{}).ProtoReflect().Descriptor().Oneofs().ByName("event")
 
-func Topic(envelope *murphy.Envelope) string {
+func TopicOf(envelope *murphy.Envelope) string {
 	field := envelope.ProtoReflect().WhichOneof(event)
 	if field == nil {
 		return ""
@@ -77,22 +83,22 @@ func topicOf(field protoreflect.FieldDescriptor) string {
 }
 
 type Publisher struct {
-	broker Broker
+	topic Topic
 }
 
-func NewPublisher(broker Broker) *Publisher {
-	return &Publisher{broker: broker}
+func NewPublisher(topic Topic) *Publisher {
+	return &Publisher{topic: topic}
 }
 
 func (p *Publisher) Publish(ctx context.Context, envelope *murphy.Envelope) (err error) {
-	topic := Topic(envelope)
+	topic := TopicOf(envelope)
 	if topic == "" || envelope.GetId() == "" {
 		return errors.New("publish message: it needs an ID and an event")
 	}
 
 	ctx, span := tracer.Span(ctx, tracer.Producer())
 	defer span.End(&err)
-	ctx = span.Set(ctx, attributes(p.broker.System(), topic, envelope.GetId())...)
+	ctx = span.Set(ctx, attributes(p.topic.System(), topic, envelope.GetId())...)
 
 	message := proto.CloneOf(envelope)
 	message.TraceContext = tracer.Inject(ctx)
@@ -100,16 +106,16 @@ func (p *Publisher) Publish(ctx context.Context, envelope *murphy.Envelope) (err
 	if err != nil {
 		return fmt.Errorf("encode message: %w", err)
 	}
-	if err := p.broker.Publish(ctx, topic, envelope.GetId(), data); err != nil {
+	if err := p.topic.Publish(ctx, topic, envelope.GetId(), data); err != nil {
 		return fmt.Errorf("publish message: %w", err)
 	}
 	published.Add(ctx, 1, metrics.Dimension{Name: "topic", Value: topic})
 	return nil
 }
 
-func Subscribe(ctx context.Context, broker Broker, group string, handlers Handlers) (Subscription, error) {
+func Consume(ctx context.Context, subscription Subscription, group string, handlers Handlers) (Consumer, error) {
 	if len(handlers) == 0 {
-		return nil, errors.New("subscribe: no handlers")
+		return nil, errors.New("consume: no handlers")
 	}
 	known := map[string]bool{}
 	for _, topic := range Topics() {
@@ -117,17 +123,17 @@ func Subscribe(ctx context.Context, broker Broker, group string, handlers Handle
 	}
 	for topic := range handlers {
 		if !known[topic] {
-			return nil, fmt.Errorf("subscribe: unknown topic %s", topic)
+			return nil, fmt.Errorf("consume: unknown topic %s", topic)
 		}
 	}
 
-	subscription, err := broker.Subscribe(ctx, func(ctx context.Context, delivery Delivery) error {
-		return process(ctx, broker.System(), group, handlers, delivery)
+	consumer, err := subscription.Consume(ctx, func(ctx context.Context, delivery Delivery) error {
+		return process(ctx, subscription.System(), group, handlers, delivery)
 	})
 	if err != nil {
-		return nil, fmt.Errorf("subscribe %s: %w", group, err)
+		return nil, fmt.Errorf("consume %s: %w", group, err)
 	}
-	return subscription, nil
+	return consumer, nil
 }
 
 func process(ctx context.Context, system, group string, handlers Handlers, delivery Delivery) (err error) {
@@ -137,7 +143,7 @@ func process(ctx context.Context, system, group string, handlers Handlers, deliv
 		logger.Error(ctx, "message rejected", telemetry.WithField("consumer.group", group), telemetry.WithError(err))
 		return Reject(fmt.Errorf("decode message: %w", err))
 	}
-	topic := Topic(envelope)
+	topic := TopicOf(envelope)
 
 	ctx, span := tracer.Span(ctx, tracer.Consumer(), tracer.ContinuedFrom(envelope.GetTraceContext()))
 	defer span.End(&err)
