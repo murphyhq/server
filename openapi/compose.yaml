@@ -1,0 +1,7 @@
+services:
+  api-docs:
+    image: nginx:1.27-alpine
+    ports:
+      - "8090:80"
+    volumes:
+      - .:/usr/share/nginx/html:ro

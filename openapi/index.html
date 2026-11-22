@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Murphy API reference</title>
+    <style>
+      body {
+        margin: 0;
+        background: #fff;
+      }
+      @media (prefers-color-scheme: dark) {
+        body {
+          background: #0b0b0c;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference@1.77.0"></script>
+    <script>
+      Scalar.createApiReference("#app", {
+        sources: [
+          { title: "Murphy API", slug: "v1", url: "./v1.yaml" },
+          { title: "Ingest API", slug: "ingest", url: "./ingest/v1.yaml" },
+        ],
+      });
+    </script>
+  </body>
+</html>
