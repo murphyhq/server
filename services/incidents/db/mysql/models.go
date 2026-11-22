@@ -20,6 +20,9 @@ type Alert struct {
 	Labels        json.RawMessage
 	ReceivedAt    time.Time
 	CreatedAt     time.Time
+	Source        string
+	Instance      *string
+	Annotations   json.RawMessage
 }
 
 type HandledMessage struct {

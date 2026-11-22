@@ -12,10 +12,12 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/oapi-codegen/runtime"
@@ -23,16 +25,106 @@ import (
 
 // Defines values for AlertStatus.
 const (
-	Firing   AlertStatus = "firing"
-	Resolved AlertStatus = "resolved"
+	AlertStatusFiring   AlertStatus = "firing"
+	AlertStatusResolved AlertStatus = "resolved"
 )
 
 // Valid indicates whether the value is a known member of the AlertStatus enum.
 func (e AlertStatus) Valid() bool {
 	switch e {
-	case Firing:
+	case AlertStatusFiring:
 		return true
-	case Resolved:
+	case AlertStatusResolved:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AlertmanagerAlertStatus.
+const (
+	AlertmanagerAlertStatusFiring   AlertmanagerAlertStatus = "firing"
+	AlertmanagerAlertStatusResolved AlertmanagerAlertStatus = "resolved"
+)
+
+// Valid indicates whether the value is a known member of the AlertmanagerAlertStatus enum.
+func (e AlertmanagerAlertStatus) Valid() bool {
+	switch e {
+	case AlertmanagerAlertStatusFiring:
+		return true
+	case AlertmanagerAlertStatusResolved:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AlertmanagerWebhookStatus.
+const (
+	AlertmanagerWebhookStatusFiring   AlertmanagerWebhookStatus = "firing"
+	AlertmanagerWebhookStatusResolved AlertmanagerWebhookStatus = "resolved"
+)
+
+// Valid indicates whether the value is a known member of the AlertmanagerWebhookStatus enum.
+func (e AlertmanagerWebhookStatus) Valid() bool {
+	switch e {
+	case AlertmanagerWebhookStatusFiring:
+		return true
+	case AlertmanagerWebhookStatusResolved:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GoogleCloudIncidentState.
+const (
+	Closed GoogleCloudIncidentState = "closed"
+	Open   GoogleCloudIncidentState = "open"
+)
+
+// Valid indicates whether the value is a known member of the GoogleCloudIncidentState enum.
+func (e GoogleCloudIncidentState) Valid() bool {
+	switch e {
+	case Closed:
+		return true
+	case Open:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GrafanaAlertStatus.
+const (
+	GrafanaAlertStatusFiring   GrafanaAlertStatus = "firing"
+	GrafanaAlertStatusResolved GrafanaAlertStatus = "resolved"
+)
+
+// Valid indicates whether the value is a known member of the GrafanaAlertStatus enum.
+func (e GrafanaAlertStatus) Valid() bool {
+	switch e {
+	case GrafanaAlertStatusFiring:
+		return true
+	case GrafanaAlertStatusResolved:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GrafanaWebhookStatus.
+const (
+	GrafanaWebhookStatusFiring   GrafanaWebhookStatus = "firing"
+	GrafanaWebhookStatusResolved GrafanaWebhookStatus = "resolved"
+)
+
+// Valid indicates whether the value is a known member of the GrafanaWebhookStatus enum.
+func (e GrafanaWebhookStatus) Valid() bool {
+	switch e {
+	case GrafanaWebhookStatusFiring:
+		return true
+	case GrafanaWebhookStatusResolved:
 		return true
 	default:
 		return false
@@ -57,6 +149,118 @@ type Alert struct {
 // AlertStatus defines model for Alert.Status.
 type AlertStatus string
 
+// AlertmanagerAlert defines model for AlertmanagerAlert.
+type AlertmanagerAlert struct {
+	Annotations  map[string]string       `json:"annotations"`
+	EndsAt       *time.Time              `json:"endsAt,omitempty"`
+	Fingerprint  string                  `json:"fingerprint"`
+	GeneratorURL *string                 `json:"generatorURL,omitempty"`
+	Labels       map[string]string       `json:"labels"`
+	StartsAt     time.Time               `json:"startsAt"`
+	Status       AlertmanagerAlertStatus `json:"status"`
+}
+
+// AlertmanagerAlertStatus defines model for AlertmanagerAlert.Status.
+type AlertmanagerAlertStatus string
+
+// AlertmanagerWebhook defines model for AlertmanagerWebhook.
+type AlertmanagerWebhook struct {
+	Alerts            []AlertmanagerAlert       `json:"alerts"`
+	CommonAnnotations *map[string]string        `json:"commonAnnotations,omitempty"`
+	CommonLabels      *map[string]string        `json:"commonLabels,omitempty"`
+	ExternalURL       *string                   `json:"externalURL,omitempty"`
+	GroupKey          string                    `json:"groupKey"`
+	GroupLabels       *map[string]string        `json:"groupLabels,omitempty"`
+	Receiver          *string                   `json:"receiver,omitempty"`
+	Status            AlertmanagerWebhookStatus `json:"status"`
+	Version           *string                   `json:"version,omitempty"`
+}
+
+// AlertmanagerWebhookStatus defines model for AlertmanagerWebhook.Status.
+type AlertmanagerWebhookStatus string
+
+// BatchAccepted defines model for BatchAccepted.
+type BatchAccepted struct {
+	// Ids The IDs of the messages the alerts were published as.
+	Ids []string `json:"ids"`
+}
+
+// DatadogAlert defines model for DatadogAlert.
+type DatadogAlert struct {
+	AggregationKey *string `json:"aggregation_key,omitempty"`
+	AlertId        string  `json:"alert_id"`
+	CycleKey       *string `json:"cycle_key,omitempty"`
+	Link           *string `json:"link,omitempty"`
+	Message        *string `json:"message,omitempty"`
+	Priority       *string `json:"priority,omitempty"`
+
+	// Tags Datadog's $TAGS, comma-separated.
+	Tags  *string `json:"tags,omitempty"`
+	Title string  `json:"title"`
+
+	// Transition Datadog's $ALERT_TRANSITION. Recovered resolves the alert; every other transition fires it.
+	Transition string `json:"transition"`
+}
+
+// GoogleCloudIncident defines model for GoogleCloudIncident.
+type GoogleCloudIncident struct {
+	ConditionName *string `json:"condition_name,omitempty"`
+	IncidentId    string  `json:"incident_id"`
+	Metric        *struct {
+		Labels *map[string]string `json:"labels,omitempty"`
+		Type   *string            `json:"type,omitempty"`
+	} `json:"metric,omitempty"`
+	PolicyName       *string            `json:"policy_name,omitempty"`
+	PolicyUserLabels *map[string]string `json:"policy_user_labels,omitempty"`
+	Resource         *struct {
+		Labels *map[string]string `json:"labels,omitempty"`
+		Type   *string            `json:"type,omitempty"`
+	} `json:"resource,omitempty"`
+	Severity *string                  `json:"severity,omitempty"`
+	State    GoogleCloudIncidentState `json:"state"`
+	Summary  string                   `json:"summary"`
+	Url      *string                  `json:"url,omitempty"`
+}
+
+// GoogleCloudIncidentState defines model for GoogleCloudIncident.State.
+type GoogleCloudIncidentState string
+
+// GoogleCloudWebhook defines model for GoogleCloudWebhook.
+type GoogleCloudWebhook struct {
+	Incident GoogleCloudIncident `json:"incident"`
+	Version  string              `json:"version"`
+}
+
+// GrafanaAlert defines model for GrafanaAlert.
+type GrafanaAlert struct {
+	Annotations  map[string]string  `json:"annotations"`
+	DashboardURL *string            `json:"dashboardURL,omitempty"`
+	EndsAt       *time.Time         `json:"endsAt,omitempty"`
+	Fingerprint  string             `json:"fingerprint"`
+	GeneratorURL *string            `json:"generatorURL,omitempty"`
+	Labels       map[string]string  `json:"labels"`
+	PanelURL     *string            `json:"panelURL,omitempty"`
+	SilenceURL   *string            `json:"silenceURL,omitempty"`
+	StartsAt     time.Time          `json:"startsAt"`
+	Status       GrafanaAlertStatus `json:"status"`
+}
+
+// GrafanaAlertStatus defines model for GrafanaAlert.Status.
+type GrafanaAlertStatus string
+
+// GrafanaWebhook defines model for GrafanaWebhook.
+type GrafanaWebhook struct {
+	Alerts            []GrafanaAlert       `json:"alerts"`
+	CommonAnnotations *map[string]string   `json:"commonAnnotations,omitempty"`
+	ExternalURL       *string              `json:"externalURL,omitempty"`
+	GroupKey          string               `json:"groupKey"`
+	Status            GrafanaWebhookStatus `json:"status"`
+	Title             *string              `json:"title,omitempty"`
+}
+
+// GrafanaWebhookStatus defines model for GrafanaWebhook.Status.
+type GrafanaWebhookStatus string
+
 // Problem defines model for Problem.
 type Problem struct {
 	Detail *string `json:"detail,omitempty"`
@@ -67,14 +271,47 @@ type Problem struct {
 	TraceId *string `json:"trace_id,omitempty"`
 }
 
+// ReceiveCloudWatchAlarmTextBody defines parameters for ReceiveCloudWatchAlarm.
+type ReceiveCloudWatchAlarmTextBody = string
+
 // ReceiveAlertJSONRequestBody defines body for ReceiveAlert for application/json ContentType.
 type ReceiveAlertJSONRequestBody = Alert
+
+// ReceiveAlertmanagerAlertsJSONRequestBody defines body for ReceiveAlertmanagerAlerts for application/json ContentType.
+type ReceiveAlertmanagerAlertsJSONRequestBody = AlertmanagerWebhook
+
+// ReceiveCloudWatchAlarmTextRequestBody defines body for ReceiveCloudWatchAlarm for text/plain ContentType.
+type ReceiveCloudWatchAlarmTextRequestBody = ReceiveCloudWatchAlarmTextBody
+
+// ReceiveDatadogAlertJSONRequestBody defines body for ReceiveDatadogAlert for application/json ContentType.
+type ReceiveDatadogAlertJSONRequestBody = DatadogAlert
+
+// ReceiveGoogleCloudIncidentJSONRequestBody defines body for ReceiveGoogleCloudIncident for application/json ContentType.
+type ReceiveGoogleCloudIncidentJSONRequestBody = GoogleCloudWebhook
+
+// ReceiveGrafanaAlertsJSONRequestBody defines body for ReceiveGrafanaAlerts for application/json ContentType.
+type ReceiveGrafanaAlertsJSONRequestBody = GrafanaWebhook
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 	// ReceiveAlert Receive an alert
 	// (POST /v1/alerts)
 	ReceiveAlert(w http.ResponseWriter, r *http.Request)
+	// ReceiveAlertmanagerAlerts Receive alerts from Prometheus Alertmanager
+	// (POST /v1/alerts/alertmanager)
+	ReceiveAlertmanagerAlerts(w http.ResponseWriter, r *http.Request)
+	// ReceiveCloudWatchAlarm Receive a CloudWatch alarm through SNS
+	// (POST /v1/alerts/cloudwatch)
+	ReceiveCloudWatchAlarm(w http.ResponseWriter, r *http.Request)
+	// ReceiveDatadogAlert Receive an alert from Datadog
+	// (POST /v1/alerts/datadog)
+	ReceiveDatadogAlert(w http.ResponseWriter, r *http.Request)
+	// ReceiveGoogleCloudIncident Receive an incident from Google Cloud Monitoring
+	// (POST /v1/alerts/google-cloud)
+	ReceiveGoogleCloudIncident(w http.ResponseWriter, r *http.Request)
+	// ReceiveGrafanaAlerts Receive alerts from Grafana
+	// (POST /v1/alerts/grafana)
+	ReceiveGrafanaAlerts(w http.ResponseWriter, r *http.Request)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -91,6 +328,76 @@ func (siw *ServerInterfaceWrapper) ReceiveAlert(w http.ResponseWriter, r *http.R
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ReceiveAlert(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ReceiveAlertmanagerAlerts operation middleware
+func (siw *ServerInterfaceWrapper) ReceiveAlertmanagerAlerts(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ReceiveAlertmanagerAlerts(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ReceiveCloudWatchAlarm operation middleware
+func (siw *ServerInterfaceWrapper) ReceiveCloudWatchAlarm(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ReceiveCloudWatchAlarm(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ReceiveDatadogAlert operation middleware
+func (siw *ServerInterfaceWrapper) ReceiveDatadogAlert(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ReceiveDatadogAlert(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ReceiveGoogleCloudIncident operation middleware
+func (siw *ServerInterfaceWrapper) ReceiveGoogleCloudIncident(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ReceiveGoogleCloudIncident(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ReceiveGrafanaAlerts operation middleware
+func (siw *ServerInterfaceWrapper) ReceiveGrafanaAlerts(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ReceiveGrafanaAlerts(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -221,6 +528,11 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	}
 
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/alerts", wrapper.ReceiveAlert)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/alerts/alertmanager", wrapper.ReceiveAlertmanagerAlerts)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/alerts/grafana", wrapper.ReceiveGrafanaAlerts)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/alerts/datadog", wrapper.ReceiveDatadogAlert)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/alerts/cloudwatch", wrapper.ReceiveCloudWatchAlarm)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/alerts/google-cloud", wrapper.ReceiveGoogleCloudIncident)
 
 	return m
 }
@@ -279,11 +591,286 @@ func (response ReceiveAlert401ApplicationProblemPlusJSONResponse) VisitReceiveAl
 	return err
 }
 
+type ReceiveAlertmanagerAlertsRequestObject struct {
+	Body *ReceiveAlertmanagerAlertsJSONRequestBody
+}
+
+type ReceiveAlertmanagerAlertsResponseObject interface {
+	VisitReceiveAlertmanagerAlertsResponse(w http.ResponseWriter) error
+}
+
+type ReceiveAlertmanagerAlerts202JSONResponse BatchAccepted
+
+func (response ReceiveAlertmanagerAlerts202JSONResponse) VisitReceiveAlertmanagerAlertsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(202)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReceiveAlertmanagerAlerts400ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response ReceiveAlertmanagerAlerts400ApplicationProblemPlusJSONResponse) VisitReceiveAlertmanagerAlertsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReceiveAlertmanagerAlerts401ApplicationProblemPlusJSONResponse Problem
+
+func (response ReceiveAlertmanagerAlerts401ApplicationProblemPlusJSONResponse) VisitReceiveAlertmanagerAlertsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReceiveCloudWatchAlarmRequestObject struct {
+	Body *ReceiveCloudWatchAlarmTextRequestBody
+}
+
+type ReceiveCloudWatchAlarmResponseObject interface {
+	VisitReceiveCloudWatchAlarmResponse(w http.ResponseWriter) error
+}
+
+type ReceiveCloudWatchAlarm202JSONResponse BatchAccepted
+
+func (response ReceiveCloudWatchAlarm202JSONResponse) VisitReceiveCloudWatchAlarmResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(202)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReceiveCloudWatchAlarm400ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response ReceiveCloudWatchAlarm400ApplicationProblemPlusJSONResponse) VisitReceiveCloudWatchAlarmResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReceiveCloudWatchAlarm401ApplicationProblemPlusJSONResponse Problem
+
+func (response ReceiveCloudWatchAlarm401ApplicationProblemPlusJSONResponse) VisitReceiveCloudWatchAlarmResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReceiveDatadogAlertRequestObject struct {
+	Body *ReceiveDatadogAlertJSONRequestBody
+}
+
+type ReceiveDatadogAlertResponseObject interface {
+	VisitReceiveDatadogAlertResponse(w http.ResponseWriter) error
+}
+
+type ReceiveDatadogAlert202JSONResponse BatchAccepted
+
+func (response ReceiveDatadogAlert202JSONResponse) VisitReceiveDatadogAlertResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(202)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReceiveDatadogAlert400ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response ReceiveDatadogAlert400ApplicationProblemPlusJSONResponse) VisitReceiveDatadogAlertResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReceiveDatadogAlert401ApplicationProblemPlusJSONResponse Problem
+
+func (response ReceiveDatadogAlert401ApplicationProblemPlusJSONResponse) VisitReceiveDatadogAlertResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReceiveGoogleCloudIncidentRequestObject struct {
+	Body *ReceiveGoogleCloudIncidentJSONRequestBody
+}
+
+type ReceiveGoogleCloudIncidentResponseObject interface {
+	VisitReceiveGoogleCloudIncidentResponse(w http.ResponseWriter) error
+}
+
+type ReceiveGoogleCloudIncident202JSONResponse BatchAccepted
+
+func (response ReceiveGoogleCloudIncident202JSONResponse) VisitReceiveGoogleCloudIncidentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(202)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReceiveGoogleCloudIncident400ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response ReceiveGoogleCloudIncident400ApplicationProblemPlusJSONResponse) VisitReceiveGoogleCloudIncidentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReceiveGoogleCloudIncident401ApplicationProblemPlusJSONResponse Problem
+
+func (response ReceiveGoogleCloudIncident401ApplicationProblemPlusJSONResponse) VisitReceiveGoogleCloudIncidentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReceiveGrafanaAlertsRequestObject struct {
+	Body *ReceiveGrafanaAlertsJSONRequestBody
+}
+
+type ReceiveGrafanaAlertsResponseObject interface {
+	VisitReceiveGrafanaAlertsResponse(w http.ResponseWriter) error
+}
+
+type ReceiveGrafanaAlerts202JSONResponse BatchAccepted
+
+func (response ReceiveGrafanaAlerts202JSONResponse) VisitReceiveGrafanaAlertsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(202)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReceiveGrafanaAlerts400ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response ReceiveGrafanaAlerts400ApplicationProblemPlusJSONResponse) VisitReceiveGrafanaAlertsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ReceiveGrafanaAlerts401ApplicationProblemPlusJSONResponse Problem
+
+func (response ReceiveGrafanaAlerts401ApplicationProblemPlusJSONResponse) VisitReceiveGrafanaAlertsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 	// ReceiveAlert Receive an alert
 	// (POST /v1/alerts)
 	ReceiveAlert(ctx context.Context, request ReceiveAlertRequestObject) (ReceiveAlertResponseObject, error)
+	// ReceiveAlertmanagerAlerts Receive alerts from Prometheus Alertmanager
+	// (POST /v1/alerts/alertmanager)
+	ReceiveAlertmanagerAlerts(ctx context.Context, request ReceiveAlertmanagerAlertsRequestObject) (ReceiveAlertmanagerAlertsResponseObject, error)
+	// ReceiveCloudWatchAlarm Receive a CloudWatch alarm through SNS
+	// (POST /v1/alerts/cloudwatch)
+	ReceiveCloudWatchAlarm(ctx context.Context, request ReceiveCloudWatchAlarmRequestObject) (ReceiveCloudWatchAlarmResponseObject, error)
+	// ReceiveDatadogAlert Receive an alert from Datadog
+	// (POST /v1/alerts/datadog)
+	ReceiveDatadogAlert(ctx context.Context, request ReceiveDatadogAlertRequestObject) (ReceiveDatadogAlertResponseObject, error)
+	// ReceiveGoogleCloudIncident Receive an incident from Google Cloud Monitoring
+	// (POST /v1/alerts/google-cloud)
+	ReceiveGoogleCloudIncident(ctx context.Context, request ReceiveGoogleCloudIncidentRequestObject) (ReceiveGoogleCloudIncidentResponseObject, error)
+	// ReceiveGrafanaAlerts Receive alerts from Grafana
+	// (POST /v1/alerts/grafana)
+	ReceiveGrafanaAlerts(ctx context.Context, request ReceiveGrafanaAlertsRequestObject) (ReceiveGrafanaAlertsResponseObject, error)
 }
 
 type StrictHandlerFunc func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error)
@@ -356,24 +943,194 @@ func (sh *strictHandler) ReceiveAlert(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// ReceiveAlertmanagerAlerts operation middleware
+func (sh *strictHandler) ReceiveAlertmanagerAlerts(w http.ResponseWriter, r *http.Request) {
+	var request ReceiveAlertmanagerAlertsRequestObject
+
+	var body ReceiveAlertmanagerAlertsJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ReceiveAlertmanagerAlerts(ctx, request.(ReceiveAlertmanagerAlertsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ReceiveAlertmanagerAlerts")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ReceiveAlertmanagerAlertsResponseObject); ok {
+		if err := validResponse.VisitReceiveAlertmanagerAlertsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ReceiveCloudWatchAlarm operation middleware
+func (sh *strictHandler) ReceiveCloudWatchAlarm(w http.ResponseWriter, r *http.Request) {
+	var request ReceiveCloudWatchAlarmRequestObject
+
+	data, err := io.ReadAll(r.Body)
+	if err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't read body: %w", err))
+		return
+	}
+	body := ReceiveCloudWatchAlarmTextRequestBody(data)
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ReceiveCloudWatchAlarm(ctx, request.(ReceiveCloudWatchAlarmRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ReceiveCloudWatchAlarm")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ReceiveCloudWatchAlarmResponseObject); ok {
+		if err := validResponse.VisitReceiveCloudWatchAlarmResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ReceiveDatadogAlert operation middleware
+func (sh *strictHandler) ReceiveDatadogAlert(w http.ResponseWriter, r *http.Request) {
+	var request ReceiveDatadogAlertRequestObject
+
+	var body ReceiveDatadogAlertJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ReceiveDatadogAlert(ctx, request.(ReceiveDatadogAlertRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ReceiveDatadogAlert")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ReceiveDatadogAlertResponseObject); ok {
+		if err := validResponse.VisitReceiveDatadogAlertResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ReceiveGoogleCloudIncident operation middleware
+func (sh *strictHandler) ReceiveGoogleCloudIncident(w http.ResponseWriter, r *http.Request) {
+	var request ReceiveGoogleCloudIncidentRequestObject
+
+	var body ReceiveGoogleCloudIncidentJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ReceiveGoogleCloudIncident(ctx, request.(ReceiveGoogleCloudIncidentRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ReceiveGoogleCloudIncident")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ReceiveGoogleCloudIncidentResponseObject); ok {
+		if err := validResponse.VisitReceiveGoogleCloudIncidentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ReceiveGrafanaAlerts operation middleware
+func (sh *strictHandler) ReceiveGrafanaAlerts(w http.ResponseWriter, r *http.Request) {
+	var request ReceiveGrafanaAlertsRequestObject
+
+	var body ReceiveGrafanaAlertsJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ReceiveGrafanaAlerts(ctx, request.(ReceiveGrafanaAlertsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ReceiveGrafanaAlerts")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ReceiveGrafanaAlertsResponseObject); ok {
+		if err := validResponse.VisitReceiveGrafanaAlertsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // Base64 encoded, compressed with deflate, json marshaled OpenAPI spec.
 // Stored as a slice of fixed-width chunks rather than one concatenated
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"7FhPb9s6Ev8qBLdAD+vYSbq9uCd3W3SDpm2QpNhDEKQ0NZbYSKTecJTUKPzdH0jKkmxJVtI6r5fcJJEc",
+	"zp+f5jczP7k0WW40aLJ8+pMj2NxoC/7lDM08hcw9SqMJNLlHkeepkoKU0ZM87Pj3d2u0W7MygUy4pxcI",
+	"Cz7l/5rU8idh1U7Wcler1YhHYCWq3InjU36ZAEP4qwBLbCFUCtGYu13lUSd5JiXkBJF7ztHkgKSCvsp/",
+	"aws8ecfMglECLANrRQz+WaSAxO6FZXkxT5VNIGLCjvmI0zIHPuWWUOnYX+9UUujuvHK3XFd7zPw7SOKr",
+	"EZ85cW2dIoiK/OYWlm3VTiLQpBYKbEMfIdFYy7RxK8HLdsSsYYIhWJMW7gvLBMlk45yisH4H3oRM/DgF",
+	"HVPCp8evX7dMGvFUzCH1GoooUk6oSM82NG8daZlsSVDh94IuMuebhfKbR7zUpemqWpAtskzgsuOSLVfX",
+	"zqsuq0/3BiETWsSAPQERWhsKfv0960FHduYvWBjMBPEpjwTBAakMeIfVC6VjwBxV+I1a6zFoQEEGv56f",
+	"dm7YU8iQHqX2rwV5K5BV8EobRhthaKi16aahEP8f5okxtx1Bdpv8kyLI7FBCasOm9p1AFEv3Lk2WGT3b",
+	"F3yCuNM9xBR+EKAWaR9uYjRF/hGW/Yv70AJBgroD7Nz9q5niDtCqQC27AVbZ2EgUJQi6QPTW5c9dRGL7",
+	"mMRuUUkjB1t2DwgtNqkQ2OfDEmEtmulW/Z0gEZm4L7vFMULs8bkmnda1XtkbFXUuyqVMofdoqvRt50Lp",
+	"jc61HJVBRd0SScQdvi6NfGnZi8vZh4sRc3+LOLCQCxTkioIOsJCitFsDQqGtohJJvVfNTt+fX95cns8+",
+	"X5xcnnz5PGbnIM0dIEQVudbhfsPgDnDJDCWArL6CLRSCZYqGS4kqEhsqri3piv4HY+IU/puaIjrRUkWg",
+	"O0AgjQ5/8Y0WWbdHVHm4DwYZECrZFr0PDgofuv7o1tbcpEou+80o1wsLeJPuJYlZU6CEP264ddjq+2dc",
+	"hoNmMjU5ONjI1NhHl1wjXmA6nGCbgFlrsLsWa0C1l6dVA8O7CLoL9o+hh/XGGvjdKqNYCC2q3CrS9MuC",
+	"T68eXz202gBhk7kRGPWRdC409DK4VSloCd3Lbfhc16bsq0La8MzTF0e/VdL8arHRxx+/V2o0mujtzpCE",
+	"SgcsKJeUJogBB1lOwk1fE+xXQ/Gi7LrHHjEybKF05PpHpdnSFJ7KpNIxmwt5CzoaprGgUqV22wvOJJCF",
+	"S2gXDlDrn58gRg+Xj7Ds1rqxh93C0uniIemkz0EgYK1dQpQHbmvKfSuskm3hX60DWAbsW1Zgniy/jZjQ",
+	"kWf3rTuZCKSfC2vvDUabOnjpWyqsvBIL0771PBTJdl0wLtBkLDNakXGeZWRM6ovGVEnQ1sc5kB+ffTg7",
+	"PXg1PmxggH/yqjPXMVnijXzI747cPscLIld8yl+ND8evuEszlHjnT+6OJnUOyI2ltrahQLZM6PWQQbNw",
+	"5UvLfLuqJAtd5JiFyU2YHjFlmQVNzGjZHLa4z2RcOTVf+s9zNLeAzmD3Z3iXn0S1n0K6CWADS29NtNwx",
+	"jHrcEKpMZZtYJizAf2hMwY4Pj/d36brl6Bl91TMpUe4cuzj+5/CwT3Klaj1Vc/uPHrG/WR6sPV/FnK9L",
+	"9KsqybkDNXwmokF/w1hqkuVL1zF5fmK5WKZGRGP2XsikRpvDiM+3bA7SZGCZ0VXr9aaxrMLKmt13I6rJ",
+	"1fYp4bU1pviHwbbZ5O5CXNm5/nHMNZLiGZoMKIFiEzLDcJSuSLx3pg+DcaOPNwsH+ovPF+x/l5dnF8wW",
+	"8+rMmJ0Qk0YvFGbhWHO1pI4CtUvsArPN8a0jFFMa1wvMUCf7iDkJO1FJ8IMmeSrUFhi2WfoZbTvRxmqf",
+	"l2GjBE0RJw4Ew0CLwuDgYSgr85sDWcWg5eShyoEEWZ4Kgl6MbIx+niZtbVzxjKCHcWTIWKXrhoET+2b2",
+	"wCeqYfR4kLJPVY3YJs0RCx5kZfnHjsbHvRjq6qSfBkod/f8zoAYBta5gAqaCD1sYeADGQr8+DK+ysQ8k",
+	"2wmvJ6/JmrOFpyrHtsYhz0B8eCVWuq4Tc43G3o/Jtlv6q+vVaPtr2ZBfXa+uV38PAA==",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

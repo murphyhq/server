@@ -20,6 +20,12 @@ overrides:
         go_type:
           type: time.Time
           pointer: true
+      - engine: postgresql
+        db_type: text
+        nullable: true
+        go_type:
+          type: string
+          pointer: true
 sql:
   - engine: postgresql
     schema: services/catalog/db/postgres/migrations
@@ -55,6 +61,11 @@ sql:
             go_type:
               type: string
               pointer: true
+          - db_type: varchar
+            nullable: true
+            go_type:
+              type: string
+              pointer: true
   - engine: mysql
     schema: services/incidents/db/mysql/migrations
     queries: services/incidents/db/mysql/queries.sql
@@ -69,6 +80,11 @@ sql:
               type: time.Time
               pointer: true
           - db_type: char
+            nullable: true
+            go_type:
+              type: string
+              pointer: true
+          - db_type: varchar
             nullable: true
             go_type:
               type: string

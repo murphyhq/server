@@ -22,11 +22,16 @@ import (
 
 func integrationKey(t *testing.T, api *client.ClientWithResponses) (serviceID, integrationID, key string) {
 	t.Helper()
+	return integrationOf(t, api, client.Generic)
+}
+
+func integrationOf(t *testing.T, api *client.ClientWithResponses, kind client.IntegrationType) (serviceID, integrationID, key string) {
+	t.Helper()
 	ctx := t.Context()
 	service, err := api.CreateServiceWithResponse(ctx, nil, newService("checkout-api"))
 	require.NoError(t, err)
 	require.Equal(t, http.StatusCreated, service.StatusCode())
-	integration, err := api.CreateIntegrationWithResponse(ctx, service.JSON201.Id, nil, client.IntegrationCreate{Name: "grafana", Type: client.Grafana})
+	integration, err := api.CreateIntegrationWithResponse(ctx, service.JSON201.Id, nil, client.IntegrationCreate{Name: string(kind), Type: kind})
 	require.NoError(t, err)
 	require.Equal(t, http.StatusCreated, integration.StatusCode())
 	return service.JSON201.Id, integration.JSON201.Id, integration.JSON201.Key
@@ -166,7 +171,7 @@ func TestAlertsForADisabledIntegrationOpenNothing(t *testing.T) {
 		stack := testenv.Murphy(t, testenv.NATS(), engine)
 		_, integrationID, key := integrationKey(t, stack.API)
 		disabled := client.IntegrationStatusDisabled
-		updated, err := stack.API.UpdateIntegrationWithResponse(t.Context(), integrationID, client.IntegrationUpdate{Name: "grafana", Status: &disabled})
+		updated, err := stack.API.UpdateIntegrationWithResponse(t.Context(), integrationID, client.IntegrationUpdate{Name: "generic", Status: &disabled})
 		require.NoError(t, err)
 		require.Equal(t, http.StatusOK, updated.StatusCode())
 

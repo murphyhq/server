@@ -19,6 +19,9 @@ type Alert struct {
 	Labels        []byte
 	ReceivedAt    time.Time
 	CreatedAt     time.Time
+	Source        string
+	Instance      *string
+	Annotations   []byte
 }
 
 type HandledMessage struct {

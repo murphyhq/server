@@ -79,6 +79,8 @@ const (
 	IntegrationType_INTEGRATION_TYPE_ALERTMANAGER IntegrationType = 2
 	IntegrationType_INTEGRATION_TYPE_GRAFANA      IntegrationType = 3
 	IntegrationType_INTEGRATION_TYPE_DATADOG      IntegrationType = 4
+	IntegrationType_INTEGRATION_TYPE_CLOUDWATCH   IntegrationType = 5
+	IntegrationType_INTEGRATION_TYPE_GOOGLE_CLOUD IntegrationType = 6
 )
 
 // Enum value maps for IntegrationType.
@@ -89,6 +91,8 @@ var (
 		2: "INTEGRATION_TYPE_ALERTMANAGER",
 		3: "INTEGRATION_TYPE_GRAFANA",
 		4: "INTEGRATION_TYPE_DATADOG",
+		5: "INTEGRATION_TYPE_CLOUDWATCH",
+		6: "INTEGRATION_TYPE_GOOGLE_CLOUD",
 	}
 	IntegrationType_value = map[string]int32{
 		"INTEGRATION_TYPE_UNSPECIFIED":  0,
@@ -96,6 +100,8 @@ var (
 		"INTEGRATION_TYPE_ALERTMANAGER": 2,
 		"INTEGRATION_TYPE_GRAFANA":      3,
 		"INTEGRATION_TYPE_DATADOG":      4,
+		"INTEGRATION_TYPE_CLOUDWATCH":   5,
+		"INTEGRATION_TYPE_GOOGLE_CLOUD": 6,
 	}
 )
 
@@ -500,13 +506,15 @@ const file_murphy_v1_catalog_proto_rawDesc = "" +
 	"\rServiceStatus\x12\x1e\n" +
 	"\x1aSERVICE_STATUS_UNSPECIFIED\x10\x00\x12\x19\n" +
 	"\x15SERVICE_STATUS_ACTIVE\x10\x01\x12\x1b\n" +
-	"\x17SERVICE_STATUS_DISABLED\x10\x02*\xb0\x01\n" +
+	"\x17SERVICE_STATUS_DISABLED\x10\x02*\xf4\x01\n" +
 	"\x0fIntegrationType\x12 \n" +
 	"\x1cINTEGRATION_TYPE_UNSPECIFIED\x10\x00\x12\x1c\n" +
 	"\x18INTEGRATION_TYPE_GENERIC\x10\x01\x12!\n" +
 	"\x1dINTEGRATION_TYPE_ALERTMANAGER\x10\x02\x12\x1c\n" +
 	"\x18INTEGRATION_TYPE_GRAFANA\x10\x03\x12\x1c\n" +
-	"\x18INTEGRATION_TYPE_DATADOG\x10\x04*w\n" +
+	"\x18INTEGRATION_TYPE_DATADOG\x10\x04\x12\x1f\n" +
+	"\x1bINTEGRATION_TYPE_CLOUDWATCH\x10\x05\x12!\n" +
+	"\x1dINTEGRATION_TYPE_GOOGLE_CLOUD\x10\x06*w\n" +
 	"\x11IntegrationStatus\x12\"\n" +
 	"\x1eINTEGRATION_STATUS_UNSPECIFIED\x10\x00\x12\x1d\n" +
 	"\x19INTEGRATION_STATUS_ACTIVE\x10\x01\x12\x1f\n" +

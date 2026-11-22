@@ -59,8 +59,10 @@ func (e IntegrationStatus) Valid() bool {
 // Defines values for IntegrationType.
 const (
 	Alertmanager IntegrationType = "alertmanager"
+	Cloudwatch   IntegrationType = "cloudwatch"
 	Datadog      IntegrationType = "datadog"
 	Generic      IntegrationType = "generic"
+	GoogleCloud  IntegrationType = "google_cloud"
 	Grafana      IntegrationType = "grafana"
 )
 
@@ -69,9 +71,13 @@ func (e IntegrationType) Valid() bool {
 	switch e {
 	case Alertmanager:
 		return true
+	case Cloudwatch:
+		return true
 	case Datadog:
 		return true
 	case Generic:
+		return true
+	case GoogleCloud:
 		return true
 	case Grafana:
 		return true

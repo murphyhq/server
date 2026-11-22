@@ -14,8 +14,8 @@ import (
 )
 
 const createAlert = `-- name: CreateAlert :exec
-INSERT INTO alerts (id, incident_id, integration_id, service_id, dedup_key, status, summary, labels, received_at, created_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+INSERT INTO alerts (id, incident_id, integration_id, service_id, dedup_key, status, summary, labels, received_at, created_at, source, instance, annotations)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type CreateAlertParams struct {
@@ -29,6 +29,9 @@ type CreateAlertParams struct {
 	Labels        json.RawMessage
 	ReceivedAt    time.Time
 	CreatedAt     time.Time
+	Source        string
+	Instance      *string
+	Annotations   json.RawMessage
 }
 
 func (q *Queries) CreateAlert(ctx context.Context, arg CreateAlertParams) error {
@@ -43,6 +46,9 @@ func (q *Queries) CreateAlert(ctx context.Context, arg CreateAlertParams) error 
 		arg.Labels,
 		arg.ReceivedAt,
 		arg.CreatedAt,
+		arg.Source,
+		arg.Instance,
+		arg.Annotations,
 	)
 	return err
 }
@@ -334,6 +340,39 @@ func (q *Queries) MarkHandled(ctx context.Context, arg MarkHandledParams) (int64
 		return 0, err
 	}
 	return result.RowsAffected()
+}
+
+const openInstances = `-- name: OpenInstances :many
+SELECT DISTINCT fired.instance
+FROM alerts AS fired
+WHERE fired.incident_id = ? AND fired.status = 'firing' AND fired.instance IS NOT NULL
+  AND fired.instance NOT IN (
+    SELECT resolved.instance FROM alerts AS resolved
+    WHERE resolved.incident_id = fired.incident_id AND resolved.status = 'resolved' AND resolved.instance IS NOT NULL
+  )
+`
+
+func (q *Queries) OpenInstances(ctx context.Context, incidentID *string) ([]*string, error) {
+	rows, err := q.db.QueryContext(ctx, openInstances, incidentID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*string
+	for rows.Next() {
+		var instance *string
+		if err := rows.Scan(&instance); err != nil {
+			return nil, err
+		}
+		items = append(items, instance)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const purgeHandledMessages = `-- name: PurgeHandledMessages :execrows

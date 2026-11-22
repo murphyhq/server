@@ -3,6 +3,7 @@ syntax = "proto3";
 package murphy.v1;
 
 import "google/protobuf/timestamp.proto";
+import "murphy/v1/catalog.proto";
 
 option go_package = "github.com/murphyhq/server;murphy";
 
@@ -16,6 +17,9 @@ message Alert {
   map<string, string> labels = 7;
   google.protobuf.Timestamp received_at = 8;
   int32 key_version = 9;
+  string instance = 10;
+  map<string, string> annotations = 11;
+  IntegrationType source = 12;
 }
 
 enum AlertStatus {

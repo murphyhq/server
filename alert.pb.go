@@ -128,6 +128,9 @@ type Alert struct {
 	Labels        map[string]string      `protobuf:"bytes,7,rep,name=labels,proto3" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	ReceivedAt    *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=received_at,json=receivedAt,proto3" json:"received_at,omitempty"`
 	KeyVersion    int32                  `protobuf:"varint,9,opt,name=key_version,json=keyVersion,proto3" json:"key_version,omitempty"`
+	Instance      string                 `protobuf:"bytes,10,opt,name=instance,proto3" json:"instance,omitempty"`
+	Annotations   map[string]string      `protobuf:"bytes,11,rep,name=annotations,proto3" json:"annotations,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Source        IntegrationType        `protobuf:"varint,12,opt,name=source,proto3,enum=murphy.v1.IntegrationType" json:"source,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -225,6 +228,27 @@ func (x *Alert) GetKeyVersion() int32 {
 	return 0
 }
 
+func (x *Alert) GetInstance() string {
+	if x != nil {
+		return x.Instance
+	}
+	return ""
+}
+
+func (x *Alert) GetAnnotations() map[string]string {
+	if x != nil {
+		return x.Annotations
+	}
+	return nil
+}
+
+func (x *Alert) GetSource() IntegrationType {
+	if x != nil {
+		return x.Source
+	}
+	return IntegrationType_INTEGRATION_TYPE_UNSPECIFIED
+}
+
 type AlertEvent struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Verb          AlertVerb              `protobuf:"varint,1,opt,name=verb,proto3,enum=murphy.v1.AlertVerb" json:"verb,omitempty"`
@@ -289,7 +313,7 @@ var File_murphy_v1_alert_proto protoreflect.FileDescriptor
 
 const file_murphy_v1_alert_proto_rawDesc = "" +
 	"\n" +
-	"\x15murphy/v1/alert.proto\x12\tmurphy.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\x93\x03\n" +
+	"\x15murphy/v1/alert.proto\x12\tmurphy.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x17murphy/v1/catalog.proto\"\xe8\x04\n" +
 	"\x05Alert\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12%\n" +
 	"\x0eintegration_id\x18\x02 \x01(\tR\rintegrationId\x12\x1d\n" +
@@ -302,8 +326,15 @@ const file_murphy_v1_alert_proto_rawDesc = "" +
 	"\vreceived_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"receivedAt\x12\x1f\n" +
 	"\vkey_version\x18\t \x01(\x05R\n" +
-	"keyVersion\x1a9\n" +
+	"keyVersion\x12\x1a\n" +
+	"\binstance\x18\n" +
+	" \x01(\tR\binstance\x12C\n" +
+	"\vannotations\x18\v \x03(\v2!.murphy.v1.Alert.AnnotationsEntryR\vannotations\x122\n" +
+	"\x06source\x18\f \x01(\x0e2\x1a.murphy.v1.IntegrationTypeR\x06source\x1a9\n" +
 	"\vLabelsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1a>\n" +
+	"\x10AnnotationsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x90\x01\n" +
 	"\n" +
@@ -332,27 +363,31 @@ func file_murphy_v1_alert_proto_rawDescGZIP() []byte {
 }
 
 var file_murphy_v1_alert_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_murphy_v1_alert_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
+var file_murphy_v1_alert_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_murphy_v1_alert_proto_goTypes = []any{
 	(AlertStatus)(0),              // 0: murphy.v1.AlertStatus
 	(AlertVerb)(0),                // 1: murphy.v1.AlertVerb
 	(*Alert)(nil),                 // 2: murphy.v1.Alert
 	(*AlertEvent)(nil),            // 3: murphy.v1.AlertEvent
 	nil,                           // 4: murphy.v1.Alert.LabelsEntry
-	(*timestamppb.Timestamp)(nil), // 5: google.protobuf.Timestamp
+	nil,                           // 5: murphy.v1.Alert.AnnotationsEntry
+	(*timestamppb.Timestamp)(nil), // 6: google.protobuf.Timestamp
+	(IntegrationType)(0),          // 7: murphy.v1.IntegrationType
 }
 var file_murphy_v1_alert_proto_depIdxs = []int32{
 	0, // 0: murphy.v1.Alert.status:type_name -> murphy.v1.AlertStatus
 	4, // 1: murphy.v1.Alert.labels:type_name -> murphy.v1.Alert.LabelsEntry
-	5, // 2: murphy.v1.Alert.received_at:type_name -> google.protobuf.Timestamp
-	1, // 3: murphy.v1.AlertEvent.verb:type_name -> murphy.v1.AlertVerb
-	2, // 4: murphy.v1.AlertEvent.previous:type_name -> murphy.v1.Alert
-	2, // 5: murphy.v1.AlertEvent.current:type_name -> murphy.v1.Alert
-	6, // [6:6] is the sub-list for method output_type
-	6, // [6:6] is the sub-list for method input_type
-	6, // [6:6] is the sub-list for extension type_name
-	6, // [6:6] is the sub-list for extension extendee
-	0, // [0:6] is the sub-list for field type_name
+	6, // 2: murphy.v1.Alert.received_at:type_name -> google.protobuf.Timestamp
+	5, // 3: murphy.v1.Alert.annotations:type_name -> murphy.v1.Alert.AnnotationsEntry
+	7, // 4: murphy.v1.Alert.source:type_name -> murphy.v1.IntegrationType
+	1, // 5: murphy.v1.AlertEvent.verb:type_name -> murphy.v1.AlertVerb
+	2, // 6: murphy.v1.AlertEvent.previous:type_name -> murphy.v1.Alert
+	2, // 7: murphy.v1.AlertEvent.current:type_name -> murphy.v1.Alert
+	8, // [8:8] is the sub-list for method output_type
+	8, // [8:8] is the sub-list for method input_type
+	8, // [8:8] is the sub-list for extension type_name
+	8, // [8:8] is the sub-list for extension extendee
+	0, // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_murphy_v1_alert_proto_init() }
@@ -360,13 +395,14 @@ func file_murphy_v1_alert_proto_init() {
 	if File_murphy_v1_alert_proto != nil {
 		return
 	}
+	file_murphy_v1_catalog_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_murphy_v1_alert_proto_rawDesc), len(file_murphy_v1_alert_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   3,
+			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

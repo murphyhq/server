@@ -299,7 +299,7 @@ components:
       enum: [active, disabled]
     IntegrationType:
       type: string
-      enum: [generic, alertmanager, grafana, datadog]
+      enum: [generic, alertmanager, grafana, datadog, cloudwatch, google_cloud]
     IntegrationStatus:
       type: string
       enum: [active, disabled]

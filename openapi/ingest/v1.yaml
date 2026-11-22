@@ -32,6 +32,121 @@ paths:
           $ref: "#/components/responses/Problem"
         "401":
           $ref: "#/components/responses/Problem"
+  /v1/alerts/alertmanager:
+    post:
+      operationId: receiveAlertmanagerAlerts
+      summary: Receive alerts from Prometheus Alertmanager
+      description: Accepts Alertmanager's webhook payload. Each alert in the group becomes one message; the group is one incident.
+      tags: [alerts]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AlertmanagerWebhook"
+      responses:
+        "202":
+          description: The alerts were accepted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchAccepted"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "401":
+          $ref: "#/components/responses/Problem"
+  /v1/alerts/grafana:
+    post:
+      operationId: receiveGrafanaAlerts
+      summary: Receive alerts from Grafana
+      description: Accepts Grafana Alerting's webhook payload. Each alert in the group becomes one message; the group is one incident.
+      tags: [alerts]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GrafanaWebhook"
+      responses:
+        "202":
+          description: The alerts were accepted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchAccepted"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "401":
+          $ref: "#/components/responses/Problem"
+  /v1/alerts/datadog:
+    post:
+      operationId: receiveDatadogAlert
+      summary: Receive an alert from Datadog
+      description: Accepts the payload of Murphy's Datadog webhook template.
+      tags: [alerts]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DatadogAlert"
+      responses:
+        "202":
+          description: The alerts were accepted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchAccepted"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "401":
+          $ref: "#/components/responses/Problem"
+  /v1/alerts/cloudwatch:
+    post:
+      operationId: receiveCloudWatchAlarm
+      summary: Receive a CloudWatch alarm through SNS
+      description: Accepts the messages of an SNS HTTPS subscription. It confirms the subscription, and turns alarm notifications into alerts.
+      tags: [alerts]
+      requestBody:
+        required: true
+        content:
+          text/plain:
+            schema:
+              type: string
+      responses:
+        "202":
+          description: The alerts were accepted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchAccepted"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "401":
+          $ref: "#/components/responses/Problem"
+  /v1/alerts/google-cloud:
+    post:
+      operationId: receiveGoogleCloudIncident
+      summary: Receive an incident from Google Cloud Monitoring
+      description: Accepts Cloud Monitoring's webhook payload, schema version 1.2.
+      tags: [alerts]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GoogleCloudWebhook"
+      responses:
+        "202":
+          description: The alerts were accepted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BatchAccepted"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "401":
+          $ref: "#/components/responses/Problem"
 components:
   securitySchemes:
     integrationKey:
@@ -74,6 +189,176 @@ components:
         id:
           type: string
           description: The ID of the message the alert was published as.
+    BatchAccepted:
+      type: object
+      required: [ids]
+      properties:
+        ids:
+          type: array
+          description: The IDs of the messages the alerts were published as.
+          items:
+            type: string
+    AlertmanagerAlert:
+      type: object
+      required: [status, labels, annotations, startsAt, fingerprint]
+      properties:
+        status:
+          type: string
+          enum: [firing, resolved]
+        labels:
+          type: object
+          additionalProperties:
+            type: string
+        annotations:
+          type: object
+          additionalProperties:
+            type: string
+        startsAt:
+          type: string
+          format: date-time
+        endsAt:
+          type: string
+          format: date-time
+        generatorURL:
+          type: string
+        fingerprint:
+          type: string
+    AlertmanagerWebhook:
+      type: object
+      required: [groupKey, status, alerts]
+      properties:
+        version:
+          type: string
+        groupKey:
+          type: string
+        status:
+          type: string
+          enum: [firing, resolved]
+        receiver:
+          type: string
+        groupLabels:
+          type: object
+          additionalProperties:
+            type: string
+        commonLabels:
+          type: object
+          additionalProperties:
+            type: string
+        commonAnnotations:
+          type: object
+          additionalProperties:
+            type: string
+        externalURL:
+          type: string
+        alerts:
+          type: array
+          items:
+            $ref: "#/components/schemas/AlertmanagerAlert"
+    GrafanaAlert:
+      allOf:
+        - $ref: "#/components/schemas/AlertmanagerAlert"
+        - type: object
+          properties:
+            silenceURL:
+              type: string
+            dashboardURL:
+              type: string
+            panelURL:
+              type: string
+    GrafanaWebhook:
+      type: object
+      required: [groupKey, status, alerts]
+      properties:
+        groupKey:
+          type: string
+        status:
+          type: string
+          enum: [firing, resolved]
+        title:
+          type: string
+        commonAnnotations:
+          type: object
+          additionalProperties:
+            type: string
+        externalURL:
+          type: string
+        alerts:
+          type: array
+          items:
+            $ref: "#/components/schemas/GrafanaAlert"
+    DatadogAlert:
+      type: object
+      required: [alert_id, transition, title]
+      properties:
+        alert_id:
+          type: string
+        aggregation_key:
+          type: string
+        cycle_key:
+          type: string
+        transition:
+          type: string
+          description: "Datadog's $ALERT_TRANSITION. Recovered resolves the alert; every other transition fires it."
+        title:
+          type: string
+        message:
+          type: string
+        priority:
+          type: string
+        link:
+          type: string
+        tags:
+          type: string
+          description: "Datadog's $TAGS, comma-separated."
+    GoogleCloudIncident:
+      type: object
+      required: [incident_id, state, summary]
+      properties:
+        incident_id:
+          type: string
+        state:
+          type: string
+          enum: [open, closed]
+        summary:
+          type: string
+        url:
+          type: string
+        policy_name:
+          type: string
+        condition_name:
+          type: string
+        severity:
+          type: string
+        resource:
+          type: object
+          properties:
+            type:
+              type: string
+            labels:
+              type: object
+              additionalProperties:
+                type: string
+        metric:
+          type: object
+          properties:
+            type:
+              type: string
+            labels:
+              type: object
+              additionalProperties:
+                type: string
+        policy_user_labels:
+          type: object
+          additionalProperties:
+            type: string
+    GoogleCloudWebhook:
+      type: object
+      required: [version, incident]
+      properties:
+        version:
+          type: string
+        incident:
+          $ref: "#/components/schemas/GoogleCloudIncident"
     Problem:
       type: object
       required: [title, status]

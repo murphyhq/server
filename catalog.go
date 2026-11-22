@@ -21,7 +21,7 @@ func (i *Integration) Validate() error {
 	var errs []error
 	errs = append(errs, requireID("service_id", i.GetServiceId()), requireName("name", i.GetName()))
 	if !i.GetType().valid() {
-		errs = append(errs, invalid("type", "must be generic, alertmanager, grafana or datadog"))
+		errs = append(errs, invalid("type", "must be generic, alertmanager, grafana, datadog, cloudwatch or google_cloud"))
 	}
 	if !i.GetStatus().valid() {
 		errs = append(errs, invalid("status", "must be active or disabled"))
