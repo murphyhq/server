@@ -195,7 +195,7 @@ services:
     volumes:
       - ./openapi:/usr/share/nginx/html:ro
 
-  db:
+  db-viewer:
     image: dbgate/dbgate:7.3.4
     environment:
       CONNECTIONS: murphy,catalog
