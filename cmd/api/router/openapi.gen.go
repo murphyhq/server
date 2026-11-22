@@ -141,6 +141,22 @@ type IntegrationUpdate struct {
 	Status *IntegrationStatus `json:"status,omitempty"`
 }
 
+// IntegrationWithKey defines model for IntegrationWithKey.
+type IntegrationWithKey struct {
+	CreatedAt time.Time `json:"created_at"`
+	Id        string    `json:"id"`
+
+	// Key The integration key, sent by monitoring tools in the Authorization header.
+	Key                   string            `json:"key"`
+	KeyVersion            int32             `json:"key_version"`
+	Name                  string            `json:"name"`
+	PreviousKeyValidUntil *time.Time        `json:"previous_key_valid_until,omitempty"`
+	ServiceId             string            `json:"service_id"`
+	Status                IntegrationStatus `json:"status"`
+	Type                  IntegrationType   `json:"type"`
+	UpdatedAt             time.Time         `json:"updated_at"`
+}
+
 // Problem defines model for Problem.
 type Problem struct {
 	Detail *string `json:"detail,omitempty"`
@@ -200,6 +216,12 @@ type IdempotencyKey = string
 // Limit defines model for Limit.
 type Limit = int
 
+// RotateIntegrationKeyParams defines parameters for RotateIntegrationKey.
+type RotateIntegrationKeyParams struct {
+	// IdempotencyKey Makes retries safe. A retry with the same key and request returns the original response for 24 hours; the same key with a different request is rejected with 422, and a retry while the first request is still running gets 409.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
 // ListServicesParams defines parameters for ListServices.
 type ListServicesParams struct {
 	// Limit Items per page, 50 by default and at most 100.
@@ -253,6 +275,9 @@ type ServerInterface interface {
 
 	// (PUT /v1/integrations/{id})
 	UpdateIntegration(w http.ResponseWriter, r *http.Request, id ID)
+	// RotateIntegrationKey Rotate the integration's key
+	// (POST /v1/integrations/{id}/key)
+	RotateIntegrationKey(w http.ResponseWriter, r *http.Request, id ID, params RotateIntegrationKeyParams)
 
 	// (GET /v1/services)
 	ListServices(w http.ResponseWriter, r *http.Request, params ListServicesParams)
@@ -354,6 +379,56 @@ func (siw *ServerInterfaceWrapper) UpdateIntegration(w http.ResponseWriter, r *h
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdateIntegration(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RotateIntegrationKey operation middleware
+func (siw *ServerInterfaceWrapper) RotateIntegrationKey(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id ID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params RotateIntegrationKeyParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RotateIntegrationKey(w, r, id, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -763,6 +838,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/v1/integrations/{id}", wrapper.DeleteIntegration)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/integrations/{id}", wrapper.GetIntegration)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/v1/integrations/{id}", wrapper.UpdateIntegration)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/integrations/{id}/key", wrapper.RotateIntegrationKey)
 
 	return m
 }
@@ -888,6 +964,73 @@ func (response UpdateIntegration404ApplicationProblemPlusJSONResponse) VisitUpda
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RotateIntegrationKeyRequestObject struct {
+	Id     ID `json:"id"`
+	Params RotateIntegrationKeyParams
+}
+
+type RotateIntegrationKeyResponseObject interface {
+	VisitRotateIntegrationKeyResponse(w http.ResponseWriter) error
+}
+
+type RotateIntegrationKey200JSONResponse IntegrationWithKey
+
+func (response RotateIntegrationKey200JSONResponse) VisitRotateIntegrationKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RotateIntegrationKey404ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response RotateIntegrationKey404ApplicationProblemPlusJSONResponse) VisitRotateIntegrationKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RotateIntegrationKey409ApplicationProblemPlusJSONResponse Problem
+
+func (response RotateIntegrationKey409ApplicationProblemPlusJSONResponse) VisitRotateIntegrationKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RotateIntegrationKey422ApplicationProblemPlusJSONResponse Problem
+
+func (response RotateIntegrationKey422ApplicationProblemPlusJSONResponse) VisitRotateIntegrationKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -1197,7 +1340,7 @@ type CreateIntegrationResponseObject interface {
 	VisitCreateIntegrationResponse(w http.ResponseWriter) error
 }
 
-type CreateIntegration201JSONResponse Integration
+type CreateIntegration201JSONResponse IntegrationWithKey
 
 func (response CreateIntegration201JSONResponse) VisitCreateIntegrationResponse(w http.ResponseWriter) error {
 
@@ -1280,6 +1423,9 @@ type StrictServerInterface interface {
 
 	// (PUT /v1/integrations/{id})
 	UpdateIntegration(ctx context.Context, request UpdateIntegrationRequestObject) (UpdateIntegrationResponseObject, error)
+	// RotateIntegrationKey Rotate the integration's key
+	// (POST /v1/integrations/{id}/key)
+	RotateIntegrationKey(ctx context.Context, request RotateIntegrationKeyRequestObject) (RotateIntegrationKeyResponseObject, error)
 
 	// (GET /v1/services)
 	ListServices(ctx context.Context, request ListServicesRequestObject) (ListServicesResponseObject, error)
@@ -1420,6 +1566,33 @@ func (sh *strictHandler) UpdateIntegration(w http.ResponseWriter, r *http.Reques
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(UpdateIntegrationResponseObject); ok {
 		if err := validResponse.VisitUpdateIntegrationResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RotateIntegrationKey operation middleware
+func (sh *strictHandler) RotateIntegrationKey(w http.ResponseWriter, r *http.Request, id ID, params RotateIntegrationKeyParams) {
+	var request RotateIntegrationKeyRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RotateIntegrationKey(ctx, request.(RotateIntegrationKeyRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RotateIntegrationKey")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RotateIntegrationKeyResponseObject); ok {
+		if err := validResponse.VisitRotateIntegrationKeyResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -1637,29 +1810,32 @@ func (sh *strictHandler) CreateIntegration(w http.ResponseWriter, r *http.Reques
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"1FhLb9s4EP4rxOwCe1g2dhz3UO+p2y4KY1MgQNpTERiMNJbZSKRKjpIKgf77gpRkS5b8ahwne9NjOI9v",
-	"Hh/JRwh0kmqFiixMHiEVRiRIaPzbh8xYbdxTiDYwMiWpFUzgywKZwp80C7wA03NGC2SpwXupM8tSEeEZ",
-	"cJBO+EeGJgcOSiQIEyiXAAcbLDARTjnlqftjyUgVQVFwmH503/3yVNBitVqGwMHgj0waDGFCJsMdmkJM",
-	"Uk2ogvxfzLuhfBZ3aJlBMhIts2KOZ+y9f8/Zg6SFD8yKBNkd5kyokDnraMnJZEZZL6CNjKQSMTNoU60s",
-	"srk2bDRmC50Z+1dbiVcrWCjnczSoaKlROke+Y0AYlkLj0Yh7m6L2aCFj9Nrm0tjWSksyjpnJlJIqYhGS",
-	"ZePhu2UWFihCNCsgG7i8ccA0UUzEz0tUES1gMnr7lvegeikTSV0wp4SJZSkaXwGcvR2y25yFOBdZTGUg",
-	"xBJtiZ0Ph5sKJPa61/yRSZbA5Hw45JBIVb0tPZOKMEIDhfOtToGv4Cujb2NM3GOgFaHyXos0jWUgnNeD",
-	"tJT487t1ITw2zP5ucA4T+G2wapFB+dcOar3eYrc56rzMhYwxPPOYVUud5qnz14hywSOkRqdoSJYuBwYF",
-	"YTgT3tW5Nol7glAQviGZIHQSwl1bdKufwx3ms3s0trKz1CUVXYygC1+dgx5VdW/PvE4Ry3CWKZLx/j5a",
-	"NPcywNkGXy0Jyuwu3BvIXZcLitrU3gu/OPGCQ5aGBwJdNGfPt3IYNcKq4KuWteFfBsibCW45cbO0p2/d",
-	"FHA+Ntz+4Jd162Vjyk6N6Bo6TSx2hHYlop7AJGHSftjTnVUEIIwRuXtv0FV3bv2TpJQzrfxkjYWlJYPt",
-	"KADvWFv5jlCvl0lB5YbYNxAByXsEDqG04jbGEG46djmso91QEKFCIwPgIGI0lAglIj/qIyPmQgmnWpAI",
-	"dbRL81dfjKcosb5a6UOuMb/bLoVIopw+W5zqzjeSFPeHQkYsh1N3oPu/5T5H2nq8c0aazaUKmSQmFct1",
-	"ZrykY+BbEdyhCncXUenS0u0+FK7LGXMcrmgF1wME2kDEPlmzVMcyyDdN7A2fn1gsVayNWYQi2eTC4SOc",
-	"Q2Yit+vZ5cfXSqx36FezrQnlytENEK4s/yIXVMhMVZpRX0McKa0nzd/TclFTzHbgt2B5DOKpVL060mkn",
-	"4mDC+bpKTb1wISN3FIv1Q88K56ZUc+0WxDJAZXFFHfD+09Xlm4uzYWMGw+fMpIucvb+aAoflNhXuz52Q",
-	"TlGJVMIELs6GZxfA/UHQxzG4Px/IFaXYwaMMixLfGEv6ctn0P6chTOCj/97cIKydEkbDcf/Yb5hhD8Ky",
-	"0oLb0HMYD8ebSmOpvHFO4EAisg7GQJCIHRkXHCKkrr+fkLY6O9xynDnsGNM0s+Eo04DgeGE3rxm+9Stb",
-	"iQymH6G44ZBmPViVW5Z1uDw9/63D/DmQKk1C0W5MMhkWL5uqij96UjY8IGVHSXHBfZtWhyMPRm+pX0pL",
-	"17XQoXVR3kIUfKdgdY/liujZ8tNklJ781EFypvDBXw1IY+kX0rOpo7Ttgbc8M1a2D8Z37e6suHme1mrt",
-	"a/bqqvNj297UUdX2jFV1/Ivd9O4w+dHoyN23J0GuymQ/cqzU+3s9SbY5dix7QIOno8uNrg9PVSntCnmF",
-	"FNmE6DX08MkyU7Pi03p4/Iw9v3cPt7a9Wzl12hT8X/Pq+jXh9v77oz2Gnsy2L9rMWyi9veF9lbTevbo+",
-	"MbfvsWOu+f20O+aX2RMUxX8DAA==",
+	"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",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

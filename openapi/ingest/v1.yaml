@@ -1,0 +1,89 @@
+openapi: 3.0.3
+info:
+  title: Murphy ingest
+  description: Receives alerts from monitoring tools.
+  version: v1
+  license:
+    name: AGPL-3.0
+security:
+  - integrationKey: []
+  - integrationKeyBasic: []
+paths:
+  /v1/alerts:
+    post:
+      operationId: receiveAlert
+      summary: Receive an alert
+      description: Accepts an alert in Murphy's generic format. The response is sent once the alert is stored by the broker.
+      tags: [alerts]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Alert"
+      responses:
+        "202":
+          description: The alert was accepted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Accepted"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "401":
+          $ref: "#/components/responses/Problem"
+components:
+  securitySchemes:
+    integrationKey:
+      type: http
+      scheme: bearer
+      description: The integration key.
+    integrationKeyBasic:
+      type: http
+      scheme: basic
+      description: Username `murphy`, and the integration key as the password.
+  responses:
+    Problem:
+      description: The request failed.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+  schemas:
+    Alert:
+      type: object
+      required: [dedup_key, status, summary]
+      properties:
+        dedup_key:
+          type: string
+          maxLength: 255
+          description: Identifies the alert across notifications, so a resolution matches the alert it resolves.
+        status:
+          type: string
+          enum: [firing, resolved]
+        summary:
+          type: string
+        labels:
+          type: object
+          additionalProperties:
+            type: string
+    Accepted:
+      type: object
+      required: [id]
+      properties:
+        id:
+          type: string
+          description: The ID of the message the alert was published as.
+    Problem:
+      type: object
+      required: [title, status]
+      properties:
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        trace_id:
+          type: string
+          description: The trace of this request, to find it in your tracing backend.

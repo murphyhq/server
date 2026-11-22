@@ -5,12 +5,14 @@ package integration
 import (
 	"net/http"
 	"testing"
+	"time"
 	"uuid"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/murphyhq/server/client"
+	"github.com/murphyhq/server/services/catalog"
 	"github.com/murphyhq/server/tests/testenv"
 )
 
@@ -49,6 +51,41 @@ func TestCatalogServicesAndIntegrations(t *testing.T) {
 	gone, err := api.GetIntegrationWithResponse(ctx, integration.JSON201.Id)
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusNotFound, gone.StatusCode())
+}
+
+func TestIntegrationKeysAreIssuedAndRotated(t *testing.T) {
+	api, _ := testenv.API(t)
+	ctx := t.Context()
+	keys, err := catalog.ParseKeyring(testenv.IntegrationKeySecrets)
+	require.NoError(t, err)
+
+	service, err := api.CreateServiceWithResponse(ctx, nil, newService("checkout-api"))
+	require.NoError(t, err)
+	created, err := api.CreateIntegrationWithResponse(ctx, service.JSON201.Id, nil, client.IntegrationCreate{Name: "grafana", Type: client.Grafana})
+	require.NoError(t, err)
+	require.Equal(t, http.StatusCreated, created.StatusCode())
+
+	first, err := keys.Verify(created.JSON201.Key)
+	require.NoError(t, err)
+	assert.Equal(t, created.JSON201.Id, first.GetIntegrationId())
+	assert.Equal(t, service.JSON201.Id, first.GetServiceId())
+	assert.Equal(t, int32(1), first.GetKeyVersion())
+
+	rotated, err := api.RotateIntegrationKeyWithResponse(ctx, created.JSON201.Id, nil)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, rotated.StatusCode())
+	assert.Equal(t, int32(2), rotated.JSON200.KeyVersion)
+	require.NotNil(t, rotated.JSON200.PreviousKeyValidUntil)
+	assert.WithinDuration(t, time.Now().Add(24*time.Hour), *rotated.JSON200.PreviousKeyValidUntil, time.Minute)
+
+	second, err := keys.Verify(rotated.JSON200.Key)
+	require.NoError(t, err)
+	assert.Equal(t, int32(2), second.GetKeyVersion())
+	assert.NotEqual(t, created.JSON201.Key, rotated.JSON200.Key)
+
+	missing, err := api.RotateIntegrationKeyWithResponse(ctx, uuid.NewV7().String(), nil)
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusNotFound, missing.StatusCode())
 }
 
 func TestCatalogListsServicesNewestFirst(t *testing.T) {

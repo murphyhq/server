@@ -3,6 +3,7 @@ package catalog
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/murphyhq/server"
 	"github.com/murphyhq/server/internal/pagination"
@@ -20,15 +21,19 @@ type Repository interface {
 	GetIntegration(ctx context.Context, id string) (*murphy.Integration, error)
 	ListIntegrations(ctx context.Context, serviceID, before string, limit int) ([]*murphy.Integration, error)
 	UpdateIntegration(ctx context.Context, integration *murphy.Integration) error
+	RotateIntegrationKey(ctx context.Context, id string, previousValidUntil, updatedAt time.Time) (*murphy.Integration, error)
 	DeleteIntegration(ctx context.Context, id string) error
 }
 
+const previousKeyGrace = 24 * time.Hour
+
 type Service struct {
 	repo Repository
+	keys *Keyring
 }
 
-func New(repo Repository) *Service {
-	return &Service{repo: repo}
+func New(repo Repository, keys *Keyring) *Service {
+	return &Service{repo: repo, keys: keys}
 }
 
 func (s *Service) CreateService(ctx context.Context, in *murphy.Service) (_ *murphy.Service, err error) {
@@ -131,7 +136,7 @@ func (s *Service) DeleteService(ctx context.Context, id string) (err error) {
 	return nil
 }
 
-func (s *Service) CreateIntegration(ctx context.Context, in *murphy.Integration) (_ *murphy.Integration, err error) {
+func (s *Service) CreateIntegration(ctx context.Context, in *murphy.Integration) (_ *murphy.Integration, _ string, err error) {
 	ctx, span := tracer.Span(ctx)
 	ctx = span.Set(ctx, telemetry.WithField("service.id", in.GetServiceId()))
 	defer span.End(&err)
@@ -149,15 +154,39 @@ func (s *Service) CreateIntegration(ctx context.Context, in *murphy.Integration)
 	}
 	ctx = span.Set(ctx, telemetry.WithField("integration.id", integration.GetId()))
 	if err := integration.Validate(); err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	if _, err := s.GetService(ctx, integration.GetServiceId()); err != nil {
-		return nil, err
+		return nil, "", err
+	}
+	key, err := s.keys.Sign(integration)
+	if err != nil {
+		return nil, "", err
 	}
 	if err := s.repo.CreateIntegration(ctx, integration); err != nil {
-		return nil, fmt.Errorf("create integration: %w", err)
+		return nil, "", fmt.Errorf("create integration: %w", err)
 	}
-	return integration, nil
+	return integration, key, nil
+}
+
+func (s *Service) RotateIntegrationKey(ctx context.Context, id string) (_ *murphy.Integration, _ string, err error) {
+	ctx, span := tracer.Span(ctx)
+	ctx = span.Set(ctx, telemetry.WithField("integration.id", id))
+	defer span.End(&err)
+
+	if err := murphy.LookupID("integration", id); err != nil {
+		return nil, "", err
+	}
+	now := murphy.Now()
+	integration, err := s.repo.RotateIntegrationKey(ctx, id, now.AsTime().Add(previousKeyGrace), now.AsTime())
+	if err != nil {
+		return nil, "", fmt.Errorf("rotate integration key: %w", err)
+	}
+	key, err := s.keys.Sign(integration)
+	if err != nil {
+		return nil, "", err
+	}
+	return integration, key, nil
 }
 
 func (s *Service) GetIntegration(ctx context.Context, id string) (_ *murphy.Integration, err error) {

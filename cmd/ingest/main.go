@@ -4,7 +4,9 @@ import (
 	"context"
 	"os"
 
+	"github.com/murphyhq/server/cmd/ingest/app"
 	"github.com/murphyhq/server/internal/config"
+	"github.com/murphyhq/server/internal/httpserver"
 	"github.com/murphyhq/server/internal/lifecycle"
 	"github.com/murphyhq/server/internal/logger"
 	"github.com/murphyhq/server/internal/telemetry"
@@ -12,6 +14,7 @@ import (
 
 type settings struct {
 	Lifecycle lifecycle.Config
+	App       app.Settings
 }
 
 func main() {
@@ -27,5 +30,14 @@ func run(ctx context.Context) error {
 	if err := config.Load(&s); err != nil {
 		return err
 	}
-	return lifecycle.Run(ctx, "ingest", s.Lifecycle, lifecycle.UntilStopped)
+
+	a, err := app.New(ctx, s.App)
+	if err != nil {
+		return err
+	}
+	defer a.Close()
+
+	return lifecycle.Run(ctx, "ingest", s.Lifecycle, func(ctx context.Context) error {
+		return httpserver.Serve(ctx, httpserver.Config{Addr: s.App.HTTPAddr, ShutdownTimeout: s.Lifecycle.ShutdownTimeout}, a.Handler)
+	}, a.Ready...)
 }

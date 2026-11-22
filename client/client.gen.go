@@ -135,6 +135,22 @@ type IntegrationUpdate struct {
 	Status *IntegrationStatus `json:"status,omitempty"`
 }
 
+// IntegrationWithKey defines model for IntegrationWithKey.
+type IntegrationWithKey struct {
+	CreatedAt time.Time `json:"created_at"`
+	Id        string    `json:"id"`
+
+	// Key The integration key, sent by monitoring tools in the Authorization header.
+	Key                   string            `json:"key"`
+	KeyVersion            int32             `json:"key_version"`
+	Name                  string            `json:"name"`
+	PreviousKeyValidUntil *time.Time        `json:"previous_key_valid_until,omitempty"`
+	ServiceId             string            `json:"service_id"`
+	Status                IntegrationStatus `json:"status"`
+	Type                  IntegrationType   `json:"type"`
+	UpdatedAt             time.Time         `json:"updated_at"`
+}
+
 // Problem defines model for Problem.
 type Problem struct {
 	Detail *string `json:"detail,omitempty"`
@@ -193,6 +209,12 @@ type IdempotencyKey = string
 
 // Limit defines model for Limit.
 type Limit = int
+
+// RotateIntegrationKeyParams defines parameters for RotateIntegrationKey.
+type RotateIntegrationKeyParams struct {
+	// IdempotencyKey Makes retries safe. A retry with the same key and request returns the original response for 24 hours; the same key with a different request is rejected with 422, and a retry while the first request is still running gets 409.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
 
 // ListServicesParams defines parameters for ListServices.
 type ListServicesParams struct {
@@ -324,6 +346,13 @@ type ClientInterface interface {
 	// Takes a body of the `application/json` content type.
 	UpdateIntegration(ctx context.Context, id ID, body UpdateIntegrationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// RotateIntegrationKey Rotate the integration's key
+	//
+	// Issues a new key and bumps the key version. The previous key keeps working for 24 hours, until previous_key_valid_until.
+	//
+	// Corresponds with POST /v1/integrations/{id}/key (the `RotateIntegrationKey` operationId).
+	RotateIntegrationKey(ctx context.Context, id ID, params *RotateIntegrationKeyParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListServices performs a GET /v1/services (the `ListServices` operationId) request.
 	ListServices(ctx context.Context, params *ListServicesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -405,6 +434,23 @@ func (c *Client) UpdateIntegrationWithBody(ctx context.Context, id ID, contentTy
 // Takes a body of the `application/json` content type.
 func (c *Client) UpdateIntegration(ctx context.Context, id ID, body UpdateIntegrationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUpdateIntegrationRequest(c.Server, id, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RotateIntegrationKey Rotate the integration's key
+//
+// Issues a new key and bumps the key version. The previous key keeps working for 24 hours, until previous_key_valid_until.
+//
+// Corresponds with POST /v1/integrations/{id}/key (the `RotateIntegrationKey` operationId).
+func (c *Client) RotateIntegrationKey(ctx context.Context, id ID, params *RotateIntegrationKeyParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRotateIntegrationKeyRequest(c.Server, id, params)
 	if err != nil {
 		return nil, err
 	}
@@ -662,6 +708,55 @@ func NewUpdateIntegrationRequestWithBody(server string, id ID, contentType strin
 	}
 
 	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewRotateIntegrationKeyRequest constructs an http.Request for the RotateIntegrationKey method
+func NewRotateIntegrationKeyRequest(server string, id ID, params *RotateIntegrationKeyParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/integrations/%s/key", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+
+		if params.IdempotencyKey != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Idempotency-Key", headerParam0)
+		}
+
+	}
 
 	return req, nil
 }
@@ -1101,6 +1196,15 @@ type ClientWithResponsesInterface interface {
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	UpdateIntegrationWithResponse(ctx context.Context, id ID, body UpdateIntegrationJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateIntegrationResponse, error)
 
+	// RotateIntegrationKeyWithResponse Rotate the integration's key
+	//
+	// Issues a new key and bumps the key version. The previous key keeps working for 24 hours, until previous_key_valid_until.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /v1/integrations/{id}/key (the `RotateIntegrationKey` operationId).
+	RotateIntegrationKeyWithResponse(ctx context.Context, id ID, params *RotateIntegrationKeyParams, reqEditors ...RequestEditorFn) (*RotateIntegrationKeyResponse, error)
+
 	// ListServicesWithResponse performs a GET /v1/services (the `ListServices` operationId) request.
 	//
 	// Returns a wrapper object for the known response body format(s).
@@ -1290,6 +1394,68 @@ func (r UpdateIntegrationResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r UpdateIntegrationResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type RotateIntegrationKeyResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *IntegrationWithKey
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *Problem
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Problem
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Problem
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r RotateIntegrationKeyResponse) GetJSON200() *IntegrationWithKey {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r RotateIntegrationKeyResponse) GetApplicationproblemJSON404() *Problem {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r RotateIntegrationKeyResponse) GetApplicationproblemJSON409() *Problem {
+	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r RotateIntegrationKeyResponse) GetApplicationproblemJSON422() *Problem {
+	return r.ApplicationproblemJSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r RotateIntegrationKeyResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r RotateIntegrationKeyResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RotateIntegrationKeyResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r RotateIntegrationKeyResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -1616,7 +1782,7 @@ type CreateIntegrationResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	// JSON201 the response for an HTTP 201 `application/json` response
-	JSON201 *Integration
+	JSON201 *IntegrationWithKey
 	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
 	ApplicationproblemJSON400 *Problem
 	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
@@ -1628,7 +1794,7 @@ type CreateIntegrationResponse struct {
 }
 
 // GetJSON201 returns the response for an HTTP 201 `application/json` response
-func (r CreateIntegrationResponse) GetJSON201() *Integration {
+func (r CreateIntegrationResponse) GetJSON201() *IntegrationWithKey {
 	return r.JSON201
 }
 
@@ -1723,6 +1889,21 @@ func (c *ClientWithResponses) UpdateIntegrationWithResponse(ctx context.Context,
 		return nil, err
 	}
 	return ParseUpdateIntegrationResponse(rsp)
+}
+
+// RotateIntegrationKeyWithResponse Rotate the integration's key
+//
+// Issues a new key and bumps the key version. The previous key keeps working for 24 hours, until previous_key_valid_until.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /v1/integrations/{id}/key (the `RotateIntegrationKey` operationId).
+func (c *ClientWithResponses) RotateIntegrationKeyWithResponse(ctx context.Context, id ID, params *RotateIntegrationKeyParams, reqEditors ...RequestEditorFn) (*RotateIntegrationKeyResponse, error) {
+	rsp, err := c.RotateIntegrationKey(ctx, id, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRotateIntegrationKeyResponse(rsp)
 }
 
 // ListServicesWithResponse performs a GET /v1/services (the `ListServices` operationId) request.
@@ -1931,6 +2112,53 @@ func ParseUpdateIntegrationResponse(rsp *http.Response) (*UpdateIntegrationRespo
 			return nil, err
 		}
 		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseRotateIntegrationKeyResponse parses an HTTP response from a RotateIntegrationKeyWithResponse call
+func ParseRotateIntegrationKeyResponse(rsp *http.Response) (*RotateIntegrationKeyResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RotateIntegrationKeyResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest IntegrationWithKey
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
 
 	}
 
@@ -2181,7 +2409,7 @@ func ParseCreateIntegrationResponse(rsp *http.Response) (*CreateIntegrationRespo
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
-		var dest Integration
+		var dest IntegrationWithKey
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}

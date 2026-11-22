@@ -13,9 +13,10 @@ import (
 )
 
 type Settings struct {
-	HTTPAddr            string `env:"HTTP_ADDR" default:":8080"`
-	CatalogDatabaseURL  string `env:"CATALOG_DATABASE_URL" required:"true"`
-	IdempotencyStoreURL string `env:"IDEMPOTENCY_STORE_URL" required:"true"`
+	HTTPAddr              string `env:"HTTP_ADDR" default:":8080"`
+	CatalogDatabaseURL    string `env:"CATALOG_DATABASE_URL" required:"true"`
+	IdempotencyStoreURL   string `env:"IDEMPOTENCY_STORE_URL" required:"true"`
+	IntegrationKeySecrets string `env:"INTEGRATION_KEY_SECRETS" required:"true"`
 }
 
 type App struct {
@@ -44,7 +45,12 @@ func New(ctx context.Context, s Settings) (_ *App, err error) {
 	}
 	a.closers = append(a.closers, func() { _ = keys.Close() })
 
-	a.Handler, err = router.New(catalog.New(catalogStorage), keys)
+	keyring, err := catalog.ParseKeyring(s.IntegrationKeySecrets)
+	if err != nil {
+		return nil, fmt.Errorf("MURPHY_INTEGRATION_KEY_SECRETS: %w", err)
+	}
+
+	a.Handler, err = router.New(catalog.New(catalogStorage, keyring), keys)
 	if err != nil {
 		return nil, err
 	}

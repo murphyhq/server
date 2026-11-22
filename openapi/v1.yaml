@@ -123,11 +123,11 @@ paths:
               $ref: "#/components/schemas/IntegrationCreate"
       responses:
         "201":
-          description: The created integration.
+          description: The created integration, with its key. The key is only shown in this response.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Integration"
+                $ref: "#/components/schemas/IntegrationWithKey"
         "400":
           $ref: "#/components/responses/Problem"
         "404":
@@ -178,6 +178,29 @@ paths:
         "204":
           description: The integration was deleted.
         "404":
+          $ref: "#/components/responses/Problem"
+  /v1/integrations/{id}/key:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    post:
+      operationId: rotateIntegrationKey
+      summary: Rotate the integration's key
+      description: Issues a new key and bumps the key version. The previous key keeps working for 24 hours, until previous_key_valid_until.
+      tags: [catalog]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "200":
+          description: The integration, with its new key. The key is only shown in this response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntegrationWithKey"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "409":
+          $ref: "#/components/responses/Problem"
+        "422":
           $ref: "#/components/responses/Problem"
 components:
   parameters:
@@ -305,6 +328,15 @@ components:
         updated_at:
           type: string
           format: date-time
+    IntegrationWithKey:
+      allOf:
+        - $ref: "#/components/schemas/Integration"
+        - type: object
+          required: [key]
+          properties:
+            key:
+              type: string
+              description: The integration key, sent by monitoring tools in the Authorization header.
     IntegrationCreate:
       type: object
       required: [name, type]

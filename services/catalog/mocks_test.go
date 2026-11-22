@@ -6,6 +6,7 @@ package catalog_test
 
 import (
 	"context"
+	"time"
 
 	"github.com/murphyhq/server"
 	mock "github.com/stretchr/testify/mock"
@@ -561,6 +562,86 @@ func (_c *MockRepository_ListServices_Call) Return(services []*murphy.Service, e
 }
 
 func (_c *MockRepository_ListServices_Call) RunAndReturn(run func(ctx context.Context, before string, limit int) ([]*murphy.Service, error)) *MockRepository_ListServices_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// RotateIntegrationKey provides a mock function for the type MockRepository
+func (_mock *MockRepository) RotateIntegrationKey(ctx context.Context, id string, previousValidUntil time.Time, updatedAt time.Time) (*murphy.Integration, error) {
+	ret := _mock.Called(ctx, id, previousValidUntil, updatedAt)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RotateIntegrationKey")
+	}
+
+	var r0 *murphy.Integration
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, time.Time, time.Time) (*murphy.Integration, error)); ok {
+		return returnFunc(ctx, id, previousValidUntil, updatedAt)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, time.Time, time.Time) *murphy.Integration); ok {
+		r0 = returnFunc(ctx, id, previousValidUntil, updatedAt)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*murphy.Integration)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, time.Time, time.Time) error); ok {
+		r1 = returnFunc(ctx, id, previousValidUntil, updatedAt)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockRepository_RotateIntegrationKey_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RotateIntegrationKey'
+type MockRepository_RotateIntegrationKey_Call struct {
+	*mock.Call
+}
+
+// RotateIntegrationKey is a helper method to define mock.On call
+//   - ctx context.Context
+//   - id string
+//   - previousValidUntil time.Time
+//   - updatedAt time.Time
+func (_e *MockRepository_Expecter) RotateIntegrationKey(ctx any, id any, previousValidUntil any, updatedAt any) *MockRepository_RotateIntegrationKey_Call {
+	return &MockRepository_RotateIntegrationKey_Call{Call: _e.mock.On("RotateIntegrationKey", ctx, id, previousValidUntil, updatedAt)}
+}
+
+func (_c *MockRepository_RotateIntegrationKey_Call) Run(run func(ctx context.Context, id string, previousValidUntil time.Time, updatedAt time.Time)) *MockRepository_RotateIntegrationKey_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 time.Time
+		if args[2] != nil {
+			arg2 = args[2].(time.Time)
+		}
+		var arg3 time.Time
+		if args[3] != nil {
+			arg3 = args[3].(time.Time)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_RotateIntegrationKey_Call) Return(integration *murphy.Integration, err error) *MockRepository_RotateIntegrationKey_Call {
+	_c.Call.Return(integration, err)
+	return _c
+}
+
+func (_c *MockRepository_RotateIntegrationKey_Call) RunAndReturn(run func(ctx context.Context, id string, previousValidUntil time.Time, updatedAt time.Time) (*murphy.Integration, error)) *MockRepository_RotateIntegrationKey_Call {
 	_c.Call.Return(run)
 	return _c
 }
