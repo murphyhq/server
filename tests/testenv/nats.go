@@ -8,50 +8,21 @@ import (
 	"os"
 	"strings"
 	"testing"
-	"time"
 	"uuid"
 
-	"github.com/nats-io/nats.go/jetstream"
 	"github.com/stretchr/testify/require"
 
 	"github.com/murphyhq/server/internal/messaging/brokertest"
-	"github.com/murphyhq/server/internal/nats"
+	"github.com/murphyhq/server/tests/provision"
 )
 
 func NATS() brokertest.Environment {
 	return brokertest.Environment{
 		Provision: func(t *testing.T, topology brokertest.Topology) string {
 			t.Helper()
-			ctx := t.Context()
 			stream := name()
-			conn, js, err := nats.Open(nats.Config{URL: natsServer()})
-			require.NoError(t, err)
-			t.Cleanup(func() {
-				_ = js.DeleteStream(context.Background(), stream)
-				conn.Close()
-			})
-
-			_, err = js.CreateStream(ctx, jetstream.StreamConfig{
-				Name:      stream,
-				Subjects:  []string{stream + ".>"},
-				Retention: jetstream.InterestPolicy,
-				Storage:   jetstream.MemoryStorage,
-			})
-			require.NoError(t, err)
-			for group, topics := range topology {
-				subjects := make([]string, len(topics))
-				for i, topic := range topics {
-					subjects[i] = stream + "." + topic
-				}
-				_, err := js.CreateConsumer(ctx, stream, jetstream.ConsumerConfig{
-					Durable:        group,
-					FilterSubjects: subjects,
-					AckPolicy:      jetstream.AckExplicitPolicy,
-					AckWait:        30 * time.Second,
-					MaxAckPending:  64,
-				})
-				require.NoError(t, err)
-			}
+			t.Cleanup(func() { _ = provision.DropNATS(context.Background(), natsServer(), stream) })
+			require.NoError(t, provision.NATS(t.Context(), natsServer(), stream, provision.Topology(topology)))
 			return natsURL(t, stream)
 		},
 		Missing: func(t *testing.T) string {
