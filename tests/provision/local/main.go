@@ -31,6 +31,19 @@ func main() {
 }
 
 func run(ctx context.Context) error {
+	for key, value := range map[string]string{
+		"AWS_ENDPOINT_URL":      "http://localhost:4566",
+		"AWS_REGION":            "us-east-1",
+		"AWS_ACCESS_KEY_ID":     "test",
+		"AWS_SECRET_ACCESS_KEY": "test",
+	} {
+		if os.Getenv(key) == "" {
+			if err := os.Setenv(key, value); err != nil {
+				return err
+			}
+		}
+	}
+
 	var s settings
 	if err := config.Load(&s); err != nil {
 		return err
