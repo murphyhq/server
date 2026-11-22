@@ -135,6 +135,22 @@ type IntegrationUpdate struct {
 	Status *IntegrationStatus `json:"status,omitempty"`
 }
 
+// IntegrationWithKey defines model for IntegrationWithKey.
+type IntegrationWithKey struct {
+	CreatedAt time.Time `json:"created_at"`
+	Id        string    `json:"id"`
+
+	// Key The integration key, sent by monitoring tools in the Authorization header.
+	Key                   string            `json:"key"`
+	KeyVersion            int32             `json:"key_version"`
+	Name                  string            `json:"name"`
+	PreviousKeyValidUntil *time.Time        `json:"previous_key_valid_until,omitempty"`
+	ServiceId             string            `json:"service_id"`
+	Status                IntegrationStatus `json:"status"`
+	Type                  IntegrationType   `json:"type"`
+	UpdatedAt             time.Time         `json:"updated_at"`
+}
+
 // Problem defines model for Problem.
 type Problem struct {
 	Detail *string `json:"detail,omitempty"`
@@ -193,6 +209,12 @@ type IdempotencyKey = string
 
 // Limit defines model for Limit.
 type Limit = int
+
+// RotateIntegrationKeyParams defines parameters for RotateIntegrationKey.
+type RotateIntegrationKeyParams struct {
+	// IdempotencyKey Makes retries safe. A retry with the same key and request returns the original response for 24 hours; the same key with a different request is rejected with 422, and a retry while the first request is still running gets 409.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
 
 // ListServicesParams defines parameters for ListServices.
 type ListServicesParams struct {
@@ -310,58 +332,103 @@ func WithRequestEditorFn(fn RequestEditorFn) ClientOption {
 // The interface specification for the client above.
 type ClientInterface interface {
 
-	// DeleteIntegration performs a DELETE /v1/integrations/{id} (the `DeleteIntegration` operationId) request.
+	// DeleteIntegration Delete an integration
+	//
+	// Corresponds with DELETE /v1/integrations/{id} (the `DeleteIntegration` operationId).
 	DeleteIntegration(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// GetIntegration performs a GET /v1/integrations/{id} (the `GetIntegration` operationId) request.
+	// GetIntegration Get an integration
+	//
+	// Corresponds with GET /v1/integrations/{id} (the `GetIntegration` operationId).
 	GetIntegration(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// UpdateIntegrationWithBody performs a PUT /v1/integrations/{id} (the `UpdateIntegration` operationId) request,
-	// with any type of body and a specified content type.
+	// UpdateIntegrationWithBody Update an integration
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /v1/integrations/{id} (the `UpdateIntegration` operationId).
 	UpdateIntegrationWithBody(ctx context.Context, id ID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// UpdateIntegration performs a PUT /v1/integrations/{id} (the `UpdateIntegration` operationId) request.
+	// UpdateIntegration Update an integration
+	//
 	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /v1/integrations/{id} (the `UpdateIntegration` operationId).
 	UpdateIntegration(ctx context.Context, id ID, body UpdateIntegrationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// ListServices performs a GET /v1/services (the `ListServices` operationId) request.
+	// RotateIntegrationKey Rotate an integration's key
+	//
+	// Issues a new key and bumps the key version. The previous key keeps working for 24 hours, until previous_key_valid_until.
+	//
+	// Corresponds with POST /v1/integrations/{id}/key (the `RotateIntegrationKey` operationId).
+	RotateIntegrationKey(ctx context.Context, id ID, params *RotateIntegrationKeyParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListServices List services
+	//
+	// Corresponds with GET /v1/services (the `ListServices` operationId).
 	ListServices(ctx context.Context, params *ListServicesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// CreateServiceWithBody performs a POST /v1/services (the `CreateService` operationId) request,
-	// with any type of body and a specified content type.
+	// CreateServiceWithBody Create a service
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /v1/services (the `CreateService` operationId).
 	CreateServiceWithBody(ctx context.Context, params *CreateServiceParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// CreateService performs a POST /v1/services (the `CreateService` operationId) request.
+	// CreateService Create a service
+	//
 	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /v1/services (the `CreateService` operationId).
 	CreateService(ctx context.Context, params *CreateServiceParams, body CreateServiceJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// DeleteService performs a DELETE /v1/services/{id} (the `DeleteService` operationId) request.
+	// DeleteService Delete a service
+	//
+	// Corresponds with DELETE /v1/services/{id} (the `DeleteService` operationId).
 	DeleteService(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// GetService performs a GET /v1/services/{id} (the `GetService` operationId) request.
+	// GetService Get a service
+	//
+	// Corresponds with GET /v1/services/{id} (the `GetService` operationId).
 	GetService(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// UpdateServiceWithBody performs a PUT /v1/services/{id} (the `UpdateService` operationId) request,
-	// with any type of body and a specified content type.
+	// UpdateServiceWithBody Update a service
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /v1/services/{id} (the `UpdateService` operationId).
 	UpdateServiceWithBody(ctx context.Context, id ID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// UpdateService performs a PUT /v1/services/{id} (the `UpdateService` operationId) request.
+	// UpdateService Update a service
+	//
 	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /v1/services/{id} (the `UpdateService` operationId).
 	UpdateService(ctx context.Context, id ID, body UpdateServiceJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// ListIntegrations performs a GET /v1/services/{id}/integrations (the `ListIntegrations` operationId) request.
+	// ListIntegrations List a service's integrations
+	//
+	// Corresponds with GET /v1/services/{id}/integrations (the `ListIntegrations` operationId).
 	ListIntegrations(ctx context.Context, id ID, params *ListIntegrationsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// CreateIntegrationWithBody performs a POST /v1/services/{id}/integrations (the `CreateIntegration` operationId) request,
-	// with any type of body and a specified content type.
+	// CreateIntegrationWithBody Create an integration
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /v1/services/{id}/integrations (the `CreateIntegration` operationId).
 	CreateIntegrationWithBody(ctx context.Context, id ID, params *CreateIntegrationParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// CreateIntegration performs a POST /v1/services/{id}/integrations (the `CreateIntegration` operationId) request.
+	// CreateIntegration Create an integration
+	//
 	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /v1/services/{id}/integrations (the `CreateIntegration` operationId).
 	CreateIntegration(ctx context.Context, id ID, params *CreateIntegrationParams, body CreateIntegrationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
-// DeleteIntegration performs a DELETE /v1/integrations/{id} (the `DeleteIntegration` operationId) request.
+// DeleteIntegration Delete an integration
+//
+// Corresponds with DELETE /v1/integrations/{id} (the `DeleteIntegration` operationId).
 func (c *Client) DeleteIntegration(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDeleteIntegrationRequest(c.Server, id)
 	if err != nil {
@@ -374,7 +441,9 @@ func (c *Client) DeleteIntegration(ctx context.Context, id ID, reqEditors ...Req
 	return c.Client.Do(req)
 }
 
-// GetIntegration performs a GET /v1/integrations/{id} (the `GetIntegration` operationId) request.
+// GetIntegration Get an integration
+//
+// Corresponds with GET /v1/integrations/{id} (the `GetIntegration` operationId).
 func (c *Client) GetIntegration(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetIntegrationRequest(c.Server, id)
 	if err != nil {
@@ -387,8 +456,11 @@ func (c *Client) GetIntegration(ctx context.Context, id ID, reqEditors ...Reques
 	return c.Client.Do(req)
 }
 
-// UpdateIntegrationWithBody performs a PUT /v1/integrations/{id} (the `UpdateIntegration` operationId) request,
-// with any type of body and a specified content type.
+// UpdateIntegrationWithBody Update an integration
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PUT /v1/integrations/{id} (the `UpdateIntegration` operationId).
 func (c *Client) UpdateIntegrationWithBody(ctx context.Context, id ID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUpdateIntegrationRequestWithBody(c.Server, id, contentType, body)
 	if err != nil {
@@ -401,8 +473,11 @@ func (c *Client) UpdateIntegrationWithBody(ctx context.Context, id ID, contentTy
 	return c.Client.Do(req)
 }
 
-// UpdateIntegration performs a PUT /v1/integrations/{id} (the `UpdateIntegration` operationId) request.
+// UpdateIntegration Update an integration
+//
 // Takes a body of the `application/json` content type.
+//
+// Corresponds with PUT /v1/integrations/{id} (the `UpdateIntegration` operationId).
 func (c *Client) UpdateIntegration(ctx context.Context, id ID, body UpdateIntegrationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUpdateIntegrationRequest(c.Server, id, body)
 	if err != nil {
@@ -415,7 +490,26 @@ func (c *Client) UpdateIntegration(ctx context.Context, id ID, body UpdateIntegr
 	return c.Client.Do(req)
 }
 
-// ListServices performs a GET /v1/services (the `ListServices` operationId) request.
+// RotateIntegrationKey Rotate an integration's key
+//
+// Issues a new key and bumps the key version. The previous key keeps working for 24 hours, until previous_key_valid_until.
+//
+// Corresponds with POST /v1/integrations/{id}/key (the `RotateIntegrationKey` operationId).
+func (c *Client) RotateIntegrationKey(ctx context.Context, id ID, params *RotateIntegrationKeyParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRotateIntegrationKeyRequest(c.Server, id, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListServices List services
+//
+// Corresponds with GET /v1/services (the `ListServices` operationId).
 func (c *Client) ListServices(ctx context.Context, params *ListServicesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListServicesRequest(c.Server, params)
 	if err != nil {
@@ -428,8 +522,11 @@ func (c *Client) ListServices(ctx context.Context, params *ListServicesParams, r
 	return c.Client.Do(req)
 }
 
-// CreateServiceWithBody performs a POST /v1/services (the `CreateService` operationId) request,
-// with any type of body and a specified content type.
+// CreateServiceWithBody Create a service
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /v1/services (the `CreateService` operationId).
 func (c *Client) CreateServiceWithBody(ctx context.Context, params *CreateServiceParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCreateServiceRequestWithBody(c.Server, params, contentType, body)
 	if err != nil {
@@ -442,8 +539,11 @@ func (c *Client) CreateServiceWithBody(ctx context.Context, params *CreateServic
 	return c.Client.Do(req)
 }
 
-// CreateService performs a POST /v1/services (the `CreateService` operationId) request.
+// CreateService Create a service
+//
 // Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /v1/services (the `CreateService` operationId).
 func (c *Client) CreateService(ctx context.Context, params *CreateServiceParams, body CreateServiceJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCreateServiceRequest(c.Server, params, body)
 	if err != nil {
@@ -456,7 +556,9 @@ func (c *Client) CreateService(ctx context.Context, params *CreateServiceParams,
 	return c.Client.Do(req)
 }
 
-// DeleteService performs a DELETE /v1/services/{id} (the `DeleteService` operationId) request.
+// DeleteService Delete a service
+//
+// Corresponds with DELETE /v1/services/{id} (the `DeleteService` operationId).
 func (c *Client) DeleteService(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDeleteServiceRequest(c.Server, id)
 	if err != nil {
@@ -469,7 +571,9 @@ func (c *Client) DeleteService(ctx context.Context, id ID, reqEditors ...Request
 	return c.Client.Do(req)
 }
 
-// GetService performs a GET /v1/services/{id} (the `GetService` operationId) request.
+// GetService Get a service
+//
+// Corresponds with GET /v1/services/{id} (the `GetService` operationId).
 func (c *Client) GetService(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetServiceRequest(c.Server, id)
 	if err != nil {
@@ -482,8 +586,11 @@ func (c *Client) GetService(ctx context.Context, id ID, reqEditors ...RequestEdi
 	return c.Client.Do(req)
 }
 
-// UpdateServiceWithBody performs a PUT /v1/services/{id} (the `UpdateService` operationId) request,
-// with any type of body and a specified content type.
+// UpdateServiceWithBody Update a service
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PUT /v1/services/{id} (the `UpdateService` operationId).
 func (c *Client) UpdateServiceWithBody(ctx context.Context, id ID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUpdateServiceRequestWithBody(c.Server, id, contentType, body)
 	if err != nil {
@@ -496,8 +603,11 @@ func (c *Client) UpdateServiceWithBody(ctx context.Context, id ID, contentType s
 	return c.Client.Do(req)
 }
 
-// UpdateService performs a PUT /v1/services/{id} (the `UpdateService` operationId) request.
+// UpdateService Update a service
+//
 // Takes a body of the `application/json` content type.
+//
+// Corresponds with PUT /v1/services/{id} (the `UpdateService` operationId).
 func (c *Client) UpdateService(ctx context.Context, id ID, body UpdateServiceJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUpdateServiceRequest(c.Server, id, body)
 	if err != nil {
@@ -510,7 +620,9 @@ func (c *Client) UpdateService(ctx context.Context, id ID, body UpdateServiceJSO
 	return c.Client.Do(req)
 }
 
-// ListIntegrations performs a GET /v1/services/{id}/integrations (the `ListIntegrations` operationId) request.
+// ListIntegrations List a service's integrations
+//
+// Corresponds with GET /v1/services/{id}/integrations (the `ListIntegrations` operationId).
 func (c *Client) ListIntegrations(ctx context.Context, id ID, params *ListIntegrationsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListIntegrationsRequest(c.Server, id, params)
 	if err != nil {
@@ -523,8 +635,11 @@ func (c *Client) ListIntegrations(ctx context.Context, id ID, params *ListIntegr
 	return c.Client.Do(req)
 }
 
-// CreateIntegrationWithBody performs a POST /v1/services/{id}/integrations (the `CreateIntegration` operationId) request,
-// with any type of body and a specified content type.
+// CreateIntegrationWithBody Create an integration
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /v1/services/{id}/integrations (the `CreateIntegration` operationId).
 func (c *Client) CreateIntegrationWithBody(ctx context.Context, id ID, params *CreateIntegrationParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCreateIntegrationRequestWithBody(c.Server, id, params, contentType, body)
 	if err != nil {
@@ -537,8 +652,11 @@ func (c *Client) CreateIntegrationWithBody(ctx context.Context, id ID, params *C
 	return c.Client.Do(req)
 }
 
-// CreateIntegration performs a POST /v1/services/{id}/integrations (the `CreateIntegration` operationId) request.
+// CreateIntegration Create an integration
+//
 // Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /v1/services/{id}/integrations (the `CreateIntegration` operationId).
 func (c *Client) CreateIntegration(ctx context.Context, id ID, params *CreateIntegrationParams, body CreateIntegrationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCreateIntegrationRequest(c.Server, id, params, body)
 	if err != nil {
@@ -662,6 +780,55 @@ func NewUpdateIntegrationRequestWithBody(server string, id ID, contentType strin
 	}
 
 	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewRotateIntegrationKeyRequest constructs an http.Request for the RotateIntegrationKey method
+func NewRotateIntegrationKeyRequest(server string, id ID, params *RotateIntegrationKeyParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/integrations/%s/key", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+
+		if params.IdempotencyKey != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Idempotency-Key", headerParam0)
+		}
+
+	}
 
 	return req, nil
 }
@@ -1081,74 +1248,111 @@ func WithBaseURL(baseURL string) ClientOption {
 // ClientWithResponsesInterface is the interface specification for the client with responses above.
 type ClientWithResponsesInterface interface {
 
-	// DeleteIntegrationWithResponse performs a DELETE /v1/integrations/{id} (the `DeleteIntegration` operationId) request.
+	// DeleteIntegrationWithResponse Delete an integration
 	//
 	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /v1/integrations/{id} (the `DeleteIntegration` operationId).
 	DeleteIntegrationWithResponse(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*DeleteIntegrationResponse, error)
 
-	// GetIntegrationWithResponse performs a GET /v1/integrations/{id} (the `GetIntegration` operationId) request.
+	// GetIntegrationWithResponse Get an integration
 	//
 	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /v1/integrations/{id} (the `GetIntegration` operationId).
 	GetIntegrationWithResponse(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*GetIntegrationResponse, error)
 
-	// UpdateIntegrationWithBodyWithResponse performs a PUT /v1/integrations/{id} (the `UpdateIntegration` operationId) request,
-	// with any type of body and a specified content type.
+	// UpdateIntegrationWithBodyWithResponse Update an integration
 	//
-	// Returns a wrapper object for the known response body format(s).
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /v1/integrations/{id} (the `UpdateIntegration` operationId).
 	UpdateIntegrationWithBodyWithResponse(ctx context.Context, id ID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateIntegrationResponse, error)
 
-	// UpdateIntegrationWithResponse performs a PUT /v1/integrations/{id} (the `UpdateIntegration` operationId) request.
+	// UpdateIntegrationWithResponse Update an integration
+	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /v1/integrations/{id} (the `UpdateIntegration` operationId).
 	UpdateIntegrationWithResponse(ctx context.Context, id ID, body UpdateIntegrationJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateIntegrationResponse, error)
 
-	// ListServicesWithResponse performs a GET /v1/services (the `ListServices` operationId) request.
+	// RotateIntegrationKeyWithResponse Rotate an integration's key
+	//
+	// Issues a new key and bumps the key version. The previous key keeps working for 24 hours, until previous_key_valid_until.
 	//
 	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /v1/integrations/{id}/key (the `RotateIntegrationKey` operationId).
+	RotateIntegrationKeyWithResponse(ctx context.Context, id ID, params *RotateIntegrationKeyParams, reqEditors ...RequestEditorFn) (*RotateIntegrationKeyResponse, error)
+
+	// ListServicesWithResponse List services
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /v1/services (the `ListServices` operationId).
 	ListServicesWithResponse(ctx context.Context, params *ListServicesParams, reqEditors ...RequestEditorFn) (*ListServicesResponse, error)
 
-	// CreateServiceWithBodyWithResponse performs a POST /v1/services (the `CreateService` operationId) request,
-	// with any type of body and a specified content type.
+	// CreateServiceWithBodyWithResponse Create a service
 	//
-	// Returns a wrapper object for the known response body format(s).
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /v1/services (the `CreateService` operationId).
 	CreateServiceWithBodyWithResponse(ctx context.Context, params *CreateServiceParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateServiceResponse, error)
 
-	// CreateServiceWithResponse performs a POST /v1/services (the `CreateService` operationId) request.
+	// CreateServiceWithResponse Create a service
+	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /v1/services (the `CreateService` operationId).
 	CreateServiceWithResponse(ctx context.Context, params *CreateServiceParams, body CreateServiceJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateServiceResponse, error)
 
-	// DeleteServiceWithResponse performs a DELETE /v1/services/{id} (the `DeleteService` operationId) request.
+	// DeleteServiceWithResponse Delete a service
 	//
 	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /v1/services/{id} (the `DeleteService` operationId).
 	DeleteServiceWithResponse(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*DeleteServiceResponse, error)
 
-	// GetServiceWithResponse performs a GET /v1/services/{id} (the `GetService` operationId) request.
+	// GetServiceWithResponse Get a service
 	//
 	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /v1/services/{id} (the `GetService` operationId).
 	GetServiceWithResponse(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*GetServiceResponse, error)
 
-	// UpdateServiceWithBodyWithResponse performs a PUT /v1/services/{id} (the `UpdateService` operationId) request,
-	// with any type of body and a specified content type.
+	// UpdateServiceWithBodyWithResponse Update a service
 	//
-	// Returns a wrapper object for the known response body format(s).
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /v1/services/{id} (the `UpdateService` operationId).
 	UpdateServiceWithBodyWithResponse(ctx context.Context, id ID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateServiceResponse, error)
 
-	// UpdateServiceWithResponse performs a PUT /v1/services/{id} (the `UpdateService` operationId) request.
+	// UpdateServiceWithResponse Update a service
+	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /v1/services/{id} (the `UpdateService` operationId).
 	UpdateServiceWithResponse(ctx context.Context, id ID, body UpdateServiceJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateServiceResponse, error)
 
-	// ListIntegrationsWithResponse performs a GET /v1/services/{id}/integrations (the `ListIntegrations` operationId) request.
+	// ListIntegrationsWithResponse List a service's integrations
 	//
 	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /v1/services/{id}/integrations (the `ListIntegrations` operationId).
 	ListIntegrationsWithResponse(ctx context.Context, id ID, params *ListIntegrationsParams, reqEditors ...RequestEditorFn) (*ListIntegrationsResponse, error)
 
-	// CreateIntegrationWithBodyWithResponse performs a POST /v1/services/{id}/integrations (the `CreateIntegration` operationId) request,
-	// with any type of body and a specified content type.
+	// CreateIntegrationWithBodyWithResponse Create an integration
 	//
-	// Returns a wrapper object for the known response body format(s).
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /v1/services/{id}/integrations (the `CreateIntegration` operationId).
 	CreateIntegrationWithBodyWithResponse(ctx context.Context, id ID, params *CreateIntegrationParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateIntegrationResponse, error)
 
-	// CreateIntegrationWithResponse performs a POST /v1/services/{id}/integrations (the `CreateIntegration` operationId) request.
+	// CreateIntegrationWithResponse Create an integration
+	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /v1/services/{id}/integrations (the `CreateIntegration` operationId).
 	CreateIntegrationWithResponse(ctx context.Context, id ID, params *CreateIntegrationParams, body CreateIntegrationJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateIntegrationResponse, error)
 }
 
@@ -1290,6 +1494,68 @@ func (r UpdateIntegrationResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r UpdateIntegrationResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type RotateIntegrationKeyResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *IntegrationWithKey
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *Problem
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Problem
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Problem
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r RotateIntegrationKeyResponse) GetJSON200() *IntegrationWithKey {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r RotateIntegrationKeyResponse) GetApplicationproblemJSON404() *Problem {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r RotateIntegrationKeyResponse) GetApplicationproblemJSON409() *Problem {
+	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r RotateIntegrationKeyResponse) GetApplicationproblemJSON422() *Problem {
+	return r.ApplicationproblemJSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r RotateIntegrationKeyResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r RotateIntegrationKeyResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RotateIntegrationKeyResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r RotateIntegrationKeyResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -1616,7 +1882,7 @@ type CreateIntegrationResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	// JSON201 the response for an HTTP 201 `application/json` response
-	JSON201 *Integration
+	JSON201 *IntegrationWithKey
 	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
 	ApplicationproblemJSON400 *Problem
 	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
@@ -1628,7 +1894,7 @@ type CreateIntegrationResponse struct {
 }
 
 // GetJSON201 returns the response for an HTTP 201 `application/json` response
-func (r CreateIntegrationResponse) GetJSON201() *Integration {
+func (r CreateIntegrationResponse) GetJSON201() *IntegrationWithKey {
 	return r.JSON201
 }
 
@@ -1681,9 +1947,11 @@ func (r CreateIntegrationResponse) ContentType() string {
 	return ""
 }
 
-// DeleteIntegrationWithResponse performs a DELETE /v1/integrations/{id} (the `DeleteIntegration` operationId) request.
+// DeleteIntegrationWithResponse Delete an integration
 //
 // Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /v1/integrations/{id} (the `DeleteIntegration` operationId).
 func (c *ClientWithResponses) DeleteIntegrationWithResponse(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*DeleteIntegrationResponse, error) {
 	rsp, err := c.DeleteIntegration(ctx, id, reqEditors...)
 	if err != nil {
@@ -1692,9 +1960,11 @@ func (c *ClientWithResponses) DeleteIntegrationWithResponse(ctx context.Context,
 	return ParseDeleteIntegrationResponse(rsp)
 }
 
-// GetIntegrationWithResponse performs a GET /v1/integrations/{id} (the `GetIntegration` operationId) request.
+// GetIntegrationWithResponse Get an integration
 //
 // Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /v1/integrations/{id} (the `GetIntegration` operationId).
 func (c *ClientWithResponses) GetIntegrationWithResponse(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*GetIntegrationResponse, error) {
 	rsp, err := c.GetIntegration(ctx, id, reqEditors...)
 	if err != nil {
@@ -1703,10 +1973,11 @@ func (c *ClientWithResponses) GetIntegrationWithResponse(ctx context.Context, id
 	return ParseGetIntegrationResponse(rsp)
 }
 
-// UpdateIntegrationWithBodyWithResponse performs a PUT /v1/integrations/{id} (the `UpdateIntegration` operationId) request,
-// with any type of body and a specified content type.
+// UpdateIntegrationWithBodyWithResponse Update an integration
 //
-// Returns a wrapper object for the known response body format(s).
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /v1/integrations/{id} (the `UpdateIntegration` operationId).
 func (c *ClientWithResponses) UpdateIntegrationWithBodyWithResponse(ctx context.Context, id ID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateIntegrationResponse, error) {
 	rsp, err := c.UpdateIntegrationWithBody(ctx, id, contentType, body, reqEditors...)
 	if err != nil {
@@ -1715,8 +1986,11 @@ func (c *ClientWithResponses) UpdateIntegrationWithBodyWithResponse(ctx context.
 	return ParseUpdateIntegrationResponse(rsp)
 }
 
-// UpdateIntegrationWithResponse performs a PUT /v1/integrations/{id} (the `UpdateIntegration` operationId) request.
+// UpdateIntegrationWithResponse Update an integration
+//
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /v1/integrations/{id} (the `UpdateIntegration` operationId).
 func (c *ClientWithResponses) UpdateIntegrationWithResponse(ctx context.Context, id ID, body UpdateIntegrationJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateIntegrationResponse, error) {
 	rsp, err := c.UpdateIntegration(ctx, id, body, reqEditors...)
 	if err != nil {
@@ -1725,9 +1999,26 @@ func (c *ClientWithResponses) UpdateIntegrationWithResponse(ctx context.Context,
 	return ParseUpdateIntegrationResponse(rsp)
 }
 
-// ListServicesWithResponse performs a GET /v1/services (the `ListServices` operationId) request.
+// RotateIntegrationKeyWithResponse Rotate an integration's key
+//
+// Issues a new key and bumps the key version. The previous key keeps working for 24 hours, until previous_key_valid_until.
 //
 // Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /v1/integrations/{id}/key (the `RotateIntegrationKey` operationId).
+func (c *ClientWithResponses) RotateIntegrationKeyWithResponse(ctx context.Context, id ID, params *RotateIntegrationKeyParams, reqEditors ...RequestEditorFn) (*RotateIntegrationKeyResponse, error) {
+	rsp, err := c.RotateIntegrationKey(ctx, id, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRotateIntegrationKeyResponse(rsp)
+}
+
+// ListServicesWithResponse List services
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /v1/services (the `ListServices` operationId).
 func (c *ClientWithResponses) ListServicesWithResponse(ctx context.Context, params *ListServicesParams, reqEditors ...RequestEditorFn) (*ListServicesResponse, error) {
 	rsp, err := c.ListServices(ctx, params, reqEditors...)
 	if err != nil {
@@ -1736,10 +2027,11 @@ func (c *ClientWithResponses) ListServicesWithResponse(ctx context.Context, para
 	return ParseListServicesResponse(rsp)
 }
 
-// CreateServiceWithBodyWithResponse performs a POST /v1/services (the `CreateService` operationId) request,
-// with any type of body and a specified content type.
+// CreateServiceWithBodyWithResponse Create a service
 //
-// Returns a wrapper object for the known response body format(s).
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /v1/services (the `CreateService` operationId).
 func (c *ClientWithResponses) CreateServiceWithBodyWithResponse(ctx context.Context, params *CreateServiceParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateServiceResponse, error) {
 	rsp, err := c.CreateServiceWithBody(ctx, params, contentType, body, reqEditors...)
 	if err != nil {
@@ -1748,8 +2040,11 @@ func (c *ClientWithResponses) CreateServiceWithBodyWithResponse(ctx context.Cont
 	return ParseCreateServiceResponse(rsp)
 }
 
-// CreateServiceWithResponse performs a POST /v1/services (the `CreateService` operationId) request.
+// CreateServiceWithResponse Create a service
+//
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /v1/services (the `CreateService` operationId).
 func (c *ClientWithResponses) CreateServiceWithResponse(ctx context.Context, params *CreateServiceParams, body CreateServiceJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateServiceResponse, error) {
 	rsp, err := c.CreateService(ctx, params, body, reqEditors...)
 	if err != nil {
@@ -1758,9 +2053,11 @@ func (c *ClientWithResponses) CreateServiceWithResponse(ctx context.Context, par
 	return ParseCreateServiceResponse(rsp)
 }
 
-// DeleteServiceWithResponse performs a DELETE /v1/services/{id} (the `DeleteService` operationId) request.
+// DeleteServiceWithResponse Delete a service
 //
 // Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /v1/services/{id} (the `DeleteService` operationId).
 func (c *ClientWithResponses) DeleteServiceWithResponse(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*DeleteServiceResponse, error) {
 	rsp, err := c.DeleteService(ctx, id, reqEditors...)
 	if err != nil {
@@ -1769,9 +2066,11 @@ func (c *ClientWithResponses) DeleteServiceWithResponse(ctx context.Context, id 
 	return ParseDeleteServiceResponse(rsp)
 }
 
-// GetServiceWithResponse performs a GET /v1/services/{id} (the `GetService` operationId) request.
+// GetServiceWithResponse Get a service
 //
 // Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /v1/services/{id} (the `GetService` operationId).
 func (c *ClientWithResponses) GetServiceWithResponse(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*GetServiceResponse, error) {
 	rsp, err := c.GetService(ctx, id, reqEditors...)
 	if err != nil {
@@ -1780,10 +2079,11 @@ func (c *ClientWithResponses) GetServiceWithResponse(ctx context.Context, id ID,
 	return ParseGetServiceResponse(rsp)
 }
 
-// UpdateServiceWithBodyWithResponse performs a PUT /v1/services/{id} (the `UpdateService` operationId) request,
-// with any type of body and a specified content type.
+// UpdateServiceWithBodyWithResponse Update a service
 //
-// Returns a wrapper object for the known response body format(s).
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /v1/services/{id} (the `UpdateService` operationId).
 func (c *ClientWithResponses) UpdateServiceWithBodyWithResponse(ctx context.Context, id ID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateServiceResponse, error) {
 	rsp, err := c.UpdateServiceWithBody(ctx, id, contentType, body, reqEditors...)
 	if err != nil {
@@ -1792,8 +2092,11 @@ func (c *ClientWithResponses) UpdateServiceWithBodyWithResponse(ctx context.Cont
 	return ParseUpdateServiceResponse(rsp)
 }
 
-// UpdateServiceWithResponse performs a PUT /v1/services/{id} (the `UpdateService` operationId) request.
+// UpdateServiceWithResponse Update a service
+//
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /v1/services/{id} (the `UpdateService` operationId).
 func (c *ClientWithResponses) UpdateServiceWithResponse(ctx context.Context, id ID, body UpdateServiceJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateServiceResponse, error) {
 	rsp, err := c.UpdateService(ctx, id, body, reqEditors...)
 	if err != nil {
@@ -1802,9 +2105,11 @@ func (c *ClientWithResponses) UpdateServiceWithResponse(ctx context.Context, id 
 	return ParseUpdateServiceResponse(rsp)
 }
 
-// ListIntegrationsWithResponse performs a GET /v1/services/{id}/integrations (the `ListIntegrations` operationId) request.
+// ListIntegrationsWithResponse List a service's integrations
 //
 // Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /v1/services/{id}/integrations (the `ListIntegrations` operationId).
 func (c *ClientWithResponses) ListIntegrationsWithResponse(ctx context.Context, id ID, params *ListIntegrationsParams, reqEditors ...RequestEditorFn) (*ListIntegrationsResponse, error) {
 	rsp, err := c.ListIntegrations(ctx, id, params, reqEditors...)
 	if err != nil {
@@ -1813,10 +2118,11 @@ func (c *ClientWithResponses) ListIntegrationsWithResponse(ctx context.Context, 
 	return ParseListIntegrationsResponse(rsp)
 }
 
-// CreateIntegrationWithBodyWithResponse performs a POST /v1/services/{id}/integrations (the `CreateIntegration` operationId) request,
-// with any type of body and a specified content type.
+// CreateIntegrationWithBodyWithResponse Create an integration
 //
-// Returns a wrapper object for the known response body format(s).
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /v1/services/{id}/integrations (the `CreateIntegration` operationId).
 func (c *ClientWithResponses) CreateIntegrationWithBodyWithResponse(ctx context.Context, id ID, params *CreateIntegrationParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateIntegrationResponse, error) {
 	rsp, err := c.CreateIntegrationWithBody(ctx, id, params, contentType, body, reqEditors...)
 	if err != nil {
@@ -1825,8 +2131,11 @@ func (c *ClientWithResponses) CreateIntegrationWithBodyWithResponse(ctx context.
 	return ParseCreateIntegrationResponse(rsp)
 }
 
-// CreateIntegrationWithResponse performs a POST /v1/services/{id}/integrations (the `CreateIntegration` operationId) request.
+// CreateIntegrationWithResponse Create an integration
+//
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /v1/services/{id}/integrations (the `CreateIntegration` operationId).
 func (c *ClientWithResponses) CreateIntegrationWithResponse(ctx context.Context, id ID, params *CreateIntegrationParams, body CreateIntegrationJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateIntegrationResponse, error) {
 	rsp, err := c.CreateIntegration(ctx, id, params, body, reqEditors...)
 	if err != nil {
@@ -1931,6 +2240,53 @@ func ParseUpdateIntegrationResponse(rsp *http.Response) (*UpdateIntegrationRespo
 			return nil, err
 		}
 		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseRotateIntegrationKeyResponse parses an HTTP response from a RotateIntegrationKeyWithResponse call
+func ParseRotateIntegrationKeyResponse(rsp *http.Response) (*RotateIntegrationKeyResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RotateIntegrationKeyResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest IntegrationWithKey
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
 
 	}
 
@@ -2181,7 +2537,7 @@ func ParseCreateIntegrationResponse(rsp *http.Response) (*CreateIntegrationRespo
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
-		var dest Integration
+		var dest IntegrationWithKey
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}

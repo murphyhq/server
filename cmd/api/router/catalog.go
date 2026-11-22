@@ -85,7 +85,7 @@ func (s *Server) CreateIntegration(ctx context.Context, request CreateIntegratio
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
-	integration, err := s.catalog.CreateIntegration(ctx, &murphy.Integration{
+	integration, key, err := s.catalog.CreateIntegration(ctx, &murphy.Integration{
 		ServiceId: request.Id,
 		Name:      request.Body.Name,
 		Type:      murphy.IntegrationTypeFromText(string(request.Body.Type)),
@@ -94,7 +94,18 @@ func (s *Server) CreateIntegration(ctx context.Context, request CreateIntegratio
 	if err != nil {
 		return nil, err
 	}
-	return CreateIntegration201JSONResponse(toIntegration(integration)), nil
+	return CreateIntegration201JSONResponse(withKey(integration, key)), nil
+}
+
+func (s *Server) RotateIntegrationKey(ctx context.Context, request RotateIntegrationKeyRequestObject) (_ RotateIntegrationKeyResponseObject, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	integration, key, err := s.catalog.RotateIntegrationKey(ctx, request.Id)
+	if err != nil {
+		return nil, err
+	}
+	return RotateIntegrationKey200JSONResponse(withKey(integration, key)), nil
 }
 
 func (s *Server) GetIntegration(ctx context.Context, request GetIntegrationRequestObject) (_ GetIntegrationResponseObject, err error) {
@@ -175,6 +186,22 @@ func toIntegration(integration *murphy.Integration) Integration {
 		out.PreviousKeyValidUntil = &t
 	}
 	return out
+}
+
+func withKey(integration *murphy.Integration, key string) IntegrationWithKey {
+	out := toIntegration(integration)
+	return IntegrationWithKey{
+		Id:                    out.Id,
+		ServiceId:             out.ServiceId,
+		Name:                  out.Name,
+		Type:                  out.Type,
+		KeyVersion:            out.KeyVersion,
+		PreviousKeyValidUntil: out.PreviousKeyValidUntil,
+		Status:                out.Status,
+		CreatedAt:             out.CreatedAt,
+		UpdatedAt:             out.UpdatedAt,
+		Key:                   key,
+	}
 }
 
 func page(limit *Limit, cursor *Cursor) pagination.Page {

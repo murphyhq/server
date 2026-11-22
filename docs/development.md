@@ -31,7 +31,8 @@ A service owns one domain. It states what it needs as interfaces, so the same lo
 1. A service MUST declare the interfaces it needs next to the code that uses them.
 2. Interfaces MUST describe what the service needs in domain terms (acknowledge an incident), never a generic capability (run a query).
 3. A service's repository MUST live in the service's `db/<engine>/` folder and use only the service's own queries and generated code.
-4. A component's `app` MUST build its clients, repositories and services from its settings, and its `main.go` MUST only load configuration and run it. Nothing else wires dependencies: tests use the same `app`, so they run the wiring production runs.
+4. Each main type of a package MUST have its own file, named after it (`service.go` for `Service`), with the interfaces it needs.
+5. A component's `app` MUST build its clients, repositories and services from its settings, and its `main.go` MUST only load configuration and run it. Nothing else wires dependencies: tests use the same `app`, so they run the wiring production runs.
 
 ## Implementations
 
@@ -58,7 +59,7 @@ Every component starts, reports its health and stops the same way, so it behaves
 The domain is defined once, in Protobuf, so every component, and later every client, agrees on what an incident or a notification is. Components communicate only through events: facts about entities that anyone can react to.
 
 1. Domain entities MUST be defined in Protobuf under `proto/murphy/v1/`, in one `<domain>.proto` per domain. Types used by several domains MUST go in `shared.proto`. The Go types in the root package MUST be generated from them and used everywhere; there MUST NOT be a second, hand-written model.
-2. Behaviour on an entity MUST live in the root package, in the hand-written `<domain>.go` next to the generated `<domain>.pb.go`. Behaviour shared by several domains goes in `shared.go`.
+2. Behaviour that needs only an entity's own data MUST live in the root package, in the hand-written `<domain>.go` next to the generated `<domain>.pb.go`. Behaviour shared by several domains goes in `shared.go`. Behaviour that also needs configuration, storage or another service belongs to the domain's service.
 3. Generated types MUST be passed by pointer and MUST NOT be copied.
 4. Every message MUST be an event named `<Entity><PastTenseVerb>`. The verb MUST be `Created`, `Updated`, `Deleted` or a change of state in the domain (`Acknowledged`, `Resolved`, `Delivered`, `Expired`).
 5. A message MUST NOT ask a specific component to do something.

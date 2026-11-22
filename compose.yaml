@@ -1,3 +1,5 @@
+x-integration-key-secrets: &integration-key-secrets "1:AAEqhKjSkvjtvtCA2YD2wSsiQGaN/H1phWMk1vn35QQ="
+
 x-component: &component
   image: golang:1.27.4
   profiles: [murphy]
@@ -133,6 +135,12 @@ services:
   ingest:
     <<: *component
     command: ["sh", "-c", "go build -o /tmp/ingest ./cmd/ingest && exec /tmp/ingest"]
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://lgtm:4318
+      MURPHY_EVENTS_TOPIC_URL: nats://nats:4222/events
+      MURPHY_INTEGRATION_KEY_SECRETS: *integration-key-secrets
+    ports:
+      - "8081:8080"
 
   api:
     <<: *component
@@ -141,6 +149,7 @@ services:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://lgtm:4318
       MURPHY_CATALOG_DATABASE_URL: postgres://murphy:murphy@postgres:5432/catalog?sslmode=disable
       MURPHY_IDEMPOTENCY_STORE_URL: redis://redis:6379/0
+      MURPHY_INTEGRATION_KEY_SECRETS: *integration-key-secrets
     ports:
       - "8080:8080"
     depends_on:

@@ -22,8 +22,9 @@ func API(t *testing.T) (*client.ClientWithResponses, string) {
 	require.NoError(t, migrateapp.Migrate(ctx, databases))
 
 	a, err := apiapp.New(ctx, apiapp.Settings{
-		CatalogDatabaseURL:  databases.CatalogDatabaseURL,
-		IdempotencyStoreURL: RedisURL(),
+		CatalogDatabaseURL:    databases.CatalogDatabaseURL,
+		IdempotencyStoreURL:   RedisURL(),
+		IntegrationKeySecrets: IntegrationKeySecrets,
 	})
 	require.NoError(t, err)
 	t.Cleanup(a.Close)

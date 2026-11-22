@@ -391,6 +391,74 @@ func (x *Integration) GetUpdatedAt() *timestamppb.Timestamp {
 	return nil
 }
 
+type IntegrationKey struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	SecretId      string                 `protobuf:"bytes,1,opt,name=secret_id,json=secretId,proto3" json:"secret_id,omitempty"`
+	IntegrationId string                 `protobuf:"bytes,2,opt,name=integration_id,json=integrationId,proto3" json:"integration_id,omitempty"`
+	ServiceId     string                 `protobuf:"bytes,3,opt,name=service_id,json=serviceId,proto3" json:"service_id,omitempty"`
+	KeyVersion    int32                  `protobuf:"varint,4,opt,name=key_version,json=keyVersion,proto3" json:"key_version,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *IntegrationKey) Reset() {
+	*x = IntegrationKey{}
+	mi := &file_murphy_v1_catalog_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *IntegrationKey) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*IntegrationKey) ProtoMessage() {}
+
+func (x *IntegrationKey) ProtoReflect() protoreflect.Message {
+	mi := &file_murphy_v1_catalog_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use IntegrationKey.ProtoReflect.Descriptor instead.
+func (*IntegrationKey) Descriptor() ([]byte, []int) {
+	return file_murphy_v1_catalog_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *IntegrationKey) GetSecretId() string {
+	if x != nil {
+		return x.SecretId
+	}
+	return ""
+}
+
+func (x *IntegrationKey) GetIntegrationId() string {
+	if x != nil {
+		return x.IntegrationId
+	}
+	return ""
+}
+
+func (x *IntegrationKey) GetServiceId() string {
+	if x != nil {
+		return x.ServiceId
+	}
+	return ""
+}
+
+func (x *IntegrationKey) GetKeyVersion() int32 {
+	if x != nil {
+		return x.KeyVersion
+	}
+	return 0
+}
+
 var File_murphy_v1_catalog_proto protoreflect.FileDescriptor
 
 const file_murphy_v1_catalog_proto_rawDesc = "" +
@@ -421,7 +489,14 @@ const file_murphy_v1_catalog_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt*g\n" +
+	"updated_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"\x94\x01\n" +
+	"\x0eIntegrationKey\x12\x1b\n" +
+	"\tsecret_id\x18\x01 \x01(\tR\bsecretId\x12%\n" +
+	"\x0eintegration_id\x18\x02 \x01(\tR\rintegrationId\x12\x1d\n" +
+	"\n" +
+	"service_id\x18\x03 \x01(\tR\tserviceId\x12\x1f\n" +
+	"\vkey_version\x18\x04 \x01(\x05R\n" +
+	"keyVersion*g\n" +
 	"\rServiceStatus\x12\x1e\n" +
 	"\x1aSERVICE_STATUS_UNSPECIFIED\x10\x00\x12\x19\n" +
 	"\x15SERVICE_STATUS_ACTIVE\x10\x01\x12\x1b\n" +
@@ -450,26 +525,27 @@ func file_murphy_v1_catalog_proto_rawDescGZIP() []byte {
 }
 
 var file_murphy_v1_catalog_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_murphy_v1_catalog_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_murphy_v1_catalog_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
 var file_murphy_v1_catalog_proto_goTypes = []any{
 	(ServiceStatus)(0),            // 0: murphy.v1.ServiceStatus
 	(IntegrationType)(0),          // 1: murphy.v1.IntegrationType
 	(IntegrationStatus)(0),        // 2: murphy.v1.IntegrationStatus
 	(*Service)(nil),               // 3: murphy.v1.Service
 	(*Integration)(nil),           // 4: murphy.v1.Integration
-	(Urgency)(0),                  // 5: murphy.v1.Urgency
-	(*timestamppb.Timestamp)(nil), // 6: google.protobuf.Timestamp
+	(*IntegrationKey)(nil),        // 5: murphy.v1.IntegrationKey
+	(Urgency)(0),                  // 6: murphy.v1.Urgency
+	(*timestamppb.Timestamp)(nil), // 7: google.protobuf.Timestamp
 }
 var file_murphy_v1_catalog_proto_depIdxs = []int32{
-	5, // 0: murphy.v1.Service.urgency:type_name -> murphy.v1.Urgency
+	6, // 0: murphy.v1.Service.urgency:type_name -> murphy.v1.Urgency
 	0, // 1: murphy.v1.Service.status:type_name -> murphy.v1.ServiceStatus
-	6, // 2: murphy.v1.Service.created_at:type_name -> google.protobuf.Timestamp
-	6, // 3: murphy.v1.Service.updated_at:type_name -> google.protobuf.Timestamp
+	7, // 2: murphy.v1.Service.created_at:type_name -> google.protobuf.Timestamp
+	7, // 3: murphy.v1.Service.updated_at:type_name -> google.protobuf.Timestamp
 	1, // 4: murphy.v1.Integration.type:type_name -> murphy.v1.IntegrationType
-	6, // 5: murphy.v1.Integration.previous_key_valid_until:type_name -> google.protobuf.Timestamp
+	7, // 5: murphy.v1.Integration.previous_key_valid_until:type_name -> google.protobuf.Timestamp
 	2, // 6: murphy.v1.Integration.status:type_name -> murphy.v1.IntegrationStatus
-	6, // 7: murphy.v1.Integration.created_at:type_name -> google.protobuf.Timestamp
-	6, // 8: murphy.v1.Integration.updated_at:type_name -> google.protobuf.Timestamp
+	7, // 7: murphy.v1.Integration.created_at:type_name -> google.protobuf.Timestamp
+	7, // 8: murphy.v1.Integration.updated_at:type_name -> google.protobuf.Timestamp
 	9, // [9:9] is the sub-list for method output_type
 	9, // [9:9] is the sub-list for method input_type
 	9, // [9:9] is the sub-list for extension type_name
@@ -489,7 +565,7 @@ func file_murphy_v1_catalog_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_murphy_v1_catalog_proto_rawDesc), len(file_murphy_v1_catalog_proto_rawDesc)),
 			NumEnums:      3,
-			NumMessages:   2,
+			NumMessages:   3,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

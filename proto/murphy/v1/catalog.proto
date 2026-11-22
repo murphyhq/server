@@ -50,3 +50,10 @@ enum IntegrationStatus {
   INTEGRATION_STATUS_ACTIVE = 1;
   INTEGRATION_STATUS_DISABLED = 2;
 }
+
+message IntegrationKey {
+  string secret_id = 1;
+  string integration_id = 2;
+  string service_id = 3;
+  int32 key_version = 4;
+}

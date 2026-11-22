@@ -174,6 +174,21 @@ func (r *Repository) UpdateIntegration(ctx context.Context, integration *murphy.
 	return changed("integration", rows, err)
 }
 
+func (r *Repository) RotateIntegrationKey(ctx context.Context, id string, previousValidUntil, updatedAt time.Time) (_ *murphy.Integration, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	row, err := r.queries.RotateIntegrationKey(ctx, RotateIntegrationKeyParams{
+		ID:                    id,
+		PreviousKeyValidUntil: &previousValidUntil,
+		UpdatedAt:             updatedAt,
+	})
+	if err != nil {
+		return nil, storeError("integration", err)
+	}
+	return toIntegration(row), nil
+}
+
 func (r *Repository) DeleteIntegration(ctx context.Context, id string) (err error) {
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)

@@ -1,0 +1,7 @@
+package: router
+output: cmd/ingest/router/openapi.gen.go
+generate:
+  std-http-server: true
+  strict-server: true
+  models: true
+  embedded-spec: true

@@ -22,7 +22,7 @@ func TestCreateServiceAppliesDefaults(t *testing.T) {
 		return nil
 	})
 
-	service, err := catalog.New(repo).CreateService(t.Context(), validService())
+	service, err := catalog.New(repo, nil).CreateService(t.Context(), validService())
 	require.NoError(t, err)
 
 	assert.Equal(t, murphy.Urgency_URGENCY_HIGH, service.GetUrgency())
@@ -35,7 +35,7 @@ func TestCreateServiceAppliesDefaults(t *testing.T) {
 func TestCreateServiceRejectsInvalidInput(t *testing.T) {
 	repo := NewMockRepository(t)
 
-	_, err := catalog.New(repo).CreateService(t.Context(), &murphy.Service{TeamId: "not-a-uuid"})
+	_, err := catalog.New(repo, nil).CreateService(t.Context(), &murphy.Service{TeamId: "not-a-uuid"})
 
 	require.ErrorIs(t, err, murphy.ErrInvalid)
 	for _, field := range []string{"name", "team_id", "escalation_policy_id"} {
@@ -60,7 +60,7 @@ func TestUpdateServiceKeepsIdentityAndUnsetFields(t *testing.T) {
 	update := validService()
 	update.Id = current.GetId()
 	update.Name = "payments-api"
-	updated, err := catalog.New(repo).UpdateService(t.Context(), update)
+	updated, err := catalog.New(repo, nil).UpdateService(t.Context(), update)
 	require.NoError(t, err)
 
 	assert.Equal(t, "payments-api", updated.GetName())
@@ -74,7 +74,7 @@ func TestCreateIntegrationRequiresExistingService(t *testing.T) {
 	serviceID := murphy.NewID()
 	repo.EXPECT().GetService(mock.Anything, serviceID).Return(nil, &murphy.NotFoundError{Entity: "service"})
 
-	_, err := catalog.New(repo).CreateIntegration(t.Context(), &murphy.Integration{
+	_, _, err := catalog.New(repo, nil).CreateIntegration(t.Context(), &murphy.Integration{
 		ServiceId: serviceID,
 		Name:      "alertmanager",
 		Type:      murphy.IntegrationType_INTEGRATION_TYPE_ALERTMANAGER,
