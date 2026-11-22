@@ -266,37 +266,37 @@ type CreateIntegrationJSONRequestBody = IntegrationCreate
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
-
+	// DeleteIntegration Delete an integration
 	// (DELETE /v1/integrations/{id})
 	DeleteIntegration(w http.ResponseWriter, r *http.Request, id ID)
-
+	// GetIntegration Get an integration
 	// (GET /v1/integrations/{id})
 	GetIntegration(w http.ResponseWriter, r *http.Request, id ID)
-
+	// UpdateIntegration Update an integration
 	// (PUT /v1/integrations/{id})
 	UpdateIntegration(w http.ResponseWriter, r *http.Request, id ID)
-	// RotateIntegrationKey Rotate the integration's key
+	// RotateIntegrationKey Rotate an integration's key
 	// (POST /v1/integrations/{id}/key)
 	RotateIntegrationKey(w http.ResponseWriter, r *http.Request, id ID, params RotateIntegrationKeyParams)
-
+	// ListServices List services
 	// (GET /v1/services)
 	ListServices(w http.ResponseWriter, r *http.Request, params ListServicesParams)
-
+	// CreateService Create a service
 	// (POST /v1/services)
 	CreateService(w http.ResponseWriter, r *http.Request, params CreateServiceParams)
-
+	// DeleteService Delete a service
 	// (DELETE /v1/services/{id})
 	DeleteService(w http.ResponseWriter, r *http.Request, id ID)
-
+	// GetService Get a service
 	// (GET /v1/services/{id})
 	GetService(w http.ResponseWriter, r *http.Request, id ID)
-
+	// UpdateService Update a service
 	// (PUT /v1/services/{id})
 	UpdateService(w http.ResponseWriter, r *http.Request, id ID)
-
+	// ListIntegrations List a service's integrations
 	// (GET /v1/services/{id}/integrations)
 	ListIntegrations(w http.ResponseWriter, r *http.Request, id ID, params ListIntegrationsParams)
-
+	// CreateIntegration Create an integration
 	// (POST /v1/services/{id}/integrations)
 	CreateIntegration(w http.ResponseWriter, r *http.Request, id ID, params CreateIntegrationParams)
 }
@@ -1414,37 +1414,37 @@ func (response CreateIntegration422ApplicationProblemPlusJSONResponse) VisitCrea
 
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
-
+	// DeleteIntegration Delete an integration
 	// (DELETE /v1/integrations/{id})
 	DeleteIntegration(ctx context.Context, request DeleteIntegrationRequestObject) (DeleteIntegrationResponseObject, error)
-
+	// GetIntegration Get an integration
 	// (GET /v1/integrations/{id})
 	GetIntegration(ctx context.Context, request GetIntegrationRequestObject) (GetIntegrationResponseObject, error)
-
+	// UpdateIntegration Update an integration
 	// (PUT /v1/integrations/{id})
 	UpdateIntegration(ctx context.Context, request UpdateIntegrationRequestObject) (UpdateIntegrationResponseObject, error)
-	// RotateIntegrationKey Rotate the integration's key
+	// RotateIntegrationKey Rotate an integration's key
 	// (POST /v1/integrations/{id}/key)
 	RotateIntegrationKey(ctx context.Context, request RotateIntegrationKeyRequestObject) (RotateIntegrationKeyResponseObject, error)
-
+	// ListServices List services
 	// (GET /v1/services)
 	ListServices(ctx context.Context, request ListServicesRequestObject) (ListServicesResponseObject, error)
-
+	// CreateService Create a service
 	// (POST /v1/services)
 	CreateService(ctx context.Context, request CreateServiceRequestObject) (CreateServiceResponseObject, error)
-
+	// DeleteService Delete a service
 	// (DELETE /v1/services/{id})
 	DeleteService(ctx context.Context, request DeleteServiceRequestObject) (DeleteServiceResponseObject, error)
-
+	// GetService Get a service
 	// (GET /v1/services/{id})
 	GetService(ctx context.Context, request GetServiceRequestObject) (GetServiceResponseObject, error)
-
+	// UpdateService Update a service
 	// (PUT /v1/services/{id})
 	UpdateService(ctx context.Context, request UpdateServiceRequestObject) (UpdateServiceResponseObject, error)
-
+	// ListIntegrations List a service's integrations
 	// (GET /v1/services/{id}/integrations)
 	ListIntegrations(ctx context.Context, request ListIntegrationsRequestObject) (ListIntegrationsResponseObject, error)
-
+	// CreateIntegration Create an integration
 	// (POST /v1/services/{id}/integrations)
 	CreateIntegration(ctx context.Context, request CreateIntegrationRequestObject) (CreateIntegrationResponseObject, error)
 }
@@ -1810,32 +1810,33 @@ func (sh *strictHandler) CreateIntegration(w http.ResponseWriter, r *http.Reques
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"1FlRb9s2EP4rBDegD2Njx0kf6j1l7VAYS7FgabGHIggY6SyzkUiVPCXVAv33gaRkS5Zk2bHrZW+WRB7v",
+	"vjved3d+ooFKUiVBoqHTJ5pyzRNA0O7pXaaN0vZXCCbQIkWhJJ3STwsgEr7jbeAWEDUnuACSangQKjMk",
+	"5RGcUEaFXfwtA51TRiVPgE6p30IZNcECEm6FY57aLwa1kBEtCkZn7+17tz3luFjtFiFlVMO3TGgI6RR1",
+	"BgOSQkhShSCD/A/I26Z85PdgiAbUAgwxfA4n5MI95+RR4MIZZngC5B5ywmVI7Olg0K7JtDRugdIiEpLH",
+	"RINJlTRA5kqTyTlZqEybX5tCnFhOQjGfgwaJS4nCKvIVAoTQLzqfTJg7k1caLUQMTtpcaNPYaVDEMdGZ",
+	"lEJGJAI05Hz8dumFBfAQ9ArIGi6vLTB1FBP+/RJkhAs6nbx5wzpQvRSJwDaYM4TEkBS0iwBG3ozJXU5C",
+	"mPMsRm8IkkQZJKfjcV+AxE72mj4iyRI6PR2PGU2ELJ+WmgmJEIGmhdWtcoGL4Cut7mJI7M9ASQTptOZp",
+	"GouAW61HqV/xy1djTXiqHfuzhjmd0p9Gqysy8l/NqJLrTmxfjsovcy5iCE8cZuVWK3lm9dXcb3iiqVYp",
+	"aBRe5UADRwhvuVN1rnRif9GQI7xGkQBtOYTZa9GOfkbvIb99AG3Kc5ayhMSzCW3DV/mgQ1R1t2+dTB6L",
+	"8DaTKOLtdTSgH0QAtz26GuSYmSHca8hd+w1FddTWGz/Z5QWjWRruCHRRzz1ffDKqmVXCV25rwr80kNUd",
+	"3FDiZnmeurNZwOpYU/ud29aOl16XHRvRNXTqWAyYdsWjDsMEQtL8saU6Kwso15rn9rlGV+289XuSYk6U",
+	"dJk15gaXDDYQAE6xpvABU6+XTgFpk9gXygMUD0AZDYXhdzGE9KZ1LqPraNcERCBBi4AyymPQmHDJI5fq",
+	"I83nXHIrmiMPVTQk+bMLxmOEWFesDCD3t8BFSeE8jv+c0+mXXSJi3ab7rmrA5m6x2mbpmhFjOfouJ4mS",
+	"ApU1naBSsSHCB8xFhgulxT9+iyfa4dix57ctvilYnbOaKoeA3GfcDY5o53QUGHe7DzVfJuQ2EO6rr+2E",
+	"qSiNEVRkLmRIBFoAcpVpt9LCcseDe5DhsPFepaXaXZ6/9nn1MPzYMK4DCDABj53/blMViyDvY6me13te",
+	"kNLWWv4FnvSpsDttMZrpyFZ6Q3p8Lpd1El2Zz+tQrhTtgXB18jP5r0RmJtMMuy7Egdx6VP/t54uKVjcD",
+	"vwHLQ5BtKerFEW3TETuT7OeVa6qNCxHZ9jNWjx07rJpCzpXdEIsApIEVXdKLD1eXr89OxrUcTD9mOl3k",
+	"5OJqRhldlub04dQuUilIngo6pWcn45Mzylzz6+wYPZyOasRkRk8iLDy+MXjKtt50H2chndL37n2dAtc6",
+	"o8n4fJj/Hrkh/gTbxDB6Pj7vC42l8FpvxKjJkoTrfKkQ4bJ+gHU8j4wFOuDIY1uiFIxGgG2LPgBuNGe8",
+	"ocnbrblrFA7dDV7Nhn2B+QC4HSr12UxP6bNaMpq9p8UNo2nWAaWv89bRdPz+mwrzHwGkP5IWzZuNOoPi",
+	"v/VkSUAdHh3v4NG9IsBjs00QFKw7E4zKavZ5IaJM1yzHmAwM4UTC43L2dZclqZ942Tdl/john+rDP/vl",
+	"HiA15FHpe1sW1mdhjLixAembJ1guaAbrXwqbwerHVTua2hwDWrOPEXRVzzKcRZif+Ak0FeAeVoumMETJ",
+	"OCdmoR6l7zpcQe71f0b+sevf7rZ+MnludHv/rUX3Kxcnm2K8nKs473TywaUweF0t2jUe/ACzYIMLyxH4",
+	"Dw2YemHWESmVkcxGhpsqCm3wGUmq4RYLHzEr/DoZR5kO4P0gqtTqMDfx8NTTaBy2Yp3TQ5/dd+vL/qcC",
+	"/5lsc7T7691NeKXvNpd2y/J0FUPblaaleEdFNlPWeZA8goZDF6sbbe6vU3vtGh8rxpqxtV9tOgDCocvS",
+	"OngvIS8czWdVJbpfXviRdUBn1bpzXmiUrxvpfVZf+L+m+PU/OzZf21fN1LY38e+VA1yhwHtUO2hO2FBt",
+	"NHvVF1lxtP+qO3LZsX3fUVUg3f3H7r3HS8pRB6l1tujEi+LfAQA=",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

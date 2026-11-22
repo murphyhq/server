@@ -8,6 +8,7 @@ paths:
   /v1/services:
     get:
       operationId: listServices
+      summary: List services
       tags: [catalog]
       parameters:
         - $ref: "#/components/parameters/Limit"
@@ -23,6 +24,7 @@ paths:
           $ref: "#/components/responses/Problem"
     post:
       operationId: createService
+      summary: Create a service
       tags: [catalog]
       parameters:
         - $ref: "#/components/parameters/IdempotencyKey"
@@ -50,6 +52,7 @@ paths:
       - $ref: "#/components/parameters/ID"
     get:
       operationId: getService
+      summary: Get a service
       tags: [catalog]
       responses:
         "200":
@@ -62,6 +65,7 @@ paths:
           $ref: "#/components/responses/Problem"
     put:
       operationId: updateService
+      summary: Update a service
       tags: [catalog]
       requestBody:
         required: true
@@ -84,6 +88,7 @@ paths:
           $ref: "#/components/responses/Problem"
     delete:
       operationId: deleteService
+      summary: Delete a service
       tags: [catalog]
       responses:
         "204":
@@ -95,6 +100,7 @@ paths:
       - $ref: "#/components/parameters/ID"
     get:
       operationId: listIntegrations
+      summary: List a service's integrations
       tags: [catalog]
       parameters:
         - $ref: "#/components/parameters/Limit"
@@ -112,6 +118,7 @@ paths:
           $ref: "#/components/responses/Problem"
     post:
       operationId: createIntegration
+      summary: Create an integration
       tags: [catalog]
       parameters:
         - $ref: "#/components/parameters/IdempotencyKey"
@@ -141,6 +148,7 @@ paths:
       - $ref: "#/components/parameters/ID"
     get:
       operationId: getIntegration
+      summary: Get an integration
       tags: [catalog]
       responses:
         "200":
@@ -153,6 +161,7 @@ paths:
           $ref: "#/components/responses/Problem"
     put:
       operationId: updateIntegration
+      summary: Update an integration
       tags: [catalog]
       requestBody:
         required: true
@@ -173,6 +182,7 @@ paths:
           $ref: "#/components/responses/Problem"
     delete:
       operationId: deleteIntegration
+      summary: Delete an integration
       tags: [catalog]
       responses:
         "204":
@@ -184,7 +194,7 @@ paths:
       - $ref: "#/components/parameters/ID"
     post:
       operationId: rotateIntegrationKey
-      summary: Rotate the integration's key
+      summary: Rotate an integration's key
       description: Issues a new key and bumps the key version. The previous key keeps working for 24 hours, until previous_key_valid_until.
       tags: [catalog]
       parameters:
