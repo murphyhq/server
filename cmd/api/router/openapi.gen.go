@@ -23,6 +23,27 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// Defines values for IncidentStatus.
+const (
+	IncidentStatusAcknowledged IncidentStatus = "acknowledged"
+	IncidentStatusResolved     IncidentStatus = "resolved"
+	IncidentStatusTriggered    IncidentStatus = "triggered"
+)
+
+// Valid indicates whether the value is a known member of the IncidentStatus enum.
+func (e IncidentStatus) Valid() bool {
+	switch e {
+	case IncidentStatusAcknowledged:
+		return true
+	case IncidentStatusResolved:
+		return true
+	case IncidentStatusTriggered:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for IntegrationStatus.
 const (
 	IntegrationStatusActive   IntegrationStatus = "active"
@@ -83,6 +104,30 @@ func (e ServiceStatus) Valid() bool {
 	}
 }
 
+// Defines values for TimelineEntryType.
+const (
+	TimelineEntryTypeAcknowledged TimelineEntryType = "acknowledged"
+	TimelineEntryTypeAlerted      TimelineEntryType = "alerted"
+	TimelineEntryTypeResolved     TimelineEntryType = "resolved"
+	TimelineEntryTypeTriggered    TimelineEntryType = "triggered"
+)
+
+// Valid indicates whether the value is a known member of the TimelineEntryType enum.
+func (e TimelineEntryType) Valid() bool {
+	switch e {
+	case TimelineEntryTypeAcknowledged:
+		return true
+	case TimelineEntryTypeAlerted:
+		return true
+	case TimelineEntryTypeResolved:
+		return true
+	case TimelineEntryTypeTriggered:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for Urgency.
 const (
 	High Urgency = "high"
@@ -99,6 +144,50 @@ func (e Urgency) Valid() bool {
 	default:
 		return false
 	}
+}
+
+// Incident defines model for Incident.
+type Incident struct {
+	CreatedAt time.Time `json:"created_at"`
+	DedupKey  string    `json:"dedup_key"`
+	Id        string    `json:"id"`
+
+	// Number Numbers incidents in the order they were opened, for people to refer to.
+	Number     int64          `json:"number"`
+	ResolvedAt *time.Time     `json:"resolved_at,omitempty"`
+	ServiceId  string         `json:"service_id"`
+	Status     IncidentStatus `json:"status"`
+	Title      string         `json:"title"`
+	UpdatedAt  time.Time      `json:"updated_at"`
+	Urgency    Urgency        `json:"urgency"`
+}
+
+// IncidentPage defines model for IncidentPage.
+type IncidentPage struct {
+	Items []Incident `json:"items"`
+
+	// NextCursor Empty on the last page.
+	NextCursor string `json:"next_cursor"`
+}
+
+// IncidentStatus defines model for IncidentStatus.
+type IncidentStatus string
+
+// IncidentWithTimeline defines model for IncidentWithTimeline.
+type IncidentWithTimeline struct {
+	CreatedAt time.Time `json:"created_at"`
+	DedupKey  string    `json:"dedup_key"`
+	Id        string    `json:"id"`
+
+	// Number Numbers incidents in the order they were opened, for people to refer to.
+	Number     int64           `json:"number"`
+	ResolvedAt *time.Time      `json:"resolved_at,omitempty"`
+	ServiceId  string          `json:"service_id"`
+	Status     IncidentStatus  `json:"status"`
+	Timeline   []TimelineEntry `json:"timeline"`
+	Title      string          `json:"title"`
+	UpdatedAt  time.Time       `json:"updated_at"`
+	Urgency    Urgency         `json:"urgency"`
 }
 
 // Integration defines model for Integration.
@@ -201,6 +290,18 @@ type ServicePage struct {
 // ServiceStatus defines model for ServiceStatus.
 type ServiceStatus string
 
+// TimelineEntry defines model for TimelineEntry.
+type TimelineEntry struct {
+	AlertId *string           `json:"alert_id,omitempty"`
+	At      time.Time         `json:"at"`
+	Id      string            `json:"id"`
+	Summary string            `json:"summary"`
+	Type    TimelineEntryType `json:"type"`
+}
+
+// TimelineEntryType defines model for TimelineEntry.Type.
+type TimelineEntryType string
+
 // Urgency defines model for Urgency.
 type Urgency string
 
@@ -215,6 +316,18 @@ type IdempotencyKey = string
 
 // Limit defines model for Limit.
 type Limit = int
+
+// ListIncidentsParams defines parameters for ListIncidents.
+type ListIncidentsParams struct {
+	// Limit Items per page, 50 by default and at most 100.
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Cursor The next_cursor of the previous page.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Status Only incidents with one of these statuses.
+	Status *[]IncidentStatus `form:"status,omitempty" json:"status,omitempty"`
+}
 
 // RotateIntegrationKeyParams defines parameters for RotateIntegrationKey.
 type RotateIntegrationKeyParams struct {
@@ -266,6 +379,12 @@ type CreateIntegrationJSONRequestBody = IntegrationCreate
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// ListIncidents List incidents
+	// (GET /v1/incidents)
+	ListIncidents(w http.ResponseWriter, r *http.Request, params ListIncidentsParams)
+	// GetIncident Get an incident with its timeline
+	// (GET /v1/incidents/{id})
+	GetIncident(w http.ResponseWriter, r *http.Request, id ID)
 	// DeleteIntegration Delete an integration
 	// (DELETE /v1/integrations/{id})
 	DeleteIntegration(w http.ResponseWriter, r *http.Request, id ID)
@@ -309,6 +428,91 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// ListIncidents operation middleware
+func (siw *ServerInterfaceWrapper) ListIncidents(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListIncidentsParams
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "status" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "status", r.URL.Query(), &params.Status, runtime.BindQueryParameterOptions{Type: "array", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "status"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListIncidents(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetIncident operation middleware
+func (siw *ServerInterfaceWrapper) GetIncident(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id ID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetIncident(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
 
 // DeleteIntegration operation middleware
 func (siw *ServerInterfaceWrapper) DeleteIntegration(w http.ResponseWriter, r *http.Request) {
@@ -839,11 +1043,89 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/integrations/{id}", wrapper.GetIntegration)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/v1/integrations/{id}", wrapper.UpdateIntegration)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/integrations/{id}/key", wrapper.RotateIntegrationKey)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/incidents", wrapper.ListIncidents)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/incidents/{id}", wrapper.GetIncident)
 
 	return m
 }
 
 type ProblemApplicationProblemPlusJSONResponse Problem
+
+type ListIncidentsRequestObject struct {
+	Params ListIncidentsParams
+}
+
+type ListIncidentsResponseObject interface {
+	VisitListIncidentsResponse(w http.ResponseWriter) error
+}
+
+type ListIncidents200JSONResponse IncidentPage
+
+func (response ListIncidents200JSONResponse) VisitListIncidentsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListIncidents400ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response ListIncidents400ApplicationProblemPlusJSONResponse) VisitListIncidentsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetIncidentRequestObject struct {
+	Id ID `json:"id"`
+}
+
+type GetIncidentResponseObject interface {
+	VisitGetIncidentResponse(w http.ResponseWriter) error
+}
+
+type GetIncident200JSONResponse IncidentWithTimeline
+
+func (response GetIncident200JSONResponse) VisitGetIncidentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetIncident404ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response GetIncident404ApplicationProblemPlusJSONResponse) VisitGetIncidentResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
 
 type DeleteIntegrationRequestObject struct {
 	Id ID `json:"id"`
@@ -1414,6 +1696,12 @@ func (response CreateIntegration422ApplicationProblemPlusJSONResponse) VisitCrea
 
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
+	// ListIncidents List incidents
+	// (GET /v1/incidents)
+	ListIncidents(ctx context.Context, request ListIncidentsRequestObject) (ListIncidentsResponseObject, error)
+	// GetIncident Get an incident with its timeline
+	// (GET /v1/incidents/{id})
+	GetIncident(ctx context.Context, request GetIncidentRequestObject) (GetIncidentResponseObject, error)
 	// DeleteIntegration Delete an integration
 	// (DELETE /v1/integrations/{id})
 	DeleteIntegration(ctx context.Context, request DeleteIntegrationRequestObject) (DeleteIntegrationResponseObject, error)
@@ -1486,6 +1774,58 @@ type strictHandler struct {
 	ssi         StrictServerInterface
 	middlewares []StrictMiddlewareFunc
 	options     StrictHTTPServerOptions
+}
+
+// ListIncidents operation middleware
+func (sh *strictHandler) ListIncidents(w http.ResponseWriter, r *http.Request, params ListIncidentsParams) {
+	var request ListIncidentsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListIncidents(ctx, request.(ListIncidentsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListIncidents")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListIncidentsResponseObject); ok {
+		if err := validResponse.VisitListIncidentsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetIncident operation middleware
+func (sh *strictHandler) GetIncident(w http.ResponseWriter, r *http.Request, id ID) {
+	var request GetIncidentRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetIncident(ctx, request.(GetIncidentRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetIncident")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetIncidentResponseObject); ok {
+		if err := validResponse.VisitGetIncidentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
 }
 
 // DeleteIntegration operation middleware
@@ -1810,33 +2150,39 @@ func (sh *strictHandler) CreateIntegration(w http.ResponseWriter, r *http.Reques
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"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",
+	"5rJj976jrEC6+4/9e4/XFKNOUuvs0Inn+Z8DAA==",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

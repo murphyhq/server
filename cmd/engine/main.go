@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 
+	"github.com/murphyhq/server/cmd/engine/app"
 	"github.com/murphyhq/server/internal/config"
 	"github.com/murphyhq/server/internal/lifecycle"
 	"github.com/murphyhq/server/internal/logger"
@@ -12,6 +13,7 @@ import (
 
 type settings struct {
 	Lifecycle lifecycle.Config
+	App       app.Settings
 }
 
 func main() {
@@ -27,5 +29,12 @@ func run(ctx context.Context) error {
 	if err := config.Load(&s); err != nil {
 		return err
 	}
-	return lifecycle.Run(ctx, "engine", s.Lifecycle, lifecycle.UntilStopped)
+
+	a, err := app.New(ctx, s.App)
+	if err != nil {
+		return err
+	}
+	defer a.Close()
+
+	return lifecycle.Run(ctx, "engine", s.Lifecycle, a.Run, a.Ready...)
 }

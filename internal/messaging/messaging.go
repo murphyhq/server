@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand/v2"
+	"strings"
 	"time"
 
 	"google.golang.org/protobuf/proto"
@@ -82,6 +83,43 @@ func topicOf(field protoreflect.FieldDescriptor) string {
 	return string(field.ParentFile().Package()) + "." + string(field.Name())
 }
 
+func EventTypeOf(envelope *murphy.Envelope) string {
+	message := envelope.ProtoReflect()
+	field := message.WhichOneof(event)
+	if field == nil {
+		return ""
+	}
+	payload := message.Get(field).Message()
+	verb := payload.Descriptor().Fields().ByName("verb")
+	if verb == nil {
+		return ""
+	}
+	value := verb.Enum().Values().ByNumber(payload.Get(verb).Enum())
+	if value == nil {
+		return ""
+	}
+	return topicOf(field) + "." + verbText(value)
+}
+
+func EventTypes() []string {
+	var types []string
+	for i := range event.Fields().Len() {
+		field := event.Fields().Get(i)
+		verbs := field.Message().Fields().ByName("verb").Enum().Values()
+		for j := range verbs.Len() {
+			if verbs.Get(j).Number() != 0 {
+				types = append(types, topicOf(field)+"."+verbText(verbs.Get(j)))
+			}
+		}
+	}
+	return types
+}
+
+func verbText(value protoreflect.EnumValueDescriptor) string {
+	_, verb, _ := strings.Cut(string(value.Name()), "_VERB_")
+	return strings.ToLower(verb)
+}
+
 type Publisher struct {
 	topic Topic
 }
@@ -118,12 +156,12 @@ func Consume(ctx context.Context, subscription Subscription, group string, handl
 		return nil, errors.New("consume: no handlers")
 	}
 	known := map[string]bool{}
-	for _, topic := range Topics() {
-		known[topic] = true
+	for _, eventType := range EventTypes() {
+		known[eventType] = true
 	}
-	for topic := range handlers {
-		if !known[topic] {
-			return nil, fmt.Errorf("consume: unknown topic %s", topic)
+	for eventType := range handlers {
+		if !known[eventType] {
+			return nil, fmt.Errorf("consume: unknown event type %s", eventType)
 		}
 	}
 
@@ -143,19 +181,20 @@ func process(ctx context.Context, system, group string, handlers Handlers, deliv
 		logger.Error(ctx, "message rejected", telemetry.WithField("consumer.group", group), telemetry.WithError(err))
 		return Reject(fmt.Errorf("decode message: %w", err))
 	}
-	topic := TopicOf(envelope)
+	topic, eventType := TopicOf(envelope), EventTypeOf(envelope)
 
 	ctx, span := tracer.Span(ctx, tracer.Consumer(), tracer.ContinuedFrom(envelope.GetTraceContext()))
 	defer span.End(&err)
 	ctx = span.Set(ctx, append(attributes(system, topic, envelope.GetId()),
 		telemetry.Standard("messaging.consumer.group.name", group),
+		telemetry.WithField("event.type", eventType),
 		telemetry.WithField("message.attempt", delivery.Attempt),
 	)...)
 
-	if handle, ok := handlers[topic]; ok {
+	if handle, ok := handlers[eventType]; ok {
 		err = handle(ctx, envelope)
 	} else {
-		err = Reject(fmt.Errorf("%s has no handler for %s", group, topic))
+		err = Reject(fmt.Errorf("%s has no handler for %s", group, eventType))
 	}
 	if err != nil && errors.Is(err, murphy.ErrInvalid) {
 		err = Reject(err)
@@ -178,7 +217,7 @@ func process(ctx context.Context, system, group string, handlers Handlers, deliv
 	}
 	log(ctx, "message handled", fields...)
 
-	dimensions := []metrics.Dimension{{Name: "topic", Value: topic}, {Name: "consumer.group", Value: group}, {Name: "outcome", Value: outcome}}
+	dimensions := []metrics.Dimension{{Name: "event.type", Value: eventType}, {Name: "consumer.group", Value: group}, {Name: "outcome", Value: outcome}}
 	processed.Add(ctx, 1, dimensions...)
 	duration.Record(ctx, elapsed.Seconds(), dimensions...)
 	return err

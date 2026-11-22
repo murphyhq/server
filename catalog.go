@@ -1,6 +1,9 @@
 package murphy
 
-import "errors"
+import (
+	"errors"
+	"time"
+)
 
 func (s *Service) Validate() error {
 	var errs []error
@@ -65,4 +68,15 @@ func (s IntegrationStatus) Text() string {
 
 func IntegrationStatusFromText(text string) IntegrationStatus {
 	return enumFromText[IntegrationStatus](IntegrationStatus_value, "INTEGRATION_STATUS_", text)
+}
+
+func (i *Integration) Accepts(keyVersion int32, at time.Time) bool {
+	if i.GetStatus() != IntegrationStatus_INTEGRATION_STATUS_ACTIVE {
+		return false
+	}
+	if keyVersion == i.GetKeyVersion() {
+		return true
+	}
+	until := i.GetPreviousKeyValidUntil()
+	return keyVersion == i.GetKeyVersion()-1 && until != nil && at.Before(until.AsTime())
 }

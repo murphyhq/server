@@ -15,6 +15,7 @@ message Alert {
   string summary = 6;
   map<string, string> labels = 7;
   google.protobuf.Timestamp received_at = 8;
+  int32 key_version = 9;
 }
 
 enum AlertStatus {

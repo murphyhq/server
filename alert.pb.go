@@ -127,6 +127,7 @@ type Alert struct {
 	Summary       string                 `protobuf:"bytes,6,opt,name=summary,proto3" json:"summary,omitempty"`
 	Labels        map[string]string      `protobuf:"bytes,7,rep,name=labels,proto3" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	ReceivedAt    *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=received_at,json=receivedAt,proto3" json:"received_at,omitempty"`
+	KeyVersion    int32                  `protobuf:"varint,9,opt,name=key_version,json=keyVersion,proto3" json:"key_version,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -217,6 +218,13 @@ func (x *Alert) GetReceivedAt() *timestamppb.Timestamp {
 	return nil
 }
 
+func (x *Alert) GetKeyVersion() int32 {
+	if x != nil {
+		return x.KeyVersion
+	}
+	return 0
+}
+
 type AlertEvent struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Verb          AlertVerb              `protobuf:"varint,1,opt,name=verb,proto3,enum=murphy.v1.AlertVerb" json:"verb,omitempty"`
@@ -281,7 +289,7 @@ var File_murphy_v1_alert_proto protoreflect.FileDescriptor
 
 const file_murphy_v1_alert_proto_rawDesc = "" +
 	"\n" +
-	"\x15murphy/v1/alert.proto\x12\tmurphy.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xf2\x02\n" +
+	"\x15murphy/v1/alert.proto\x12\tmurphy.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\x93\x03\n" +
 	"\x05Alert\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12%\n" +
 	"\x0eintegration_id\x18\x02 \x01(\tR\rintegrationId\x12\x1d\n" +
@@ -292,7 +300,9 @@ const file_murphy_v1_alert_proto_rawDesc = "" +
 	"\asummary\x18\x06 \x01(\tR\asummary\x124\n" +
 	"\x06labels\x18\a \x03(\v2\x1c.murphy.v1.Alert.LabelsEntryR\x06labels\x12;\n" +
 	"\vreceived_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\n" +
-	"receivedAt\x1a9\n" +
+	"receivedAt\x12\x1f\n" +
+	"\vkey_version\x18\t \x01(\x05R\n" +
+	"keyVersion\x1a9\n" +
 	"\vLabelsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x90\x01\n" +

@@ -212,6 +212,48 @@ paths:
           $ref: "#/components/responses/Problem"
         "422":
           $ref: "#/components/responses/Problem"
+  /v1/incidents:
+    get:
+      operationId: listIncidents
+      summary: List incidents
+      tags: [incidents]
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+        - name: status
+          in: query
+          description: Only incidents with one of these statuses.
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              $ref: "#/components/schemas/IncidentStatus"
+      responses:
+        "200":
+          description: Incidents, newest first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IncidentPage"
+        "400":
+          $ref: "#/components/responses/Problem"
+  /v1/incidents/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    get:
+      operationId: getIncident
+      summary: Get an incident with its timeline
+      tags: [incidents]
+      responses:
+        "200":
+          description: The incident and its timeline, oldest entry first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IncidentWithTimeline"
+        "404":
+          $ref: "#/components/responses/Problem"
 components:
   parameters:
     IdempotencyKey:
@@ -373,6 +415,75 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Integration"
+        next_cursor:
+          type: string
+          description: Empty on the last page.
+    IncidentStatus:
+      type: string
+      enum: [triggered, acknowledged, resolved]
+    Incident:
+      type: object
+      required: [id, number, service_id, dedup_key, title, status, urgency, created_at, updated_at]
+      properties:
+        id:
+          type: string
+        number:
+          type: integer
+          format: int64
+          description: Numbers incidents in the order they were opened, for people to refer to.
+        service_id:
+          type: string
+        dedup_key:
+          type: string
+        title:
+          type: string
+        status:
+          $ref: "#/components/schemas/IncidentStatus"
+        urgency:
+          $ref: "#/components/schemas/Urgency"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        resolved_at:
+          type: string
+          format: date-time
+    TimelineEntry:
+      type: object
+      required: [id, type, summary, at]
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [triggered, alerted, acknowledged, resolved]
+        alert_id:
+          type: string
+        summary:
+          type: string
+        at:
+          type: string
+          format: date-time
+    IncidentWithTimeline:
+      allOf:
+        - $ref: "#/components/schemas/Incident"
+        - type: object
+          required: [timeline]
+          properties:
+            timeline:
+              type: array
+              items:
+                $ref: "#/components/schemas/TimelineEntry"
+    IncidentPage:
+      type: object
+      required: [items, next_cursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Incident"
         next_cursor:
           type: string
           description: Empty on the last page.

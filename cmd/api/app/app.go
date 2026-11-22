@@ -10,11 +10,14 @@ import (
 	"github.com/murphyhq/server/internal/lifecycle"
 	"github.com/murphyhq/server/services/catalog"
 	catalogdb "github.com/murphyhq/server/services/catalog/db"
+	"github.com/murphyhq/server/services/incidents"
+	incidentsdb "github.com/murphyhq/server/services/incidents/db"
 )
 
 type Settings struct {
 	HTTPAddr              string `env:"HTTP_ADDR" default:":8080"`
 	CatalogDatabaseURL    string `env:"CATALOG_DATABASE_URL" required:"true"`
+	IncidentsDatabaseURL  string `env:"INCIDENTS_DATABASE_URL" required:"true"`
 	IdempotencyStoreURL   string `env:"IDEMPOTENCY_STORE_URL" required:"true"`
 	IntegrationKeySecrets string `env:"INTEGRATION_KEY_SECRETS" required:"true"`
 }
@@ -39,6 +42,12 @@ func New(ctx context.Context, s Settings) (_ *App, err error) {
 	}
 	a.closers = append(a.closers, catalogStorage.Close)
 
+	incidentsStorage, err := incidentsdb.Open(ctx, s.IncidentsDatabaseURL)
+	if err != nil {
+		return nil, fmt.Errorf("MURPHY_INCIDENTS_DATABASE_URL: %w", err)
+	}
+	a.closers = append(a.closers, incidentsStorage.Close)
+
 	keys, err := idempotencystore.Open(ctx, s.IdempotencyStoreURL)
 	if err != nil {
 		return nil, fmt.Errorf("MURPHY_IDEMPOTENCY_STORE_URL: %w", err)
@@ -50,11 +59,12 @@ func New(ctx context.Context, s Settings) (_ *App, err error) {
 		return nil, fmt.Errorf("MURPHY_INTEGRATION_KEY_SECRETS: %w", err)
 	}
 
-	a.Handler, err = router.New(catalog.New(catalogStorage, keyring), keys)
+	catalogService := catalog.New(catalogStorage, keyring)
+	a.Handler, err = router.New(catalogService, incidents.New(incidentsStorage, catalogService), keys)
 	if err != nil {
 		return nil, err
 	}
-	a.Ready = []lifecycle.Check{catalogStorage.Ping, keys.Ping}
+	a.Ready = []lifecycle.Check{catalogStorage.Ping, incidentsStorage.Ping, keys.Ping}
 	return a, nil
 }
 

@@ -1,0 +1,46 @@
+syntax = "proto3";
+
+package murphy.v1;
+
+import "google/protobuf/timestamp.proto";
+import "murphy/v1/shared.proto";
+
+option go_package = "github.com/murphyhq/server;murphy";
+
+message Incident {
+  string id = 1;
+  int64 number = 2;
+  string service_id = 3;
+  string dedup_key = 4;
+  string title = 5;
+  IncidentStatus status = 6;
+  Urgency urgency = 7;
+  int32 version = 8;
+  google.protobuf.Timestamp created_at = 9;
+  google.protobuf.Timestamp updated_at = 10;
+  google.protobuf.Timestamp resolved_at = 11;
+}
+
+enum IncidentStatus {
+  INCIDENT_STATUS_UNSPECIFIED = 0;
+  INCIDENT_STATUS_TRIGGERED = 1;
+  INCIDENT_STATUS_ACKNOWLEDGED = 2;
+  INCIDENT_STATUS_RESOLVED = 3;
+}
+
+message TimelineEntry {
+  string id = 1;
+  string incident_id = 2;
+  TimelineEntryType type = 3;
+  string alert_id = 4;
+  string summary = 5;
+  google.protobuf.Timestamp at = 6;
+}
+
+enum TimelineEntryType {
+  TIMELINE_ENTRY_TYPE_UNSPECIFIED = 0;
+  TIMELINE_ENTRY_TYPE_TRIGGERED = 1;
+  TIMELINE_ENTRY_TYPE_ALERTED = 2;
+  TIMELINE_ENTRY_TYPE_ACKNOWLEDGED = 3;
+  TIMELINE_ENTRY_TYPE_RESOLVED = 4;
+}
