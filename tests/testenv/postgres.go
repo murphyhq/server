@@ -16,7 +16,7 @@ import (
 	"github.com/murphyhq/server/tests/provision"
 )
 
-func Database(t *testing.T) string {
+func PostgresDatabase(t *testing.T) string {
 	t.Helper()
 	ctx := t.Context()
 
@@ -26,7 +26,7 @@ func Database(t *testing.T) string {
 	}
 	name := "test_" + strings.ReplaceAll(uuid.NewV4().String(), "-", "")
 
-	require.NoError(t, provision.Database(ctx, admin, name))
+	require.NoError(t, provision.PostgresDatabase(ctx, admin, name))
 	t.Cleanup(func() {
 		ctx := context.Background()
 		conn, err := pgx.Connect(ctx, admin)

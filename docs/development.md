@@ -163,7 +163,7 @@ Every kind of failure Murphy guards against is tested, without changing the code
 
 1. The Go toolchain MUST be pinned with the `toolchain` directive, and tools (`sqlc`, `oapi-codegen`, `buf`, `protoc-gen-go`, `mockery`, `goose`, `ko`, `govulncheck`) with `tool` directives, all on their latest stable versions.
 2. `gofmt`, `go vet`, `golangci-lint`, `buf lint`, `buf breaking` and `govulncheck` MUST pass.
-3. `compose.yaml` MUST provide every service the components depend on (PostgreSQL, Redis, NATS, LocalStack, and Grafana's LGTM stack for telemetry at `localhost:3000`), MUST create every domain's database and the broker's topics and subscriptions on every start, and MUST run every component from source in its `murphy` profile: `docker compose up` starts the services only, `docker compose --profile murphy up` starts everything, and `docker compose --profile murphy watch` also restarts the components when code changes.
+3. `compose.yaml` MUST provide every service the components depend on (PostgreSQL, MySQL, Redis, NATS, LocalStack, and Grafana's LGTM stack for telemetry at `localhost:3000`), MUST create every domain's database and the broker's topics and subscriptions on every start, and MUST run every component from source in its `murphy` profile: `docker compose up` starts the services only, `docker compose --profile murphy up` starts everything, and `docker compose --profile murphy watch` also restarts the components when code changes.
 4. Container images MUST be built with `ko`, one per component, from `.ko.yaml`. The release workflow publishes them to `ghcr.io/murphyhq/<component>` for every `v*` tag.
 5. Dependencies MUST be kept current through Dependabot, for Go modules, GitHub Actions and the images in `compose.yaml`.
 

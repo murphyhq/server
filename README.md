@@ -29,7 +29,7 @@ Requires Docker.
 
 | Command | Starts |
 |---|---|
-| `docker compose --profile murphy up` | everything: PostgreSQL, Redis, NATS, LocalStack, Grafana, and every component built from source |
+| `docker compose --profile murphy up` | everything: PostgreSQL, MySQL, Redis, NATS, LocalStack, Grafana, and every component built from source |
 | `docker compose --profile murphy watch` | the same, restarting components when the code changes |
 | `docker compose up` | the services only, to run a component yourself |
 

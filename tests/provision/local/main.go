@@ -24,6 +24,7 @@ var (
 
 type settings struct {
 	PostgresURL string `env:"PROVISION_POSTGRES_URL" default:"postgres://murphy:murphy@localhost:5432/murphy?sslmode=disable"`
+	MySQLURL    string `env:"PROVISION_MYSQL_URL" default:"mysql://root:murphy@localhost:3306/mysql"`
 	NATSURL     string `env:"PROVISION_NATS_URL" default:"nats://localhost:4222"`
 
 	AWSEndpointURL     string `env:"AWS_ENDPOINT_URL" default:"http://localhost:4566"`
@@ -47,7 +48,10 @@ func run(ctx context.Context) error {
 		return err
 	}
 	for _, database := range databases {
-		if err := provision.Database(ctx, s.PostgresURL, database); err != nil {
+		if err := provision.PostgresDatabase(ctx, s.PostgresURL, database); err != nil {
+			return err
+		}
+		if err := provision.MySQLDatabase(ctx, s.MySQLURL, database, "murphy"); err != nil {
 			return err
 		}
 	}

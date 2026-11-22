@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/murphyhq/server/services/incidents"
+	"github.com/murphyhq/server/services/incidents/db/mysql"
 	"github.com/murphyhq/server/services/incidents/db/postgres"
 )
 
@@ -25,6 +26,12 @@ func Open(ctx context.Context, url string) (Storage, error) {
 			return nil, err
 		}
 		return &Repository[*postgres.Tx]{Engine: engine}, nil
+	case "mysql":
+		engine, err := mysql.Open(ctx, url)
+		if err != nil {
+			return nil, err
+		}
+		return &Repository[*mysql.Tx]{Engine: engine}, nil
 	default:
 		return nil, errors.New("unsupported database")
 	}

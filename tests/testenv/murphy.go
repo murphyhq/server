@@ -21,9 +21,9 @@ type Stack struct {
 	Databases migrateapp.Settings
 }
 
-func Murphy(t *testing.T, broker brokertest.Environment) Stack {
+func Murphy(t *testing.T, broker brokertest.Environment, engine DatabaseEngine) Stack {
 	t.Helper()
-	databases := Databases(t)
+	databases := Databases(t, engine)
 	endpoints := broker.Provision(t, brokertest.Topology{"engine": {"murphy.v1.alert"}}, messaging.TopologyVersion)
 
 	api, _ := APIWith(t, databases)

@@ -11,6 +11,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/murphyhq/server"
+	"github.com/murphyhq/server/internal/database"
 	murphypostgres "github.com/murphyhq/server/internal/postgres"
 	"github.com/murphyhq/server/internal/tracer"
 )
@@ -121,7 +122,7 @@ func (r *Repository) ListTimeline(ctx context.Context, incidentID string) (_ []*
 			Id:         row.ID,
 			IncidentId: row.IncidentID,
 			Type:       murphy.TimelineEntryTypeFromText(row.Type),
-			AlertId:    murphypostgres.TextValue(row.AlertID),
+			AlertId:    database.TextValue(row.AlertID),
 			Summary:    row.Summary,
 			At:         timestamppb.New(row.CreatedAt),
 		}
@@ -159,6 +160,6 @@ func toIncident(row Incident) *murphy.Incident {
 		Version:    row.Version,
 		CreatedAt:  timestamppb.New(row.CreatedAt),
 		UpdatedAt:  timestamppb.New(row.UpdatedAt),
-		ResolvedAt: murphypostgres.Timestamp(row.ResolvedAt),
+		ResolvedAt: database.Timestamp(row.ResolvedAt),
 	}
 }
