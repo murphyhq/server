@@ -1,5 +1,11 @@
 x-integration-key-secrets: &integration-key-secrets "1:AAEqhKjSkvjtvtCA2YD2wSsiQGaN/H1phWMk1vn35QQ="
 
+x-component-environment: &component-environment
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://lgtm:4318
+  GIT_CONFIG_COUNT: "1"
+  GIT_CONFIG_KEY_0: safe.directory
+  GIT_CONFIG_VALUE_0: /src
+
 x-component: &component
   image: golang:1.27.4
   profiles: [murphy]
@@ -13,8 +19,7 @@ x-component: &component
     interval: 5s
     start_period: 120s
     retries: 3
-  environment:
-    OTEL_EXPORTER_OTLP_ENDPOINT: http://lgtm:4318
+  environment: *component-environment
   depends_on:
     lgtm:
       condition: service_started
@@ -88,6 +93,7 @@ services:
     profiles: []
     command: ["sh", "-c", "go build -o /tmp/provision ./tests/provision/local && exec /tmp/provision"]
     environment:
+      <<: *component-environment
       MURPHY_PROVISION_POSTGRES_URL: postgres://murphy:murphy@postgres:5432/murphy?sslmode=disable
       MURPHY_PROVISION_NATS_URL: nats://nats:4222
       AWS_ENDPOINT_URL: http://localstack:4566
@@ -109,7 +115,7 @@ services:
     <<: *component
     command: ["sh", "-c", "go build -o /tmp/migrate ./cmd/migrate && exec /tmp/migrate"]
     environment:
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://lgtm:4318
+      <<: *component-environment
       MURPHY_CATALOG_DATABASE_URL: postgres://murphy:murphy@postgres:5432/catalog?sslmode=disable
       MURPHY_INCIDENTS_DATABASE_URL: postgres://murphy:murphy@postgres:5432/incidents?sslmode=disable
     healthcheck:
@@ -125,6 +131,7 @@ services:
     <<: *component
     command: ["sh", "-c", "go build -o /tmp/seed ./tests/seed && exec /tmp/seed"]
     environment:
+      <<: *component-environment
       MURPHY_SEED_API_URL: http://api:8080
     healthcheck:
       disable: true
@@ -137,7 +144,7 @@ services:
     <<: *component
     command: ["sh", "-c", "go build -o /tmp/ingest ./cmd/ingest && exec /tmp/ingest"]
     environment:
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://lgtm:4318
+      <<: *component-environment
       MURPHY_EVENTS_TOPIC_URL: nats://nats:4222/events
       MURPHY_INTEGRATION_KEY_SECRETS: *integration-key-secrets
     ports:
@@ -147,7 +154,7 @@ services:
     <<: *component
     command: ["sh", "-c", "go build -o /tmp/api ./cmd/api && exec /tmp/api"]
     environment:
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://lgtm:4318
+      <<: *component-environment
       MURPHY_CATALOG_DATABASE_URL: postgres://murphy:murphy@postgres:5432/catalog?sslmode=disable
       MURPHY_INCIDENTS_DATABASE_URL: postgres://murphy:murphy@postgres:5432/incidents?sslmode=disable
       MURPHY_IDEMPOTENCY_STORE_URL: redis://redis:6379/0
@@ -168,7 +175,7 @@ services:
     <<: *component
     command: ["sh", "-c", "go build -o /tmp/engine ./cmd/engine && exec /tmp/engine"]
     environment:
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://lgtm:4318
+      <<: *component-environment
       MURPHY_EVENTS_SUBSCRIPTION_URL: nats://nats:4222/events/engine
       MURPHY_CATALOG_DATABASE_URL: postgres://murphy:murphy@postgres:5432/catalog?sslmode=disable
       MURPHY_INCIDENTS_DATABASE_URL: postgres://murphy:murphy@postgres:5432/incidents?sslmode=disable
