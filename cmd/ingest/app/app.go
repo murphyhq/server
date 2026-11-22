@@ -21,7 +21,7 @@ type Settings struct {
 type App struct {
 	Handler http.Handler
 	Ready   []lifecycle.Check
-	closers []func()
+	closers lifecycle.Closers
 }
 
 func New(ctx context.Context, s Settings) (_ *App, err error) {
@@ -41,7 +41,7 @@ func New(ctx context.Context, s Settings) (_ *App, err error) {
 	if err != nil {
 		return nil, fmt.Errorf("MURPHY_EVENTS_TOPIC_URL: %w", err)
 	}
-	a.closers = append(a.closers, func() { _ = topic.Close() })
+	a.closers.Add(func() { _ = topic.Close() })
 
 	a.Handler, err = router.New(messaging.NewPublisher(topic), keyring)
 	if err != nil {
@@ -52,7 +52,5 @@ func New(ctx context.Context, s Settings) (_ *App, err error) {
 }
 
 func (a *App) Close() {
-	for i := len(a.closers) - 1; i >= 0; i-- {
-		a.closers[i]()
-	}
+	a.closers.Close()
 }

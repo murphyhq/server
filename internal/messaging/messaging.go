@@ -59,7 +59,23 @@ func RetryAfter(attempt int) time.Duration {
 
 type Handler func(ctx context.Context, envelope *murphy.Envelope) error
 
-type Handlers map[string]Handler
+type Registration struct {
+	eventType string
+	handle    Handler
+}
+
+type Handlers []Registration
+
+func On(verb protoreflect.Enum, handle Handler) Registration {
+	value := verb.Descriptor().Values().ByNumber(verb.Number())
+	for i := range event.Fields().Len() {
+		field := event.Fields().Get(i)
+		if candidate := field.Message().Fields().ByName("verb"); candidate != nil && candidate.Enum() == verb.Descriptor() && value != nil && value.Number() != 0 {
+			return Registration{eventType: topicOf(field) + "." + verbText(value), handle: handle}
+		}
+	}
+	return Registration{handle: handle}
+}
 
 var event = (&murphy.Envelope{}).ProtoReflect().Descriptor().Oneofs().ByName("event")
 
@@ -159,14 +175,19 @@ func Consume(ctx context.Context, subscription Subscription, group string, handl
 	for _, eventType := range EventTypes() {
 		known[eventType] = true
 	}
-	for eventType := range handlers {
-		if !known[eventType] {
-			return nil, fmt.Errorf("consume: unknown event type %s", eventType)
+	byType := map[string]Handler{}
+	for _, registration := range handlers {
+		switch {
+		case !known[registration.eventType]:
+			return nil, errors.New("consume: a handler is registered for something that is not an event verb")
+		case byType[registration.eventType] != nil:
+			return nil, fmt.Errorf("consume: two handlers for %s", registration.eventType)
 		}
+		byType[registration.eventType] = registration.handle
 	}
 
 	consumer, err := subscription.Consume(ctx, func(ctx context.Context, delivery Delivery) error {
-		return process(ctx, subscription.System(), group, handlers, delivery)
+		return process(ctx, subscription.System(), group, byType, delivery)
 	})
 	if err != nil {
 		return nil, fmt.Errorf("consume %s: %w", group, err)
@@ -174,7 +195,19 @@ func Consume(ctx context.Context, subscription Subscription, group string, handl
 	return consumer, nil
 }
 
-func process(ctx context.Context, system, group string, handlers Handlers, delivery Delivery) (err error) {
+func Runner(subscription Subscription, group string, handlers Handlers) func(context.Context) error {
+	return func(ctx context.Context) error {
+		consumer, err := Consume(ctx, subscription, group, handlers)
+		if err != nil {
+			return err
+		}
+		<-ctx.Done()
+		consumer.Stop()
+		return nil
+	}
+}
+
+func process(ctx context.Context, system, group string, handlers map[string]Handler, delivery Delivery) (err error) {
 	started := time.Now()
 	envelope := &murphy.Envelope{}
 	if err := proto.Unmarshal(delivery.Data, envelope); err != nil {
