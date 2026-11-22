@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package murphy.v1;
+
+import "google/protobuf/timestamp.proto";
+import "murphy/v1/alert.proto";
+
+option go_package = "github.com/murphyhq/server;murphy";
+
+message Envelope {
+  string id = 1;
+  google.protobuf.Timestamp occurred_at = 2;
+  map<string, string> trace_context = 3;
+
+  oneof event {
+    AlertEvent alert = 10;
+  }
+}
