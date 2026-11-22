@@ -195,6 +195,24 @@ services:
     volumes:
       - ./openapi:/usr/share/nginx/html:ro
 
+  db-murphy:
+    image: sosedoff/pgweb:0.17.0
+    command: ["--bind=0.0.0.0", "--listen=8081", "--readonly", "--url=postgres://murphy:murphy@postgres:5432/murphy?sslmode=disable"]
+    ports:
+      - "8082:8081"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  db-catalog:
+    image: sosedoff/pgweb:0.17.0
+    command: ["--bind=0.0.0.0", "--listen=8081", "--readonly", "--url=postgres://murphy:murphy@postgres:5432/catalog?sslmode=disable"]
+    ports:
+      - "8083:8081"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
 volumes:
   postgres:
   go-mod:
