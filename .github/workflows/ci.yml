@@ -24,6 +24,7 @@ jobs:
       - uses: golangci/golangci-lint-action@v9
         with:
           version: v2.15.0
+          args: --build-tags integration,e2e
       - run: go tool buf lint
       - run: go tool buf breaking --against "https://github.com/${{ github.repository }}.git#branch=main"
       - name: Check generated code is current
