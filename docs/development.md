@@ -149,7 +149,7 @@ Every kind of failure Murphy guards against is tested, without changing the code
 4. Tests MUST use `testify`: `require` for anything the rest of the test depends on, `assert` for the checks themselves.
 5. Every consumer MUST have tests for a crash between each step of its delivery handling.
 6. `tests/seed/` MUST give a fresh local stack realistic data, created only through the API and safe to run again. Every domain MUST add its data there in the PR that adds the domain.
-7. `go test ./...` MUST run the unit tests without Docker or network access. Tests under `tests/` MUST use the `integration` build tag.
+7. `go test ./...` MUST run the unit tests without Docker or network access. Tests under `tests/` MUST use the `integration` build tag, except end-to-end tests, which use `e2e`.
 
 ## Code
 
