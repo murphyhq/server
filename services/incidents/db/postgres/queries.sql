@@ -17,7 +17,7 @@ INSERT INTO incidents (id, service_id, dedup_key, title, status, urgency, versio
 VALUES (@id, @service_id, @dedup_key, @title, @status, @urgency, @version, @created_at, @updated_at, @resolved_at)
 RETURNING number;
 
--- name: UpdateIncidentStatus :execrows
+-- name: UpdateIncident :execrows
 UPDATE incidents
 SET status = @status, resolved_at = @resolved_at, updated_at = @updated_at, version = version + 1
 WHERE id = @id AND version = @version;
@@ -52,8 +52,3 @@ ORDER BY id;
 SELECT COALESCE(max(received_at), 'epoch'::timestamptz)::timestamptz AS received_at
 FROM alerts
 WHERE incident_id = @incident_id AND status = 'firing';
-
--- name: TouchIncident :execrows
-UPDATE incidents
-SET updated_at = @updated_at, version = version + 1
-WHERE id = @id AND version = @version;

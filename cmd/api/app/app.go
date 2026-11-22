@@ -23,9 +23,9 @@ type Settings struct {
 }
 
 type App struct {
-	Handler http.Handler
-	Ready   []lifecycle.Check
-	closers lifecycle.Closers
+	Handler   http.Handler
+	Ready     []lifecycle.Check
+	resources lifecycle.Resources
 }
 
 func New(ctx context.Context, s Settings) (_ *App, err error) {
@@ -40,19 +40,19 @@ func New(ctx context.Context, s Settings) (_ *App, err error) {
 	if err != nil {
 		return nil, fmt.Errorf("MURPHY_CATALOG_DATABASE_URL: %w", err)
 	}
-	a.closers.Add(catalogStorage.Close)
+	a.resources.Add(catalogStorage.Close, catalogStorage.Ping)
 
 	incidentsStorage, err := incidentsdb.Open(ctx, s.IncidentsDatabaseURL)
 	if err != nil {
 		return nil, fmt.Errorf("MURPHY_INCIDENTS_DATABASE_URL: %w", err)
 	}
-	a.closers.Add(incidentsStorage.Close)
+	a.resources.Add(incidentsStorage.Close, incidentsStorage.Ping)
 
 	keys, err := idempotencystore.Open(ctx, s.IdempotencyStoreURL)
 	if err != nil {
 		return nil, fmt.Errorf("MURPHY_IDEMPOTENCY_STORE_URL: %w", err)
 	}
-	a.closers.Add(func() { _ = keys.Close() })
+	a.resources.Add(func() { _ = keys.Close() }, keys.Ping)
 
 	keyring, err := catalog.ParseKeyring(s.IntegrationKeySecrets)
 	if err != nil {
@@ -64,10 +64,10 @@ func New(ctx context.Context, s Settings) (_ *App, err error) {
 	if err != nil {
 		return nil, err
 	}
-	a.Ready = []lifecycle.Check{catalogStorage.Ping, incidentsStorage.Ping, keys.Ping}
+	a.Ready = a.resources.Checks()
 	return a, nil
 }
 
 func (a *App) Close() {
-	a.closers.Close()
+	a.resources.Close()
 }

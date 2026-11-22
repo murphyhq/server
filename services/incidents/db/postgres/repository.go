@@ -3,21 +3,16 @@ package postgres
 import (
 	"context"
 	"embed"
-	"encoding/json"
-	"errors"
 	"fmt"
 	"io/fs"
 	"time"
 
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/murphyhq/server"
 	murphypostgres "github.com/murphyhq/server/internal/postgres"
 	"github.com/murphyhq/server/internal/tracer"
-	"github.com/murphyhq/server/services/incidents"
 )
 
 //go:embed migrations/*.sql
@@ -58,114 +53,28 @@ func (r *Repository) FindOpenIncident(ctx context.Context, serviceID, dedupKey s
 
 	row, err := r.queries.FindOpenIncident(ctx, FindOpenIncidentParams{ServiceID: serviceID, DedupKey: dedupKey})
 	if err != nil {
-		return nil, storeError("incident", err)
+		return nil, murphypostgres.Error("incident", err)
 	}
 	return toIncident(row), nil
 }
 
-func (r *Repository) RecordAlert(ctx context.Context, outcome *incidents.AlertOutcome) (recorded bool, err error) {
+func (r *Repository) Transaction(ctx context.Context, work func(tx *Tx) error) (err error) {
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
-	labels, err := json.Marshal(outcome.Alert.GetLabels())
+	pgTx, err := r.pool.Begin(ctx)
 	if err != nil {
-		return false, fmt.Errorf("encode labels: %w", err)
+		return fmt.Errorf("begin transaction: %w", err)
 	}
-	now := time.Now().UTC()
+	defer func() { _ = pgTx.Rollback(context.WithoutCancel(ctx)) }()
 
-	tx, err := r.pool.Begin(ctx)
-	if err != nil {
-		return false, fmt.Errorf("begin transaction: %w", err)
+	if err := work(&Tx{queries: r.queries.WithTx(pgTx)}); err != nil {
+		return err
 	}
-	defer func() { _ = tx.Rollback(context.WithoutCancel(ctx)) }()
-	q := r.queries.WithTx(tx)
-
-	marked, err := q.MarkHandled(ctx, MarkHandledParams{ID: outcome.MessageID, CreatedAt: now})
-	if err != nil {
-		return false, storeError("message", err)
+	if err := pgTx.Commit(ctx); err != nil {
+		return murphypostgres.Error("incident", err)
 	}
-	if marked == 0 {
-		return false, nil
-	}
-
-	if incident := outcome.Opened; incident != nil {
-		number, err := q.CreateIncident(ctx, CreateIncidentParams{
-			ID:        incident.GetId(),
-			ServiceID: incident.GetServiceId(),
-			DedupKey:  incident.GetDedupKey(),
-			Title:     incident.GetTitle(),
-			Status:    incident.GetStatus().Text(),
-			Urgency:   incident.GetUrgency().Text(),
-			Version:   incident.GetVersion(),
-			CreatedAt: incident.GetCreatedAt().AsTime(),
-			UpdatedAt: incident.GetUpdatedAt().AsTime(),
-		})
-		if err != nil {
-			return false, storeError("incident", err)
-		}
-		incident.Number = number
-	}
-	if incident := outcome.Joined; incident != nil {
-		rows, err := q.TouchIncident(ctx, TouchIncidentParams{
-			ID:        incident.GetId(),
-			Version:   incident.GetVersion(),
-			UpdatedAt: incident.GetUpdatedAt().AsTime(),
-		})
-		if err != nil {
-			return false, storeError("incident", err)
-		}
-		if rows == 0 {
-			return false, murphy.ErrConflict
-		}
-	}
-	if incident := outcome.Resolved; incident != nil {
-		rows, err := q.UpdateIncidentStatus(ctx, UpdateIncidentStatusParams{
-			ID:         incident.GetId(),
-			Version:    incident.GetVersion(),
-			Status:     incident.GetStatus().Text(),
-			ResolvedAt: fromTimestamp(incident.GetResolvedAt()),
-			UpdatedAt:  incident.GetUpdatedAt().AsTime(),
-		})
-		if err != nil {
-			return false, storeError("incident", err)
-		}
-		if rows == 0 {
-			return false, murphy.ErrConflict
-		}
-	}
-
-	alert := outcome.Alert
-	if err := q.CreateAlert(ctx, CreateAlertParams{
-		ID:            alert.GetId(),
-		IncidentID:    optional(outcome.IncidentID),
-		IntegrationID: alert.GetIntegrationId(),
-		ServiceID:     alert.GetServiceId(),
-		DedupKey:      alert.GetDedupKey(),
-		Status:        alert.GetStatus().Text(),
-		Summary:       alert.GetSummary(),
-		Labels:        labels,
-		ReceivedAt:    alert.GetReceivedAt().AsTime(),
-		CreatedAt:     now,
-	}); err != nil {
-		return false, storeError("alert", err)
-	}
-	for _, entry := range outcome.Timeline {
-		if err := q.CreateTimelineEntry(ctx, CreateTimelineEntryParams{
-			ID:         entry.GetId(),
-			IncidentID: entry.GetIncidentId(),
-			Type:       entry.GetType().Text(),
-			AlertID:    optional(entry.GetAlertId()),
-			Summary:    entry.GetSummary(),
-			CreatedAt:  entry.GetAt().AsTime(),
-		}); err != nil {
-			return false, storeError("timeline entry", err)
-		}
-	}
-
-	if err := tx.Commit(ctx); err != nil {
-		return false, storeError("incident", err)
-	}
-	return true, nil
+	return nil
 }
 
 func (r *Repository) GetIncident(ctx context.Context, id string) (_ *murphy.Incident, err error) {
@@ -174,7 +83,7 @@ func (r *Repository) GetIncident(ctx context.Context, id string) (_ *murphy.Inci
 
 	row, err := r.queries.GetIncident(ctx, id)
 	if err != nil {
-		return nil, storeError("incident", err)
+		return nil, murphypostgres.Error("incident", err)
 	}
 	return toIncident(row), nil
 }
@@ -189,7 +98,7 @@ func (r *Repository) ListIncidents(ctx context.Context, statuses []murphy.Incide
 	}
 	rows, err := r.queries.ListIncidents(ctx, ListIncidentsParams{Before: before, Statuses: texts, MaxRows: int32(limit)})
 	if err != nil {
-		return nil, storeError("incident", err)
+		return nil, murphypostgres.Error("incident", err)
 	}
 	items := make([]*murphy.Incident, len(rows))
 	for i, row := range rows {
@@ -204,7 +113,7 @@ func (r *Repository) ListTimeline(ctx context.Context, incidentID string) (_ []*
 
 	rows, err := r.queries.ListTimeline(ctx, incidentID)
 	if err != nil {
-		return nil, storeError("timeline entry", err)
+		return nil, murphypostgres.Error("timeline entry", err)
 	}
 	entries := make([]*murphy.TimelineEntry, len(rows))
 	for i, row := range rows {
@@ -212,7 +121,7 @@ func (r *Repository) ListTimeline(ctx context.Context, incidentID string) (_ []*
 			Id:         row.ID,
 			IncidentId: row.IncidentID,
 			Type:       murphy.TimelineEntryTypeFromText(row.Type),
-			AlertId:    value(row.AlertID),
+			AlertId:    murphypostgres.TextValue(row.AlertID),
 			Summary:    row.Summary,
 			At:         timestamppb.New(row.CreatedAt),
 		}
@@ -226,7 +135,7 @@ func (r *Repository) LatestFiringAt(ctx context.Context, incidentID string) (_ t
 
 	latest, err := r.queries.LatestFiringAt(ctx, &incidentID)
 	if err != nil {
-		return time.Time{}, storeError("alert", err)
+		return time.Time{}, murphypostgres.Error("alert", err)
 	}
 	return latest, nil
 }
@@ -250,46 +159,6 @@ func toIncident(row Incident) *murphy.Incident {
 		Version:    row.Version,
 		CreatedAt:  timestamppb.New(row.CreatedAt),
 		UpdatedAt:  timestamppb.New(row.UpdatedAt),
-		ResolvedAt: toTimestamp(row.ResolvedAt),
+		ResolvedAt: murphypostgres.Timestamp(row.ResolvedAt),
 	}
-}
-
-func optional(s string) *string {
-	if s == "" {
-		return nil
-	}
-	return &s
-}
-
-func value(s *string) string {
-	if s == nil {
-		return ""
-	}
-	return *s
-}
-
-func fromTimestamp(ts *timestamppb.Timestamp) *time.Time {
-	if ts == nil {
-		return nil
-	}
-	t := ts.AsTime()
-	return &t
-}
-
-func toTimestamp(t *time.Time) *timestamppb.Timestamp {
-	if t == nil {
-		return nil
-	}
-	return timestamppb.New(*t)
-}
-
-func storeError(entity string, err error) error {
-	var pgErr *pgconn.PgError
-	switch {
-	case errors.Is(err, pgx.ErrNoRows):
-		return &murphy.NotFoundError{Entity: entity}
-	case errors.As(err, &pgErr) && pgErr.Code == "23505":
-		return murphy.ErrConflict
-	}
-	return err
 }

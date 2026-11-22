@@ -32,9 +32,8 @@ type AlertOutcome struct {
 	MessageID  string
 	Alert      *murphy.Alert
 	IncidentID string
-	Opened     *murphy.Incident
-	Joined     *murphy.Incident
-	Resolved   *murphy.Incident
+	Created    *murphy.Incident
+	Updated    *murphy.Incident
 	Timeline   []*murphy.TimelineEntry
 }
 
@@ -90,11 +89,11 @@ func (s *Service) AlertReceived(ctx context.Context, messageID string, alert *mu
 			CreatedAt: now,
 			UpdatedAt: now,
 		}
-		outcome.IncidentID, outcome.Opened = incident.GetId(), incident
+		outcome.IncidentID, outcome.Created = incident.GetId(), incident
 		outcome.Timeline = append(outcome.Timeline, entry(incident, murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_TRIGGERED, alert, now))
 	case open != nil && firing:
 		open.UpdatedAt = now
-		outcome.IncidentID, outcome.Joined = open.GetId(), open
+		outcome.IncidentID, outcome.Updated = open.GetId(), open
 		outcome.Timeline = append(outcome.Timeline, entry(open, murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_ALERTED, alert, now))
 	case open != nil:
 		outcome.IncidentID = open.GetId()
@@ -104,12 +103,12 @@ func (s *Service) AlertReceived(ctx context.Context, messageID string, alert *mu
 		}
 		if alert.GetReceivedAt().AsTime().Sub(latest) <= clockSkew {
 			open.UpdatedAt = now
-			outcome.Joined = open
+			outcome.Updated = open
 			outcome.Timeline = append(outcome.Timeline, entry(open, murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_ALERTED, alert, now))
 			break
 		}
 		open.Resolve(now)
-		outcome.Resolved = open
+		outcome.Updated = open
 		outcome.Timeline = append(outcome.Timeline, entry(open, murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_RESOLVED, alert, now))
 	}
 	if outcome.IncidentID != "" {
