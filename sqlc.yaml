@@ -2,16 +2,20 @@ version: "2"
 overrides:
   go:
     overrides:
-      - db_type: uuid
+      - engine: postgresql
+        db_type: uuid
         go_type: string
-      - db_type: uuid
+      - engine: postgresql
+        db_type: uuid
         nullable: true
         go_type:
           type: string
           pointer: true
-      - db_type: timestamptz
+      - engine: postgresql
+        db_type: timestamptz
         go_type: time.Time
-      - db_type: timestamptz
+      - engine: postgresql
+        db_type: timestamptz
         nullable: true
         go_type:
           type: time.Time
@@ -33,3 +37,39 @@ sql:
         package: postgres
         out: services/incidents/db/postgres
         sql_package: pgx/v5
+  - engine: mysql
+    schema: services/catalog/db/mysql/migrations
+    queries: services/catalog/db/mysql/queries.sql
+    gen:
+      go:
+        package: mysql
+        out: services/catalog/db/mysql
+        overrides:
+          - db_type: datetime
+            nullable: true
+            go_type:
+              type: time.Time
+              pointer: true
+          - db_type: char
+            nullable: true
+            go_type:
+              type: string
+              pointer: true
+  - engine: mysql
+    schema: services/incidents/db/mysql/migrations
+    queries: services/incidents/db/mysql/queries.sql
+    gen:
+      go:
+        package: mysql
+        out: services/incidents/db/mysql
+        overrides:
+          - db_type: datetime
+            nullable: true
+            go_type:
+              type: time.Time
+              pointer: true
+          - db_type: char
+            nullable: true
+            go_type:
+              type: string
+              pointer: true

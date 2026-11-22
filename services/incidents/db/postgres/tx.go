@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/murphyhq/server"
+	"github.com/murphyhq/server/internal/database"
 	murphypostgres "github.com/murphyhq/server/internal/postgres"
 	"github.com/murphyhq/server/internal/tracer"
 )
@@ -40,7 +41,7 @@ func (t *Tx) CreateIncident(ctx context.Context, incident *murphy.Incident) (err
 		Version:    incident.GetVersion(),
 		CreatedAt:  incident.GetCreatedAt().AsTime(),
 		UpdatedAt:  incident.GetUpdatedAt().AsTime(),
-		ResolvedAt: murphypostgres.Time(incident.GetResolvedAt()),
+		ResolvedAt: database.Time(incident.GetResolvedAt()),
 	})
 	if err != nil {
 		return murphypostgres.Error("incident", err)
@@ -57,7 +58,7 @@ func (t *Tx) UpdateIncident(ctx context.Context, incident *murphy.Incident) (err
 		ID:         incident.GetId(),
 		Version:    incident.GetVersion(),
 		Status:     incident.GetStatus().Text(),
-		ResolvedAt: murphypostgres.Time(incident.GetResolvedAt()),
+		ResolvedAt: database.Time(incident.GetResolvedAt()),
 		UpdatedAt:  incident.GetUpdatedAt().AsTime(),
 	})
 	if err != nil {
@@ -79,7 +80,7 @@ func (t *Tx) CreateAlert(ctx context.Context, alert *murphy.Alert, incidentID st
 	}
 	return murphypostgres.Error("alert", t.queries.CreateAlert(ctx, CreateAlertParams{
 		ID:            alert.GetId(),
-		IncidentID:    murphypostgres.Text(incidentID),
+		IncidentID:    database.Text(incidentID),
 		IntegrationID: alert.GetIntegrationId(),
 		ServiceID:     alert.GetServiceId(),
 		DedupKey:      alert.GetDedupKey(),
@@ -99,7 +100,7 @@ func (t *Tx) CreateTimelineEntry(ctx context.Context, entry *murphy.TimelineEntr
 		ID:         entry.GetId(),
 		IncidentID: entry.GetIncidentId(),
 		Type:       entry.GetType().Text(),
-		AlertID:    murphypostgres.Text(entry.GetAlertId()),
+		AlertID:    database.Text(entry.GetAlertId()),
 		Summary:    entry.GetSummary(),
 		CreatedAt:  entry.GetAt().AsTime(),
 	}))

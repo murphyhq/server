@@ -101,7 +101,7 @@ The message broker keeps every message until it is processed, delivers it at lea
 
 A key-value store keeps the `Idempotency-Key` of every request that creates something, with its response, for 24 hours, so `api` answers a retry without doing the work twice. The implementation is Redis.
 
-The database provides transactions, so changes that belong together are applied together, and row locking, so two `scheduler` instances never claim the same timer. The implementation is PostgreSQL.
+The database provides transactions, so changes that belong together are applied together, and row locking, so two `scheduler` instances never claim the same timer. The implementations are PostgreSQL and MySQL.
 
 ## Flows
 

@@ -11,6 +11,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/murphyhq/server"
+	"github.com/murphyhq/server/internal/database"
 	murphypostgres "github.com/murphyhq/server/internal/postgres"
 	"github.com/murphyhq/server/internal/tracer"
 )
@@ -125,7 +126,7 @@ func (r *Repository) CreateIntegration(ctx context.Context, integration *murphy.
 		Name:                  integration.GetName(),
 		Type:                  integration.GetType().Text(),
 		KeyVersion:            integration.GetKeyVersion(),
-		PreviousKeyValidUntil: murphypostgres.Time(integration.GetPreviousKeyValidUntil()),
+		PreviousKeyValidUntil: database.Time(integration.GetPreviousKeyValidUntil()),
 		Status:                integration.GetStatus().Text(),
 		CreatedAt:             integration.GetCreatedAt().AsTime(),
 		UpdatedAt:             integration.GetUpdatedAt().AsTime(),
@@ -215,7 +216,7 @@ func toIntegration(row Integration) *murphy.Integration {
 		Name:                  row.Name,
 		Type:                  murphy.IntegrationTypeFromText(row.Type),
 		KeyVersion:            row.KeyVersion,
-		PreviousKeyValidUntil: murphypostgres.Timestamp(row.PreviousKeyValidUntil),
+		PreviousKeyValidUntil: database.Timestamp(row.PreviousKeyValidUntil),
 		Status:                murphy.IntegrationStatusFromText(row.Status),
 		CreatedAt:             timestamppb.New(row.CreatedAt),
 		UpdatedAt:             timestamppb.New(row.UpdatedAt),

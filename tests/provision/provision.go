@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -18,12 +19,13 @@ import (
 	"github.com/nats-io/nats.go/jetstream"
 
 	"github.com/murphyhq/server/internal/messaging"
+	murphymysql "github.com/murphyhq/server/internal/mysql"
 	"github.com/murphyhq/server/internal/nats"
 )
 
 type Topology map[string][]string
 
-func Database(ctx context.Context, adminURL, name string) error {
+func PostgresDatabase(ctx context.Context, adminURL, name string) error {
 	conn, err := pgx.Connect(ctx, adminURL)
 	if err != nil {
 		return fmt.Errorf("connect to PostgreSQL: %w", err)
@@ -39,6 +41,30 @@ func Database(ctx context.Context, adminURL, name string) error {
 	}
 	if _, err := conn.Exec(ctx, "CREATE DATABASE "+pgx.Identifier{name}.Sanitize()); err != nil {
 		return fmt.Errorf("create database %s: %w", name, err)
+	}
+	return nil
+}
+
+var account = regexp.MustCompile(`^[A-Za-z0-9_]+$`)
+
+func MySQLDatabase(ctx context.Context, adminURL, name, user string) error {
+	db, err := murphymysql.Open(ctx, murphymysql.Config{URL: adminURL})
+	if err != nil {
+		return err
+	}
+	defer func() { _ = db.Close() }()
+
+	quoted := "`" + strings.ReplaceAll(name, "`", "``") + "`"
+	if _, err := db.ExecContext(ctx, "CREATE DATABASE IF NOT EXISTS "+quoted); err != nil {
+		return fmt.Errorf("create database %s: %w", name, err)
+	}
+	if user != "" {
+		if !account.MatchString(user) {
+			return fmt.Errorf("%q is not a valid MySQL user name", user)
+		}
+		if _, err := db.ExecContext(ctx, "GRANT ALL PRIVILEGES ON "+quoted+".* TO '"+user+"'@'%'"); err != nil {
+			return fmt.Errorf("grant %s access to database %s: %w", user, name, err)
+		}
 	}
 	return nil
 }

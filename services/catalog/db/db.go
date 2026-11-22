@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/murphyhq/server/services/catalog"
+	"github.com/murphyhq/server/services/catalog/db/mysql"
 	"github.com/murphyhq/server/services/catalog/db/postgres"
 )
 
@@ -21,6 +22,8 @@ func Open(ctx context.Context, url string) (Storage, error) {
 	switch scheme {
 	case "postgres", "postgresql":
 		return postgres.Open(ctx, url)
+	case "mysql":
+		return mysql.Open(ctx, url)
 	default:
 		return nil, errors.New("unsupported database")
 	}

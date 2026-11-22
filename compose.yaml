@@ -50,6 +50,21 @@ services:
       interval: 2s
       retries: 30
 
+  mysql:
+    image: mysql:8.4.13
+    environment:
+      MYSQL_ROOT_PASSWORD: murphy
+      MYSQL_USER: murphy
+      MYSQL_PASSWORD: murphy
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-umurphy", "-pmurphy"]
+      interval: 2s
+      retries: 60
+
   nats:
     image: nats:2.15.3-alpine
     command: ["-js", "-m", "8222"]
@@ -95,6 +110,7 @@ services:
     environment:
       <<: *component-environment
       MURPHY_PROVISION_POSTGRES_URL: postgres://murphy:murphy@postgres:5432/murphy?sslmode=disable
+      MURPHY_PROVISION_MYSQL_URL: mysql://root:murphy@mysql:3306/mysql
       MURPHY_PROVISION_NATS_URL: nats://nats:4222
       AWS_ENDPOINT_URL: http://localstack:4566
       AWS_REGION: us-east-1
@@ -104,6 +120,8 @@ services:
       disable: true
     depends_on:
       postgres:
+        condition: service_healthy
+      mysql:
         condition: service_healthy
       nats:
         condition: service_healthy
@@ -198,17 +216,29 @@ services:
   db-viewer:
     image: dbgate/dbgate:7.3.4
     environment:
-      CONNECTIONS: murphy
-      LABEL_murphy: Murphy
-      ENGINE_murphy: postgres@dbgate-plugin-postgres
-      URL_murphy: postgres://murphy:murphy@postgres:5432/postgres?sslmode=disable
+      CONNECTIONS: postgres,mysql
+      LABEL_postgres: PostgreSQL
+      ENGINE_postgres: postgres@dbgate-plugin-postgres
+      SERVER_postgres: postgres
+      PORT_postgres: "5432"
+      USER_postgres: murphy
+      PASSWORD_postgres: murphy
+      LABEL_mysql: MySQL
+      ENGINE_mysql: mysql@dbgate-plugin-mysql
+      SERVER_mysql: mysql
+      PORT_mysql: "3306"
+      USER_mysql: murphy
+      PASSWORD_mysql: murphy
     ports:
       - "8082:3000"
     depends_on:
       postgres:
         condition: service_healthy
+      mysql:
+        condition: service_healthy
 
 volumes:
   postgres:
+  mysql:
   go-mod:
   go-build:
