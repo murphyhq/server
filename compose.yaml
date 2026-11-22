@@ -18,8 +18,8 @@ x-component: &component
       condition: service_started
     migrate:
       condition: service_completed_successfully
-    nats:
-      condition: service_healthy
+    nats-topology:
+      condition: service_completed_successfully
     localstack:
       condition: service_healthy
   develop:
@@ -56,14 +56,27 @@ services:
       interval: 2s
       retries: 30
 
+  nats-topology:
+    image: natsio/nats-box:0.20.2
+    command: ["/topology.sh"]
+    environment:
+      NATS_URL: nats://nats:4222
+    volumes:
+      - ./compose/nats/topology.sh:/topology.sh:ro
+    depends_on:
+      nats:
+        condition: service_healthy
+
   localstack:
     image: localstack/localstack:4.14.0
     environment:
       SERVICES: sqs,sns,ssm
     ports:
       - "4566:4566"
+    volumes:
+      - ./compose/localstack/topology.sh:/etc/localstack/init/ready.d/topology.sh:ro
     healthcheck:
-      test: ["CMD", "curl", "-sf", "http://localhost:4566/_localstack/health"]
+      test: ["CMD-SHELL", "curl -sf http://localhost:4566/_localstack/init/ready | grep -q '\"completed\": *true'"]
       interval: 2s
       retries: 30
 
@@ -142,8 +155,8 @@ services:
         condition: service_started
       migrate:
         condition: service_completed_successfully
-      nats:
-        condition: service_healthy
+      nats-topology:
+        condition: service_completed_successfully
       localstack:
         condition: service_healthy
       redis:

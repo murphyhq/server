@@ -43,7 +43,7 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
-      - run: docker compose up -d --wait postgres redis nats
+      - run: docker compose up -d --wait postgres redis nats localstack
       - run: go test -race -tags integration ./...
 
   vulncheck:

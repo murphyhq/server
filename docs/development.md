@@ -47,7 +47,7 @@ Databases, message brokers and notification providers are interchangeable. Addin
 
 Every component starts, reports its health and stops the same way, so it behaves predictably in Docker Compose, Kubernetes or anywhere else it runs.
 
-1. Configuration MUST come only from environment variables prefixed `MURPHY_`, loaded at startup through `internal/config`. The only exception is the standard OpenTelemetry variables (`OTEL_*`), which configure telemetry.
+1. Configuration MUST come only from environment variables prefixed `MURPHY_`, loaded at startup through `internal/config`. The only exceptions are the standard OpenTelemetry variables (`OTEL_*`), which configure telemetry, and the standard AWS variables (`AWS_*`), which configure credentials, region and endpoints.
 2. A missing or invalid setting MUST stop the component at startup, with an error naming every variable at fault and never its value.
 3. Every component MUST run through `internal/lifecycle`, which sets up telemetry first. On `SIGTERM` or `SIGINT` it stops taking new work, finishes what it has and flushes telemetry, all within `MURPHY_SHUTDOWN_TIMEOUT`.
 4. Every component MUST serve `/healthz` and `/readyz` on `MURPHY_HEALTH_ADDR`. `/healthz` answers whether the process is alive; `/readyz` answers whether it can do its work, and MUST check every dependency it needs.
@@ -162,7 +162,7 @@ Every kind of failure Murphy guards against is tested, without changing the code
 
 1. The Go toolchain MUST be pinned with the `toolchain` directive, and tools (`sqlc`, `oapi-codegen`, `buf`, `protoc-gen-go`, `mockery`, `goose`, `ko`, `govulncheck`) with `tool` directives, all on their latest stable versions.
 2. `gofmt`, `go vet`, `golangci-lint`, `buf lint`, `buf breaking` and `govulncheck` MUST pass.
-3. `compose.yaml` MUST provide every service the components depend on (PostgreSQL, Redis, NATS, LocalStack, and Grafana's LGTM stack for telemetry at `localhost:3000`), MUST create every domain's database on every start, and MUST run every component from source in its `murphy` profile: `docker compose up` starts the services only, `docker compose --profile murphy up` starts everything, and `docker compose --profile murphy watch` also restarts the components when code changes.
+3. `compose.yaml` MUST provide every service the components depend on (PostgreSQL, Redis, NATS, LocalStack, and Grafana's LGTM stack for telemetry at `localhost:3000`), MUST create every domain's database and the broker's topics and subscriptions on every start, and MUST run every component from source in its `murphy` profile: `docker compose up` starts the services only, `docker compose --profile murphy up` starts everything, and `docker compose --profile murphy watch` also restarts the components when code changes.
 4. Container images MUST be built with `ko`, one per component, from `.ko.yaml`. The release workflow publishes them to `ghcr.io/murphyhq/<component>` for every `v*` tag.
 5. Dependencies MUST be kept current through Dependabot, for Go modules, GitHub Actions and the images in `compose.yaml`.
 

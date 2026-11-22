@@ -24,7 +24,7 @@ type Delivery struct {
 
 type Broker interface {
 	System() string
-	Publish(ctx context.Context, topic, key, id string, data []byte) error
+	Publish(ctx context.Context, topic, id string, data []byte) error
 	Subscribe(ctx context.Context, group string, topics []string, handle func(context.Context, Delivery) error) (Subscription, error)
 	Ping(ctx context.Context) error
 	Close() error
@@ -82,14 +82,15 @@ func NewPublisher(broker Broker) *Publisher {
 	return &Publisher{broker: broker}
 }
 
-func (p *Publisher) Publish(ctx context.Context, key string, envelope *murphy.Envelope) (err error) {
+func (p *Publisher) Publish(ctx context.Context, envelope *murphy.Envelope) (err error) {
 	topic := Topic(envelope)
-	if topic == "" || envelope.GetId() == "" || key == "" {
-		return errors.New("publish message: it needs an ID, a key and an event")
+	if topic == "" || envelope.GetId() == "" {
+		return errors.New("publish message: it needs an ID and an event")
 	}
 
-	ctx, span := tracer.Send(ctx, tracer.Message{System: p.broker.System(), Destination: topic, ID: envelope.GetId()})
+	ctx, span := tracer.Span(ctx, tracer.Producer())
 	defer span.End(&err)
+	ctx = span.Set(ctx, attributes(p.broker.System(), topic, envelope.GetId())...)
 
 	message := proto.CloneOf(envelope)
 	message.TraceContext = tracer.Inject(ctx)
@@ -97,7 +98,7 @@ func (p *Publisher) Publish(ctx context.Context, key string, envelope *murphy.En
 	if err != nil {
 		return fmt.Errorf("encode message: %w", err)
 	}
-	if err := p.broker.Publish(ctx, topic, key, envelope.GetId(), data); err != nil {
+	if err := p.broker.Publish(ctx, topic, envelope.GetId(), data); err != nil {
 		return fmt.Errorf("publish message: %w", err)
 	}
 	published.Add(ctx, 1, metrics.Dimension{Name: "topic", Value: topic})
@@ -136,9 +137,12 @@ func process(ctx context.Context, system, group string, handle Handler, delivery
 	}
 	topic := Topic(envelope)
 
-	ctx, span := tracer.Process(ctx, envelope.GetTraceContext(), tracer.Message{System: system, Destination: topic, ID: envelope.GetId(), Group: group})
-	ctx = span.Set(ctx, telemetry.WithField("message.attempt", delivery.Attempt))
+	ctx, span := tracer.Span(ctx, tracer.Consumer(), tracer.ContinuedFrom(envelope.GetTraceContext()))
 	defer span.End(&err)
+	ctx = span.Set(ctx, append(attributes(system, topic, envelope.GetId()),
+		telemetry.Standard("messaging.consumer.group.name", group),
+		telemetry.WithField("message.attempt", delivery.Attempt),
+	)...)
 
 	err = handle(ctx, envelope)
 	if err != nil && errors.Is(err, murphy.ErrInvalid) {
@@ -154,9 +158,6 @@ func process(ctx context.Context, system, group string, handle Handler, delivery
 	}
 	elapsed := time.Since(started)
 	fields := []telemetry.Field{
-		telemetry.Standard("messaging.destination.name", topic),
-		telemetry.Standard("messaging.consumer.group.name", group),
-		telemetry.Standard("messaging.message.id", envelope.GetId()),
 		telemetry.WithField("message.outcome", outcome),
 		telemetry.WithField("duration_ms", elapsed.Milliseconds()),
 	}
@@ -169,6 +170,14 @@ func process(ctx context.Context, system, group string, handle Handler, delivery
 	processed.Add(ctx, 1, dimensions...)
 	duration.Record(ctx, elapsed.Seconds(), dimensions...)
 	return err
+}
+
+func attributes(system, topic, id string) []telemetry.Field {
+	return []telemetry.Field{
+		telemetry.Standard("messaging.system", system),
+		telemetry.Standard("messaging.destination.name", topic),
+		telemetry.Standard("messaging.message.id", id),
+	}
 }
 
 var published, processed, duration = instruments()

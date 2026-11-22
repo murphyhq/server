@@ -2,6 +2,7 @@ package nats
 
 import (
 	"errors"
+	"fmt"
 	"net/url"
 
 	gonats "github.com/nats-io/nats.go"
@@ -21,19 +22,12 @@ func Open(cfg Config) (*gonats.Conn, jetstream.JetStream, error) {
 
 	conn, err := gonats.Connect(u.String(), gonats.MaxReconnects(-1))
 	if err != nil {
-		return nil, nil, errors.New("connect to NATS: " + redact(err, u))
+		return nil, nil, fmt.Errorf("connect to NATS: %w", err)
 	}
 	js, err := jetstream.New(conn)
 	if err != nil {
 		conn.Close()
-		return nil, nil, errors.New("open JetStream: " + redact(err, u))
+		return nil, nil, fmt.Errorf("open JetStream: %w", err)
 	}
 	return conn, js, nil
-}
-
-func redact(err error, u *url.URL) string {
-	if u.User != nil {
-		return "connection failed"
-	}
-	return err.Error()
 }
