@@ -143,7 +143,16 @@ services:
         condition: service_started
       provision:
         condition: service_completed_successfully
-    develop: {}
+    develop:
+      watch:
+        - action: restart
+          path: ./services/catalog/db/postgres/migrations
+        - action: restart
+          path: ./services/catalog/db/mysql/migrations
+        - action: restart
+          path: ./services/incidents/db/postgres/migrations
+        - action: restart
+          path: ./services/incidents/db/mysql/migrations
 
   seed:
     <<: *component
