@@ -27,7 +27,7 @@ type App struct {
 	Ready        []lifecycle.Check
 	subscription messaging.Subscription
 	incidents    *incidents.Service
-	closers      lifecycle.Closers
+	resources    lifecycle.Resources
 }
 
 func New(ctx context.Context, s Settings) (_ *App, err error) {
@@ -42,22 +42,22 @@ func New(ctx context.Context, s Settings) (_ *App, err error) {
 	if err != nil {
 		return nil, fmt.Errorf("MURPHY_CATALOG_DATABASE_URL: %w", err)
 	}
-	a.closers.Add(catalogStorage.Close)
+	a.resources.Add(catalogStorage.Close, catalogStorage.Ping)
 
 	incidentsStorage, err := incidentsdb.Open(ctx, s.IncidentsDatabaseURL)
 	if err != nil {
 		return nil, fmt.Errorf("MURPHY_INCIDENTS_DATABASE_URL: %w", err)
 	}
-	a.closers.Add(incidentsStorage.Close)
+	a.resources.Add(incidentsStorage.Close, incidentsStorage.Ping)
 
 	a.subscription, err = broker.OpenSubscription(ctx, s.EventsSubscriptionURL)
 	if err != nil {
 		return nil, fmt.Errorf("MURPHY_EVENTS_SUBSCRIPTION_URL: %w", err)
 	}
-	a.closers.Add(func() { _ = a.subscription.Close() })
+	a.resources.Add(func() { _ = a.subscription.Close() }, a.subscription.Ping)
 
 	a.incidents = incidents.New(incidentsStorage, catalog.New(catalogStorage, nil))
-	a.Ready = []lifecycle.Check{catalogStorage.Ping, incidentsStorage.Ping, a.subscription.Ping}
+	a.Ready = a.resources.Checks()
 	return a, nil
 }
 
@@ -69,5 +69,5 @@ func (a *App) Run(ctx context.Context) error {
 }
 
 func (a *App) Close() {
-	a.closers.Close()
+	a.resources.Close()
 }

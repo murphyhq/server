@@ -75,7 +75,7 @@ func TestAFiringAlertOpensAnIncident(t *testing.T) {
 
 	require.NoError(t, f.service.AlertReceived(t.Context(), "message-1", f.alert(murphy.AlertStatus_ALERT_STATUS_FIRING)))
 
-	opened := f.recorded.Opened
+	opened := f.recorded.Created
 	require.NotNil(t, opened)
 	assert.Equal(t, "message-1", f.recorded.MessageID)
 	assert.Equal(t, murphy.IncidentStatus_INCIDENT_STATUS_TRIGGERED, opened.GetStatus())
@@ -93,9 +93,9 @@ func TestAFiringAlertJoinsTheOpenIncident(t *testing.T) {
 
 	require.NoError(t, f.service.AlertReceived(t.Context(), "message-1", f.alert(murphy.AlertStatus_ALERT_STATUS_FIRING)))
 
-	assert.Nil(t, f.recorded.Opened)
-	assert.Nil(t, f.recorded.Resolved)
-	assert.Equal(t, open, f.recorded.Joined)
+	assert.Nil(t, f.recorded.Created)
+	assert.Equal(t, open, f.recorded.Updated)
+	assert.Equal(t, murphy.IncidentStatus_INCIDENT_STATUS_ACKNOWLEDGED, open.GetStatus())
 	assert.Equal(t, open.GetId(), f.recorded.IncidentID)
 	require.Len(t, f.recorded.Timeline, 1)
 	assert.Equal(t, murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_ALERTED, f.recorded.Timeline[0].GetType())
@@ -109,7 +109,7 @@ func TestAResolvedAlertResolvesTheOpenIncident(t *testing.T) {
 
 	require.NoError(t, f.service.AlertReceived(t.Context(), "message-1", f.alert(murphy.AlertStatus_ALERT_STATUS_RESOLVED)))
 
-	resolved := f.recorded.Resolved
+	resolved := f.recorded.Updated
 	require.NotNil(t, resolved)
 	assert.Equal(t, murphy.IncidentStatus_INCIDENT_STATUS_RESOLVED, resolved.GetStatus())
 	assert.NotNil(t, resolved.GetResolvedAt())
@@ -127,8 +127,7 @@ func TestAResolvedAlertNotClearlyNewerThanTheLatestFiringKeepsTheIncidentOpen(t 
 
 	require.NoError(t, f.service.AlertReceived(t.Context(), "message-1", alert))
 
-	assert.Nil(t, f.recorded.Resolved)
-	assert.Equal(t, open, f.recorded.Joined)
+	assert.Equal(t, open, f.recorded.Updated)
 	assert.Equal(t, murphy.IncidentStatus_INCIDENT_STATUS_TRIGGERED, open.GetStatus())
 	require.Len(t, f.recorded.Timeline, 1)
 	assert.Equal(t, murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_ALERTED, f.recorded.Timeline[0].GetType())
@@ -141,7 +140,7 @@ func TestAResolvedAlertWithoutAnOpenIncidentIsOnlyRecorded(t *testing.T) {
 	require.NoError(t, f.service.AlertReceived(t.Context(), "message-1", f.alert(murphy.AlertStatus_ALERT_STATUS_RESOLVED)))
 
 	assert.Empty(t, f.recorded.IncidentID)
-	assert.Nil(t, f.recorded.Opened)
+	assert.Nil(t, f.recorded.Created)
 	assert.Empty(t, f.recorded.Timeline)
 }
 
@@ -153,7 +152,7 @@ func TestThePreviousKeyWorksDuringTheGracePeriod(t *testing.T) {
 	alert.KeyVersion = 1
 
 	require.NoError(t, f.service.AlertReceived(t.Context(), "message-1", alert))
-	assert.NotNil(t, f.recorded.Opened)
+	assert.NotNil(t, f.recorded.Created)
 }
 
 func TestKeysTheIntegrationNoLongerAcceptsAreRefused(t *testing.T) {

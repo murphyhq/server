@@ -287,33 +287,13 @@ func (q *Queries) PurgeHandledMessages(ctx context.Context, before time.Time) (i
 	return result.RowsAffected(), nil
 }
 
-const touchIncident = `-- name: TouchIncident :execrows
-UPDATE incidents
-SET updated_at = $1, version = version + 1
-WHERE id = $2 AND version = $3
-`
-
-type TouchIncidentParams struct {
-	UpdatedAt time.Time
-	ID        string
-	Version   int32
-}
-
-func (q *Queries) TouchIncident(ctx context.Context, arg TouchIncidentParams) (int64, error) {
-	result, err := q.db.Exec(ctx, touchIncident, arg.UpdatedAt, arg.ID, arg.Version)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
-}
-
-const updateIncidentStatus = `-- name: UpdateIncidentStatus :execrows
+const updateIncident = `-- name: UpdateIncident :execrows
 UPDATE incidents
 SET status = $1, resolved_at = $2, updated_at = $3, version = version + 1
 WHERE id = $4 AND version = $5
 `
 
-type UpdateIncidentStatusParams struct {
+type UpdateIncidentParams struct {
 	Status     string
 	ResolvedAt *time.Time
 	UpdatedAt  time.Time
@@ -321,8 +301,8 @@ type UpdateIncidentStatusParams struct {
 	Version    int32
 }
 
-func (q *Queries) UpdateIncidentStatus(ctx context.Context, arg UpdateIncidentStatusParams) (int64, error) {
-	result, err := q.db.Exec(ctx, updateIncidentStatus,
+func (q *Queries) UpdateIncident(ctx context.Context, arg UpdateIncidentParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateIncident,
 		arg.Status,
 		arg.ResolvedAt,
 		arg.UpdatedAt,

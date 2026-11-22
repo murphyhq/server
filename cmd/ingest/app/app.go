@@ -19,9 +19,9 @@ type Settings struct {
 }
 
 type App struct {
-	Handler http.Handler
-	Ready   []lifecycle.Check
-	closers lifecycle.Closers
+	Handler   http.Handler
+	Ready     []lifecycle.Check
+	resources lifecycle.Resources
 }
 
 func New(ctx context.Context, s Settings) (_ *App, err error) {
@@ -41,16 +41,16 @@ func New(ctx context.Context, s Settings) (_ *App, err error) {
 	if err != nil {
 		return nil, fmt.Errorf("MURPHY_EVENTS_TOPIC_URL: %w", err)
 	}
-	a.closers.Add(func() { _ = topic.Close() })
+	a.resources.Add(func() { _ = topic.Close() }, topic.Ping)
 
 	a.Handler, err = router.New(messaging.NewPublisher(topic), keyring)
 	if err != nil {
 		return nil, err
 	}
-	a.Ready = []lifecycle.Check{topic.Ping}
+	a.Ready = a.resources.Checks()
 	return a, nil
 }
 
 func (a *App) Close() {
-	a.closers.Close()
+	a.resources.Close()
 }
