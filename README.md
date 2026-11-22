@@ -49,6 +49,12 @@ Integration tests run against the services from `docker compose up`:
 go test -tags integration ./...
 ```
 
+End-to-end tests run against the whole stack from `docker compose --profile murphy up`:
+
+```
+go test -tags e2e ./tests/e2e/...
+```
+
 ## License
 
 [AGPL-3.0](LICENSE). Contributions are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md). To report a vulnerability, see [SECURITY.md](SECURITY.md).

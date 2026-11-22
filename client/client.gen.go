@@ -17,6 +17,27 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// Defines values for IncidentStatus.
+const (
+	IncidentStatusAcknowledged IncidentStatus = "acknowledged"
+	IncidentStatusResolved     IncidentStatus = "resolved"
+	IncidentStatusTriggered    IncidentStatus = "triggered"
+)
+
+// Valid indicates whether the value is a known member of the IncidentStatus enum.
+func (e IncidentStatus) Valid() bool {
+	switch e {
+	case IncidentStatusAcknowledged:
+		return true
+	case IncidentStatusResolved:
+		return true
+	case IncidentStatusTriggered:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for IntegrationStatus.
 const (
 	IntegrationStatusActive   IntegrationStatus = "active"
@@ -77,6 +98,30 @@ func (e ServiceStatus) Valid() bool {
 	}
 }
 
+// Defines values for TimelineEntryType.
+const (
+	TimelineEntryTypeAcknowledged TimelineEntryType = "acknowledged"
+	TimelineEntryTypeAlerted      TimelineEntryType = "alerted"
+	TimelineEntryTypeResolved     TimelineEntryType = "resolved"
+	TimelineEntryTypeTriggered    TimelineEntryType = "triggered"
+)
+
+// Valid indicates whether the value is a known member of the TimelineEntryType enum.
+func (e TimelineEntryType) Valid() bool {
+	switch e {
+	case TimelineEntryTypeAcknowledged:
+		return true
+	case TimelineEntryTypeAlerted:
+		return true
+	case TimelineEntryTypeResolved:
+		return true
+	case TimelineEntryTypeTriggered:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for Urgency.
 const (
 	High Urgency = "high"
@@ -93,6 +138,50 @@ func (e Urgency) Valid() bool {
 	default:
 		return false
 	}
+}
+
+// Incident defines model for Incident.
+type Incident struct {
+	CreatedAt time.Time `json:"created_at"`
+	DedupKey  string    `json:"dedup_key"`
+	Id        string    `json:"id"`
+
+	// Number Numbers incidents in the order they were opened, for people to refer to.
+	Number     int64          `json:"number"`
+	ResolvedAt *time.Time     `json:"resolved_at,omitempty"`
+	ServiceId  string         `json:"service_id"`
+	Status     IncidentStatus `json:"status"`
+	Title      string         `json:"title"`
+	UpdatedAt  time.Time      `json:"updated_at"`
+	Urgency    Urgency        `json:"urgency"`
+}
+
+// IncidentPage defines model for IncidentPage.
+type IncidentPage struct {
+	Items []Incident `json:"items"`
+
+	// NextCursor Empty on the last page.
+	NextCursor string `json:"next_cursor"`
+}
+
+// IncidentStatus defines model for IncidentStatus.
+type IncidentStatus string
+
+// IncidentWithTimeline defines model for IncidentWithTimeline.
+type IncidentWithTimeline struct {
+	CreatedAt time.Time `json:"created_at"`
+	DedupKey  string    `json:"dedup_key"`
+	Id        string    `json:"id"`
+
+	// Number Numbers incidents in the order they were opened, for people to refer to.
+	Number     int64           `json:"number"`
+	ResolvedAt *time.Time      `json:"resolved_at,omitempty"`
+	ServiceId  string          `json:"service_id"`
+	Status     IncidentStatus  `json:"status"`
+	Timeline   []TimelineEntry `json:"timeline"`
+	Title      string          `json:"title"`
+	UpdatedAt  time.Time       `json:"updated_at"`
+	Urgency    Urgency         `json:"urgency"`
 }
 
 // Integration defines model for Integration.
@@ -195,6 +284,18 @@ type ServicePage struct {
 // ServiceStatus defines model for ServiceStatus.
 type ServiceStatus string
 
+// TimelineEntry defines model for TimelineEntry.
+type TimelineEntry struct {
+	AlertId *string           `json:"alert_id,omitempty"`
+	At      time.Time         `json:"at"`
+	Id      string            `json:"id"`
+	Summary string            `json:"summary"`
+	Type    TimelineEntryType `json:"type"`
+}
+
+// TimelineEntryType defines model for TimelineEntry.Type.
+type TimelineEntryType string
+
 // Urgency defines model for Urgency.
 type Urgency string
 
@@ -209,6 +310,18 @@ type IdempotencyKey = string
 
 // Limit defines model for Limit.
 type Limit = int
+
+// ListIncidentsParams defines parameters for ListIncidents.
+type ListIncidentsParams struct {
+	// Limit Items per page, 50 by default and at most 100.
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Cursor The next_cursor of the previous page.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Status Only incidents with one of these statuses.
+	Status *[]IncidentStatus `form:"status,omitempty" json:"status,omitempty"`
+}
 
 // RotateIntegrationKeyParams defines parameters for RotateIntegrationKey.
 type RotateIntegrationKeyParams struct {
@@ -332,6 +445,16 @@ func WithRequestEditorFn(fn RequestEditorFn) ClientOption {
 // The interface specification for the client above.
 type ClientInterface interface {
 
+	// ListIncidents List incidents
+	//
+	// Corresponds with GET /v1/incidents (the `ListIncidents` operationId).
+	ListIncidents(ctx context.Context, params *ListIncidentsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetIncident Get an incident with its timeline
+	//
+	// Corresponds with GET /v1/incidents/{id} (the `GetIncident` operationId).
+	GetIncident(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// DeleteIntegration Delete an integration
 	//
 	// Corresponds with DELETE /v1/integrations/{id} (the `DeleteIntegration` operationId).
@@ -424,6 +547,36 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /v1/services/{id}/integrations (the `CreateIntegration` operationId).
 	CreateIntegration(ctx context.Context, id ID, params *CreateIntegrationParams, body CreateIntegrationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+}
+
+// ListIncidents List incidents
+//
+// Corresponds with GET /v1/incidents (the `ListIncidents` operationId).
+func (c *Client) ListIncidents(ctx context.Context, params *ListIncidentsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListIncidentsRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetIncident Get an incident with its timeline
+//
+// Corresponds with GET /v1/incidents/{id} (the `GetIncident` operationId).
+func (c *Client) GetIncident(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetIncidentRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
 }
 
 // DeleteIntegration Delete an integration
@@ -667,6 +820,118 @@ func (c *Client) CreateIntegration(ctx context.Context, id ID, params *CreateInt
 		return nil, err
 	}
 	return c.Client.Do(req)
+}
+
+// NewListIncidentsRequest constructs an http.Request for the ListIncidents method
+func NewListIncidentsRequest(server string, params *ListIncidentsParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/incidents")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Cursor != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Status != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "status", *params.Status, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "array", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetIncidentRequest constructs an http.Request for the GetIncident method
+func NewGetIncidentRequest(server string, id ID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/incidents/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
 }
 
 // NewDeleteIntegrationRequest constructs an http.Request for the DeleteIntegration method
@@ -1248,6 +1513,20 @@ func WithBaseURL(baseURL string) ClientOption {
 // ClientWithResponsesInterface is the interface specification for the client with responses above.
 type ClientWithResponsesInterface interface {
 
+	// ListIncidentsWithResponse List incidents
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /v1/incidents (the `ListIncidents` operationId).
+	ListIncidentsWithResponse(ctx context.Context, params *ListIncidentsParams, reqEditors ...RequestEditorFn) (*ListIncidentsResponse, error)
+
+	// GetIncidentWithResponse Get an incident with its timeline
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /v1/incidents/{id} (the `GetIncident` operationId).
+	GetIncidentWithResponse(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*GetIncidentResponse, error)
+
 	// DeleteIntegrationWithResponse Delete an integration
 	//
 	// Returns a wrapper object for the known response body format(s).
@@ -1354,6 +1633,102 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /v1/services/{id}/integrations (the `CreateIntegration` operationId).
 	CreateIntegrationWithResponse(ctx context.Context, id ID, params *CreateIntegrationParams, body CreateIntegrationJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateIntegrationResponse, error)
+}
+
+type ListIncidentsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *IncidentPage
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *Problem
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListIncidentsResponse) GetJSON200() *IncidentPage {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r ListIncidentsResponse) GetApplicationproblemJSON400() *Problem {
+	return r.ApplicationproblemJSON400
+}
+
+// GetBody returns the raw response body bytes
+func (r ListIncidentsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListIncidentsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListIncidentsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListIncidentsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetIncidentResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *IncidentWithTimeline
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *Problem
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetIncidentResponse) GetJSON200() *IncidentWithTimeline {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r GetIncidentResponse) GetApplicationproblemJSON404() *Problem {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r GetIncidentResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetIncidentResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetIncidentResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetIncidentResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
 }
 
 type DeleteIntegrationResponse struct {
@@ -1947,6 +2322,32 @@ func (r CreateIntegrationResponse) ContentType() string {
 	return ""
 }
 
+// ListIncidentsWithResponse List incidents
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /v1/incidents (the `ListIncidents` operationId).
+func (c *ClientWithResponses) ListIncidentsWithResponse(ctx context.Context, params *ListIncidentsParams, reqEditors ...RequestEditorFn) (*ListIncidentsResponse, error) {
+	rsp, err := c.ListIncidents(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListIncidentsResponse(rsp)
+}
+
+// GetIncidentWithResponse Get an incident with its timeline
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /v1/incidents/{id} (the `GetIncident` operationId).
+func (c *ClientWithResponses) GetIncidentWithResponse(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*GetIncidentResponse, error) {
+	rsp, err := c.GetIncident(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetIncidentResponse(rsp)
+}
+
 // DeleteIntegrationWithResponse Delete an integration
 //
 // Returns a wrapper object for the known response body format(s).
@@ -2142,6 +2543,72 @@ func (c *ClientWithResponses) CreateIntegrationWithResponse(ctx context.Context,
 		return nil, err
 	}
 	return ParseCreateIntegrationResponse(rsp)
+}
+
+// ParseListIncidentsResponse parses an HTTP response from a ListIncidentsWithResponse call
+func ParseListIncidentsResponse(rsp *http.Response) (*ListIncidentsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListIncidentsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest IncidentPage
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetIncidentResponse parses an HTTP response from a GetIncidentWithResponse call
+func ParseGetIncidentResponse(rsp *http.Response) (*GetIncidentResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetIncidentResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest IncidentWithTimeline
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	return response, nil
 }
 
 // ParseDeleteIntegrationResponse parses an HTTP response from a DeleteIntegrationWithResponse call

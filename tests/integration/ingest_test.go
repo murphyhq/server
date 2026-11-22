@@ -57,10 +57,10 @@ func startIngest(t *testing.T, env brokertest.Environment) ingestFixture {
 	t.Cleanup(func() { _ = subscription.Close() })
 	received := make(chan *murphy.Envelope, 10)
 	consumer, err := messaging.Consume(ctx, subscription, "engine", messaging.Handlers{
-		"murphy.v1.alert": func(_ context.Context, envelope *murphy.Envelope) error {
+		messaging.On(murphy.AlertVerb_ALERT_VERB_RECEIVED, func(_ context.Context, envelope *murphy.Envelope) error {
 			received <- envelope
 			return nil
-		},
+		}),
 	})
 	require.NoError(t, err)
 	t.Cleanup(consumer.Stop)

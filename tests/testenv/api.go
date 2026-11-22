@@ -14,15 +14,23 @@ import (
 	"github.com/murphyhq/server/internal/httpserver"
 )
 
+func Databases(t *testing.T) migrateapp.Settings {
+	t.Helper()
+	databases := migrateapp.Settings{CatalogDatabaseURL: Database(t), IncidentsDatabaseURL: Database(t)}
+	require.NoError(t, migrateapp.Migrate(t.Context(), databases))
+	return databases
+}
+
 func API(t *testing.T) (*client.ClientWithResponses, string) {
 	t.Helper()
-	ctx := t.Context()
+	return APIWith(t, Databases(t))
+}
 
-	databases := migrateapp.Settings{CatalogDatabaseURL: Database(t)}
-	require.NoError(t, migrateapp.Migrate(ctx, databases))
-
-	a, err := apiapp.New(ctx, apiapp.Settings{
+func APIWith(t *testing.T, databases migrateapp.Settings) (*client.ClientWithResponses, string) {
+	t.Helper()
+	a, err := apiapp.New(t.Context(), apiapp.Settings{
 		CatalogDatabaseURL:    databases.CatalogDatabaseURL,
+		IncidentsDatabaseURL:  databases.IncidentsDatabaseURL,
 		IdempotencyStoreURL:   RedisURL(),
 		IntegrationKeySecrets: IntegrationKeySecrets,
 	})

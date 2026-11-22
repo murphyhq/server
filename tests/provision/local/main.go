@@ -16,8 +16,10 @@ import (
 )
 
 var (
-	databases = []string{"catalog"}
-	topology  = provision.Topology{}
+	databases = []string{"catalog", "incidents"}
+	topology  = provision.Topology{
+		"engine": {"murphy.v1.alert"},
+	}
 )
 
 type settings struct {

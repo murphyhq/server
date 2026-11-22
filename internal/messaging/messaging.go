@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand/v2"
+	"strings"
 	"time"
 
 	"google.golang.org/protobuf/proto"
@@ -58,7 +59,23 @@ func RetryAfter(attempt int) time.Duration {
 
 type Handler func(ctx context.Context, envelope *murphy.Envelope) error
 
-type Handlers map[string]Handler
+type Registration struct {
+	eventType string
+	handle    Handler
+}
+
+type Handlers []Registration
+
+func On(verb protoreflect.Enum, handle Handler) Registration {
+	value := verb.Descriptor().Values().ByNumber(verb.Number())
+	for i := range event.Fields().Len() {
+		field := event.Fields().Get(i)
+		if candidate := field.Message().Fields().ByName("verb"); candidate != nil && candidate.Enum() == verb.Descriptor() && value != nil && value.Number() != 0 {
+			return Registration{eventType: topicOf(field) + "." + verbText(value), handle: handle}
+		}
+	}
+	return Registration{handle: handle}
+}
 
 var event = (&murphy.Envelope{}).ProtoReflect().Descriptor().Oneofs().ByName("event")
 
@@ -80,6 +97,43 @@ func Topics() []string {
 
 func topicOf(field protoreflect.FieldDescriptor) string {
 	return string(field.ParentFile().Package()) + "." + string(field.Name())
+}
+
+func EventTypeOf(envelope *murphy.Envelope) string {
+	message := envelope.ProtoReflect()
+	field := message.WhichOneof(event)
+	if field == nil {
+		return ""
+	}
+	payload := message.Get(field).Message()
+	verb := payload.Descriptor().Fields().ByName("verb")
+	if verb == nil {
+		return ""
+	}
+	value := verb.Enum().Values().ByNumber(payload.Get(verb).Enum())
+	if value == nil {
+		return ""
+	}
+	return topicOf(field) + "." + verbText(value)
+}
+
+func EventTypes() []string {
+	var types []string
+	for i := range event.Fields().Len() {
+		field := event.Fields().Get(i)
+		verbs := field.Message().Fields().ByName("verb").Enum().Values()
+		for j := range verbs.Len() {
+			if verbs.Get(j).Number() != 0 {
+				types = append(types, topicOf(field)+"."+verbText(verbs.Get(j)))
+			}
+		}
+	}
+	return types
+}
+
+func verbText(value protoreflect.EnumValueDescriptor) string {
+	_, verb, _ := strings.Cut(string(value.Name()), "_VERB_")
+	return strings.ToLower(verb)
 }
 
 type Publisher struct {
@@ -118,17 +172,22 @@ func Consume(ctx context.Context, subscription Subscription, group string, handl
 		return nil, errors.New("consume: no handlers")
 	}
 	known := map[string]bool{}
-	for _, topic := range Topics() {
-		known[topic] = true
+	for _, eventType := range EventTypes() {
+		known[eventType] = true
 	}
-	for topic := range handlers {
-		if !known[topic] {
-			return nil, fmt.Errorf("consume: unknown topic %s", topic)
+	byType := map[string]Handler{}
+	for _, registration := range handlers {
+		switch {
+		case !known[registration.eventType]:
+			return nil, errors.New("consume: a handler is registered for something that is not an event verb")
+		case byType[registration.eventType] != nil:
+			return nil, fmt.Errorf("consume: two handlers for %s", registration.eventType)
 		}
+		byType[registration.eventType] = registration.handle
 	}
 
 	consumer, err := subscription.Consume(ctx, func(ctx context.Context, delivery Delivery) error {
-		return process(ctx, subscription.System(), group, handlers, delivery)
+		return process(ctx, subscription.System(), group, byType, delivery)
 	})
 	if err != nil {
 		return nil, fmt.Errorf("consume %s: %w", group, err)
@@ -136,26 +195,39 @@ func Consume(ctx context.Context, subscription Subscription, group string, handl
 	return consumer, nil
 }
 
-func process(ctx context.Context, system, group string, handlers Handlers, delivery Delivery) (err error) {
+func Runner(subscription Subscription, group string, handlers Handlers) func(context.Context) error {
+	return func(ctx context.Context) error {
+		consumer, err := Consume(ctx, subscription, group, handlers)
+		if err != nil {
+			return err
+		}
+		<-ctx.Done()
+		consumer.Stop()
+		return nil
+	}
+}
+
+func process(ctx context.Context, system, group string, handlers map[string]Handler, delivery Delivery) (err error) {
 	started := time.Now()
 	envelope := &murphy.Envelope{}
 	if err := proto.Unmarshal(delivery.Data, envelope); err != nil {
 		logger.Error(ctx, "message rejected", telemetry.WithField("consumer.group", group), telemetry.WithError(err))
 		return Reject(fmt.Errorf("decode message: %w", err))
 	}
-	topic := TopicOf(envelope)
+	topic, eventType := TopicOf(envelope), EventTypeOf(envelope)
 
 	ctx, span := tracer.Span(ctx, tracer.Consumer(), tracer.ContinuedFrom(envelope.GetTraceContext()))
 	defer span.End(&err)
 	ctx = span.Set(ctx, append(attributes(system, topic, envelope.GetId()),
 		telemetry.Standard("messaging.consumer.group.name", group),
+		telemetry.WithField("event.type", eventType),
 		telemetry.WithField("message.attempt", delivery.Attempt),
 	)...)
 
-	if handle, ok := handlers[topic]; ok {
+	if handle, ok := handlers[eventType]; ok {
 		err = handle(ctx, envelope)
 	} else {
-		err = Reject(fmt.Errorf("%s has no handler for %s", group, topic))
+		err = Reject(fmt.Errorf("%s has no handler for %s", group, eventType))
 	}
 	if err != nil && errors.Is(err, murphy.ErrInvalid) {
 		err = Reject(err)
@@ -178,7 +250,7 @@ func process(ctx context.Context, system, group string, handlers Handlers, deliv
 	}
 	log(ctx, "message handled", fields...)
 
-	dimensions := []metrics.Dimension{{Name: "topic", Value: topic}, {Name: "consumer.group", Value: group}, {Name: "outcome", Value: outcome}}
+	dimensions := []metrics.Dimension{{Name: "event.type", Value: eventType}, {Name: "consumer.group", Value: group}, {Name: "outcome", Value: outcome}}
 	processed.Add(ctx, 1, dimensions...)
 	duration.Record(ctx, elapsed.Seconds(), dimensions...)
 	return err

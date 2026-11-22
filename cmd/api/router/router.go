@@ -8,18 +8,20 @@ import (
 	"github.com/murphyhq/server/internal/httpserver"
 	"github.com/murphyhq/server/internal/idempotency"
 	"github.com/murphyhq/server/services/catalog"
+	"github.com/murphyhq/server/services/incidents"
 )
 
 type Server struct {
-	catalog *catalog.Service
+	catalog   *catalog.Service
+	incidents *incidents.Service
 }
 
-func New(catalog *catalog.Service, keys idempotency.Store) (http.Handler, error) {
+func New(catalog *catalog.Service, incidents *incidents.Service, keys idempotency.Store) (http.Handler, error) {
 	spec, err := GetSwagger()
 	if err != nil {
 		return nil, fmt.Errorf("load OpenAPI spec: %w", err)
 	}
-	strict := NewStrictHandlerWithOptions(&Server{catalog: catalog}, nil, StrictHTTPServerOptions{
+	strict := NewStrictHandlerWithOptions(&Server{catalog: catalog, incidents: incidents}, nil, StrictHTTPServerOptions{
 		RequestErrorHandlerFunc:  httpserver.BadRequest,
 		ResponseErrorHandlerFunc: httpserver.WriteError,
 	})

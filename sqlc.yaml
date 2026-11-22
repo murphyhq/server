@@ -4,6 +4,11 @@ overrides:
     overrides:
       - db_type: uuid
         go_type: string
+      - db_type: uuid
+        nullable: true
+        go_type:
+          type: string
+          pointer: true
       - db_type: timestamptz
         go_type: time.Time
       - db_type: timestamptz
@@ -19,4 +24,12 @@ sql:
       go:
         package: postgres
         out: services/catalog/db/postgres
+        sql_package: pgx/v5
+  - engine: postgresql
+    schema: services/incidents/db/postgres/migrations
+    queries: services/incidents/db/postgres/queries.sql
+    gen:
+      go:
+        package: postgres
+        out: services/incidents/db/postgres
         sql_package: pgx/v5

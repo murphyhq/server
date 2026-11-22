@@ -27,6 +27,7 @@ func (s *Server) ReceiveAlert(ctx context.Context, request ReceiveAlertRequestOb
 		Status:        murphy.AlertStatusFromText(string(request.Body.Status)),
 		Summary:       request.Body.Summary,
 		ReceivedAt:    now,
+		KeyVersion:    key.GetKeyVersion(),
 	}
 	if request.Body.Labels != nil {
 		alert.Labels = *request.Body.Labels
