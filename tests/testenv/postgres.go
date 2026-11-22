@@ -12,6 +12,8 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/require"
+
+	"github.com/murphyhq/server/tests/provision"
 )
 
 func Database(t *testing.T) string {
@@ -24,11 +26,7 @@ func Database(t *testing.T) string {
 	}
 	name := "test_" + strings.ReplaceAll(uuid.NewV4().String(), "-", "")
 
-	conn, err := pgx.Connect(ctx, admin)
-	require.NoError(t, err)
-	_, err = conn.Exec(ctx, "CREATE DATABASE "+name)
-	require.NoError(t, conn.Close(ctx))
-	require.NoError(t, err)
+	require.NoError(t, provision.Database(ctx, admin, name))
 	t.Cleanup(func() {
 		ctx := context.Background()
 		conn, err := pgx.Connect(ctx, admin)

@@ -18,10 +18,8 @@ x-component: &component
       condition: service_started
     migrate:
       condition: service_completed_successfully
-    nats:
-      condition: service_healthy
-    localstack:
-      condition: service_healthy
+    provision:
+      condition: service_completed_successfully
   develop:
     watch:
       - action: restart
@@ -67,20 +65,6 @@ services:
       interval: 2s
       retries: 30
 
-  databases:
-    image: postgres:19.0
-    command: ["/databases.sh"]
-    environment:
-      PGHOST: postgres
-      PGUSER: murphy
-      PGPASSWORD: murphy
-      PGDATABASE: murphy
-    volumes:
-      - ./compose/postgres/databases.sh:/databases.sh:ro
-    depends_on:
-      postgres:
-        condition: service_healthy
-
   redis:
     image: redis:8.10.3-alpine
     ports:
@@ -97,6 +81,28 @@ services:
       - "4317:4317"
       - "4318:4318"
 
+  provision:
+    <<: *component
+    profiles: []
+    command: ["sh", "-c", "go build -o /tmp/provision ./tests/provision/local && exec /tmp/provision"]
+    environment:
+      MURPHY_PROVISION_POSTGRES_URL: postgres://murphy:murphy@postgres:5432/murphy?sslmode=disable
+      MURPHY_PROVISION_NATS_URL: nats://nats:4222
+      AWS_ENDPOINT_URL: http://localstack:4566
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+    healthcheck:
+      disable: true
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
+    develop: {}
+
   migrate:
     <<: *component
     command: ["sh", "-c", "go build -o /tmp/migrate ./cmd/migrate && exec /tmp/migrate"]
@@ -108,7 +114,7 @@ services:
     depends_on:
       lgtm:
         condition: service_started
-      databases:
+      provision:
         condition: service_completed_successfully
     develop: {}
 
@@ -142,10 +148,8 @@ services:
         condition: service_started
       migrate:
         condition: service_completed_successfully
-      nats:
-        condition: service_healthy
-      localstack:
-        condition: service_healthy
+      provision:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
 

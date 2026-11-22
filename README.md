@@ -43,7 +43,7 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 go run ./cmd/api
 
 Each component reports its health at `http://localhost:9000/healthz` and `/readyz`.
 
-Integration tests run against the PostgreSQL from `docker compose up`:
+Integration tests run against the services from `docker compose up`:
 
 ```
 go test -tags integration ./...

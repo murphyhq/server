@@ -1,0 +1,35 @@
+syntax = "proto3";
+
+package murphy.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/murphyhq/server;murphy";
+
+message Alert {
+  string id = 1;
+  string integration_id = 2;
+  string service_id = 3;
+  string dedup_key = 4;
+  AlertStatus status = 5;
+  string summary = 6;
+  map<string, string> labels = 7;
+  google.protobuf.Timestamp received_at = 8;
+}
+
+enum AlertStatus {
+  ALERT_STATUS_UNSPECIFIED = 0;
+  ALERT_STATUS_FIRING = 1;
+  ALERT_STATUS_RESOLVED = 2;
+}
+
+message AlertEvent {
+  AlertVerb verb = 1;
+  Alert previous = 2;
+  Alert current = 3;
+}
+
+enum AlertVerb {
+  ALERT_VERB_UNSPECIFIED = 0;
+  ALERT_VERB_RECEIVED = 1;
+}

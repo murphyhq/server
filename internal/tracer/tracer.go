@@ -8,6 +8,7 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/murphyhq/server"
@@ -18,10 +19,48 @@ type Scope struct {
 	span trace.Span
 }
 
-func Span(ctx context.Context) (context.Context, Scope) {
+type Option func(context.Context, *[]trace.SpanStartOption) context.Context
+
+func Producer() Option {
+	return func(ctx context.Context, options *[]trace.SpanStartOption) context.Context {
+		*options = append(*options, trace.WithSpanKind(trace.SpanKindProducer))
+		return ctx
+	}
+}
+
+func Consumer() Option {
+	return func(ctx context.Context, options *[]trace.SpanStartOption) context.Context {
+		*options = append(*options, trace.WithSpanKind(trace.SpanKindConsumer))
+		return ctx
+	}
+}
+
+func ContinuedFrom(carrier map[string]string) Option {
+	return func(ctx context.Context, options *[]trace.SpanStartOption) context.Context {
+		remote := otel.GetTextMapPropagator().Extract(ctx, propagation.MapCarrier(carrier))
+		link := trace.SpanContextFromContext(remote)
+		if !link.IsValid() {
+			return ctx
+		}
+		*options = append(*options, trace.WithLinks(trace.Link{SpanContext: link}))
+		return remote
+	}
+}
+
+func Span(ctx context.Context, opts ...Option) (context.Context, Scope) {
 	caller := telemetry.CallerOf(1)
-	ctx, span := otel.Tracer(caller.Package).Start(ctx, caller.Function, trace.WithAttributes(attributes(telemetry.Fields(ctx))...))
+	options := []trace.SpanStartOption{trace.WithAttributes(attributes(telemetry.Fields(ctx))...)}
+	for _, opt := range opts {
+		ctx = opt(ctx, &options)
+	}
+	ctx, span := otel.Tracer(caller.Package).Start(ctx, caller.Function, options...)
 	return ctx, Scope{span: span}
+}
+
+func Inject(ctx context.Context) map[string]string {
+	carrier := propagation.MapCarrier{}
+	otel.GetTextMapPropagator().Inject(ctx, carrier)
+	return carrier
 }
 
 func (s Scope) Set(ctx context.Context, fields ...telemetry.Field) context.Context {

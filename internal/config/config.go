@@ -5,11 +5,15 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"slices"
 	"strconv"
+	"strings"
 	"time"
 )
 
 const prefix = "MURPHY_"
+
+var standard = []string{"AWS_", "OTEL_"}
 
 func Load(dst any) error {
 	v := reflect.ValueOf(dst)
@@ -38,7 +42,9 @@ func load(v reflect.Value, errs *[]error) {
 			continue
 		}
 
-		name = prefix + name
+		if !slices.ContainsFunc(standard, func(p string) bool { return strings.HasPrefix(name, p) }) {
+			name = prefix + name
+		}
 		if err := set(v.Field(i), field, name); err != nil {
 			*errs = append(*errs, fmt.Errorf("%s: %w", name, err))
 		}

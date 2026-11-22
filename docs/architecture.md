@@ -97,7 +97,7 @@ Applies database schema changes. It runs once before the other components start,
 
 Murphy depends on what it needs from a message broker, a database and a key-value store, never on a specific product. Each product is an implementation chosen by configuration, and every implementation passes the same test suite against the real service. Supporting another product means adding an implementation that passes it, without touching the components.
 
-The message broker keeps every message until it is processed, delivers it at least once, keeps one incident's messages in order, and can hand the same message to several consumers. It never has to delay a message, because timers live in the database. The implementations are SNS with SQS, and NATS JetStream.
+The message broker keeps every message until it is processed, delivers it at least once, and hands each message to every component that reads its entity. It promises no order: the incident's state machine decides what a late message means. It never has to delay a message, because timers live in the database. Its topics and subscriptions are created outside Murphy, like the databases, and labelled with a topology version. Each component is given its exact topic and queue, and refuses to start on a topology older than its release needs. The implementations are SNS with SQS, and NATS JetStream.
 
 A key-value store keeps the `Idempotency-Key` of every request that creates something, with its response, for 24 hours, so `api` answers a retry without doing the work twice. The implementation is Redis.
 

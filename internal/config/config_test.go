@@ -19,6 +19,7 @@ type settings struct {
 	Port    int           `env:"PORT" default:"8080"`
 	Debug   bool          `env:"DEBUG"`
 	Timeout time.Duration `env:"TIMEOUT" default:"5s"`
+	Region  string        `env:"AWS_REGION"`
 	Nested  nested
 }
 
@@ -26,6 +27,7 @@ func TestLoadAppliesValuesAndDefaults(t *testing.T) {
 	t.Setenv("MURPHY_NAME", "murphy")
 	t.Setenv("MURPHY_DEBUG", "true")
 	t.Setenv("MURPHY_ADDR", ":9000")
+	t.Setenv("AWS_REGION", "eu-west-1")
 
 	var s settings
 	require.NoError(t, config.Load(&s))
@@ -35,6 +37,7 @@ func TestLoadAppliesValuesAndDefaults(t *testing.T) {
 		Port:    8080,
 		Debug:   true,
 		Timeout: 5 * time.Second,
+		Region:  "eu-west-1",
 		Nested:  nested{Addr: ":9000"},
 	}, s)
 }
