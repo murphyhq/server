@@ -218,3 +218,14 @@ func toIntegration(row Integration) *murphy.Integration {
 		UpdatedAt:             timestamppb.New(row.UpdatedAt),
 	}
 }
+
+func (r *Repository) PolicyInUse(ctx context.Context, policyID string) (_ bool, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	inUse, err := r.queries.PolicyInUse(ctx, policyID)
+	if err != nil {
+		return false, murphypostgres.Error("service", err)
+	}
+	return inUse, nil
+}

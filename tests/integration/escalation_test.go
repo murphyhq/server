@@ -66,3 +66,51 @@ func policyInput(name, team string, targets ...client.EscalationTarget) client.E
 		Levels: []client.EscalationLevel{{DelaySeconds: 5 * 60, Targets: targets}},
 	}
 }
+
+func TestEscalationPoliciesKeepEveryVersion(t *testing.T) {
+	testenv.EachDatabase(t, func(t *testing.T, engine testenv.DatabaseEngine) {
+		api, _ := testenv.API(t, engine)
+		ctx := t.Context()
+		team := createTeam(t, api, "payments")
+		ana, bo := createUser(t, api, "ana@example.com"), createUser(t, api, "bo@example.com")
+
+		created, err := api.CreateEscalationPolicyWithResponse(ctx, nil, policyInput("payments", team, client.EscalationTarget{Type: client.EscalationTargetTypeUser, Id: ana}))
+		require.NoError(t, err)
+		require.Equal(t, http.StatusCreated, created.StatusCode())
+		assert.Equal(t, int32(1), created.JSON201.Version)
+		policy := created.JSON201.Id
+
+		updated, err := api.UpdateEscalationPolicyWithResponse(ctx, policy, policyInput("payments", team, client.EscalationTarget{Type: client.EscalationTargetTypeUser, Id: bo}))
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, updated.StatusCode())
+		assert.Equal(t, int32(2), updated.JSON200.Version)
+
+		first, err := api.GetEscalationPolicyVersionWithResponse(ctx, policy, 1)
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, first.StatusCode())
+		assert.Equal(t, ana, first.JSON200.Levels[0].Targets[0].Id)
+
+		service, err := api.CreateServiceWithResponse(ctx, nil, client.ServiceInput{Name: "checkout-api", EscalationPolicyId: policy})
+		require.NoError(t, err)
+		require.Equal(t, http.StatusCreated, service.StatusCode())
+		inUse, err := api.DeleteEscalationPolicyWithResponse(ctx, policy)
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusConflict, inUse.StatusCode())
+
+		other, err := api.CreateEscalationPolicyWithResponse(ctx, nil, policyInput("payments-backup", team, client.EscalationTarget{Type: client.EscalationTargetTypeUser, Id: bo}))
+		require.NoError(t, err)
+		moved, err := api.UpdateServiceWithResponse(ctx, service.JSON201.Id, client.ServiceInput{Name: "checkout-api", EscalationPolicyId: other.JSON201.Id})
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, moved.StatusCode())
+		deleted, err := api.DeleteEscalationPolicyWithResponse(ctx, policy)
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusNoContent, deleted.StatusCode())
+
+		gone, err := api.GetEscalationPolicyWithResponse(ctx, policy)
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusNotFound, gone.StatusCode())
+		kept, err := api.GetEscalationPolicyVersionWithResponse(ctx, policy, 1)
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, kept.StatusCode())
+	})
+}

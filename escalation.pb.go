@@ -81,6 +81,7 @@ type EscalationPolicy struct {
 	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
 	TeamId        string                 `protobuf:"bytes,7,opt,name=team_id,json=teamId,proto3" json:"team_id,omitempty"`
+	Version       int32                  `protobuf:"varint,8,opt,name=version,proto3" json:"version,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -162,6 +163,13 @@ func (x *EscalationPolicy) GetTeamId() string {
 		return x.TeamId
 	}
 	return ""
+}
+
+func (x *EscalationPolicy) GetVersion() int32 {
+	if x != nil {
+		return x.Version
+	}
+	return 0
 }
 
 type EscalationLevel struct {
@@ -280,7 +288,7 @@ var File_murphy_v1_escalation_proto protoreflect.FileDescriptor
 
 const file_murphy_v1_escalation_proto_rawDesc = "" +
 	"\n" +
-	"\x1amurphy/v1/escalation.proto\x12\tmurphy.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x9c\x02\n" +
+	"\x1amurphy/v1/escalation.proto\x12\tmurphy.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xb6\x02\n" +
 	"\x10EscalationPolicy\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12!\n" +
@@ -290,7 +298,8 @@ const file_murphy_v1_escalation_proto_rawDesc = "" +
 	"created_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
 	"updated_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12\x17\n" +
-	"\ateam_id\x18\a \x01(\tR\x06teamId\"\x89\x01\n" +
+	"\ateam_id\x18\a \x01(\tR\x06teamId\x12\x18\n" +
+	"\aversion\x18\b \x01(\x05R\aversion\"\x89\x01\n" +
 	"\x0fEscalationLevel\x12/\n" +
 	"\x05delay\x18\x01 \x01(\v2\x19.google.protobuf.DurationR\x05delay\x125\n" +
 	"\atargets\x18\x02 \x03(\v2\x1b.murphy.v1.EscalationTargetR\atargets\x12\x0e\n" +

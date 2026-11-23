@@ -45,36 +45,45 @@ func (t *Tx) CreatePolicyRow(ctx context.Context, policy *murphy.EscalationPolic
 	defer span.End(&err)
 
 	return murphypostgres.Error("escalation policy", t.queries.CreatePolicy(ctx, CreatePolicyParams{
-		ID: policy.GetId(), Name: policy.GetName(), TeamID: policy.GetTeamId(), RepeatCount: policy.GetRepeatCount(),
+		ID: policy.GetId(), Name: policy.GetName(), TeamID: policy.GetTeamId(), Version: policy.GetVersion(),
 		CreatedAt: policy.GetCreatedAt().AsTime(), UpdatedAt: policy.GetUpdatedAt().AsTime(),
 	}))
 }
 
-func (t *Tx) UpdatePolicyRow(ctx context.Context, policy *murphy.EscalationPolicy) (err error) {
+func (t *Tx) UpdatePolicyRow(ctx context.Context, policy *murphy.EscalationPolicy, previousVersion int32) (err error) {
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
 	rows, err := t.queries.UpdatePolicy(ctx, UpdatePolicyParams{
-		ID: policy.GetId(), Name: policy.GetName(), TeamID: policy.GetTeamId(), RepeatCount: policy.GetRepeatCount(), UpdatedAt: policy.GetUpdatedAt().AsTime(),
+		ID: policy.GetId(), Name: policy.GetName(), TeamID: policy.GetTeamId(), Version: policy.GetVersion(),
+		PreviousVersion: previousVersion, UpdatedAt: policy.GetUpdatedAt().AsTime(),
 	})
-	return murphypostgres.Changed("escalation policy", rows, err)
+	if err != nil {
+		return murphypostgres.Error("escalation policy", err)
+	}
+	if rows == 0 {
+		return murphy.ErrConflict
+	}
+	return nil
 }
 
-func (t *Tx) DeleteLevels(ctx context.Context, policyID string) (err error) {
+func (t *Tx) CreateVersionRow(ctx context.Context, policy *murphy.EscalationPolicy, versionID string, at time.Time) (err error) {
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
-	return murphypostgres.Error("escalation level", t.queries.DeleteLevels(ctx, policyID))
+	return murphypostgres.Error("escalation policy version", t.queries.CreateVersion(ctx, CreateVersionParams{
+		ID: versionID, PolicyID: policy.GetId(), Version: policy.GetVersion(), RepeatCount: policy.GetRepeatCount(), CreatedAt: at,
+	}))
 }
 
-func (t *Tx) CreateLevels(ctx context.Context, policyID string, levels []*murphy.EscalationLevel, at time.Time) (err error) {
+func (t *Tx) CreateLevels(ctx context.Context, versionID string, levels []*murphy.EscalationLevel, at time.Time) (err error) {
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
 	if len(levels) == 0 {
 		return nil
 	}
-	params := CreateLevelsParams{PolicyID: policyID, CreatedAt: at}
+	params := CreateLevelsParams{VersionID: versionID, CreatedAt: at}
 	for i, level := range levels {
 		params.Ids = append(params.Ids, level.GetId())
 		params.Positions = append(params.Positions, int32(i))
@@ -103,54 +112,66 @@ func (t *Tx) CreateLevelTargets(ctx context.Context, levels []*murphy.Escalation
 	return murphypostgres.Error("escalation target", t.queries.CreateLevelTargets(ctx, params))
 }
 
-func (r *Repository) GetPolicyRow(ctx context.Context, id string) (_ *murphy.EscalationPolicy, err error) {
+func (r *Repository) GetPolicyRow(ctx context.Context, id string) (_ *murphy.EscalationPolicy, _ string, err error) {
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
 	row, err := r.queries.GetPolicy(ctx, id)
 	if err != nil {
-		return nil, murphypostgres.Error("escalation policy", err)
+		return nil, "", murphypostgres.Error("escalation policy", err)
 	}
-	return toPolicy(row), nil
+	return toPolicy(GetPolicyVersionRow(row)), row.VersionID, nil
 }
 
-func (r *Repository) ListPolicyRows(ctx context.Context, teamID string, before string, limit int) (_ []*murphy.EscalationPolicy, err error) {
+func (r *Repository) GetPolicyVersionRow(ctx context.Context, id string, version int32) (_ *murphy.EscalationPolicy, _ string, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	row, err := r.queries.GetPolicyVersion(ctx, GetPolicyVersionParams{ID: id, Version: version})
+	if err != nil {
+		return nil, "", murphypostgres.Error("escalation policy version", err)
+	}
+	return toPolicy(row), row.VersionID, nil
+}
+
+func (r *Repository) ListPolicyRows(ctx context.Context, teamID string, before string, limit int) (_ []*murphy.EscalationPolicy, _ []string, err error) {
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
 	rows, err := r.queries.ListPolicies(ctx, ListPoliciesParams{Before: before, TeamID: database.Text(teamID), MaxRows: int32(limit)})
 	if err != nil {
-		return nil, murphypostgres.Error("escalation policy", err)
+		return nil, nil, murphypostgres.Error("escalation policy", err)
 	}
 	policies := make([]*murphy.EscalationPolicy, len(rows))
+	versionIDs := make([]string, len(rows))
 	for i, row := range rows {
-		policies[i] = toPolicy(row)
+		policies[i], versionIDs[i] = toPolicy(GetPolicyVersionRow(row)), row.VersionID
 	}
-	return policies, nil
+	return policies, versionIDs, nil
 }
 
-func (r *Repository) ListLevels(ctx context.Context, policyIDs []string) (_ map[string][]*murphy.EscalationLevel, err error) {
+func (r *Repository) ListLevels(ctx context.Context, versionIDs []string) (_ map[string][]*murphy.EscalationLevel, err error) {
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
-	rows, err := r.queries.ListLevels(ctx, policyIDs)
+	rows, err := r.queries.ListLevels(ctx, versionIDs)
 	if err != nil {
 		return nil, murphypostgres.Error("escalation level", err)
 	}
 	levels := map[string][]*murphy.EscalationLevel{}
 	for _, row := range rows {
-		levels[row.PolicyID] = append(levels[row.PolicyID], &murphy.EscalationLevel{
+		levels[row.VersionID] = append(levels[row.VersionID], &murphy.EscalationLevel{
 			Id: row.ID, Delay: durationpb.New(time.Duration(row.DelaySeconds) * time.Second),
 		})
 	}
 	return levels, nil
 }
 
-func (r *Repository) ListLevelTargets(ctx context.Context, policyIDs []string) (_ map[string][]*murphy.EscalationTarget, err error) {
+func (r *Repository) ListLevelTargets(ctx context.Context, versionIDs []string) (_ map[string][]*murphy.EscalationTarget, err error) {
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
-	rows, err := r.queries.ListLevelTargets(ctx, policyIDs)
+	rows, err := r.queries.ListLevelTargets(ctx, versionIDs)
 	if err != nil {
 		return nil, murphypostgres.Error("escalation target", err)
 	}
@@ -163,17 +184,17 @@ func (r *Repository) ListLevelTargets(ctx context.Context, policyIDs []string) (
 	return targets, nil
 }
 
-func toPolicy(row EscalationPolicy) *murphy.EscalationPolicy {
-	return &murphy.EscalationPolicy{
-		Id: row.ID, Name: row.Name, TeamId: row.TeamID, RepeatCount: row.RepeatCount,
-		CreatedAt: timestamppb.New(row.CreatedAt), UpdatedAt: timestamppb.New(row.UpdatedAt),
-	}
-}
-
-func (r *Repository) DeletePolicy(ctx context.Context, id string) (err error) {
+func (r *Repository) DeletePolicy(ctx context.Context, id string, at time.Time) (err error) {
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
-	rows, err := r.queries.DeletePolicy(ctx, id)
+	rows, err := r.queries.DeletePolicy(ctx, DeletePolicyParams{ID: id, DeletedAt: &at})
 	return murphypostgres.Changed("escalation policy", rows, err)
+}
+
+func toPolicy(row GetPolicyVersionRow) *murphy.EscalationPolicy {
+	return &murphy.EscalationPolicy{
+		Id: row.ID, Name: row.Name, TeamId: row.TeamID, Version: row.Version, RepeatCount: row.RepeatCount,
+		CreatedAt: timestamppb.New(row.CreatedAt), UpdatedAt: timestamppb.New(row.UpdatedAt),
+	}
 }

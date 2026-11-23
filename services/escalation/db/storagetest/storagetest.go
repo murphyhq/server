@@ -37,24 +37,66 @@ func Run(t *testing.T, open func(t *testing.T) escalation.Repository) {
 		assert.Equal(t, []string{bo, ana}, targetIDs(got.GetLevels()[1]))
 	})
 
-	t.Run("updating a policy replaces its levels", func(t *testing.T) {
+	t.Run("updating a policy makes a new version and keeps the previous one", func(t *testing.T) {
 		repo := open(t)
+		first, second := murphy.NewID(), murphy.NewID()
 		policy := newPolicy("payments", murphy.NewID(),
-			level(5*time.Minute, target(murphy.EscalationTargetType_ESCALATION_TARGET_TYPE_USER, murphy.NewID())),
-			level(10*time.Minute, target(murphy.EscalationTargetType_ESCALATION_TARGET_TYPE_USER, murphy.NewID())),
+			level(5*time.Minute, target(murphy.EscalationTargetType_ESCALATION_TARGET_TYPE_USER, first)),
+			level(10*time.Minute, target(murphy.EscalationTargetType_ESCALATION_TARGET_TYPE_USER, second)),
 		)
 		require.NoError(t, repo.CreatePolicy(t.Context(), policy))
 
 		user := murphy.NewID()
 		policy.TeamId = murphy.NewID()
+		policy.Version = 2
+		policy.RepeatCount = 0
 		policy.Levels = []*murphy.EscalationLevel{level(time.Minute, target(murphy.EscalationTargetType_ESCALATION_TARGET_TYPE_USER, user))}
 		require.NoError(t, repo.UpdatePolicy(t.Context(), policy))
 
 		got, err := repo.GetPolicy(t.Context(), policy.GetId())
 		require.NoError(t, err)
+		assert.Equal(t, int32(2), got.GetVersion())
 		assert.Equal(t, policy.GetTeamId(), got.GetTeamId())
+		assert.Equal(t, int32(0), got.GetRepeatCount())
 		require.Len(t, got.GetLevels(), 1)
 		assert.Equal(t, []string{user}, targetIDs(got.GetLevels()[0]))
+
+		previous, err := repo.GetPolicyVersion(t.Context(), policy.GetId(), 1)
+		require.NoError(t, err)
+		assert.Equal(t, int32(1), previous.GetVersion())
+		assert.Equal(t, int32(2), previous.GetRepeatCount())
+		require.Len(t, previous.GetLevels(), 2)
+		assert.Equal(t, []string{first}, targetIDs(previous.GetLevels()[0]))
+		assert.Equal(t, []string{second}, targetIDs(previous.GetLevels()[1]))
+	})
+
+	t.Run("refuses an update made from an outdated version", func(t *testing.T) {
+		repo := open(t)
+		policy := newPolicy("payments", murphy.NewID(), level(time.Minute, target(murphy.EscalationTargetType_ESCALATION_TARGET_TYPE_USER, murphy.NewID())))
+		require.NoError(t, repo.CreatePolicy(t.Context(), policy))
+		policy.Version = 2
+		require.NoError(t, repo.UpdatePolicy(t.Context(), policy))
+
+		assert.ErrorIs(t, repo.UpdatePolicy(t.Context(), policy), murphy.ErrConflict)
+	})
+
+	t.Run("deleting a policy hides it and keeps its versions", func(t *testing.T) {
+		repo := open(t)
+		team := murphy.NewID()
+		policy := newPolicy("payments", team, level(time.Minute, target(murphy.EscalationTargetType_ESCALATION_TARGET_TYPE_USER, murphy.NewID())))
+		require.NoError(t, repo.CreatePolicy(t.Context(), policy))
+
+		require.NoError(t, repo.DeletePolicy(t.Context(), policy.GetId()))
+
+		_, err := repo.GetPolicy(t.Context(), policy.GetId())
+		assert.ErrorIs(t, err, murphy.ErrNotFound)
+		listed, err := repo.ListPolicies(t.Context(), team, maxID, 10)
+		require.NoError(t, err)
+		assert.Empty(t, listed)
+		version, err := repo.GetPolicyVersion(t.Context(), policy.GetId(), 1)
+		require.NoError(t, err)
+		assert.Len(t, version.GetLevels(), 1)
+		assert.NoError(t, repo.CreatePolicy(t.Context(), newPolicy("payments", team)), "the name is free again")
 	})
 
 	t.Run("lists policies newest first, optionally of one team", func(t *testing.T) {
@@ -92,7 +134,8 @@ func Run(t *testing.T, open func(t *testing.T) escalation.Repository) {
 		repo := open(t)
 		_, err := repo.GetPolicy(t.Context(), murphy.NewID())
 		assert.ErrorIs(t, err, murphy.ErrNotFound)
-		assert.ErrorIs(t, repo.UpdatePolicy(t.Context(), newPolicy("ghost", murphy.NewID())), murphy.ErrNotFound)
+		_, err = repo.GetPolicyVersion(t.Context(), murphy.NewID(), 1)
+		assert.ErrorIs(t, err, murphy.ErrNotFound)
 		assert.ErrorIs(t, repo.DeletePolicy(t.Context(), murphy.NewID()), murphy.ErrNotFound)
 	})
 }
@@ -100,7 +143,7 @@ func Run(t *testing.T, open func(t *testing.T) escalation.Repository) {
 func newPolicy(name, team string, levels ...*murphy.EscalationLevel) *murphy.EscalationPolicy {
 	now := murphy.Now()
 	return &murphy.EscalationPolicy{
-		Id: murphy.NewID(), Name: name, TeamId: team, RepeatCount: 2, Levels: levels, CreatedAt: now, UpdatedAt: now,
+		Id: murphy.NewID(), Name: name, TeamId: team, Version: 1, RepeatCount: 2, Levels: levels, CreatedAt: now, UpdatedAt: now,
 	}
 }
 

@@ -79,7 +79,7 @@ The management API, described by an OpenAPI spec and used by people and automati
 
 ### Engine
 
-Decides what happens to an incident, and only ever reacts to messages. An alert opens or updates an incident, the incident's escalation snapshot and the on-call schedule decide who to page, and `engine` stores the change together with the messages it causes: the incident's events, the notifications to send and the timer for the next escalation step. It also records delivery results and acknowledgements that come back from notification providers. It is the only component that changes incident state in response to messages, and it handles every message exactly once, even when the broker delivers it twice.
+Decides what happens to an incident, and only ever reacts to messages. An alert opens or updates an incident, the version of its escalation policy the incident follows and the on-call schedule decide who to page, and `engine` stores the change together with the messages it causes: the incident's events, the notifications to send and the timer for the next escalation step. It also records delivery results and acknowledgements that come back from notification providers. It is the only component that changes incident state in response to messages, and it handles every message exactly once, even when the broker delivers it twice.
 
 ### Scheduler
 

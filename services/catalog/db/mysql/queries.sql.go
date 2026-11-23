@@ -235,6 +235,19 @@ func (q *Queries) ListServices(ctx context.Context, arg ListServicesParams) ([]S
 	return items, nil
 }
 
+const policyInUse = `-- name: PolicyInUse :one
+SELECT EXISTS (
+  SELECT 1 FROM services WHERE escalation_policy_id = ?
+) AS in_use
+`
+
+func (q *Queries) PolicyInUse(ctx context.Context, escalationPolicyID string) (bool, error) {
+	row := q.db.QueryRowContext(ctx, policyInUse, escalationPolicyID)
+	var in_use bool
+	err := row.Scan(&in_use)
+	return in_use, err
+}
+
 const rotateIntegrationKey = `-- name: RotateIntegrationKey :execrows
 UPDATE integrations
 SET key_version = key_version + 1, previous_key_valid_until = ?, updated_at = ?

@@ -70,6 +70,17 @@ func (s *Server) DeleteEscalationPolicy(ctx context.Context, request DeleteEscal
 	return DeleteEscalationPolicy204Response{}, nil
 }
 
+func (s *Server) GetEscalationPolicyVersion(ctx context.Context, request GetEscalationPolicyVersionRequestObject) (_ GetEscalationPolicyVersionResponseObject, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	policy, err := s.escalation.GetPolicyVersion(ctx, request.Id, request.Version)
+	if err != nil {
+		return nil, err
+	}
+	return GetEscalationPolicyVersion200JSONResponse(toPolicy(policy)), nil
+}
+
 func fromPolicyInput(in *EscalationPolicyInput) *murphy.EscalationPolicy {
 	policy := &murphy.EscalationPolicy{Name: in.Name, TeamId: in.TeamId}
 	if in.RepeatCount != nil {
@@ -93,6 +104,7 @@ func toPolicy(policy *murphy.EscalationPolicy) EscalationPolicy {
 		Id:          policy.GetId(),
 		Name:        policy.GetName(),
 		TeamId:      policy.GetTeamId(),
+		Version:     policy.GetVersion(),
 		RepeatCount: policy.GetRepeatCount(),
 		Levels:      []EscalationLevel{},
 		CreatedAt:   policy.GetCreatedAt().AsTime(),

@@ -53,3 +53,8 @@ WHERE id = sqlc.arg(id);
 UPDATE integrations
 SET key_version = key_version + 1, previous_key_valid_until = sqlc.arg(previous_key_valid_until), updated_at = sqlc.arg(updated_at)
 WHERE id = sqlc.arg(id);
+
+-- name: PolicyInUse :one
+SELECT EXISTS (
+  SELECT 1 FROM services WHERE escalation_policy_id = sqlc.arg(escalation_policy_id)
+) AS in_use;

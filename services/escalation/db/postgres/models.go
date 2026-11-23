@@ -10,19 +10,28 @@ import (
 
 type EscalationLevel struct {
 	ID           string
-	PolicyID     string
+	VersionID    string
 	Position     int32
 	DelaySeconds int64
 	CreatedAt    time.Time
 }
 
 type EscalationPolicy struct {
+	ID        string
+	Name      string
+	TeamID    string
+	Version   int32
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	DeletedAt *time.Time
+}
+
+type EscalationPolicyVersion struct {
 	ID          string
-	Name        string
-	TeamID      string
+	PolicyID    string
+	Version     int32
 	RepeatCount int32
 	CreatedAt   time.Time
-	UpdatedAt   time.Time
 }
 
 type LevelTarget struct {
