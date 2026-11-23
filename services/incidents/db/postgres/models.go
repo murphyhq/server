@@ -17,11 +17,11 @@ type Alert struct {
 	Status        string
 	Summary       string
 	Labels        []byte
-	ReceivedAt    time.Time
-	CreatedAt     time.Time
+	Annotations   []byte
 	Source        string
 	Instance      *string
-	Annotations   []byte
+	ReceivedAt    time.Time
+	CreatedAt     time.Time
 }
 
 type HandledMessage struct {

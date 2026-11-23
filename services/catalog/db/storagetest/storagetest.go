@@ -133,7 +133,7 @@ func Run(t *testing.T, open func(t *testing.T) catalog.Repository) {
 func newService(name string) *murphy.Service {
 	now := murphy.Now()
 	return &murphy.Service{
-		Id: murphy.NewID(), Name: name, TeamId: murphy.NewID(), EscalationPolicyId: murphy.NewID(),
+		Id: murphy.NewID(), Name: name, EscalationPolicyId: murphy.NewID(),
 		Urgency: murphy.Urgency_URGENCY_HIGH, Status: murphy.ServiceStatus_SERVICE_STATUS_ACTIVE,
 		CreatedAt: now, UpdatedAt: now,
 	}

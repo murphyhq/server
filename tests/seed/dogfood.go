@@ -63,7 +63,6 @@ func dogfoodIntegration(ctx context.Context, api *client.ClientWithResponses, fi
 		created, err := api.CreateServiceWithResponse(ctx, nil, client.ServiceInput{
 			Name:               dogfoodService,
 			Description:        new("Murphy itself, paged by the Grafana that watches it."),
-			TeamId:             platformTeam,
 			EscalationPolicyId: platformPolicy,
 		})
 		if err != nil || created.StatusCode() != http.StatusCreated {

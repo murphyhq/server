@@ -305,15 +305,13 @@ components:
       enum: [active, disabled]
     Service:
       type: object
-      required: [id, name, description, team_id, escalation_policy_id, urgency, status, created_at, updated_at]
+      required: [id, name, description, escalation_policy_id, urgency, status, created_at, updated_at]
       properties:
         id:
           type: string
         name:
           type: string
         description:
-          type: string
-        team_id:
           type: string
         escalation_policy_id:
           type: string
@@ -329,13 +327,11 @@ components:
           format: date-time
     ServiceInput:
       type: object
-      required: [name, team_id, escalation_policy_id]
+      required: [name, escalation_policy_id]
       properties:
         name:
           type: string
         description:
-          type: string
-        team_id:
           type: string
         escalation_policy_id:
           type: string

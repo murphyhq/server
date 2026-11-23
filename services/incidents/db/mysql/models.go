@@ -18,11 +18,11 @@ type Alert struct {
 	Status        string
 	Summary       string
 	Labels        json.RawMessage
-	ReceivedAt    time.Time
-	CreatedAt     time.Time
+	Annotations   json.RawMessage
 	Source        string
 	Instance      *string
-	Annotations   json.RawMessage
+	ReceivedAt    time.Time
+	CreatedAt     time.Time
 }
 
 type HandledMessage struct {

@@ -264,7 +264,6 @@ type Service struct {
 	Id                 string        `json:"id"`
 	Name               string        `json:"name"`
 	Status             ServiceStatus `json:"status"`
-	TeamId             string        `json:"team_id"`
 	UpdatedAt          time.Time     `json:"updated_at"`
 	Urgency            Urgency       `json:"urgency"`
 }
@@ -275,7 +274,6 @@ type ServiceInput struct {
 	EscalationPolicyId string         `json:"escalation_policy_id"`
 	Name               string         `json:"name"`
 	Status             *ServiceStatus `json:"status,omitempty"`
-	TeamId             string         `json:"team_id"`
 	Urgency            *Urgency       `json:"urgency,omitempty"`
 }
 

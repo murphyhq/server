@@ -35,10 +35,10 @@ func TestCreateServiceAppliesDefaults(t *testing.T) {
 func TestCreateServiceRejectsInvalidInput(t *testing.T) {
 	repo := NewMockRepository(t)
 
-	_, err := catalog.New(repo, nil).CreateService(t.Context(), &murphy.Service{TeamId: "not-a-uuid"})
+	_, err := catalog.New(repo, nil).CreateService(t.Context(), &murphy.Service{EscalationPolicyId: "not-a-uuid"})
 
 	require.ErrorIs(t, err, murphy.ErrInvalid)
-	for _, field := range []string{"name", "team_id", "escalation_policy_id"} {
+	for _, field := range []string{"name", "escalation_policy_id"} {
 		assert.ErrorContains(t, err, field)
 	}
 }
@@ -87,7 +87,6 @@ func TestCreateIntegrationRequiresExistingService(t *testing.T) {
 func validService() *murphy.Service {
 	return &murphy.Service{
 		Name:               "checkout-api",
-		TeamId:             uuid.NewV7().String(),
 		EscalationPolicyId: uuid.NewV7().String(),
 	}
 }

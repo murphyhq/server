@@ -1,14 +1,14 @@
 -- name: CreateService :exec
-INSERT INTO services (id, name, description, team_id, escalation_policy_id, urgency, status, created_at, updated_at)
-VALUES (sqlc.arg(id), sqlc.arg(name), sqlc.arg(description), sqlc.arg(team_id), sqlc.arg(escalation_policy_id), sqlc.arg(urgency), sqlc.arg(status), sqlc.arg(created_at), sqlc.arg(updated_at));
+INSERT INTO services (id, name, description, escalation_policy_id, urgency, status, created_at, updated_at)
+VALUES (sqlc.arg(id), sqlc.arg(name), sqlc.arg(description), sqlc.arg(escalation_policy_id), sqlc.arg(urgency), sqlc.arg(status), sqlc.arg(created_at), sqlc.arg(updated_at));
 
 -- name: GetService :one
-SELECT id, name, description, team_id, escalation_policy_id, urgency, status, created_at, updated_at
+SELECT id, name, description, escalation_policy_id, urgency, status, created_at, updated_at
 FROM services
 WHERE id = sqlc.arg(id);
 
 -- name: ListServices :many
-SELECT id, name, description, team_id, escalation_policy_id, urgency, status, created_at, updated_at
+SELECT id, name, description, escalation_policy_id, urgency, status, created_at, updated_at
 FROM services
 WHERE id < sqlc.arg(before)
 ORDER BY id DESC
@@ -16,7 +16,7 @@ LIMIT ?;
 
 -- name: UpdateService :execrows
 UPDATE services
-SET name = sqlc.arg(name), description = sqlc.arg(description), team_id = sqlc.arg(team_id), escalation_policy_id = sqlc.arg(escalation_policy_id),
+SET name = sqlc.arg(name), description = sqlc.arg(description), escalation_policy_id = sqlc.arg(escalation_policy_id),
     urgency = sqlc.arg(urgency), status = sqlc.arg(status), updated_at = sqlc.arg(updated_at)
 WHERE id = sqlc.arg(id);
 

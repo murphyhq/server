@@ -1,5 +1,0 @@
--- +goose Up
-ALTER TABLE alerts
-  ADD COLUMN source VARCHAR(32) NOT NULL DEFAULT 'generic',
-  ADD COLUMN instance VARCHAR(512),
-  ADD COLUMN annotations JSON NOT NULL DEFAULT (JSON_OBJECT());

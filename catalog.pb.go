@@ -186,7 +186,6 @@ type Service struct {
 	Id                 string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	Name               string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
 	Description        string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
-	TeamId             string                 `protobuf:"bytes,4,opt,name=team_id,json=teamId,proto3" json:"team_id,omitempty"`
 	EscalationPolicyId string                 `protobuf:"bytes,5,opt,name=escalation_policy_id,json=escalationPolicyId,proto3" json:"escalation_policy_id,omitempty"`
 	Urgency            Urgency                `protobuf:"varint,6,opt,name=urgency,proto3,enum=murphy.v1.Urgency" json:"urgency,omitempty"`
 	Status             ServiceStatus          `protobuf:"varint,7,opt,name=status,proto3,enum=murphy.v1.ServiceStatus" json:"status,omitempty"`
@@ -243,13 +242,6 @@ func (x *Service) GetName() string {
 func (x *Service) GetDescription() string {
 	if x != nil {
 		return x.Description
-	}
-	return ""
-}
-
-func (x *Service) GetTeamId() string {
-	if x != nil {
-		return x.TeamId
 	}
 	return ""
 }
@@ -469,12 +461,11 @@ var File_murphy_v1_catalog_proto protoreflect.FileDescriptor
 
 const file_murphy_v1_catalog_proto_rawDesc = "" +
 	"\n" +
-	"\x17murphy/v1/catalog.proto\x12\tmurphy.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x16murphy/v1/shared.proto\"\xf0\x02\n" +
+	"\x17murphy/v1/catalog.proto\x12\tmurphy.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x16murphy/v1/shared.proto\"\xd7\x02\n" +
 	"\aService\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
-	"\vdescription\x18\x03 \x01(\tR\vdescription\x12\x17\n" +
-	"\ateam_id\x18\x04 \x01(\tR\x06teamId\x120\n" +
+	"\vdescription\x18\x03 \x01(\tR\vdescription\x120\n" +
 	"\x14escalation_policy_id\x18\x05 \x01(\tR\x12escalationPolicyId\x12,\n" +
 	"\aurgency\x18\x06 \x01(\x0e2\x12.murphy.v1.UrgencyR\aurgency\x120\n" +
 	"\x06status\x18\a \x01(\x0e2\x18.murphy.v1.ServiceStatusR\x06status\x129\n" +

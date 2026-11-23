@@ -24,7 +24,6 @@ type Service struct {
 	ID                 string
 	Name               string
 	Description        string
-	TeamID             string
 	EscalationPolicyID string
 	Urgency            string
 	Status             string
