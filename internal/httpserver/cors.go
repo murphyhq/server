@@ -1,10 +1,7 @@
 package httpserver
 
 import (
-	"errors"
 	"net/http"
-	"net/url"
-	"strconv"
 	"strings"
 )
 
@@ -15,17 +12,6 @@ type CORS struct {
 	Methods       []string
 	AllowHeaders  []string
 	ExposeHeaders []string
-}
-
-func validateOrigins(origins []string) error {
-	for i, origin := range origins {
-		u, err := url.Parse(origin)
-		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" ||
-			u.Path != "" || u.RawQuery != "" || u.Fragment != "" || u.User != nil {
-			return errors.New("entry " + strconv.Itoa(i+1) + " is not an origin of the form scheme://host[:port]")
-		}
-	}
-	return nil
 }
 
 func cors(c CORS) func(http.Handler) http.Handler {

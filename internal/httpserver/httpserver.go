@@ -29,11 +29,8 @@ type Server struct {
 	handler http.Handler
 }
 
-func New(cfg Config, handler http.Handler) (*Server, error) {
-	if err := validateOrigins(cfg.CORS.Origins); err != nil {
-		return nil, err
-	}
-	return &Server{cfg: cfg, handler: cors(cfg.CORS)(Handler(handler))}, nil
+func New(cfg Config, handler http.Handler) *Server {
+	return &Server{cfg: cfg, handler: cors(cfg.CORS)(Handler(handler))}
 }
 
 func (s *Server) Handler() http.Handler {

@@ -30,7 +30,7 @@ type Settings struct {
 	EscalationDatabaseURL string   `env:"ESCALATION_DATABASE_URL" required:"true"`
 	IdempotencyStoreURL   string   `env:"IDEMPOTENCY_STORE_URL" required:"true"`
 	IntegrationKeySecrets string   `env:"INTEGRATION_KEY_SECRETS" required:"true"`
-	CORSOrigins           []string `env:"CORS_ORIGINS"`
+	CORSOrigins           []string `env:"CORS_ORIGINS" validate:"base-url"`
 }
 
 type App struct {

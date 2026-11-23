@@ -17,7 +17,7 @@ type Settings struct {
 	HTTPAddr              string   `env:"HTTP_ADDR" default:":8080"`
 	EventsTopicURL        string   `env:"EVENTS_TOPIC_URL" required:"true"`
 	IntegrationKeySecrets string   `env:"INTEGRATION_KEY_SECRETS" required:"true"`
-	CORSOrigins           []string `env:"CORS_ORIGINS"`
+	CORSOrigins           []string `env:"CORS_ORIGINS" validate:"base-url"`
 }
 
 type App struct {

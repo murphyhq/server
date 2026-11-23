@@ -126,11 +126,8 @@ func corsPolicy(origins ...string) httpserver.CORS {
 	}
 }
 
-func corsServer(t *testing.T, c httpserver.CORS, route http.Handler) http.Handler {
-	t.Helper()
-	server, err := httpserver.New(httpserver.Config{CORS: c}, route)
-	require.NoError(t, err)
-	return server.Handler()
+func corsServer(c httpserver.CORS, route http.Handler) http.Handler {
+	return httpserver.New(httpserver.Config{CORS: c}, route).Handler()
 }
 
 func TestCORSAllowsDeclaredOriginsAndAnswersPreflightsWithTheDeclaredPolicy(t *testing.T) {
@@ -139,7 +136,7 @@ func TestCORSAllowsDeclaredOriginsAndAnswersPreflightsWithTheDeclaredPolicy(t *t
 		reached = true
 		w.WriteHeader(http.StatusOK)
 	})
-	handler := corsServer(t, corsPolicy("http://localhost:8090"), route)
+	handler := corsServer(corsPolicy("http://localhost:8090"), route)
 
 	get := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/v1/services", nil)
@@ -167,22 +164,8 @@ func TestCORSSendsNoOriginToUndeclaredCallers(t *testing.T) {
 		rec := httptest.NewRecorder()
 		req := httptest.NewRequest(http.MethodGet, "/v1/services", nil)
 		req.Header.Set("Origin", "https://evil.example")
-		corsServer(t, c, ok).ServeHTTP(rec, req)
+		corsServer(c, ok).ServeHTTP(rec, req)
 		assert.Equal(t, http.StatusOK, rec.Code)
 		assert.Empty(t, rec.Header().Get("Access-Control-Allow-Origin"))
 	}
-}
-
-func TestNewRejectsOriginsThatAreNotBareURLsWithoutEchoingThem(t *testing.T) {
-	ok := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {})
-
-	for _, bad := range []string{"*", "example.com", "ftp://example.com", "https://app.example.com/", "https://user@app.example.com"} {
-		_, err := httpserver.New(httpserver.Config{CORS: corsPolicy(bad)}, ok)
-		assert.Error(t, err, bad)
-	}
-
-	_, err := httpserver.New(httpserver.Config{CORS: corsPolicy("https://app.example.com", "s3cret-host")}, ok)
-	require.Error(t, err)
-	assert.ErrorContains(t, err, "entry 2")
-	assert.NotContains(t, err.Error(), "s3cret-host")
 }

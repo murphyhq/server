@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"os"
 
 	"github.com/murphyhq/server/cmd/ingest/app"
@@ -38,14 +37,11 @@ func run(ctx context.Context) error {
 	}
 	defer a.Close()
 
-	server, err := httpserver.New(httpserver.Config{
+	server := httpserver.New(httpserver.Config{
 		Addr:            s.App.HTTPAddr,
 		ShutdownTimeout: s.Lifecycle.ShutdownTimeout,
 		CORS:            s.App.CORS(),
 	}, a.Handler)
-	if err != nil {
-		return fmt.Errorf("MURPHY_CORS_ORIGINS: %w", err)
-	}
 
 	return lifecycle.Run(ctx, "ingest", s.Lifecycle, func(ctx context.Context) error {
 		return server.Serve(ctx)
