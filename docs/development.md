@@ -74,11 +74,11 @@ The domain is defined once, in Protobuf, so every component, and later every cli
 
 A page must never be lost or sent twice. The broker delivers at least once and any process can crash at any moment, so every message takes effect exactly once through retries and deduplication.
 
-1. Every published message MUST have something that retries it after a failure: the caller for `ingest` (no `202` means it sends again), redelivery by the broker for `engine` and `notifier`, and the next poll for `scheduler` (a timer stays due until its message is published).
-2. `ingest` MUST answer only after the broker confirms its message.
-3. Work MUST be marked done only after its messages are published: publish, wait for the broker's confirmation, then acknowledge the incoming message or mark the timer as fired.
-4. Message IDs MUST be deterministic, derived from what caused them (the incoming message or the timer), so running the work again publishes the same IDs.
-5. Every consumer MUST record the IDs it has handled in a table its service owns, in the same transaction as the change the message causes. When a message arrives again, the change MUST be skipped and the messages it produced MUST be published again with the same IDs.
+1. Every message that decides whether someone is paged MUST have something that retries it after a failure: the caller for `ingest` (no `202` means it sends again), redelivery by the broker for what `notifier` reads, and `scheduler` for every scheduled message (it stays until the broker confirms it).
+2. A component without a database MUST publish before it lets go of what caused the message: `ingest` answers only after the broker confirms, and `notifier` acknowledges its incoming message only after the broker confirms what it publishes.
+3. Messages that decide whether someone is paged (incident events, escalation timers, notifications) MUST be saved as scheduled messages, in the same transaction as the change that causes them, and MUST NOT be published by that component. Only `scheduler` publishes scheduled messages, when they are due, and deletes each one after the broker confirms it. Other messages MAY be published right after the change commits.
+4. Message IDs MUST be fixed when the message is created: stored with the scheduled message, or derived from what caused it otherwise, so every retry sends the same ID.
+5. Every consumer MUST record the IDs it has handled in a table its service owns, in the same transaction as the change the message causes. When a message arrives again, it MUST be skipped: its change is already saved, and so are its scheduled messages. Messages it published directly are not sent again.
 6. Records of handled IDs MUST be removed after a retention period.
 7. Components MUST retry transient failures themselves (timeouts, dropped connections, throttling, deadlocks) with exponential backoff and jitter, within the context's deadline. They MUST NOT retry permanent failures such as invalid data. When they give up, rule 1 takes over.
 8. Every retry MUST be recorded in the trace.

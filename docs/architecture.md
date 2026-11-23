@@ -44,7 +44,7 @@ flowchart LR
 
   ingest --> broker
   scheduler --> broker
-  broker <--> engine
+  broker --> engine
   broker <--> notifier
 
   api --> db
@@ -71,19 +71,19 @@ flowchart LR
 
 ### Ingest
 
-The public entry point for webhooks. Monitoring tools such as Alertmanager, Grafana and Datadog send it alerts, and notification providers send it delivery updates and replies, like an SMS answer or a button pressed in a chat. It checks who is calling, turns each payload into a message (`AlertReceived`, `NotificationDelivered` or `IncidentAcknowledged`), and answers only once the message is published, so an accepted webhook is never lost. It doesn't use the database, which keeps intake working when the rest of Murphy is slow or down.
+The public entry point for webhooks. Monitoring tools such as Alertmanager, Grafana and Datadog send it alerts, and notification providers send it delivery updates and replies, like an SMS answer or a button pressed in a chat. It checks who is calling, turns each payload into a message (`AlertReceived`, `NotificationDelivered` or `NotificationReplied`), and answers only once the message is published, so an accepted webhook is never lost. It doesn't use the database, which keeps intake working when the rest of Murphy is slow or down.
 
 ### API
 
-The management API, described by an OpenAPI spec and used by people and automation. It reads and writes the database directly: schedules, rotations, escalation policies, users, teams and incidents. Changes that belong together happen in one transaction; acknowledging an incident, for example, also cancels its pending escalation timers.
+The management API, described by an OpenAPI spec and used by people and automation. It reads and writes the database directly: schedules, rotations, escalation policies, users, teams and incidents. Changes that belong together happen in one transaction; acknowledging an incident, for example, also cancels its pending escalation timers and stores the event that announces it.
 
 ### Engine
 
-Decides what happens to an incident, and only ever reacts to messages. An alert opens or updates an incident, the on-call schedule decides who to page, and `engine` requests the notifications and stores the timer for the next escalation step. It also records delivery results and acknowledgements that come back from notification providers. It is the only component that changes incident state in response to messages, and it handles every message exactly once, even when the broker delivers it twice.
+Decides what happens to an incident, and only ever reacts to messages. An alert opens or updates an incident, the incident's escalation snapshot and the on-call schedule decide who to page, and `engine` stores the change together with the messages it causes: the incident's events, the notifications to send and the timer for the next escalation step. It also records delivery results and acknowledgements that come back from notification providers. It is the only component that changes incident state in response to messages, and it handles every message exactly once, even when the broker delivers it twice.
 
 ### Scheduler
 
-Turns time into messages. Escalation timers are rows in the database, so they survive restarts and can be set any time in the future. When a timer is due, `scheduler` publishes `TimerExpired`, and `engine` decides what it means.
+Turns stored messages into published ones. Every message that decides whether someone is paged, from incident events to escalation timers, is a scheduled message in its domain's database, saved in the same transaction as the change that caused it. `scheduler` publishes each one when it is due, events right away and timers at their time, and deletes it once the broker confirms. A change and its messages are therefore never separated: a crash or a broker outage delays a message, and loses none. When a timer is due, `scheduler` publishes `TimerExpired`, and `engine` decides what it means.
 
 ### Notifier
 
@@ -101,7 +101,7 @@ The message broker keeps every message until it is processed, delivers it at lea
 
 A key-value store keeps the `Idempotency-Key` of every request that creates something, with its response, for 24 hours, so `api` answers a retry without doing the work twice. The implementation is Redis.
 
-The database provides transactions, so changes that belong together are applied together, and row locking, so two `scheduler` instances never claim the same timer. The implementations are PostgreSQL and MySQL.
+The database provides transactions, so changes that belong together are applied together, and row locking, so two `scheduler` instances never claim the same scheduled message. The implementations are PostgreSQL and MySQL.
 
 ## Flows
 
@@ -115,13 +115,16 @@ sequenceDiagram
   participant I as ingest
   participant E as engine
   participant D as database
+  participant S as scheduler
   participant N as notifier
   participant P as Provider
   M->>I: webhook
   I-->>E: AlertReceived
   I->>M: 202
-  E->>D: open incident, store escalation timer
-  E-->>N: NotificationCreated
+  E->>D: open incident, store its events, notifications and first timer (one transaction)
+  S->>D: claim due messages
+  S-->>N: NotificationCreated
+  S->>D: delete sent messages
   N->>P: send
   N-->>E: NotificationSent
   E->>D: add to incident timeline
@@ -138,12 +141,15 @@ sequenceDiagram
   participant D as database
   participant E as engine
   participant N as notifier
-  S->>D: claim due timers
+  S->>D: claim due messages
   S-->>E: TimerExpired
+  S->>D: delete sent messages
   E->>D: incident still unacknowledged?
   alt unacknowledged
-    E->>D: store timer for the next step
-    E-->>N: NotificationCreated (next step)
+    E->>D: store the next step's notifications, events and timer (one transaction)
+    S->>D: claim due messages
+    S-->>N: NotificationCreated (next step)
+    S->>D: delete sent messages
   else acknowledged or resolved
     E->>E: ignore
   end
@@ -156,9 +162,14 @@ sequenceDiagram
   participant C as API client
   participant A as api
   participant D as database
+  participant S as scheduler
+  participant N as notifier
   C->>A: acknowledge incident
-  A->>D: update incident and cancel its timers (one transaction)
+  A->>D: update incident, cancel its timers, store IncidentAcknowledged (one transaction)
   A->>C: 200
+  S->>D: claim due messages
+  S-->>N: IncidentAcknowledged
+  S->>D: delete sent messages
 ```
 
 ### Acknowledgement from a notification
@@ -169,8 +180,13 @@ sequenceDiagram
   participant I as ingest
   participant E as engine
   participant D as database
+  participant S as scheduler
+  participant N as notifier
   P->>I: reply callback
-  I-->>E: IncidentAcknowledged
+  I-->>E: NotificationReplied
   I->>P: 200
-  E->>D: update incident and cancel its timers (one transaction)
+  E->>D: the reply acknowledges: update incident, cancel its timers, store IncidentAcknowledged (one transaction)
+  S->>D: claim due messages
+  S-->>N: IncidentAcknowledged
+  S->>D: delete sent messages
 ```
