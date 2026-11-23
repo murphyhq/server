@@ -264,3 +264,37 @@ func (r *Repository) ExistingSchedules(ctx context.Context, ids []string) (_ []s
 	}
 	return existing, nil
 }
+
+func (r *Repository) GetScheduleRows(ctx context.Context, ids []string) (_ []*murphy.Schedule, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	rows, err := r.queries.GetSchedules(ctx, ids)
+	if err != nil {
+		return nil, murphypostgres.Error("schedule", err)
+	}
+	schedules := make([]*murphy.Schedule, len(rows))
+	for i, row := range rows {
+		schedules[i] = toSchedule(row)
+	}
+	return schedules, nil
+}
+
+func (r *Repository) ListOverridesAt(ctx context.Context, scheduleIDs []string, at time.Time) (_ map[string][]*murphy.Override, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	rows, err := r.queries.ListOverridesAt(ctx, ListOverridesAtParams{ScheduleIds: scheduleIDs, At: at, After: at})
+	if err != nil {
+		return nil, murphypostgres.Error("override", err)
+	}
+	overrides := map[string][]*murphy.Override{}
+	for _, row := range rows {
+		overrides[row.ScheduleID] = append(overrides[row.ScheduleID], &murphy.Override{
+			Id: row.ID, ScheduleId: row.ScheduleID, UserId: row.UserID,
+			StartsAt: timestamppb.New(row.StartsAt), EndsAt: timestamppb.New(row.EndsAt),
+			CreatedAt: timestamppb.New(row.CreatedAt), UpdatedAt: timestamppb.New(row.UpdatedAt),
+		})
+	}
+	return overrides, nil
+}

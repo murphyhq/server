@@ -32,6 +32,7 @@ type Repository interface {
 	DeleteMembership(ctx context.Context, teamID, userID string) error
 	ExistingUsers(ctx context.Context, ids []string) ([]string, error)
 	ExistingTeams(ctx context.Context, ids []string) ([]string, error)
+	ActiveUsers(ctx context.Context, ids []string) ([]string, error)
 }
 
 type Service struct {
@@ -401,4 +402,11 @@ func existing(ctx context.Context, ids []string, find func(ctx context.Context, 
 		found[id] = true
 	}
 	return found, nil
+}
+
+func (s *Service) ActiveUsers(ctx context.Context, ids []string) (_ map[string]bool, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	return existing(ctx, ids, s.repo.ActiveUsers)
 }

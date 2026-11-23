@@ -101,3 +101,8 @@ WHERE id IN (sqlc.slice(ids));
 SELECT id
 FROM teams
 WHERE id IN (sqlc.slice(ids));
+
+-- name: ActiveUsers :many
+SELECT id
+FROM users
+WHERE id IN (sqlc.slice(ids)) AND status = 'active';

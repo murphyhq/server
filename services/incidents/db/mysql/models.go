@@ -31,25 +31,41 @@ type HandledMessage struct {
 }
 
 type Incident struct {
-	ID            string
-	Number        int64
-	ServiceID     string
-	DedupKey      string
-	Title         string
-	Status        string
-	Urgency       string
-	Version       int32
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
-	ResolvedAt    *time.Time
-	OpenServiceID *string
+	ID                      string
+	Number                  int64
+	ServiceID               string
+	DedupKey                string
+	Title                   string
+	Status                  string
+	Urgency                 string
+	Version                 int32
+	CreatedAt               time.Time
+	UpdatedAt               time.Time
+	ResolvedAt              *time.Time
+	EscalationPolicyID      string
+	EscalationPolicyVersion int32
+	EscalationLevel         int32
+	EscalationRound         int32
+	EscalationExhausted     bool
+	AcknowledgedAt          *time.Time
+	OpenServiceID           *string
+}
+
+type ScheduledMessage struct {
+	ID           string
+	IncidentID   string
+	Kind         string
+	DueAt        time.Time
+	ClaimedUntil *time.Time
+	Envelope     []byte
+	CreatedAt    time.Time
 }
 
 type TimelineEntry struct {
 	ID         string
 	IncidentID string
 	Type       string
-	AlertID    *string
 	Summary    string
+	Details    []byte
 	CreatedAt  time.Time
 }

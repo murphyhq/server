@@ -15,6 +15,7 @@ type Profile struct {
 	Pacer    vegeta.Pacer
 	Duration time.Duration
 	Settle   time.Duration
+	Parallel bool
 }
 
 var profiles = map[string]Profile{
@@ -24,6 +25,17 @@ var profiles = map[string]Profile{
 		Pacer:    vegeta.LinearPacer{StartAt: vegeta.Rate{Freq: 10, Per: time.Second}, Slope: 1},
 		Duration: 5 * time.Minute,
 		Settle:   2 * time.Minute,
+	},
+	"sustained": {
+		Pacer: vegeta.SinePacer{
+			Period:  2 * time.Minute,
+			Mean:    vegeta.Rate{Freq: 30, Per: time.Second},
+			Amp:     vegeta.Rate{Freq: 20, Per: time.Second},
+			StartAt: vegeta.MeanUp,
+		},
+		Duration: 10 * time.Minute,
+		Settle:   2 * time.Minute,
+		Parallel: true,
 	},
 }
 
@@ -40,6 +52,9 @@ func profile(t *testing.T) Profile {
 		t.Fatalf("MURPHY_LOAD_PROFILE must be one of %v", names)
 	}
 	p.Name = name
+	if p.Parallel {
+		t.Parallel()
+	}
 	return p
 }
 

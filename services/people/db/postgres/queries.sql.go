@@ -10,6 +10,32 @@ import (
 	"time"
 )
 
+const activeUsers = `-- name: ActiveUsers :many
+SELECT id
+FROM users
+WHERE id = ANY($1::uuid[]) AND status = 'active'
+`
+
+func (q *Queries) ActiveUsers(ctx context.Context, ids []string) ([]string, error) {
+	rows, err := q.db.Query(ctx, activeUsers, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const createContactMethod = `-- name: CreateContactMethod :exec
 INSERT INTO contact_methods (id, user_id, type, address, created_at, updated_at)
 VALUES ($1, $2, $3, $4, $5, $6)

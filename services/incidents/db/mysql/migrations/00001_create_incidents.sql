@@ -11,6 +11,12 @@ CREATE TABLE incidents (
   created_at DATETIME(6) NOT NULL,
   updated_at DATETIME(6) NOT NULL,
   resolved_at DATETIME(6),
+  escalation_policy_id CHAR(36) NOT NULL,
+  escalation_policy_version INT NOT NULL,
+  escalation_level INT NOT NULL,
+  escalation_round INT NOT NULL,
+  escalation_exhausted BOOLEAN NOT NULL,
+  acknowledged_at DATETIME(6),
   open_service_id CHAR(36) AS (CASE WHEN status <> 'resolved' THEN service_id END) STORED,
   CONSTRAINT incidents_pkey PRIMARY KEY (id),
   CONSTRAINT incidents_number_key UNIQUE (number),
@@ -47,13 +53,13 @@ CREATE INDEX alerts_incident_id_id_idx ON alerts (incident_id, id);
 CREATE TABLE timeline_entries (
   id CHAR(36) NOT NULL,
   incident_id CHAR(36) NOT NULL,
-  type VARCHAR(16) NOT NULL,
-  alert_id CHAR(36),
+  type VARCHAR(32) NOT NULL,
   summary TEXT NOT NULL,
+  details LONGBLOB NOT NULL,
   created_at DATETIME(6) NOT NULL,
   CONSTRAINT timeline_entries_pkey PRIMARY KEY (id),
   CONSTRAINT timeline_entries_incident_id_fkey FOREIGN KEY (incident_id) REFERENCES incidents (id) ON DELETE CASCADE,
-  CONSTRAINT timeline_entries_type_check CHECK (type IN ('triggered', 'alerted', 'acknowledged', 'resolved'))
+  CONSTRAINT timeline_entries_type_check CHECK (type IN ('triggered', 'alerted', 'acknowledged', 'resolved', 'escalated', 'escalation_skipped', 'escalation_exhausted'))
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
 
 CREATE INDEX timeline_entries_incident_id_id_idx ON timeline_entries (incident_id, id);
@@ -65,3 +71,19 @@ CREATE TABLE handled_messages (
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
 
 CREATE INDEX handled_messages_created_at_idx ON handled_messages (created_at);
+
+CREATE TABLE scheduled_messages (
+  id CHAR(36) NOT NULL,
+  incident_id CHAR(36) NOT NULL,
+  kind VARCHAR(32) NOT NULL,
+  due_at DATETIME(6) NOT NULL,
+  claimed_until DATETIME(6),
+  envelope LONGBLOB NOT NULL,
+  created_at DATETIME(6) NOT NULL,
+  CONSTRAINT scheduled_messages_pkey PRIMARY KEY (id),
+  CONSTRAINT scheduled_messages_incident_id_fkey FOREIGN KEY (incident_id) REFERENCES incidents (id) ON DELETE CASCADE,
+  CONSTRAINT scheduled_messages_kind_check CHECK (kind IN ('event', 'timer'))
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
+
+CREATE INDEX scheduled_messages_due_at_id_idx ON scheduled_messages (due_at, id);
+CREATE INDEX scheduled_messages_incident_id_kind_idx ON scheduled_messages (incident_id, kind);

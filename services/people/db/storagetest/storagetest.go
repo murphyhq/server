@@ -111,6 +111,19 @@ func Run(t *testing.T, open func(t *testing.T) people.Repository) {
 		assert.Equal(t, []string{team.GetId()}, teams)
 	})
 
+	t.Run("finds which of many users are active in one call", func(t *testing.T) {
+		repo := open(t)
+		ana, bo := newUser("ana@example.com"), newUser("bo@example.com")
+		bo.Status = murphy.UserStatus_USER_STATUS_DEACTIVATED
+		require.NoError(t, repo.CreateUser(t.Context(), ana))
+		require.NoError(t, repo.CreateUser(t.Context(), bo))
+
+		active, err := repo.ActiveUsers(t.Context(), []string{ana.GetId(), bo.GetId(), murphy.NewID()})
+
+		require.NoError(t, err)
+		assert.Equal(t, []string{ana.GetId()}, active)
+	})
+
 	t.Run("reports missing users, teams and memberships", func(t *testing.T) {
 		repo := open(t)
 		_, err := repo.GetUser(t.Context(), murphy.NewID())

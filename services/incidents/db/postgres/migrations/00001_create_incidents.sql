@@ -11,6 +11,12 @@ CREATE TABLE incidents (
   created_at timestamptz NOT NULL,
   updated_at timestamptz NOT NULL,
   resolved_at timestamptz,
+  escalation_policy_id uuid NOT NULL,
+  escalation_policy_version integer NOT NULL,
+  escalation_level integer NOT NULL,
+  escalation_round integer NOT NULL,
+  escalation_exhausted boolean NOT NULL,
+  acknowledged_at timestamptz,
   CONSTRAINT incidents_pkey PRIMARY KEY (id),
   CONSTRAINT incidents_number_key UNIQUE (number),
   CONSTRAINT incidents_status_check CHECK (status IN ('triggered', 'acknowledged', 'resolved')),
@@ -46,12 +52,12 @@ CREATE TABLE timeline_entries (
   id uuid NOT NULL,
   incident_id uuid NOT NULL,
   type text NOT NULL,
-  alert_id uuid,
   summary text NOT NULL,
+  details bytea NOT NULL,
   created_at timestamptz NOT NULL,
   CONSTRAINT timeline_entries_pkey PRIMARY KEY (id),
   CONSTRAINT timeline_entries_incident_id_fkey FOREIGN KEY (incident_id) REFERENCES incidents (id) ON DELETE CASCADE,
-  CONSTRAINT timeline_entries_type_check CHECK (type IN ('triggered', 'alerted', 'acknowledged', 'resolved'))
+  CONSTRAINT timeline_entries_type_check CHECK (type IN ('triggered', 'alerted', 'acknowledged', 'resolved', 'escalated', 'escalation_skipped', 'escalation_exhausted'))
 );
 
 CREATE INDEX timeline_entries_incident_id_id_idx ON timeline_entries (incident_id, id);
@@ -63,3 +69,19 @@ CREATE TABLE handled_messages (
 );
 
 CREATE INDEX handled_messages_created_at_idx ON handled_messages (created_at);
+
+CREATE TABLE scheduled_messages (
+  id uuid NOT NULL,
+  incident_id uuid NOT NULL,
+  kind text NOT NULL,
+  due_at timestamptz NOT NULL,
+  claimed_until timestamptz,
+  envelope bytea NOT NULL,
+  created_at timestamptz NOT NULL,
+  CONSTRAINT scheduled_messages_pkey PRIMARY KEY (id),
+  CONSTRAINT scheduled_messages_incident_id_fkey FOREIGN KEY (incident_id) REFERENCES incidents (id) ON DELETE CASCADE,
+  CONSTRAINT scheduled_messages_kind_check CHECK (kind IN ('event', 'timer'))
+);
+
+CREATE INDEX scheduled_messages_due_at_id_idx ON scheduled_messages (due_at, id);
+CREATE INDEX scheduled_messages_incident_id_kind_idx ON scheduled_messages (incident_id, kind);

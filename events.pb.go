@@ -30,6 +30,8 @@ type Envelope struct {
 	// Types that are valid to be assigned to Event:
 	//
 	//	*Envelope_Alert
+	//	*Envelope_Incident
+	//	*Envelope_Timer
 	Event         isEnvelope_Event `protobuf_oneof:"event"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -102,6 +104,24 @@ func (x *Envelope) GetAlert() *AlertEvent {
 	return nil
 }
 
+func (x *Envelope) GetIncident() *IncidentEvent {
+	if x != nil {
+		if x, ok := x.Event.(*Envelope_Incident); ok {
+			return x.Incident
+		}
+	}
+	return nil
+}
+
+func (x *Envelope) GetTimer() *TimerEvent {
+	if x != nil {
+		if x, ok := x.Event.(*Envelope_Timer); ok {
+			return x.Timer
+		}
+	}
+	return nil
+}
+
 type isEnvelope_Event interface {
 	isEnvelope_Event()
 }
@@ -110,20 +130,34 @@ type Envelope_Alert struct {
 	Alert *AlertEvent `protobuf:"bytes,10,opt,name=alert,proto3,oneof"`
 }
 
+type Envelope_Incident struct {
+	Incident *IncidentEvent `protobuf:"bytes,11,opt,name=incident,proto3,oneof"`
+}
+
+type Envelope_Timer struct {
+	Timer *TimerEvent `protobuf:"bytes,12,opt,name=timer,proto3,oneof"`
+}
+
 func (*Envelope_Alert) isEnvelope_Event() {}
+
+func (*Envelope_Incident) isEnvelope_Event() {}
+
+func (*Envelope_Timer) isEnvelope_Event() {}
 
 var File_murphy_v1_events_proto protoreflect.FileDescriptor
 
 const file_murphy_v1_events_proto_rawDesc = "" +
 	"\n" +
-	"\x16murphy/v1/events.proto\x12\tmurphy.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15murphy/v1/alert.proto\"\x9c\x02\n" +
+	"\x16murphy/v1/events.proto\x12\tmurphy.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15murphy/v1/alert.proto\x1a\x18murphy/v1/incident.proto\"\x83\x03\n" +
 	"\bEnvelope\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12;\n" +
 	"\voccurred_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"occurredAt\x12J\n" +
 	"\rtrace_context\x18\x03 \x03(\v2%.murphy.v1.Envelope.TraceContextEntryR\ftraceContext\x12-\n" +
 	"\x05alert\x18\n" +
-	" \x01(\v2\x15.murphy.v1.AlertEventH\x00R\x05alert\x1a?\n" +
+	" \x01(\v2\x15.murphy.v1.AlertEventH\x00R\x05alert\x126\n" +
+	"\bincident\x18\v \x01(\v2\x18.murphy.v1.IncidentEventH\x00R\bincident\x12-\n" +
+	"\x05timer\x18\f \x01(\v2\x15.murphy.v1.TimerEventH\x00R\x05timer\x1a?\n" +
 	"\x11TraceContextEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01B\a\n" +
@@ -147,16 +181,20 @@ var file_murphy_v1_events_proto_goTypes = []any{
 	nil,                           // 1: murphy.v1.Envelope.TraceContextEntry
 	(*timestamppb.Timestamp)(nil), // 2: google.protobuf.Timestamp
 	(*AlertEvent)(nil),            // 3: murphy.v1.AlertEvent
+	(*IncidentEvent)(nil),         // 4: murphy.v1.IncidentEvent
+	(*TimerEvent)(nil),            // 5: murphy.v1.TimerEvent
 }
 var file_murphy_v1_events_proto_depIdxs = []int32{
 	2, // 0: murphy.v1.Envelope.occurred_at:type_name -> google.protobuf.Timestamp
 	1, // 1: murphy.v1.Envelope.trace_context:type_name -> murphy.v1.Envelope.TraceContextEntry
 	3, // 2: murphy.v1.Envelope.alert:type_name -> murphy.v1.AlertEvent
-	3, // [3:3] is the sub-list for method output_type
-	3, // [3:3] is the sub-list for method input_type
-	3, // [3:3] is the sub-list for extension type_name
-	3, // [3:3] is the sub-list for extension extendee
-	0, // [0:3] is the sub-list for field type_name
+	4, // 3: murphy.v1.Envelope.incident:type_name -> murphy.v1.IncidentEvent
+	5, // 4: murphy.v1.Envelope.timer:type_name -> murphy.v1.TimerEvent
+	5, // [5:5] is the sub-list for method output_type
+	5, // [5:5] is the sub-list for method input_type
+	5, // [5:5] is the sub-list for extension type_name
+	5, // [5:5] is the sub-list for extension extendee
+	0, // [0:5] is the sub-list for field type_name
 }
 
 func init() { file_murphy_v1_events_proto_init() }
@@ -165,8 +203,11 @@ func file_murphy_v1_events_proto_init() {
 		return
 	}
 	file_murphy_v1_alert_proto_init()
+	file_murphy_v1_incident_proto_init()
 	file_murphy_v1_events_proto_msgTypes[0].OneofWrappers = []any{
 		(*Envelope_Alert)(nil),
+		(*Envelope_Incident)(nil),
+		(*Envelope_Timer)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{

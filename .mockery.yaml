@@ -17,3 +17,6 @@ packages:
     interfaces:
       Repository: {}
       Catalog: {}
+      Policies: {}
+      OnCall: {}
+      People: {}

@@ -52,6 +52,16 @@ func (s *Server) GetIncident(ctx context.Context, request GetIncidentRequestObje
 		if id := entry.GetAlertId(); id != "" {
 			entries[i].AlertId = &id
 		}
+		if escalation := entry.GetEscalation(); escalation != nil {
+			out := &TimelineEscalation{Level: escalation.GetLevel(), Round: escalation.GetRound(), Paged: []Page{}, ReachedNobody: []EscalationTarget{}}
+			for _, page := range escalation.GetPaged() {
+				out.Paged = append(out.Paged, Page{User: Reference{Id: page.GetUserId()}, Via: toTarget(page.GetVia())})
+			}
+			for _, target := range escalation.GetReachedNobody() {
+				out.ReachedNobody = append(out.ReachedNobody, toTarget(target))
+			}
+			entries[i].Escalation = out
+		}
 	}
 	return GetIncident200JSONResponse{
 		Id:         out.Id,
@@ -65,6 +75,9 @@ func (s *Server) GetIncident(ctx context.Context, request GetIncidentRequestObje
 		UpdatedAt:  out.UpdatedAt,
 		ResolvedAt: out.ResolvedAt,
 		Timeline:   entries,
+
+		AcknowledgedAt: out.AcknowledgedAt,
+		Escalation:     out.Escalation,
 	}, nil
 }
 
@@ -84,5 +97,43 @@ func toIncident(incident *murphy.Incident) Incident {
 		t := at.AsTime()
 		out.ResolvedAt = &t
 	}
+	if at := incident.GetAcknowledgedAt(); at != nil {
+		t := at.AsTime()
+		out.AcknowledgedAt = &t
+	}
+	if incident.GetEscalationPolicyId() != "" {
+		out.Escalation = &IncidentEscalation{
+			Policy:    PolicyVersionReference{Id: incident.GetEscalationPolicyId(), Version: incident.GetEscalationPolicyVersion()},
+			Level:     incident.GetEscalationLevel(),
+			Round:     incident.GetEscalationRound(),
+			Exhausted: incident.GetEscalationExhausted(),
+		}
+	}
 	return out
+}
+
+func (s *Server) AcknowledgeIncident(ctx context.Context, request AcknowledgeIncidentRequestObject) (_ AcknowledgeIncidentResponseObject, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	incident, err := s.incidents.Acknowledge(ctx, request.Id)
+	if err != nil {
+		return nil, err
+	}
+	return AcknowledgeIncident200JSONResponse(toIncident(incident)), nil
+}
+
+func (s *Server) ResolveIncident(ctx context.Context, request ResolveIncidentRequestObject) (_ ResolveIncidentResponseObject, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	incident, err := s.incidents.Resolve(ctx, request.Id)
+	if err != nil {
+		return nil, err
+	}
+	return ResolveIncident200JSONResponse(toIncident(incident)), nil
+}
+
+func toTarget(target *murphy.EscalationTarget) EscalationTarget {
+	return EscalationTarget{Type: EscalationTargetType(target.GetType().Text()), Id: target.GetId()}
 }

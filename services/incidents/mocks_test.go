@@ -49,6 +49,143 @@ func (_m *MockRepository) EXPECT() *MockRepository_Expecter {
 	return &MockRepository_Expecter{mock: &_m.Mock}
 }
 
+// ClaimDueMessages provides a mock function for the type MockRepository
+func (_mock *MockRepository) ClaimDueMessages(ctx context.Context, now time.Time, limit int, lease time.Duration) ([]*incidents.ScheduledMessage, error) {
+	ret := _mock.Called(ctx, now, limit, lease)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ClaimDueMessages")
+	}
+
+	var r0 []*incidents.ScheduledMessage
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, time.Time, int, time.Duration) ([]*incidents.ScheduledMessage, error)); ok {
+		return returnFunc(ctx, now, limit, lease)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, time.Time, int, time.Duration) []*incidents.ScheduledMessage); ok {
+		r0 = returnFunc(ctx, now, limit, lease)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*incidents.ScheduledMessage)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, time.Time, int, time.Duration) error); ok {
+		r1 = returnFunc(ctx, now, limit, lease)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockRepository_ClaimDueMessages_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ClaimDueMessages'
+type MockRepository_ClaimDueMessages_Call struct {
+	*mock.Call
+}
+
+// ClaimDueMessages is a helper method to define mock.On call
+//   - ctx context.Context
+//   - now time.Time
+//   - limit int
+//   - lease time.Duration
+func (_e *MockRepository_Expecter) ClaimDueMessages(ctx any, now any, limit any, lease any) *MockRepository_ClaimDueMessages_Call {
+	return &MockRepository_ClaimDueMessages_Call{Call: _e.mock.On("ClaimDueMessages", ctx, now, limit, lease)}
+}
+
+func (_c *MockRepository_ClaimDueMessages_Call) Run(run func(ctx context.Context, now time.Time, limit int, lease time.Duration)) *MockRepository_ClaimDueMessages_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 time.Time
+		if args[1] != nil {
+			arg1 = args[1].(time.Time)
+		}
+		var arg2 int
+		if args[2] != nil {
+			arg2 = args[2].(int)
+		}
+		var arg3 time.Duration
+		if args[3] != nil {
+			arg3 = args[3].(time.Duration)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_ClaimDueMessages_Call) Return(scheduledMessages []*incidents.ScheduledMessage, err error) *MockRepository_ClaimDueMessages_Call {
+	_c.Call.Return(scheduledMessages, err)
+	return _c
+}
+
+func (_c *MockRepository_ClaimDueMessages_Call) RunAndReturn(run func(ctx context.Context, now time.Time, limit int, lease time.Duration) ([]*incidents.ScheduledMessage, error)) *MockRepository_ClaimDueMessages_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// DeleteMessages provides a mock function for the type MockRepository
+func (_mock *MockRepository) DeleteMessages(ctx context.Context, ids []string) error {
+	ret := _mock.Called(ctx, ids)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteMessages")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, []string) error); ok {
+		r0 = returnFunc(ctx, ids)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockRepository_DeleteMessages_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteMessages'
+type MockRepository_DeleteMessages_Call struct {
+	*mock.Call
+}
+
+// DeleteMessages is a helper method to define mock.On call
+//   - ctx context.Context
+//   - ids []string
+func (_e *MockRepository_Expecter) DeleteMessages(ctx any, ids any) *MockRepository_DeleteMessages_Call {
+	return &MockRepository_DeleteMessages_Call{Call: _e.mock.On("DeleteMessages", ctx, ids)}
+}
+
+func (_c *MockRepository_DeleteMessages_Call) Run(run func(ctx context.Context, ids []string)) *MockRepository_DeleteMessages_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 []string
+		if args[1] != nil {
+			arg1 = args[1].([]string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_DeleteMessages_Call) Return(err error) *MockRepository_DeleteMessages_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockRepository_DeleteMessages_Call) RunAndReturn(run func(ctx context.Context, ids []string) error) *MockRepository_DeleteMessages_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // FindOpenIncident provides a mock function for the type MockRepository
 func (_mock *MockRepository) FindOpenIncident(ctx context.Context, serviceID string, dedupKey string) (*murphy.Incident, error) {
 	ret := _mock.Called(ctx, serviceID, dedupKey)
@@ -539,53 +676,53 @@ func (_c *MockRepository_PurgeHandledMessages_Call) RunAndReturn(run func(ctx co
 	return _c
 }
 
-// RecordAlert provides a mock function for the type MockRepository
-func (_mock *MockRepository) RecordAlert(ctx context.Context, outcome *incidents.AlertOutcome) (bool, error) {
-	ret := _mock.Called(ctx, outcome)
+// Record provides a mock function for the type MockRepository
+func (_mock *MockRepository) Record(ctx context.Context, change *incidents.Change) (bool, error) {
+	ret := _mock.Called(ctx, change)
 
 	if len(ret) == 0 {
-		panic("no return value specified for RecordAlert")
+		panic("no return value specified for Record")
 	}
 
 	var r0 bool
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *incidents.AlertOutcome) (bool, error)); ok {
-		return returnFunc(ctx, outcome)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *incidents.Change) (bool, error)); ok {
+		return returnFunc(ctx, change)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *incidents.AlertOutcome) bool); ok {
-		r0 = returnFunc(ctx, outcome)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *incidents.Change) bool); ok {
+		r0 = returnFunc(ctx, change)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, *incidents.AlertOutcome) error); ok {
-		r1 = returnFunc(ctx, outcome)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *incidents.Change) error); ok {
+		r1 = returnFunc(ctx, change)
 	} else {
 		r1 = ret.Error(1)
 	}
 	return r0, r1
 }
 
-// MockRepository_RecordAlert_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RecordAlert'
-type MockRepository_RecordAlert_Call struct {
+// MockRepository_Record_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Record'
+type MockRepository_Record_Call struct {
 	*mock.Call
 }
 
-// RecordAlert is a helper method to define mock.On call
+// Record is a helper method to define mock.On call
 //   - ctx context.Context
-//   - outcome *incidents.AlertOutcome
-func (_e *MockRepository_Expecter) RecordAlert(ctx any, outcome any) *MockRepository_RecordAlert_Call {
-	return &MockRepository_RecordAlert_Call{Call: _e.mock.On("RecordAlert", ctx, outcome)}
+//   - change *incidents.Change
+func (_e *MockRepository_Expecter) Record(ctx any, change any) *MockRepository_Record_Call {
+	return &MockRepository_Record_Call{Call: _e.mock.On("Record", ctx, change)}
 }
 
-func (_c *MockRepository_RecordAlert_Call) Run(run func(ctx context.Context, outcome *incidents.AlertOutcome)) *MockRepository_RecordAlert_Call {
+func (_c *MockRepository_Record_Call) Run(run func(ctx context.Context, change *incidents.Change)) *MockRepository_Record_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
 			arg0 = args[0].(context.Context)
 		}
-		var arg1 *incidents.AlertOutcome
+		var arg1 *incidents.Change
 		if args[1] != nil {
-			arg1 = args[1].(*incidents.AlertOutcome)
+			arg1 = args[1].(*incidents.Change)
 		}
 		run(
 			arg0,
@@ -595,12 +732,12 @@ func (_c *MockRepository_RecordAlert_Call) Run(run func(ctx context.Context, out
 	return _c
 }
 
-func (_c *MockRepository_RecordAlert_Call) Return(recorded bool, err error) *MockRepository_RecordAlert_Call {
+func (_c *MockRepository_Record_Call) Return(recorded bool, err error) *MockRepository_Record_Call {
 	_c.Call.Return(recorded, err)
 	return _c
 }
 
-func (_c *MockRepository_RecordAlert_Call) RunAndReturn(run func(ctx context.Context, outcome *incidents.AlertOutcome) (bool, error)) *MockRepository_RecordAlert_Call {
+func (_c *MockRepository_Record_Call) RunAndReturn(run func(ctx context.Context, change *incidents.Change) (bool, error)) *MockRepository_Record_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -773,6 +910,398 @@ func (_c *MockCatalog_GetService_Call) Return(service *murphy.Service, err error
 }
 
 func (_c *MockCatalog_GetService_Call) RunAndReturn(run func(ctx context.Context, id string) (*murphy.Service, error)) *MockCatalog_GetService_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// NewMockPolicies creates a new instance of MockPolicies. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
+// The first argument is typically a *testing.T value.
+func NewMockPolicies(t interface {
+	mock.TestingT
+	Cleanup(func())
+}) *MockPolicies {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
+	mock := &MockPolicies{}
+	mock.Mock.Test(t)
+
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
+
+	return mock
+}
+
+// MockPolicies is an autogenerated mock type for the Policies type
+type MockPolicies struct {
+	mock.Mock
+}
+
+type MockPolicies_Expecter struct {
+	mock *mock.Mock
+}
+
+func (_m *MockPolicies) EXPECT() *MockPolicies_Expecter {
+	return &MockPolicies_Expecter{mock: &_m.Mock}
+}
+
+// GetPolicy provides a mock function for the type MockPolicies
+func (_mock *MockPolicies) GetPolicy(ctx context.Context, id string) (*murphy.EscalationPolicy, error) {
+	ret := _mock.Called(ctx, id)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetPolicy")
+	}
+
+	var r0 *murphy.EscalationPolicy
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (*murphy.EscalationPolicy, error)); ok {
+		return returnFunc(ctx, id)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) *murphy.EscalationPolicy); ok {
+		r0 = returnFunc(ctx, id)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*murphy.EscalationPolicy)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = returnFunc(ctx, id)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockPolicies_GetPolicy_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetPolicy'
+type MockPolicies_GetPolicy_Call struct {
+	*mock.Call
+}
+
+// GetPolicy is a helper method to define mock.On call
+//   - ctx context.Context
+//   - id string
+func (_e *MockPolicies_Expecter) GetPolicy(ctx any, id any) *MockPolicies_GetPolicy_Call {
+	return &MockPolicies_GetPolicy_Call{Call: _e.mock.On("GetPolicy", ctx, id)}
+}
+
+func (_c *MockPolicies_GetPolicy_Call) Run(run func(ctx context.Context, id string)) *MockPolicies_GetPolicy_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockPolicies_GetPolicy_Call) Return(escalationPolicy *murphy.EscalationPolicy, err error) *MockPolicies_GetPolicy_Call {
+	_c.Call.Return(escalationPolicy, err)
+	return _c
+}
+
+func (_c *MockPolicies_GetPolicy_Call) RunAndReturn(run func(ctx context.Context, id string) (*murphy.EscalationPolicy, error)) *MockPolicies_GetPolicy_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetPolicyVersion provides a mock function for the type MockPolicies
+func (_mock *MockPolicies) GetPolicyVersion(ctx context.Context, id string, version int32) (*murphy.EscalationPolicy, error) {
+	ret := _mock.Called(ctx, id, version)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetPolicyVersion")
+	}
+
+	var r0 *murphy.EscalationPolicy
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, int32) (*murphy.EscalationPolicy, error)); ok {
+		return returnFunc(ctx, id, version)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, int32) *murphy.EscalationPolicy); ok {
+		r0 = returnFunc(ctx, id, version)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*murphy.EscalationPolicy)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, int32) error); ok {
+		r1 = returnFunc(ctx, id, version)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockPolicies_GetPolicyVersion_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetPolicyVersion'
+type MockPolicies_GetPolicyVersion_Call struct {
+	*mock.Call
+}
+
+// GetPolicyVersion is a helper method to define mock.On call
+//   - ctx context.Context
+//   - id string
+//   - version int32
+func (_e *MockPolicies_Expecter) GetPolicyVersion(ctx any, id any, version any) *MockPolicies_GetPolicyVersion_Call {
+	return &MockPolicies_GetPolicyVersion_Call{Call: _e.mock.On("GetPolicyVersion", ctx, id, version)}
+}
+
+func (_c *MockPolicies_GetPolicyVersion_Call) Run(run func(ctx context.Context, id string, version int32)) *MockPolicies_GetPolicyVersion_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 int32
+		if args[2] != nil {
+			arg2 = args[2].(int32)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockPolicies_GetPolicyVersion_Call) Return(escalationPolicy *murphy.EscalationPolicy, err error) *MockPolicies_GetPolicyVersion_Call {
+	_c.Call.Return(escalationPolicy, err)
+	return _c
+}
+
+func (_c *MockPolicies_GetPolicyVersion_Call) RunAndReturn(run func(ctx context.Context, id string, version int32) (*murphy.EscalationPolicy, error)) *MockPolicies_GetPolicyVersion_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// NewMockOnCall creates a new instance of MockOnCall. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
+// The first argument is typically a *testing.T value.
+func NewMockOnCall(t interface {
+	mock.TestingT
+	Cleanup(func())
+}) *MockOnCall {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
+	mock := &MockOnCall{}
+	mock.Mock.Test(t)
+
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
+
+	return mock
+}
+
+// MockOnCall is an autogenerated mock type for the OnCall type
+type MockOnCall struct {
+	mock.Mock
+}
+
+type MockOnCall_Expecter struct {
+	mock *mock.Mock
+}
+
+func (_m *MockOnCall) EXPECT() *MockOnCall_Expecter {
+	return &MockOnCall_Expecter{mock: &_m.Mock}
+}
+
+// WhoIsOnCall provides a mock function for the type MockOnCall
+func (_mock *MockOnCall) WhoIsOnCall(ctx context.Context, scheduleIDs []string, at time.Time) (map[string]string, error) {
+	ret := _mock.Called(ctx, scheduleIDs, at)
+
+	if len(ret) == 0 {
+		panic("no return value specified for WhoIsOnCall")
+	}
+
+	var r0 map[string]string
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, []string, time.Time) (map[string]string, error)); ok {
+		return returnFunc(ctx, scheduleIDs, at)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, []string, time.Time) map[string]string); ok {
+		r0 = returnFunc(ctx, scheduleIDs, at)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(map[string]string)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, []string, time.Time) error); ok {
+		r1 = returnFunc(ctx, scheduleIDs, at)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockOnCall_WhoIsOnCall_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'WhoIsOnCall'
+type MockOnCall_WhoIsOnCall_Call struct {
+	*mock.Call
+}
+
+// WhoIsOnCall is a helper method to define mock.On call
+//   - ctx context.Context
+//   - scheduleIDs []string
+//   - at time.Time
+func (_e *MockOnCall_Expecter) WhoIsOnCall(ctx any, scheduleIDs any, at any) *MockOnCall_WhoIsOnCall_Call {
+	return &MockOnCall_WhoIsOnCall_Call{Call: _e.mock.On("WhoIsOnCall", ctx, scheduleIDs, at)}
+}
+
+func (_c *MockOnCall_WhoIsOnCall_Call) Run(run func(ctx context.Context, scheduleIDs []string, at time.Time)) *MockOnCall_WhoIsOnCall_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 []string
+		if args[1] != nil {
+			arg1 = args[1].([]string)
+		}
+		var arg2 time.Time
+		if args[2] != nil {
+			arg2 = args[2].(time.Time)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockOnCall_WhoIsOnCall_Call) Return(stringToString map[string]string, err error) *MockOnCall_WhoIsOnCall_Call {
+	_c.Call.Return(stringToString, err)
+	return _c
+}
+
+func (_c *MockOnCall_WhoIsOnCall_Call) RunAndReturn(run func(ctx context.Context, scheduleIDs []string, at time.Time) (map[string]string, error)) *MockOnCall_WhoIsOnCall_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// NewMockPeople creates a new instance of MockPeople. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
+// The first argument is typically a *testing.T value.
+func NewMockPeople(t interface {
+	mock.TestingT
+	Cleanup(func())
+}) *MockPeople {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
+	mock := &MockPeople{}
+	mock.Mock.Test(t)
+
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
+
+	return mock
+}
+
+// MockPeople is an autogenerated mock type for the People type
+type MockPeople struct {
+	mock.Mock
+}
+
+type MockPeople_Expecter struct {
+	mock *mock.Mock
+}
+
+func (_m *MockPeople) EXPECT() *MockPeople_Expecter {
+	return &MockPeople_Expecter{mock: &_m.Mock}
+}
+
+// ActiveUsers provides a mock function for the type MockPeople
+func (_mock *MockPeople) ActiveUsers(ctx context.Context, ids []string) (map[string]bool, error) {
+	ret := _mock.Called(ctx, ids)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ActiveUsers")
+	}
+
+	var r0 map[string]bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, []string) (map[string]bool, error)); ok {
+		return returnFunc(ctx, ids)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, []string) map[string]bool); ok {
+		r0 = returnFunc(ctx, ids)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(map[string]bool)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, []string) error); ok {
+		r1 = returnFunc(ctx, ids)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockPeople_ActiveUsers_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ActiveUsers'
+type MockPeople_ActiveUsers_Call struct {
+	*mock.Call
+}
+
+// ActiveUsers is a helper method to define mock.On call
+//   - ctx context.Context
+//   - ids []string
+func (_e *MockPeople_Expecter) ActiveUsers(ctx any, ids any) *MockPeople_ActiveUsers_Call {
+	return &MockPeople_ActiveUsers_Call{Call: _e.mock.On("ActiveUsers", ctx, ids)}
+}
+
+func (_c *MockPeople_ActiveUsers_Call) Run(run func(ctx context.Context, ids []string)) *MockPeople_ActiveUsers_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 []string
+		if args[1] != nil {
+			arg1 = args[1].([]string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockPeople_ActiveUsers_Call) Return(stringToBool map[string]bool, err error) *MockPeople_ActiveUsers_Call {
+	_c.Call.Return(stringToBool, err)
+	return _c
+}
+
+func (_c *MockPeople_ActiveUsers_Call) RunAndReturn(run func(ctx context.Context, ids []string) (map[string]bool, error)) *MockPeople_ActiveUsers_Call {
 	_c.Call.Return(run)
 	return _c
 }

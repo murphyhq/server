@@ -13,6 +13,33 @@ import (
 	"time"
 )
 
+const claimMessages = `-- name: ClaimMessages :exec
+UPDATE scheduled_messages
+SET claimed_until = ?
+WHERE id IN (/*SLICE:ids*/?)
+`
+
+type ClaimMessagesParams struct {
+	ClaimedUntil *time.Time
+	Ids          []string
+}
+
+func (q *Queries) ClaimMessages(ctx context.Context, arg ClaimMessagesParams) error {
+	query := claimMessages
+	var queryParams []interface{}
+	queryParams = append(queryParams, arg.ClaimedUntil)
+	if len(arg.Ids) > 0 {
+		for _, v := range arg.Ids {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:ids*/?", strings.Repeat(",?", len(arg.Ids))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:ids*/?", "NULL", 1)
+	}
+	_, err := q.db.ExecContext(ctx, query, queryParams...)
+	return err
+}
+
 const createAlert = `-- name: CreateAlert :exec
 INSERT INTO alerts (id, incident_id, integration_id, service_id, dedup_key, status, summary, labels, received_at, created_at, source, instance, annotations)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -54,21 +81,27 @@ func (q *Queries) CreateAlert(ctx context.Context, arg CreateAlertParams) error 
 }
 
 const createIncident = `-- name: CreateIncident :execresult
-INSERT INTO incidents (id, service_id, dedup_key, title, status, urgency, version, created_at, updated_at, resolved_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+INSERT INTO incidents (id, service_id, dedup_key, title, status, urgency, version, created_at, updated_at, resolved_at, escalation_policy_id, escalation_policy_version, escalation_level, escalation_round, escalation_exhausted, acknowledged_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type CreateIncidentParams struct {
-	ID         string
-	ServiceID  string
-	DedupKey   string
-	Title      string
-	Status     string
-	Urgency    string
-	Version    int32
-	CreatedAt  time.Time
-	UpdatedAt  time.Time
-	ResolvedAt *time.Time
+	ID                      string
+	ServiceID               string
+	DedupKey                string
+	Title                   string
+	Status                  string
+	Urgency                 string
+	Version                 int32
+	CreatedAt               time.Time
+	UpdatedAt               time.Time
+	ResolvedAt              *time.Time
+	EscalationPolicyID      string
+	EscalationPolicyVersion int32
+	EscalationLevel         int32
+	EscalationRound         int32
+	EscalationExhausted     bool
+	AcknowledgedAt          *time.Time
 }
 
 func (q *Queries) CreateIncident(ctx context.Context, arg CreateIncidentParams) (sql.Result, error) {
@@ -83,11 +116,17 @@ func (q *Queries) CreateIncident(ctx context.Context, arg CreateIncidentParams) 
 		arg.CreatedAt,
 		arg.UpdatedAt,
 		arg.ResolvedAt,
+		arg.EscalationPolicyID,
+		arg.EscalationPolicyVersion,
+		arg.EscalationLevel,
+		arg.EscalationRound,
+		arg.EscalationExhausted,
+		arg.AcknowledgedAt,
 	)
 }
 
 const createTimelineEntry = `-- name: CreateTimelineEntry :exec
-INSERT INTO timeline_entries (id, incident_id, type, alert_id, summary, created_at)
+INSERT INTO timeline_entries (id, incident_id, type, summary, details, created_at)
 VALUES (?, ?, ?, ?, ?, ?)
 `
 
@@ -95,8 +134,8 @@ type CreateTimelineEntryParams struct {
 	ID         string
 	IncidentID string
 	Type       string
-	AlertID    *string
 	Summary    string
+	Details    []byte
 	CreatedAt  time.Time
 }
 
@@ -105,15 +144,45 @@ func (q *Queries) CreateTimelineEntry(ctx context.Context, arg CreateTimelineEnt
 		arg.ID,
 		arg.IncidentID,
 		arg.Type,
-		arg.AlertID,
 		arg.Summary,
+		arg.Details,
 		arg.CreatedAt,
 	)
 	return err
 }
 
+const deleteMessages = `-- name: DeleteMessages :exec
+DELETE FROM scheduled_messages
+WHERE id IN (/*SLICE:ids*/?)
+`
+
+func (q *Queries) DeleteMessages(ctx context.Context, ids []string) error {
+	query := deleteMessages
+	var queryParams []interface{}
+	if len(ids) > 0 {
+		for _, v := range ids {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:ids*/?", strings.Repeat(",?", len(ids))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:ids*/?", "NULL", 1)
+	}
+	_, err := q.db.ExecContext(ctx, query, queryParams...)
+	return err
+}
+
+const deleteTimers = `-- name: DeleteTimers :exec
+DELETE FROM scheduled_messages
+WHERE incident_id = ? AND kind = 'timer'
+`
+
+func (q *Queries) DeleteTimers(ctx context.Context, incidentID string) error {
+	_, err := q.db.ExecContext(ctx, deleteTimers, incidentID)
+	return err
+}
+
 const findOpenIncident = `-- name: FindOpenIncident :one
-SELECT id, number, service_id, dedup_key, title, status, urgency, version, created_at, updated_at, resolved_at
+SELECT id, number, service_id, dedup_key, title, status, urgency, version, created_at, updated_at, resolved_at, escalation_policy_id, escalation_policy_version, escalation_level, escalation_round, escalation_exhausted, acknowledged_at
 FROM incidents
 WHERE service_id = ? AND dedup_key = ? AND status <> 'resolved'
 `
@@ -124,17 +193,23 @@ type FindOpenIncidentParams struct {
 }
 
 type FindOpenIncidentRow struct {
-	ID         string
-	Number     int64
-	ServiceID  string
-	DedupKey   string
-	Title      string
-	Status     string
-	Urgency    string
-	Version    int32
-	CreatedAt  time.Time
-	UpdatedAt  time.Time
-	ResolvedAt *time.Time
+	ID                      string
+	Number                  int64
+	ServiceID               string
+	DedupKey                string
+	Title                   string
+	Status                  string
+	Urgency                 string
+	Version                 int32
+	CreatedAt               time.Time
+	UpdatedAt               time.Time
+	ResolvedAt              *time.Time
+	EscalationPolicyID      string
+	EscalationPolicyVersion int32
+	EscalationLevel         int32
+	EscalationRound         int32
+	EscalationExhausted     bool
+	AcknowledgedAt          *time.Time
 }
 
 func (q *Queries) FindOpenIncident(ctx context.Context, arg FindOpenIncidentParams) (FindOpenIncidentRow, error) {
@@ -152,28 +227,40 @@ func (q *Queries) FindOpenIncident(ctx context.Context, arg FindOpenIncidentPara
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ResolvedAt,
+		&i.EscalationPolicyID,
+		&i.EscalationPolicyVersion,
+		&i.EscalationLevel,
+		&i.EscalationRound,
+		&i.EscalationExhausted,
+		&i.AcknowledgedAt,
 	)
 	return i, err
 }
 
 const getIncident = `-- name: GetIncident :one
-SELECT id, number, service_id, dedup_key, title, status, urgency, version, created_at, updated_at, resolved_at
+SELECT id, number, service_id, dedup_key, title, status, urgency, version, created_at, updated_at, resolved_at, escalation_policy_id, escalation_policy_version, escalation_level, escalation_round, escalation_exhausted, acknowledged_at
 FROM incidents
 WHERE id = ?
 `
 
 type GetIncidentRow struct {
-	ID         string
-	Number     int64
-	ServiceID  string
-	DedupKey   string
-	Title      string
-	Status     string
-	Urgency    string
-	Version    int32
-	CreatedAt  time.Time
-	UpdatedAt  time.Time
-	ResolvedAt *time.Time
+	ID                      string
+	Number                  int64
+	ServiceID               string
+	DedupKey                string
+	Title                   string
+	Status                  string
+	Urgency                 string
+	Version                 int32
+	CreatedAt               time.Time
+	UpdatedAt               time.Time
+	ResolvedAt              *time.Time
+	EscalationPolicyID      string
+	EscalationPolicyVersion int32
+	EscalationLevel         int32
+	EscalationRound         int32
+	EscalationExhausted     bool
+	AcknowledgedAt          *time.Time
 }
 
 func (q *Queries) GetIncident(ctx context.Context, id string) (GetIncidentRow, error) {
@@ -191,6 +278,12 @@ func (q *Queries) GetIncident(ctx context.Context, id string) (GetIncidentRow, e
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.ResolvedAt,
+		&i.EscalationPolicyID,
+		&i.EscalationPolicyVersion,
+		&i.EscalationLevel,
+		&i.EscalationRound,
+		&i.EscalationExhausted,
+		&i.AcknowledgedAt,
 	)
 	return i, err
 }
@@ -211,7 +304,7 @@ func (q *Queries) LatestFiringAt(ctx context.Context, incidentID *string) (time.
 }
 
 const listIncidents = `-- name: ListIncidents :many
-SELECT id, number, service_id, dedup_key, title, status, urgency, version, created_at, updated_at, resolved_at
+SELECT id, number, service_id, dedup_key, title, status, urgency, version, created_at, updated_at, resolved_at, escalation_policy_id, escalation_policy_version, escalation_level, escalation_round, escalation_exhausted, acknowledged_at
 FROM incidents
 WHERE id < ?
   AND (? OR status IN (/*SLICE:statuses*/?))
@@ -230,17 +323,23 @@ type ListIncidentsParams struct {
 }
 
 type ListIncidentsRow struct {
-	ID         string
-	Number     int64
-	ServiceID  string
-	DedupKey   string
-	Title      string
-	Status     string
-	Urgency    string
-	Version    int32
-	CreatedAt  time.Time
-	UpdatedAt  time.Time
-	ResolvedAt *time.Time
+	ID                      string
+	Number                  int64
+	ServiceID               string
+	DedupKey                string
+	Title                   string
+	Status                  string
+	Urgency                 string
+	Version                 int32
+	CreatedAt               time.Time
+	UpdatedAt               time.Time
+	ResolvedAt              *time.Time
+	EscalationPolicyID      string
+	EscalationPolicyVersion int32
+	EscalationLevel         int32
+	EscalationRound         int32
+	EscalationExhausted     bool
+	AcknowledgedAt          *time.Time
 }
 
 func (q *Queries) ListIncidents(ctx context.Context, arg ListIncidentsParams) ([]ListIncidentsRow, error) {
@@ -286,6 +385,12 @@ func (q *Queries) ListIncidents(ctx context.Context, arg ListIncidentsParams) ([
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.ResolvedAt,
+			&i.EscalationPolicyID,
+			&i.EscalationPolicyVersion,
+			&i.EscalationLevel,
+			&i.EscalationRound,
+			&i.EscalationExhausted,
+			&i.AcknowledgedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -301,28 +406,78 @@ func (q *Queries) ListIncidents(ctx context.Context, arg ListIncidentsParams) ([
 }
 
 const listTimeline = `-- name: ListTimeline :many
-SELECT id, incident_id, type, alert_id, summary, created_at
+SELECT id, details
 FROM timeline_entries
 WHERE incident_id = ?
 ORDER BY id
 `
 
-func (q *Queries) ListTimeline(ctx context.Context, incidentID string) ([]TimelineEntry, error) {
+type ListTimelineRow struct {
+	ID      string
+	Details []byte
+}
+
+func (q *Queries) ListTimeline(ctx context.Context, incidentID string) ([]ListTimelineRow, error) {
 	rows, err := q.db.QueryContext(ctx, listTimeline, incidentID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []TimelineEntry
+	var items []ListTimelineRow
 	for rows.Next() {
-		var i TimelineEntry
+		var i ListTimelineRow
+		if err := rows.Scan(&i.ID, &i.Details); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const lockDueMessages = `-- name: LockDueMessages :many
+SELECT id, incident_id, kind, due_at, envelope
+FROM scheduled_messages
+WHERE due_at <= ? AND (claimed_until IS NULL OR claimed_until <= ?)
+ORDER BY due_at, id
+LIMIT ?
+FOR UPDATE SKIP LOCKED
+`
+
+type LockDueMessagesParams struct {
+	Now            time.Time
+	ClaimsExpireBy *time.Time
+	Limit          int32
+}
+
+type LockDueMessagesRow struct {
+	ID         string
+	IncidentID string
+	Kind       string
+	DueAt      time.Time
+	Envelope   []byte
+}
+
+func (q *Queries) LockDueMessages(ctx context.Context, arg LockDueMessagesParams) ([]LockDueMessagesRow, error) {
+	rows, err := q.db.QueryContext(ctx, lockDueMessages, arg.Now, arg.ClaimsExpireBy, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []LockDueMessagesRow
+	for rows.Next() {
+		var i LockDueMessagesRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.IncidentID,
-			&i.Type,
-			&i.AlertID,
-			&i.Summary,
-			&i.CreatedAt,
+			&i.Kind,
+			&i.DueAt,
+			&i.Envelope,
 		); err != nil {
 			return nil, err
 		}
@@ -403,25 +558,35 @@ func (q *Queries) PurgeHandledMessages(ctx context.Context, before time.Time) (i
 
 const updateIncident = `-- name: UpdateIncident :execrows
 UPDATE incidents
-SET status = ?, resolved_at = ?, updated_at = ?, version = version + 1
+SET status = ?, resolved_at = ?, acknowledged_at = ?, escalation_level = ?, escalation_round = ?, escalation_exhausted = ?, updated_at = ?, version = ?
 WHERE id = ? AND version = ?
 `
 
 type UpdateIncidentParams struct {
-	Status     string
-	ResolvedAt *time.Time
-	UpdatedAt  time.Time
-	ID         string
-	Version    int32
+	Status              string
+	ResolvedAt          *time.Time
+	AcknowledgedAt      *time.Time
+	EscalationLevel     int32
+	EscalationRound     int32
+	EscalationExhausted bool
+	UpdatedAt           time.Time
+	Version             int32
+	ID                  string
+	PreviousVersion     int32
 }
 
 func (q *Queries) UpdateIncident(ctx context.Context, arg UpdateIncidentParams) (int64, error) {
 	result, err := q.db.ExecContext(ctx, updateIncident,
 		arg.Status,
 		arg.ResolvedAt,
+		arg.AcknowledgedAt,
+		arg.EscalationLevel,
+		arg.EscalationRound,
+		arg.EscalationExhausted,
 		arg.UpdatedAt,
-		arg.ID,
 		arg.Version,
+		arg.ID,
+		arg.PreviousVersion,
 	)
 	if err != nil {
 		return 0, err

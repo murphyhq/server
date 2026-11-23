@@ -5,8 +5,10 @@ import (
 	"database/sql"
 	"embed"
 	"errors"
+	"fmt"
 	"time"
 
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/murphyhq/server"
@@ -29,7 +31,7 @@ func Open(ctx context.Context, url string) (*Repository, error) {
 		URL:        url,
 		Service:    "incidents",
 		Migrations: migrations,
-		Tx:         func(tx murphymysql.DBTX) *Tx { return &Tx{queries: New(tx)} },
+		Tx:         func(tx murphymysql.DBTX) *Tx { return &Tx{tx: tx, queries: New(tx)} },
 	})
 	if err != nil {
 		return nil, err
@@ -95,14 +97,11 @@ func (r *Repository) ListTimeline(ctx context.Context, incidentID string) (_ []*
 	}
 	entries := make([]*murphy.TimelineEntry, len(rows))
 	for i, row := range rows {
-		entries[i] = &murphy.TimelineEntry{
-			Id:         row.ID,
-			IncidentId: row.IncidentID,
-			Type:       murphy.TimelineEntryTypeFromText(row.Type),
-			AlertId:    database.TextValue(row.AlertID),
-			Summary:    row.Summary,
-			At:         timestamppb.New(row.CreatedAt),
+		entry := &murphy.TimelineEntry{}
+		if err := proto.Unmarshal(row.Details, entry); err != nil {
+			return nil, fmt.Errorf("decode timeline entry %s: %w", row.ID, err)
 		}
+		entries[i] = entry
 	}
 	return entries, nil
 }
@@ -158,5 +157,22 @@ func toIncident(row GetIncidentRow) *murphy.Incident {
 		CreatedAt:  timestamppb.New(row.CreatedAt),
 		UpdatedAt:  timestamppb.New(row.UpdatedAt),
 		ResolvedAt: database.Timestamp(row.ResolvedAt),
+
+		EscalationPolicyId:      row.EscalationPolicyID,
+		EscalationPolicyVersion: row.EscalationPolicyVersion,
+		EscalationLevel:         row.EscalationLevel,
+		EscalationRound:         row.EscalationRound,
+		EscalationExhausted:     row.EscalationExhausted,
+		AcknowledgedAt:          database.Timestamp(row.AcknowledgedAt),
 	}
+}
+
+func (r *Repository) DeleteMessages(ctx context.Context, ids []string) (err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	if len(ids) == 0 {
+		return nil
+	}
+	return murphymysql.Error("scheduled message", r.queries.DeleteMessages(ctx, ids))
 }

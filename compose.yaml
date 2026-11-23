@@ -259,14 +259,24 @@ services:
       MURPHY_EVENTS_SUBSCRIPTION_URL: nats://nats:4222/events/engine
       MURPHY_CATALOG_DATABASE_URL: postgres://murphy:murphy@postgres:5432/catalog?sslmode=disable
       MURPHY_INCIDENTS_DATABASE_URL: postgres://murphy:murphy@postgres:5432/incidents?sslmode=disable
+      MURPHY_PEOPLE_DATABASE_URL: postgres://murphy:murphy@postgres:5432/people?sslmode=disable
+      MURPHY_ONCALL_DATABASE_URL: postgres://murphy:murphy@postgres:5432/oncall?sslmode=disable
+      MURPHY_ESCALATION_DATABASE_URL: postgres://murphy:murphy@postgres:5432/escalation?sslmode=disable
 
   scheduler:
     <<: *component
     command: ["sh", "-c", "go build -o /tmp/scheduler ./cmd/scheduler && exec /tmp/scheduler"]
+    environment:
+      <<: *component-environment
+      MURPHY_EVENTS_TOPIC_URL: nats://nats:4222/events
+      MURPHY_INCIDENTS_DATABASE_URL: postgres://murphy:murphy@postgres:5432/incidents?sslmode=disable
 
   notifier:
     <<: *component
     command: ["sh", "-c", "go build -o /tmp/notifier ./cmd/notifier && exec /tmp/notifier"]
+    environment:
+      <<: *component-environment
+      MURPHY_EVENTS_SUBSCRIPTION_URL: nats://nats:4222/events/notifier
 
   api-docs:
     image: nginx:1.27-alpine

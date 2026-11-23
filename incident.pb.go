@@ -22,6 +22,64 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type IncidentVerb int32
+
+const (
+	IncidentVerb_INCIDENT_VERB_UNSPECIFIED  IncidentVerb = 0
+	IncidentVerb_INCIDENT_VERB_CREATED      IncidentVerb = 1
+	IncidentVerb_INCIDENT_VERB_UPDATED      IncidentVerb = 2
+	IncidentVerb_INCIDENT_VERB_ESCALATED    IncidentVerb = 3
+	IncidentVerb_INCIDENT_VERB_ACKNOWLEDGED IncidentVerb = 4
+	IncidentVerb_INCIDENT_VERB_RESOLVED     IncidentVerb = 5
+)
+
+// Enum value maps for IncidentVerb.
+var (
+	IncidentVerb_name = map[int32]string{
+		0: "INCIDENT_VERB_UNSPECIFIED",
+		1: "INCIDENT_VERB_CREATED",
+		2: "INCIDENT_VERB_UPDATED",
+		3: "INCIDENT_VERB_ESCALATED",
+		4: "INCIDENT_VERB_ACKNOWLEDGED",
+		5: "INCIDENT_VERB_RESOLVED",
+	}
+	IncidentVerb_value = map[string]int32{
+		"INCIDENT_VERB_UNSPECIFIED":  0,
+		"INCIDENT_VERB_CREATED":      1,
+		"INCIDENT_VERB_UPDATED":      2,
+		"INCIDENT_VERB_ESCALATED":    3,
+		"INCIDENT_VERB_ACKNOWLEDGED": 4,
+		"INCIDENT_VERB_RESOLVED":     5,
+	}
+)
+
+func (x IncidentVerb) Enum() *IncidentVerb {
+	p := new(IncidentVerb)
+	*p = x
+	return p
+}
+
+func (x IncidentVerb) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (IncidentVerb) Descriptor() protoreflect.EnumDescriptor {
+	return file_murphy_v1_incident_proto_enumTypes[0].Descriptor()
+}
+
+func (IncidentVerb) Type() protoreflect.EnumType {
+	return &file_murphy_v1_incident_proto_enumTypes[0]
+}
+
+func (x IncidentVerb) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use IncidentVerb.Descriptor instead.
+func (IncidentVerb) EnumDescriptor() ([]byte, []int) {
+	return file_murphy_v1_incident_proto_rawDescGZIP(), []int{0}
+}
+
 type IncidentStatus int32
 
 const (
@@ -58,11 +116,11 @@ func (x IncidentStatus) String() string {
 }
 
 func (IncidentStatus) Descriptor() protoreflect.EnumDescriptor {
-	return file_murphy_v1_incident_proto_enumTypes[0].Descriptor()
+	return file_murphy_v1_incident_proto_enumTypes[1].Descriptor()
 }
 
 func (IncidentStatus) Type() protoreflect.EnumType {
-	return &file_murphy_v1_incident_proto_enumTypes[0]
+	return &file_murphy_v1_incident_proto_enumTypes[1]
 }
 
 func (x IncidentStatus) Number() protoreflect.EnumNumber {
@@ -71,17 +129,20 @@ func (x IncidentStatus) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use IncidentStatus.Descriptor instead.
 func (IncidentStatus) EnumDescriptor() ([]byte, []int) {
-	return file_murphy_v1_incident_proto_rawDescGZIP(), []int{0}
+	return file_murphy_v1_incident_proto_rawDescGZIP(), []int{1}
 }
 
 type TimelineEntryType int32
 
 const (
-	TimelineEntryType_TIMELINE_ENTRY_TYPE_UNSPECIFIED  TimelineEntryType = 0
-	TimelineEntryType_TIMELINE_ENTRY_TYPE_TRIGGERED    TimelineEntryType = 1
-	TimelineEntryType_TIMELINE_ENTRY_TYPE_ALERTED      TimelineEntryType = 2
-	TimelineEntryType_TIMELINE_ENTRY_TYPE_ACKNOWLEDGED TimelineEntryType = 3
-	TimelineEntryType_TIMELINE_ENTRY_TYPE_RESOLVED     TimelineEntryType = 4
+	TimelineEntryType_TIMELINE_ENTRY_TYPE_UNSPECIFIED          TimelineEntryType = 0
+	TimelineEntryType_TIMELINE_ENTRY_TYPE_TRIGGERED            TimelineEntryType = 1
+	TimelineEntryType_TIMELINE_ENTRY_TYPE_ALERTED              TimelineEntryType = 2
+	TimelineEntryType_TIMELINE_ENTRY_TYPE_ACKNOWLEDGED         TimelineEntryType = 3
+	TimelineEntryType_TIMELINE_ENTRY_TYPE_RESOLVED             TimelineEntryType = 4
+	TimelineEntryType_TIMELINE_ENTRY_TYPE_ESCALATED            TimelineEntryType = 5
+	TimelineEntryType_TIMELINE_ENTRY_TYPE_ESCALATION_SKIPPED   TimelineEntryType = 6
+	TimelineEntryType_TIMELINE_ENTRY_TYPE_ESCALATION_EXHAUSTED TimelineEntryType = 7
 )
 
 // Enum value maps for TimelineEntryType.
@@ -92,13 +153,19 @@ var (
 		2: "TIMELINE_ENTRY_TYPE_ALERTED",
 		3: "TIMELINE_ENTRY_TYPE_ACKNOWLEDGED",
 		4: "TIMELINE_ENTRY_TYPE_RESOLVED",
+		5: "TIMELINE_ENTRY_TYPE_ESCALATED",
+		6: "TIMELINE_ENTRY_TYPE_ESCALATION_SKIPPED",
+		7: "TIMELINE_ENTRY_TYPE_ESCALATION_EXHAUSTED",
 	}
 	TimelineEntryType_value = map[string]int32{
-		"TIMELINE_ENTRY_TYPE_UNSPECIFIED":  0,
-		"TIMELINE_ENTRY_TYPE_TRIGGERED":    1,
-		"TIMELINE_ENTRY_TYPE_ALERTED":      2,
-		"TIMELINE_ENTRY_TYPE_ACKNOWLEDGED": 3,
-		"TIMELINE_ENTRY_TYPE_RESOLVED":     4,
+		"TIMELINE_ENTRY_TYPE_UNSPECIFIED":          0,
+		"TIMELINE_ENTRY_TYPE_TRIGGERED":            1,
+		"TIMELINE_ENTRY_TYPE_ALERTED":              2,
+		"TIMELINE_ENTRY_TYPE_ACKNOWLEDGED":         3,
+		"TIMELINE_ENTRY_TYPE_RESOLVED":             4,
+		"TIMELINE_ENTRY_TYPE_ESCALATED":            5,
+		"TIMELINE_ENTRY_TYPE_ESCALATION_SKIPPED":   6,
+		"TIMELINE_ENTRY_TYPE_ESCALATION_EXHAUSTED": 7,
 	}
 )
 
@@ -113,11 +180,11 @@ func (x TimelineEntryType) String() string {
 }
 
 func (TimelineEntryType) Descriptor() protoreflect.EnumDescriptor {
-	return file_murphy_v1_incident_proto_enumTypes[1].Descriptor()
+	return file_murphy_v1_incident_proto_enumTypes[2].Descriptor()
 }
 
 func (TimelineEntryType) Type() protoreflect.EnumType {
-	return &file_murphy_v1_incident_proto_enumTypes[1]
+	return &file_murphy_v1_incident_proto_enumTypes[2]
 }
 
 func (x TimelineEntryType) Number() protoreflect.EnumNumber {
@@ -126,24 +193,76 @@ func (x TimelineEntryType) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use TimelineEntryType.Descriptor instead.
 func (TimelineEntryType) EnumDescriptor() ([]byte, []int) {
-	return file_murphy_v1_incident_proto_rawDescGZIP(), []int{1}
+	return file_murphy_v1_incident_proto_rawDescGZIP(), []int{2}
+}
+
+type TimerVerb int32
+
+const (
+	TimerVerb_TIMER_VERB_UNSPECIFIED TimerVerb = 0
+	TimerVerb_TIMER_VERB_EXPIRED     TimerVerb = 1
+)
+
+// Enum value maps for TimerVerb.
+var (
+	TimerVerb_name = map[int32]string{
+		0: "TIMER_VERB_UNSPECIFIED",
+		1: "TIMER_VERB_EXPIRED",
+	}
+	TimerVerb_value = map[string]int32{
+		"TIMER_VERB_UNSPECIFIED": 0,
+		"TIMER_VERB_EXPIRED":     1,
+	}
+)
+
+func (x TimerVerb) Enum() *TimerVerb {
+	p := new(TimerVerb)
+	*p = x
+	return p
+}
+
+func (x TimerVerb) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (TimerVerb) Descriptor() protoreflect.EnumDescriptor {
+	return file_murphy_v1_incident_proto_enumTypes[3].Descriptor()
+}
+
+func (TimerVerb) Type() protoreflect.EnumType {
+	return &file_murphy_v1_incident_proto_enumTypes[3]
+}
+
+func (x TimerVerb) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use TimerVerb.Descriptor instead.
+func (TimerVerb) EnumDescriptor() ([]byte, []int) {
+	return file_murphy_v1_incident_proto_rawDescGZIP(), []int{3}
 }
 
 type Incident struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Number        int64                  `protobuf:"varint,2,opt,name=number,proto3" json:"number,omitempty"`
-	ServiceId     string                 `protobuf:"bytes,3,opt,name=service_id,json=serviceId,proto3" json:"service_id,omitempty"`
-	DedupKey      string                 `protobuf:"bytes,4,opt,name=dedup_key,json=dedupKey,proto3" json:"dedup_key,omitempty"`
-	Title         string                 `protobuf:"bytes,5,opt,name=title,proto3" json:"title,omitempty"`
-	Status        IncidentStatus         `protobuf:"varint,6,opt,name=status,proto3,enum=murphy.v1.IncidentStatus" json:"status,omitempty"`
-	Urgency       Urgency                `protobuf:"varint,7,opt,name=urgency,proto3,enum=murphy.v1.Urgency" json:"urgency,omitempty"`
-	Version       int32                  `protobuf:"varint,8,opt,name=version,proto3" json:"version,omitempty"`
-	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
-	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
-	ResolvedAt    *timestamppb.Timestamp `protobuf:"bytes,11,opt,name=resolved_at,json=resolvedAt,proto3" json:"resolved_at,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                   protoimpl.MessageState `protogen:"open.v1"`
+	Id                      string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Number                  int64                  `protobuf:"varint,2,opt,name=number,proto3" json:"number,omitempty"`
+	ServiceId               string                 `protobuf:"bytes,3,opt,name=service_id,json=serviceId,proto3" json:"service_id,omitempty"`
+	DedupKey                string                 `protobuf:"bytes,4,opt,name=dedup_key,json=dedupKey,proto3" json:"dedup_key,omitempty"`
+	Title                   string                 `protobuf:"bytes,5,opt,name=title,proto3" json:"title,omitempty"`
+	Status                  IncidentStatus         `protobuf:"varint,6,opt,name=status,proto3,enum=murphy.v1.IncidentStatus" json:"status,omitempty"`
+	Urgency                 Urgency                `protobuf:"varint,7,opt,name=urgency,proto3,enum=murphy.v1.Urgency" json:"urgency,omitempty"`
+	Version                 int32                  `protobuf:"varint,8,opt,name=version,proto3" json:"version,omitempty"`
+	CreatedAt               *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt               *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	ResolvedAt              *timestamppb.Timestamp `protobuf:"bytes,11,opt,name=resolved_at,json=resolvedAt,proto3" json:"resolved_at,omitempty"`
+	EscalationPolicyId      string                 `protobuf:"bytes,12,opt,name=escalation_policy_id,json=escalationPolicyId,proto3" json:"escalation_policy_id,omitempty"`
+	EscalationPolicyVersion int32                  `protobuf:"varint,13,opt,name=escalation_policy_version,json=escalationPolicyVersion,proto3" json:"escalation_policy_version,omitempty"`
+	EscalationLevel         int32                  `protobuf:"varint,14,opt,name=escalation_level,json=escalationLevel,proto3" json:"escalation_level,omitempty"`
+	EscalationRound         int32                  `protobuf:"varint,15,opt,name=escalation_round,json=escalationRound,proto3" json:"escalation_round,omitempty"`
+	EscalationExhausted     bool                   `protobuf:"varint,16,opt,name=escalation_exhausted,json=escalationExhausted,proto3" json:"escalation_exhausted,omitempty"`
+	AcknowledgedAt          *timestamppb.Timestamp `protobuf:"bytes,17,opt,name=acknowledged_at,json=acknowledgedAt,proto3" json:"acknowledged_at,omitempty"`
+	unknownFields           protoimpl.UnknownFields
+	sizeCache               protoimpl.SizeCache
 }
 
 func (x *Incident) Reset() {
@@ -253,6 +372,108 @@ func (x *Incident) GetResolvedAt() *timestamppb.Timestamp {
 	return nil
 }
 
+func (x *Incident) GetEscalationPolicyId() string {
+	if x != nil {
+		return x.EscalationPolicyId
+	}
+	return ""
+}
+
+func (x *Incident) GetEscalationPolicyVersion() int32 {
+	if x != nil {
+		return x.EscalationPolicyVersion
+	}
+	return 0
+}
+
+func (x *Incident) GetEscalationLevel() int32 {
+	if x != nil {
+		return x.EscalationLevel
+	}
+	return 0
+}
+
+func (x *Incident) GetEscalationRound() int32 {
+	if x != nil {
+		return x.EscalationRound
+	}
+	return 0
+}
+
+func (x *Incident) GetEscalationExhausted() bool {
+	if x != nil {
+		return x.EscalationExhausted
+	}
+	return false
+}
+
+func (x *Incident) GetAcknowledgedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.AcknowledgedAt
+	}
+	return nil
+}
+
+type IncidentEvent struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Verb          IncidentVerb           `protobuf:"varint,1,opt,name=verb,proto3,enum=murphy.v1.IncidentVerb" json:"verb,omitempty"`
+	Previous      *Incident              `protobuf:"bytes,2,opt,name=previous,proto3" json:"previous,omitempty"`
+	Current       *Incident              `protobuf:"bytes,3,opt,name=current,proto3" json:"current,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *IncidentEvent) Reset() {
+	*x = IncidentEvent{}
+	mi := &file_murphy_v1_incident_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *IncidentEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*IncidentEvent) ProtoMessage() {}
+
+func (x *IncidentEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_murphy_v1_incident_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use IncidentEvent.ProtoReflect.Descriptor instead.
+func (*IncidentEvent) Descriptor() ([]byte, []int) {
+	return file_murphy_v1_incident_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *IncidentEvent) GetVerb() IncidentVerb {
+	if x != nil {
+		return x.Verb
+	}
+	return IncidentVerb_INCIDENT_VERB_UNSPECIFIED
+}
+
+func (x *IncidentEvent) GetPrevious() *Incident {
+	if x != nil {
+		return x.Previous
+	}
+	return nil
+}
+
+func (x *IncidentEvent) GetCurrent() *Incident {
+	if x != nil {
+		return x.Current
+	}
+	return nil
+}
+
 type TimelineEntry struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -261,13 +482,14 @@ type TimelineEntry struct {
 	AlertId       string                 `protobuf:"bytes,4,opt,name=alert_id,json=alertId,proto3" json:"alert_id,omitempty"`
 	Summary       string                 `protobuf:"bytes,5,opt,name=summary,proto3" json:"summary,omitempty"`
 	At            *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=at,proto3" json:"at,omitempty"`
+	Escalation    *TimelineEscalation    `protobuf:"bytes,7,opt,name=escalation,proto3" json:"escalation,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *TimelineEntry) Reset() {
 	*x = TimelineEntry{}
-	mi := &file_murphy_v1_incident_proto_msgTypes[1]
+	mi := &file_murphy_v1_incident_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -279,7 +501,7 @@ func (x *TimelineEntry) String() string {
 func (*TimelineEntry) ProtoMessage() {}
 
 func (x *TimelineEntry) ProtoReflect() protoreflect.Message {
-	mi := &file_murphy_v1_incident_proto_msgTypes[1]
+	mi := &file_murphy_v1_incident_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -292,7 +514,7 @@ func (x *TimelineEntry) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TimelineEntry.ProtoReflect.Descriptor instead.
 func (*TimelineEntry) Descriptor() ([]byte, []int) {
-	return file_murphy_v1_incident_proto_rawDescGZIP(), []int{1}
+	return file_murphy_v1_incident_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *TimelineEntry) GetId() string {
@@ -337,11 +559,274 @@ func (x *TimelineEntry) GetAt() *timestamppb.Timestamp {
 	return nil
 }
 
+func (x *TimelineEntry) GetEscalation() *TimelineEscalation {
+	if x != nil {
+		return x.Escalation
+	}
+	return nil
+}
+
+type TimelineEscalation struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Level         int32                  `protobuf:"varint,1,opt,name=level,proto3" json:"level,omitempty"`
+	Round         int32                  `protobuf:"varint,2,opt,name=round,proto3" json:"round,omitempty"`
+	Paged         []*TimelinePage        `protobuf:"bytes,3,rep,name=paged,proto3" json:"paged,omitempty"`
+	ReachedNobody []*EscalationTarget    `protobuf:"bytes,4,rep,name=reached_nobody,json=reachedNobody,proto3" json:"reached_nobody,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TimelineEscalation) Reset() {
+	*x = TimelineEscalation{}
+	mi := &file_murphy_v1_incident_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TimelineEscalation) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TimelineEscalation) ProtoMessage() {}
+
+func (x *TimelineEscalation) ProtoReflect() protoreflect.Message {
+	mi := &file_murphy_v1_incident_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TimelineEscalation.ProtoReflect.Descriptor instead.
+func (*TimelineEscalation) Descriptor() ([]byte, []int) {
+	return file_murphy_v1_incident_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *TimelineEscalation) GetLevel() int32 {
+	if x != nil {
+		return x.Level
+	}
+	return 0
+}
+
+func (x *TimelineEscalation) GetRound() int32 {
+	if x != nil {
+		return x.Round
+	}
+	return 0
+}
+
+func (x *TimelineEscalation) GetPaged() []*TimelinePage {
+	if x != nil {
+		return x.Paged
+	}
+	return nil
+}
+
+func (x *TimelineEscalation) GetReachedNobody() []*EscalationTarget {
+	if x != nil {
+		return x.ReachedNobody
+	}
+	return nil
+}
+
+type TimelinePage struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	Via           *EscalationTarget      `protobuf:"bytes,2,opt,name=via,proto3" json:"via,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TimelinePage) Reset() {
+	*x = TimelinePage{}
+	mi := &file_murphy_v1_incident_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TimelinePage) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TimelinePage) ProtoMessage() {}
+
+func (x *TimelinePage) ProtoReflect() protoreflect.Message {
+	mi := &file_murphy_v1_incident_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TimelinePage.ProtoReflect.Descriptor instead.
+func (*TimelinePage) Descriptor() ([]byte, []int) {
+	return file_murphy_v1_incident_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *TimelinePage) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *TimelinePage) GetVia() *EscalationTarget {
+	if x != nil {
+		return x.Via
+	}
+	return nil
+}
+
+type Timer struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Id              string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	IncidentId      string                 `protobuf:"bytes,2,opt,name=incident_id,json=incidentId,proto3" json:"incident_id,omitempty"`
+	EscalationLevel int32                  `protobuf:"varint,3,opt,name=escalation_level,json=escalationLevel,proto3" json:"escalation_level,omitempty"`
+	EscalationRound int32                  `protobuf:"varint,4,opt,name=escalation_round,json=escalationRound,proto3" json:"escalation_round,omitempty"`
+	DueAt           *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=due_at,json=dueAt,proto3" json:"due_at,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *Timer) Reset() {
+	*x = Timer{}
+	mi := &file_murphy_v1_incident_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Timer) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Timer) ProtoMessage() {}
+
+func (x *Timer) ProtoReflect() protoreflect.Message {
+	mi := &file_murphy_v1_incident_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Timer.ProtoReflect.Descriptor instead.
+func (*Timer) Descriptor() ([]byte, []int) {
+	return file_murphy_v1_incident_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *Timer) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *Timer) GetIncidentId() string {
+	if x != nil {
+		return x.IncidentId
+	}
+	return ""
+}
+
+func (x *Timer) GetEscalationLevel() int32 {
+	if x != nil {
+		return x.EscalationLevel
+	}
+	return 0
+}
+
+func (x *Timer) GetEscalationRound() int32 {
+	if x != nil {
+		return x.EscalationRound
+	}
+	return 0
+}
+
+func (x *Timer) GetDueAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.DueAt
+	}
+	return nil
+}
+
+type TimerEvent struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Verb          TimerVerb              `protobuf:"varint,1,opt,name=verb,proto3,enum=murphy.v1.TimerVerb" json:"verb,omitempty"`
+	Previous      *Timer                 `protobuf:"bytes,2,opt,name=previous,proto3" json:"previous,omitempty"`
+	Current       *Timer                 `protobuf:"bytes,3,opt,name=current,proto3" json:"current,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TimerEvent) Reset() {
+	*x = TimerEvent{}
+	mi := &file_murphy_v1_incident_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TimerEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TimerEvent) ProtoMessage() {}
+
+func (x *TimerEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_murphy_v1_incident_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TimerEvent.ProtoReflect.Descriptor instead.
+func (*TimerEvent) Descriptor() ([]byte, []int) {
+	return file_murphy_v1_incident_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *TimerEvent) GetVerb() TimerVerb {
+	if x != nil {
+		return x.Verb
+	}
+	return TimerVerb_TIMER_VERB_UNSPECIFIED
+}
+
+func (x *TimerEvent) GetPrevious() *Timer {
+	if x != nil {
+		return x.Previous
+	}
+	return nil
+}
+
+func (x *TimerEvent) GetCurrent() *Timer {
+	if x != nil {
+		return x.Current
+	}
+	return nil
+}
+
 var File_murphy_v1_incident_proto protoreflect.FileDescriptor
 
 const file_murphy_v1_incident_proto_rawDesc = "" +
 	"\n" +
-	"\x18murphy/v1/incident.proto\x12\tmurphy.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x16murphy/v1/shared.proto\"\xb2\x03\n" +
+	"\x18murphy/v1/incident.proto\x12\tmurphy.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1amurphy/v1/escalation.proto\x1a\x16murphy/v1/shared.proto\"\xee\x05\n" +
 	"\bIncident\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x16\n" +
 	"\x06number\x18\x02 \x01(\x03R\x06number\x12\x1d\n" +
@@ -358,7 +843,17 @@ const file_murphy_v1_incident_proto_rawDesc = "" +
 	"updated_at\x18\n" +
 	" \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12;\n" +
 	"\vresolved_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampR\n" +
-	"resolvedAt\"\xd3\x01\n" +
+	"resolvedAt\x120\n" +
+	"\x14escalation_policy_id\x18\f \x01(\tR\x12escalationPolicyId\x12:\n" +
+	"\x19escalation_policy_version\x18\r \x01(\x05R\x17escalationPolicyVersion\x12)\n" +
+	"\x10escalation_level\x18\x0e \x01(\x05R\x0fescalationLevel\x12)\n" +
+	"\x10escalation_round\x18\x0f \x01(\x05R\x0fescalationRound\x121\n" +
+	"\x14escalation_exhausted\x18\x10 \x01(\bR\x13escalationExhausted\x12C\n" +
+	"\x0facknowledged_at\x18\x11 \x01(\v2\x1a.google.protobuf.TimestampR\x0eacknowledgedAt\"\x9c\x01\n" +
+	"\rIncidentEvent\x12+\n" +
+	"\x04verb\x18\x01 \x01(\x0e2\x17.murphy.v1.IncidentVerbR\x04verb\x12/\n" +
+	"\bprevious\x18\x02 \x01(\v2\x13.murphy.v1.IncidentR\bprevious\x12-\n" +
+	"\acurrent\x18\x03 \x01(\v2\x13.murphy.v1.IncidentR\acurrent\"\x92\x02\n" +
 	"\rTimelineEntry\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1f\n" +
 	"\vincident_id\x18\x02 \x01(\tR\n" +
@@ -366,18 +861,54 @@ const file_murphy_v1_incident_proto_rawDesc = "" +
 	"\x04type\x18\x03 \x01(\x0e2\x1c.murphy.v1.TimelineEntryTypeR\x04type\x12\x19\n" +
 	"\balert_id\x18\x04 \x01(\tR\aalertId\x12\x18\n" +
 	"\asummary\x18\x05 \x01(\tR\asummary\x12*\n" +
-	"\x02at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\x02at*\x90\x01\n" +
+	"\x02at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\x02at\x12=\n" +
+	"\n" +
+	"escalation\x18\a \x01(\v2\x1d.murphy.v1.TimelineEscalationR\n" +
+	"escalation\"\xb3\x01\n" +
+	"\x12TimelineEscalation\x12\x14\n" +
+	"\x05level\x18\x01 \x01(\x05R\x05level\x12\x14\n" +
+	"\x05round\x18\x02 \x01(\x05R\x05round\x12-\n" +
+	"\x05paged\x18\x03 \x03(\v2\x17.murphy.v1.TimelinePageR\x05paged\x12B\n" +
+	"\x0ereached_nobody\x18\x04 \x03(\v2\x1b.murphy.v1.EscalationTargetR\rreachedNobody\"V\n" +
+	"\fTimelinePage\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12-\n" +
+	"\x03via\x18\x02 \x01(\v2\x1b.murphy.v1.EscalationTargetR\x03via\"\xc1\x01\n" +
+	"\x05Timer\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1f\n" +
+	"\vincident_id\x18\x02 \x01(\tR\n" +
+	"incidentId\x12)\n" +
+	"\x10escalation_level\x18\x03 \x01(\x05R\x0fescalationLevel\x12)\n" +
+	"\x10escalation_round\x18\x04 \x01(\x05R\x0fescalationRound\x121\n" +
+	"\x06due_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\x05dueAt\"\x90\x01\n" +
+	"\n" +
+	"TimerEvent\x12(\n" +
+	"\x04verb\x18\x01 \x01(\x0e2\x14.murphy.v1.TimerVerbR\x04verb\x12,\n" +
+	"\bprevious\x18\x02 \x01(\v2\x10.murphy.v1.TimerR\bprevious\x12*\n" +
+	"\acurrent\x18\x03 \x01(\v2\x10.murphy.v1.TimerR\acurrent*\xbc\x01\n" +
+	"\fIncidentVerb\x12\x1d\n" +
+	"\x19INCIDENT_VERB_UNSPECIFIED\x10\x00\x12\x19\n" +
+	"\x15INCIDENT_VERB_CREATED\x10\x01\x12\x19\n" +
+	"\x15INCIDENT_VERB_UPDATED\x10\x02\x12\x1b\n" +
+	"\x17INCIDENT_VERB_ESCALATED\x10\x03\x12\x1e\n" +
+	"\x1aINCIDENT_VERB_ACKNOWLEDGED\x10\x04\x12\x1a\n" +
+	"\x16INCIDENT_VERB_RESOLVED\x10\x05*\x90\x01\n" +
 	"\x0eIncidentStatus\x12\x1f\n" +
 	"\x1bINCIDENT_STATUS_UNSPECIFIED\x10\x00\x12\x1d\n" +
 	"\x19INCIDENT_STATUS_TRIGGERED\x10\x01\x12 \n" +
 	"\x1cINCIDENT_STATUS_ACKNOWLEDGED\x10\x02\x12\x1c\n" +
-	"\x18INCIDENT_STATUS_RESOLVED\x10\x03*\xc4\x01\n" +
+	"\x18INCIDENT_STATUS_RESOLVED\x10\x03*\xc1\x02\n" +
 	"\x11TimelineEntryType\x12#\n" +
 	"\x1fTIMELINE_ENTRY_TYPE_UNSPECIFIED\x10\x00\x12!\n" +
 	"\x1dTIMELINE_ENTRY_TYPE_TRIGGERED\x10\x01\x12\x1f\n" +
 	"\x1bTIMELINE_ENTRY_TYPE_ALERTED\x10\x02\x12$\n" +
 	" TIMELINE_ENTRY_TYPE_ACKNOWLEDGED\x10\x03\x12 \n" +
-	"\x1cTIMELINE_ENTRY_TYPE_RESOLVED\x10\x04B#Z!github.com/murphyhq/server;murphyb\x06proto3"
+	"\x1cTIMELINE_ENTRY_TYPE_RESOLVED\x10\x04\x12!\n" +
+	"\x1dTIMELINE_ENTRY_TYPE_ESCALATED\x10\x05\x12*\n" +
+	"&TIMELINE_ENTRY_TYPE_ESCALATION_SKIPPED\x10\x06\x12,\n" +
+	"(TIMELINE_ENTRY_TYPE_ESCALATION_EXHAUSTED\x10\a*?\n" +
+	"\tTimerVerb\x12\x1a\n" +
+	"\x16TIMER_VERB_UNSPECIFIED\x10\x00\x12\x16\n" +
+	"\x12TIMER_VERB_EXPIRED\x10\x01B#Z!github.com/murphyhq/server;murphyb\x06proto3"
 
 var (
 	file_murphy_v1_incident_proto_rawDescOnce sync.Once
@@ -391,29 +922,49 @@ func file_murphy_v1_incident_proto_rawDescGZIP() []byte {
 	return file_murphy_v1_incident_proto_rawDescData
 }
 
-var file_murphy_v1_incident_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_murphy_v1_incident_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_murphy_v1_incident_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
+var file_murphy_v1_incident_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
 var file_murphy_v1_incident_proto_goTypes = []any{
-	(IncidentStatus)(0),           // 0: murphy.v1.IncidentStatus
-	(TimelineEntryType)(0),        // 1: murphy.v1.TimelineEntryType
-	(*Incident)(nil),              // 2: murphy.v1.Incident
-	(*TimelineEntry)(nil),         // 3: murphy.v1.TimelineEntry
-	(Urgency)(0),                  // 4: murphy.v1.Urgency
-	(*timestamppb.Timestamp)(nil), // 5: google.protobuf.Timestamp
+	(IncidentVerb)(0),             // 0: murphy.v1.IncidentVerb
+	(IncidentStatus)(0),           // 1: murphy.v1.IncidentStatus
+	(TimelineEntryType)(0),        // 2: murphy.v1.TimelineEntryType
+	(TimerVerb)(0),                // 3: murphy.v1.TimerVerb
+	(*Incident)(nil),              // 4: murphy.v1.Incident
+	(*IncidentEvent)(nil),         // 5: murphy.v1.IncidentEvent
+	(*TimelineEntry)(nil),         // 6: murphy.v1.TimelineEntry
+	(*TimelineEscalation)(nil),    // 7: murphy.v1.TimelineEscalation
+	(*TimelinePage)(nil),          // 8: murphy.v1.TimelinePage
+	(*Timer)(nil),                 // 9: murphy.v1.Timer
+	(*TimerEvent)(nil),            // 10: murphy.v1.TimerEvent
+	(Urgency)(0),                  // 11: murphy.v1.Urgency
+	(*timestamppb.Timestamp)(nil), // 12: google.protobuf.Timestamp
+	(*EscalationTarget)(nil),      // 13: murphy.v1.EscalationTarget
 }
 var file_murphy_v1_incident_proto_depIdxs = []int32{
-	0, // 0: murphy.v1.Incident.status:type_name -> murphy.v1.IncidentStatus
-	4, // 1: murphy.v1.Incident.urgency:type_name -> murphy.v1.Urgency
-	5, // 2: murphy.v1.Incident.created_at:type_name -> google.protobuf.Timestamp
-	5, // 3: murphy.v1.Incident.updated_at:type_name -> google.protobuf.Timestamp
-	5, // 4: murphy.v1.Incident.resolved_at:type_name -> google.protobuf.Timestamp
-	1, // 5: murphy.v1.TimelineEntry.type:type_name -> murphy.v1.TimelineEntryType
-	5, // 6: murphy.v1.TimelineEntry.at:type_name -> google.protobuf.Timestamp
-	7, // [7:7] is the sub-list for method output_type
-	7, // [7:7] is the sub-list for method input_type
-	7, // [7:7] is the sub-list for extension type_name
-	7, // [7:7] is the sub-list for extension extendee
-	0, // [0:7] is the sub-list for field type_name
+	1,  // 0: murphy.v1.Incident.status:type_name -> murphy.v1.IncidentStatus
+	11, // 1: murphy.v1.Incident.urgency:type_name -> murphy.v1.Urgency
+	12, // 2: murphy.v1.Incident.created_at:type_name -> google.protobuf.Timestamp
+	12, // 3: murphy.v1.Incident.updated_at:type_name -> google.protobuf.Timestamp
+	12, // 4: murphy.v1.Incident.resolved_at:type_name -> google.protobuf.Timestamp
+	12, // 5: murphy.v1.Incident.acknowledged_at:type_name -> google.protobuf.Timestamp
+	0,  // 6: murphy.v1.IncidentEvent.verb:type_name -> murphy.v1.IncidentVerb
+	4,  // 7: murphy.v1.IncidentEvent.previous:type_name -> murphy.v1.Incident
+	4,  // 8: murphy.v1.IncidentEvent.current:type_name -> murphy.v1.Incident
+	2,  // 9: murphy.v1.TimelineEntry.type:type_name -> murphy.v1.TimelineEntryType
+	12, // 10: murphy.v1.TimelineEntry.at:type_name -> google.protobuf.Timestamp
+	7,  // 11: murphy.v1.TimelineEntry.escalation:type_name -> murphy.v1.TimelineEscalation
+	8,  // 12: murphy.v1.TimelineEscalation.paged:type_name -> murphy.v1.TimelinePage
+	13, // 13: murphy.v1.TimelineEscalation.reached_nobody:type_name -> murphy.v1.EscalationTarget
+	13, // 14: murphy.v1.TimelinePage.via:type_name -> murphy.v1.EscalationTarget
+	12, // 15: murphy.v1.Timer.due_at:type_name -> google.protobuf.Timestamp
+	3,  // 16: murphy.v1.TimerEvent.verb:type_name -> murphy.v1.TimerVerb
+	9,  // 17: murphy.v1.TimerEvent.previous:type_name -> murphy.v1.Timer
+	9,  // 18: murphy.v1.TimerEvent.current:type_name -> murphy.v1.Timer
+	19, // [19:19] is the sub-list for method output_type
+	19, // [19:19] is the sub-list for method input_type
+	19, // [19:19] is the sub-list for extension type_name
+	19, // [19:19] is the sub-list for extension extendee
+	0,  // [0:19] is the sub-list for field type_name
 }
 
 func init() { file_murphy_v1_incident_proto_init() }
@@ -421,14 +972,15 @@ func file_murphy_v1_incident_proto_init() {
 	if File_murphy_v1_incident_proto != nil {
 		return
 	}
+	file_murphy_v1_escalation_proto_init()
 	file_murphy_v1_shared_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_murphy_v1_incident_proto_rawDesc), len(file_murphy_v1_incident_proto_rawDesc)),
-			NumEnums:      2,
-			NumMessages:   2,
+			NumEnums:      4,
+			NumMessages:   7,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

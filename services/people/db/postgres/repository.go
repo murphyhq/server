@@ -283,3 +283,14 @@ func (r *Repository) ExistingTeams(ctx context.Context, ids []string) (_ []strin
 	}
 	return existing, nil
 }
+
+func (r *Repository) ActiveUsers(ctx context.Context, ids []string) (_ []string, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	active, err := r.queries.ActiveUsers(ctx, ids)
+	if err != nil {
+		return nil, murphypostgres.Error("user", err)
+	}
+	return active, nil
+}

@@ -298,7 +298,7 @@ func TestAGroupStaysOpenUntilEveryAlertInItResolves(t *testing.T) {
 		eventually(t, func(c *assert.CollectT) {
 			incident := incidentFor(t, stack.API, serviceID)
 			if assert.NotNil(c, incident) {
-				assert.Len(c, timelineTypes(t, stack.API, incident.Id), 2)
+				assert.Len(c, alertEntries(t, stack.API, incident.Id), 2)
 			}
 		})
 
@@ -306,7 +306,7 @@ func TestAGroupStaysOpenUntilEveryAlertInItResolves(t *testing.T) {
 		status, _ = deliver(t, stack, "Bearer "+key, testenv.Alertmanager("disk", db1, db2))
 		require.Equal(t, http.StatusAccepted, status)
 		eventually(t, func(c *assert.CollectT) {
-			assert.Len(c, timelineTypes(t, stack.API, incidentFor(t, stack.API, serviceID).Id), 4)
+			assert.Len(c, alertEntries(t, stack.API, incidentFor(t, stack.API, serviceID).Id), 4)
 		})
 		assert.Equal(t, client.IncidentStatusTriggered, incidentFor(t, stack.API, serviceID).Status)
 

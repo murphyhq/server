@@ -22,6 +22,8 @@ type Repository interface {
 	ListOverrides(ctx context.Context, scheduleID string, endsAfter time.Time) ([]*murphy.Override, error)
 	DeleteOverride(ctx context.Context, id string) error
 	ExistingSchedules(ctx context.Context, ids []string) ([]string, error)
+	GetSchedules(ctx context.Context, ids []string) ([]*murphy.Schedule, error)
+	ListOverridesAt(ctx context.Context, scheduleIDs []string, at time.Time) (map[string][]*murphy.Override, error)
 }
 
 type People interface {
@@ -271,4 +273,28 @@ func (s *Service) ExistingSchedules(ctx context.Context, ids []string) (_ map[st
 		found[id] = true
 	}
 	return found, nil
+}
+
+func (s *Service) WhoIsOnCall(ctx context.Context, scheduleIDs []string, at time.Time) (_ map[string]string, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	onCallBy := map[string]string{}
+	if len(scheduleIDs) == 0 {
+		return onCallBy, nil
+	}
+	schedules, err := s.repo.GetSchedules(ctx, scheduleIDs)
+	if err != nil {
+		return nil, fmt.Errorf("get schedules: %w", err)
+	}
+	overrides, err := s.repo.ListOverridesAt(ctx, scheduleIDs, at)
+	if err != nil {
+		return nil, fmt.Errorf("list overrides: %w", err)
+	}
+	for _, schedule := range schedules {
+		if user := onCall(schedule, at, overrides[schedule.GetId()]); user != "" {
+			onCallBy[schedule.GetId()] = user
+		}
+	}
+	return onCallBy, nil
 }

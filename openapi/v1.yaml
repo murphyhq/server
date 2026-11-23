@@ -266,6 +266,50 @@ paths:
                 $ref: "#/components/schemas/IncidentWithTimeline"
         "404":
           $ref: "#/components/responses/Problem"
+  /v1/incidents/{id}/acknowledge:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    post:
+      operationId: acknowledgeIncident
+      summary: Acknowledge an incident, which stops its escalation
+      tags: [incidents]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "200":
+          description: The incident after the change, or as it was if it had already changed this way.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Incident"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "409":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+  /v1/incidents/{id}/resolve:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    post:
+      operationId: resolveIncident
+      summary: Resolve an incident
+      tags: [incidents]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "200":
+          description: The incident after the change, or as it was if it had already changed this way.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Incident"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "409":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
   /v1/users:
     get:
       operationId: listUsers
@@ -1080,6 +1124,28 @@ components:
         resolved_at:
           type: string
           format: date-time
+        acknowledged_at:
+          type: string
+          format: date-time
+        escalation:
+          $ref: "#/components/schemas/IncidentEscalation"
+    IncidentEscalation:
+      type: object
+      required: [policy, level, round, exhausted]
+      description: Where the incident is in its escalation policy. Level 0 means no level has been paged yet.
+      properties:
+        policy:
+          $ref: "#/components/schemas/PolicyVersionReference"
+        level:
+          type: integer
+          format: int32
+        round:
+          type: integer
+          format: int32
+          description: Which pass through the levels, from 1; the policy's repeat count adds more passes.
+        exhausted:
+          type: boolean
+          description: Every level and repeat has been paged, or no level could reach anyone.
     TimelineEntry:
       type: object
       required: [id, type, summary, at]
@@ -1088,7 +1154,7 @@ components:
           type: string
         type:
           type: string
-          enum: [triggered, alerted, acknowledged, resolved]
+          enum: [triggered, alerted, acknowledged, resolved, escalated, escalation_skipped, escalation_exhausted]
         alert_id:
           type: string
         summary:
@@ -1096,6 +1162,53 @@ components:
         at:
           type: string
           format: date-time
+        escalation:
+          $ref: "#/components/schemas/TimelineEscalation"
+    TimelineEscalation:
+      type: object
+      required: [level, round, paged, reached_nobody]
+      properties:
+        level:
+          type: integer
+          format: int32
+        round:
+          type: integer
+          format: int32
+        paged:
+          type: array
+          description: The people paged, each with the target that reached them.
+          items:
+            $ref: "#/components/schemas/Page"
+        reached_nobody:
+          type: array
+          description: The level's targets that reached nobody, such as a schedule with no one on call.
+          items:
+            $ref: "#/components/schemas/EscalationTarget"
+    Page:
+      type: object
+      required: [user, via]
+      properties:
+        user:
+          $ref: "#/components/schemas/Reference"
+        via:
+          $ref: "#/components/schemas/EscalationTarget"
+    Reference:
+      type: object
+      required: [id]
+      description: Points at another resource.
+      properties:
+        id:
+          type: string
+    PolicyVersionReference:
+      type: object
+      required: [id, version]
+      description: Points at one version of an escalation policy.
+      properties:
+        id:
+          type: string
+        version:
+          type: integer
+          format: int32
     IncidentWithTimeline:
       allOf:
         - $ref: "#/components/schemas/Incident"

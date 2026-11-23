@@ -116,6 +116,34 @@ func Run(t *testing.T, open func(t *testing.T) oncall.Repository) {
 		assert.ErrorIs(t, repo.DeleteOverride(t.Context(), override.GetId()), murphy.ErrNotFound)
 	})
 
+	t.Run("reads many schedules, and the overrides covering a moment, in one call each", func(t *testing.T) {
+		repo := open(t)
+		ana := murphy.NewID()
+		first := newSchedule("first", nil, layer("l", time.Hour, ana))
+		second := newSchedule("second", nil, layer("l", 2*time.Hour, murphy.NewID()))
+		require.NoError(t, repo.CreateSchedule(t.Context(), first))
+		require.NoError(t, repo.CreateSchedule(t.Context(), second))
+		covering := newOverride(first, start, start.Add(time.Hour))
+		ended := newOverride(first, start.Add(-2*time.Hour), start.Add(-time.Hour))
+		later := newOverride(second, start.Add(time.Hour), start.Add(2*time.Hour))
+		for _, override := range []*murphy.Override{covering, ended, later} {
+			require.NoError(t, repo.CreateOverride(t.Context(), override))
+		}
+
+		schedules, err := repo.GetSchedules(t.Context(), []string{first.GetId(), second.GetId(), murphy.NewID()})
+		require.NoError(t, err)
+		assert.ElementsMatch(t, []string{first.GetId(), second.GetId()}, scheduleIDs(schedules))
+		for _, schedule := range schedules {
+			require.Len(t, schedule.GetLayers(), 1)
+		}
+
+		overrides, err := repo.ListOverridesAt(t.Context(), []string{first.GetId(), second.GetId()}, start.Add(30*time.Minute))
+		require.NoError(t, err)
+		require.Len(t, overrides[first.GetId()], 1)
+		assert.Equal(t, covering.GetId(), overrides[first.GetId()][0].GetId())
+		assert.Empty(t, overrides[second.GetId()])
+	})
+
 	t.Run("finds which of many schedules exist in one call", func(t *testing.T) {
 		repo := open(t)
 		first := newSchedule("first", nil, layer("l", time.Hour, murphy.NewID()))

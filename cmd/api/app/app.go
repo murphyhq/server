@@ -91,12 +91,13 @@ func New(ctx context.Context, s Settings) (_ *App, err error) {
 	catalogService := catalog.New(catalogStorage, keyring)
 	peopleService := people.New(peopleStorage)
 	oncallService := oncall.New(oncallStorage, peopleService)
+	escalationService := escalation.New(escalationStorage, peopleService, oncallService, catalogService)
 	a.Handler, err = router.New(router.Services{
 		Catalog:    catalogService,
-		Incidents:  incidents.New(incidentsStorage, catalogService),
+		Incidents:  incidents.New(incidentsStorage, catalogService, escalationService, oncallService, peopleService),
 		People:     peopleService,
 		OnCall:     oncallService,
-		Escalation: escalation.New(escalationStorage, peopleService, oncallService, catalogService),
+		Escalation: escalationService,
 	}, keys)
 	if err != nil {
 		return nil, err
