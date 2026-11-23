@@ -67,7 +67,7 @@ Load tests run against the same stack. `MURPHY_LOAD_PROFILE` picks the traffic: 
 MURPHY_LOAD_PROFILE=load go test -tags load -v ./tests/load/...
 ```
 
-Each scenario writes a JSON and a Markdown report to `tests/load/reports/` (or `MURPHY_LOAD_REPORT_DIR`), and the run ends with every dashboard's data over the run in `dashboards/`. Watch a run live on the Overview dashboard.
+Each scenario writes a JSON and a Markdown report, and the run ends with every dashboard's data over the run in `dashboards/`. They go to `murphy-load/<profile>` in the system's temporary folder, or to `MURPHY_LOAD_REPORT_DIR`, and the test prints where. Watch a run live on the Overview dashboard.
 
 ## License
 

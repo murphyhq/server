@@ -41,11 +41,12 @@ jobs:
       - run: go test -tags load -count=1 -timeout 60m -v ./tests/load/...
         env:
           MURPHY_LOAD_PROFILE: ${{ matrix.profile }}
+          MURPHY_LOAD_REPORT_DIR: ${{ runner.temp }}/load-reports
       - if: always()
         uses: actions/upload-artifact@v7
         with:
           name: load-reports-${{ matrix.profile }}-${{ github.sha }}
-          path: tests/load/reports/
+          path: ${{ runner.temp }}/load-reports/
           if-no-files-found: ignore
       - if: failure()
         run: docker compose --profile murphy logs --no-color

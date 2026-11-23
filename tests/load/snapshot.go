@@ -74,7 +74,7 @@ func snapshot(profile string, from, to time.Time) error {
 	if err != nil {
 		return fmt.Errorf("list components: %w", err)
 	}
-	dir := filepath.Join(url("MURPHY_LOAD_REPORT_DIR", "reports"), "dashboards")
+	dir := filepath.Join(reportDir(), "dashboards")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
