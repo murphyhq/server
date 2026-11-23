@@ -8,7 +8,7 @@ on:
       profile:
         description: Traffic profile
         type: choice
-        options: [all, smoke, load, stress]
+        options: [all, smoke, load, stress, sustained]
         default: all
 
 permissions:
@@ -26,7 +26,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        profile: ${{ fromJSON((inputs.profile && inputs.profile != 'all') && format('["{0}"]', inputs.profile) || '["smoke","load","stress"]') }}
+        profile: ${{ fromJSON((inputs.profile && inputs.profile != 'all') && format('["{0}"]', inputs.profile) || '["smoke","load","stress","sustained"]') }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7

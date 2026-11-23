@@ -61,7 +61,15 @@ End-to-end tests run against the whole stack from `docker compose --profile murp
 go test -tags e2e ./tests/e2e/...
 ```
 
-Load tests run against the same stack. `MURPHY_LOAD_PROFILE` picks the traffic: `smoke` (the default), `load` or `stress`. CI runs all three after every merge:
+Load tests run against the same stack. `MURPHY_LOAD_PROFILE` picks the traffic, and CI runs every profile after every merge:
+
+| Profile | Traffic per scenario | Scenarios |
+|---|---|---|
+| `smoke` (the default) | 10/s for 10 seconds | one after another |
+| `load` | 50/s for 2 minutes | one after another |
+| `stress` | rising from 10/s for 5 minutes | one after another |
+| `sustained` | rising and falling between 10/s and 50/s for 10 minutes | all at once |
+
 
 ```
 MURPHY_LOAD_PROFILE=load go test -tags load -v ./tests/load/...
