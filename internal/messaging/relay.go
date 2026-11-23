@@ -27,7 +27,7 @@ type ScheduledMessages interface {
 }
 
 type RelaySettings struct {
-	PollInterval time.Duration `env:"POLL_INTERVAL" default:"250ms"`
+	PollInterval time.Duration `env:"POLL_INTERVAL" default:"50ms"`
 	BatchSize    int           `env:"BATCH_SIZE" default:"100"`
 	ClaimLease   time.Duration `env:"CLAIM_LEASE" default:"30s"`
 }
