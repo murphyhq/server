@@ -19,6 +19,7 @@ CREATE TABLE incidents (
 
 CREATE UNIQUE INDEX incidents_open_dedup_key_idx ON incidents (service_id, dedup_key) WHERE status <> 'resolved';
 CREATE INDEX incidents_status_id_idx ON incidents (status, id);
+CREATE INDEX incidents_service_id_id_idx ON incidents (service_id, id);
 
 CREATE TABLE alerts (
   id uuid NOT NULL,

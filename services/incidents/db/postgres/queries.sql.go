@@ -184,19 +184,27 @@ func (q *Queries) LatestFiringAt(ctx context.Context, incidentID *string) (time.
 const listIncidents = `-- name: ListIncidents :many
 SELECT id, number, service_id, dedup_key, title, status, urgency, version, created_at, updated_at, resolved_at
 FROM incidents
-WHERE id < $1 AND (cardinality($2::text[]) = 0 OR status = ANY($2::text[]))
+WHERE id < $1
+  AND (cardinality($2::text[]) = 0 OR status = ANY($2::text[]))
+  AND (coalesce(cardinality($3::uuid[]), 0) = 0 OR service_id = ANY($3::uuid[]))
 ORDER BY id DESC
-LIMIT $3
+LIMIT $4
 `
 
 type ListIncidentsParams struct {
-	Before   string
-	Statuses []string
-	MaxRows  int32
+	Before     string
+	Statuses   []string
+	ServiceIds []string
+	MaxRows    int32
 }
 
 func (q *Queries) ListIncidents(ctx context.Context, arg ListIncidentsParams) ([]Incident, error) {
-	rows, err := q.db.Query(ctx, listIncidents, arg.Before, arg.Statuses, arg.MaxRows)
+	rows, err := q.db.Query(ctx, listIncidents,
+		arg.Before,
+		arg.Statuses,
+		arg.ServiceIds,
+		arg.MaxRows,
+	)
 	if err != nil {
 		return nil, err
 	}

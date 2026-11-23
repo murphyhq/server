@@ -213,16 +213,20 @@ func (q *Queries) LatestFiringAt(ctx context.Context, incidentID *string) (time.
 const listIncidents = `-- name: ListIncidents :many
 SELECT id, number, service_id, dedup_key, title, status, urgency, version, created_at, updated_at, resolved_at
 FROM incidents
-WHERE id < ? AND (? OR status IN (/*SLICE:statuses*/?))
+WHERE id < ?
+  AND (? OR status IN (/*SLICE:statuses*/?))
+  AND (? OR service_id IN (/*SLICE:service_ids*/?))
 ORDER BY id DESC
 LIMIT ?
 `
 
 type ListIncidentsParams struct {
-	Before    string
-	AnyStatus interface{}
-	Statuses  []string
-	Limit     int32
+	Before     string
+	AnyStatus  interface{}
+	Statuses   []string
+	AnyService interface{}
+	ServiceIds []string
+	Limit      int32
 }
 
 type ListIncidentsRow struct {
@@ -251,6 +255,15 @@ func (q *Queries) ListIncidents(ctx context.Context, arg ListIncidentsParams) ([
 		query = strings.Replace(query, "/*SLICE:statuses*/?", strings.Repeat(",?", len(arg.Statuses))[1:], 1)
 	} else {
 		query = strings.Replace(query, "/*SLICE:statuses*/?", "NULL", 1)
+	}
+	queryParams = append(queryParams, arg.AnyService)
+	if len(arg.ServiceIds) > 0 {
+		for _, v := range arg.ServiceIds {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:service_ids*/?", strings.Repeat(",?", len(arg.ServiceIds))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:service_ids*/?", "NULL", 1)
 	}
 	queryParams = append(queryParams, arg.Limit)
 	rows, err := q.db.QueryContext(ctx, query, queryParams...)

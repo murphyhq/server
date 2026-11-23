@@ -1,0 +1,48 @@
+receivers:
+  docker_stats:
+    endpoint: unix:///var/run/docker.sock
+    collection_interval: 10s
+    container_labels_to_metric_labels:
+      com.docker.compose.service: compose_service
+  postgresql:
+    endpoint: postgres:5432
+    transport: tcp
+    username: murphy
+    password: murphy
+    collection_interval: 10s
+    tls:
+      insecure: true
+  mysql:
+    endpoint: mysql:3306
+    username: root
+    password: murphy
+    collection_interval: 10s
+  redis:
+    endpoint: redis:6379
+    collection_interval: 10s
+  prometheus:
+    config:
+      scrape_configs:
+        - job_name: nats
+          scrape_interval: 10s
+          static_configs:
+            - targets: ["nats-exporter:7777"]
+
+processors:
+  batch: {}
+  transform:
+    metric_statements:
+      - context: datapoint
+        statements:
+          - set(attributes["compose_service"], resource.attributes["compose_service"]) where resource.attributes["compose_service"] != nil
+
+exporters:
+  otlphttp:
+    endpoint: http://lgtm:4318
+
+service:
+  pipelines:
+    metrics:
+      receivers: [docker_stats, postgresql, mysql, redis, prometheus]
+      processors: [transform, batch]
+      exporters: [otlphttp]

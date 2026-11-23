@@ -12,6 +12,7 @@ import (
 	"github.com/murphyhq/server/internal/database"
 	murphypostgres "github.com/murphyhq/server/internal/postgres"
 	"github.com/murphyhq/server/internal/tracer"
+	"github.com/murphyhq/server/services/incidents"
 )
 
 //go:embed migrations/*.sql
@@ -57,15 +58,15 @@ func (r *Repository) GetIncident(ctx context.Context, id string) (_ *murphy.Inci
 	return toIncident(row), nil
 }
 
-func (r *Repository) ListIncidents(ctx context.Context, statuses []murphy.IncidentStatus, before string, limit int) (_ []*murphy.Incident, err error) {
+func (r *Repository) ListIncidents(ctx context.Context, filter incidents.Filter, before string, limit int) (_ []*murphy.Incident, err error) {
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
-	texts := make([]string, len(statuses))
-	for i, status := range statuses {
+	texts := make([]string, len(filter.Statuses))
+	for i, status := range filter.Statuses {
 		texts[i] = status.Text()
 	}
-	rows, err := r.queries.ListIncidents(ctx, ListIncidentsParams{Before: before, Statuses: texts, MaxRows: int32(limit)})
+	rows, err := r.queries.ListIncidents(ctx, ListIncidentsParams{Before: before, Statuses: texts, ServiceIds: filter.ServiceIDs, MaxRows: int32(limit)})
 	if err != nil {
 		return nil, murphypostgres.Error("incident", err)
 	}

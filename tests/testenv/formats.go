@@ -1,4 +1,4 @@
-//go:build integration
+//go:build integration || load
 
 package testenv
 
@@ -122,4 +122,8 @@ func GoogleCloud(incidentID, state string) Webhook {
 			"metric": map[string]any{"type": "compute.googleapis.com/disk/usage", "labels": map[string]string{}},
 		},
 	})
+}
+
+func Generic(dedupKey, status string) Webhook {
+	return jsonWebhook("/v1/alerts", map[string]string{"dedup_key": dedupKey, "status": status, "summary": dedupKey + " is " + status})
 }

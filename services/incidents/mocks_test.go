@@ -258,8 +258,8 @@ func (_c *MockRepository_LatestFiringAt_Call) RunAndReturn(run func(ctx context.
 }
 
 // ListIncidents provides a mock function for the type MockRepository
-func (_mock *MockRepository) ListIncidents(ctx context.Context, statuses []murphy.IncidentStatus, before string, limit int) ([]*murphy.Incident, error) {
-	ret := _mock.Called(ctx, statuses, before, limit)
+func (_mock *MockRepository) ListIncidents(ctx context.Context, filter incidents.Filter, before string, limit int) ([]*murphy.Incident, error) {
+	ret := _mock.Called(ctx, filter, before, limit)
 
 	if len(ret) == 0 {
 		panic("no return value specified for ListIncidents")
@@ -267,18 +267,18 @@ func (_mock *MockRepository) ListIncidents(ctx context.Context, statuses []murph
 
 	var r0 []*murphy.Incident
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, []murphy.IncidentStatus, string, int) ([]*murphy.Incident, error)); ok {
-		return returnFunc(ctx, statuses, before, limit)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, incidents.Filter, string, int) ([]*murphy.Incident, error)); ok {
+		return returnFunc(ctx, filter, before, limit)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, []murphy.IncidentStatus, string, int) []*murphy.Incident); ok {
-		r0 = returnFunc(ctx, statuses, before, limit)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, incidents.Filter, string, int) []*murphy.Incident); ok {
+		r0 = returnFunc(ctx, filter, before, limit)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]*murphy.Incident)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, []murphy.IncidentStatus, string, int) error); ok {
-		r1 = returnFunc(ctx, statuses, before, limit)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, incidents.Filter, string, int) error); ok {
+		r1 = returnFunc(ctx, filter, before, limit)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -292,22 +292,22 @@ type MockRepository_ListIncidents_Call struct {
 
 // ListIncidents is a helper method to define mock.On call
 //   - ctx context.Context
-//   - statuses []murphy.IncidentStatus
+//   - filter incidents.Filter
 //   - before string
 //   - limit int
-func (_e *MockRepository_Expecter) ListIncidents(ctx any, statuses any, before any, limit any) *MockRepository_ListIncidents_Call {
-	return &MockRepository_ListIncidents_Call{Call: _e.mock.On("ListIncidents", ctx, statuses, before, limit)}
+func (_e *MockRepository_Expecter) ListIncidents(ctx any, filter any, before any, limit any) *MockRepository_ListIncidents_Call {
+	return &MockRepository_ListIncidents_Call{Call: _e.mock.On("ListIncidents", ctx, filter, before, limit)}
 }
 
-func (_c *MockRepository_ListIncidents_Call) Run(run func(ctx context.Context, statuses []murphy.IncidentStatus, before string, limit int)) *MockRepository_ListIncidents_Call {
+func (_c *MockRepository_ListIncidents_Call) Run(run func(ctx context.Context, filter incidents.Filter, before string, limit int)) *MockRepository_ListIncidents_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
 			arg0 = args[0].(context.Context)
 		}
-		var arg1 []murphy.IncidentStatus
+		var arg1 incidents.Filter
 		if args[1] != nil {
-			arg1 = args[1].([]murphy.IncidentStatus)
+			arg1 = args[1].(incidents.Filter)
 		}
 		var arg2 string
 		if args[2] != nil {
@@ -327,12 +327,12 @@ func (_c *MockRepository_ListIncidents_Call) Run(run func(ctx context.Context, s
 	return _c
 }
 
-func (_c *MockRepository_ListIncidents_Call) Return(incidents []*murphy.Incident, err error) *MockRepository_ListIncidents_Call {
-	_c.Call.Return(incidents, err)
+func (_c *MockRepository_ListIncidents_Call) Return(incidents1 []*murphy.Incident, err error) *MockRepository_ListIncidents_Call {
+	_c.Call.Return(incidents1, err)
 	return _c
 }
 
-func (_c *MockRepository_ListIncidents_Call) RunAndReturn(run func(ctx context.Context, statuses []murphy.IncidentStatus, before string, limit int) ([]*murphy.Incident, error)) *MockRepository_ListIncidents_Call {
+func (_c *MockRepository_ListIncidents_Call) RunAndReturn(run func(ctx context.Context, filter incidents.Filter, before string, limit int) ([]*murphy.Incident, error)) *MockRepository_ListIncidents_Call {
 	_c.Call.Return(run)
 	return _c
 }

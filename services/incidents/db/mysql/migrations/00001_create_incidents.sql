@@ -20,6 +20,7 @@ CREATE TABLE incidents (
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
 
 CREATE INDEX incidents_status_id_idx ON incidents (status, id);
+CREATE INDEX incidents_service_id_id_idx ON incidents (service_id, id);
 CREATE INDEX incidents_service_id_dedup_key_idx ON incidents (service_id, dedup_key);
 
 CREATE TABLE alerts (

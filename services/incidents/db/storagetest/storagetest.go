@@ -129,7 +129,7 @@ func Run(t *testing.T, open func(t *testing.T) incidents.Repository) {
 		assert.ErrorIs(t, err, murphy.ErrNotFound)
 	})
 
-	t.Run("lists incidents newest first, filtered by status", func(t *testing.T) {
+	t.Run("lists incidents newest first, filtered by status and service", func(t *testing.T) {
 		repo := open(t)
 		first, second := opened(murphy.NewID(), "a"), opened(murphy.NewID(), "b")
 		_, err := repo.RecordAlert(t.Context(), first)
@@ -139,15 +139,19 @@ func Run(t *testing.T, open func(t *testing.T) incidents.Repository) {
 		_, err = repo.RecordAlert(t.Context(), resolved(first.Created))
 		require.NoError(t, err)
 
-		all, err := repo.ListIncidents(t.Context(), nil, maxID, 10)
+		all, err := repo.ListIncidents(t.Context(), incidents.Filter{}, maxID, 10)
 		require.NoError(t, err)
 		assert.Equal(t, []string{second.IncidentID, first.IncidentID}, ids(all))
 
-		open, err := repo.ListIncidents(t.Context(), []murphy.IncidentStatus{murphy.IncidentStatus_INCIDENT_STATUS_TRIGGERED}, maxID, 10)
+		open, err := repo.ListIncidents(t.Context(), incidents.Filter{Statuses: []murphy.IncidentStatus{murphy.IncidentStatus_INCIDENT_STATUS_TRIGGERED}}, maxID, 10)
 		require.NoError(t, err)
 		assert.Equal(t, []string{second.IncidentID}, ids(open))
 
-		page, err := repo.ListIncidents(t.Context(), nil, second.IncidentID, 10)
+		ofService, err := repo.ListIncidents(t.Context(), incidents.Filter{ServiceIDs: []string{first.Created.GetServiceId()}}, maxID, 10)
+		require.NoError(t, err)
+		assert.Equal(t, []string{first.IncidentID}, ids(ofService))
+
+		page, err := repo.ListIncidents(t.Context(), incidents.Filter{}, second.IncidentID, 10)
 		require.NoError(t, err)
 		assert.Equal(t, []string{first.IncidentID}, ids(page))
 	})

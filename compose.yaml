@@ -2,6 +2,7 @@ x-integration-key-secrets: &integration-key-secrets "1:AAEqhKjSkvjtvtCA2YD2wSsiQ
 
 x-component-environment: &component-environment
   OTEL_EXPORTER_OTLP_ENDPOINT: http://lgtm:4318
+  OTEL_METRIC_EXPORT_INTERVAL: "5000"
   GIT_CONFIG_COUNT: "1"
   GIT_CONFIG_KEY_0: safe.directory
   GIT_CONFIG_VALUE_0: /src
@@ -102,6 +103,35 @@ services:
       - "3000:3000"
       - "4317:4317"
       - "4318:4318"
+    volumes:
+      - ./tests/provision/local/grafana/dashboards.yaml:/otel-lgtm/grafana/conf/provisioning/dashboards/murphy.yaml:ro
+      - ./tests/provision/local/grafana/dashboards:/otel-lgtm/murphy-dashboards:ro
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.165.0
+    user: "0"
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./tests/provision/local/otelcol/config.yaml:/etc/otelcol/config.yaml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      lgtm:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nats-exporter:
+        condition: service_started
+
+  nats-exporter:
+    image: natsio/prometheus-nats-exporter:0.20.3
+    command: ["-varz", "-connz", "-jsz=all", "http://nats:8222"]
+    depends_on:
+      nats:
+        condition: service_healthy
 
   provision:
     <<: *component

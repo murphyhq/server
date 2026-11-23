@@ -20,7 +20,7 @@ type Tx interface {
 type Engine[T Tx] interface {
 	FindOpenIncident(ctx context.Context, serviceID, dedupKey string) (*murphy.Incident, error)
 	GetIncident(ctx context.Context, id string) (*murphy.Incident, error)
-	ListIncidents(ctx context.Context, statuses []murphy.IncidentStatus, before string, limit int) ([]*murphy.Incident, error)
+	ListIncidents(ctx context.Context, filter incidents.Filter, before string, limit int) ([]*murphy.Incident, error)
 	ListTimeline(ctx context.Context, incidentID string) ([]*murphy.TimelineEntry, error)
 	LatestFiringAt(ctx context.Context, incidentID string) (time.Time, error)
 	OpenInstances(ctx context.Context, incidentID string) ([]string, error)
