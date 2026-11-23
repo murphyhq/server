@@ -75,19 +75,21 @@ The public entry point for webhooks. Monitoring tools such as Alertmanager, Graf
 
 ### API
 
-The management API, described by an OpenAPI spec and used by people and automation. It reads and writes the database directly: schedules, rotations, escalation policies, users, teams and incidents. Changes that belong together happen in one transaction; acknowledging an incident, for example, also cancels its pending escalation timers and stores the event that announces it.
+The management API, described by an OpenAPI spec and used by people and automation. It reads and writes the database directly: schedules, rotations, escalation policies, users, teams and incidents. Changes that belong together happen in one transaction; acknowledging an incident, for example, also cancels its pending escalation timers and stores the messages it causes.
 
 ### Engine
 
-Decides what happens to an incident, and only ever reacts to messages. An alert opens or updates an incident, the version of its escalation policy the incident follows and the on-call schedule decide who to page, and `engine` stores the change together with the messages it causes: the incident's events, the notifications to send and the timer for the next escalation step. It also records delivery results and acknowledgements that come back from notification providers. It is the only component that changes incident state in response to messages, and it handles every message exactly once, even when the broker delivers it twice.
+Decides what happens to an incident when a message arrives; no other component changes incidents in response to messages. An alert opens or updates an incident; the version of the escalation policy the incident follows and the on-call schedules decide who to page; and `engine` stores the change together with the messages it causes. It also takes in what comes back: the outcome of each notification, and delivery updates and replies from providers. It handles every message exactly once, even when the broker delivers it twice.
 
 ### Scheduler
 
-Turns stored messages into published ones. Every message that decides whether someone is paged, from incident events to escalation timers, is a scheduled message in its domain's database, saved in the same transaction as the change that caused it. `scheduler` publishes each one when it is due, events right away and timers at their time, and deletes it once the broker confirms. A change and its messages are therefore never separated: a crash or a broker outage delays a message, and loses none. When a timer is due, `scheduler` publishes `TimerExpired`, and `engine` decides what it means.
+Turns stored messages into published ones. Every message that decides whether someone is paged is saved as a scheduled message in its domain's database, in the same transaction as the change that caused it. `scheduler` publishes each one when it is due, timers at their time and everything else right away, and deletes it once the broker confirms. A change and its messages are therefore never separated: a crash or a broker outage delays a message, and loses none. A due timer is published as `TimerExpired`, and `engine` decides what it means.
 
 ### Notifier
 
-Sends notifications through providers: webhooks, email, chat, SMS and voice. It publishes the outcome of every attempt as `NotificationSent` or `NotificationFailed`, and the provider's later delivery update arrives through `ingest`. It only makes outbound calls and doesn't use the database, so notifications that are already queued still go out when the database is unavailable.
+Sends notifications through providers: webhooks, email, chat, SMS and voice. It publishes the outcome of every notification as `NotificationSent` or `NotificationFailed`, and the provider's later delivery update arrives through `ingest`. Each notification arrives with its destination, so `notifier` only makes outbound calls and doesn't use the database: notifications already queued still go out when the database is unavailable.
+
+Webhooks follow [Standard Webhooks](https://www.standardwebhooks.com). `notifier` signs each one with Murphy's Ed25519 private key, which comes from its configuration as a secret reference and never leaves it. Receivers check the signature with the public key the API serves, and hold no secret of their own. While the key is being replaced, `notifier` signs with both the old and the new key, so receivers switch at their own pace.
 
 ### Migrate
 
@@ -126,11 +128,17 @@ sequenceDiagram
   S-->>N: NotificationCreated
   S->>D: delete sent messages
   N->>P: send
-  N-->>E: NotificationSent
+  alt accepted
+    N-->>E: NotificationSent
+  else failed
+    N-->>E: NotificationFailed
+  end
   E->>D: add to incident timeline
-  P->>I: delivery callback
-  I-->>E: NotificationDelivered
-  E->>D: add to incident timeline
+  opt the provider reports delivery
+    P->>I: delivery callback
+    I-->>E: NotificationDelivered
+    E->>D: add to incident timeline
+  end
 ```
 
 ### Escalation
@@ -165,10 +173,10 @@ sequenceDiagram
   participant S as scheduler
   participant N as notifier
   C->>A: acknowledge incident
-  A->>D: update incident, cancel its timers, store IncidentAcknowledged (one transaction)
+  A->>D: update incident, cancel its timers, store IncidentAcknowledged and the notifications it causes (one transaction)
   A->>C: 200
   S->>D: claim due messages
-  S-->>N: IncidentAcknowledged
+  S-->>N: NotificationCreated (acknowledged)
   S->>D: delete sent messages
 ```
 
@@ -185,8 +193,8 @@ sequenceDiagram
   P->>I: reply callback
   I-->>E: NotificationReplied
   I->>P: 200
-  E->>D: the reply acknowledges: update incident, cancel its timers, store IncidentAcknowledged (one transaction)
+  E->>D: the reply acknowledges: update incident, cancel its timers, store IncidentAcknowledged and the notifications it causes (one transaction)
   S->>D: claim due messages
-  S-->>N: IncidentAcknowledged
+  S-->>N: NotificationCreated (acknowledged)
   S->>D: delete sent messages
 ```
