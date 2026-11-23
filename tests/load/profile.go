@@ -25,7 +25,6 @@ var profiles = map[string]Profile{
 		Duration: 5 * time.Minute,
 		Settle:   2 * time.Minute,
 	},
-	"soak": {Pacer: vegeta.Rate{Freq: 20, Per: time.Second}, Duration: 30 * time.Minute, Settle: time.Minute},
 }
 
 func profile(t *testing.T) Profile {
