@@ -61,7 +61,7 @@ End-to-end tests run against the whole stack from `docker compose --profile murp
 go test -tags e2e ./tests/e2e/...
 ```
 
-Load tests run against the same stack. `MURPHY_LOAD_PROFILE` picks the traffic: `smoke` (the default), `load`, `stress` or `soak`. CI runs all four after every merge:
+Load tests run against the same stack. `MURPHY_LOAD_PROFILE` picks the traffic: `smoke` (the default), `load` or `stress`. CI runs all three after every merge:
 
 ```
 MURPHY_LOAD_PROFILE=load go test -tags load -v ./tests/load/...
