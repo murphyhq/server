@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package murphy.v1;
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/murphyhq/server;murphy";
+
+message Schedule {
+  string id = 1;
+  string name = 2;
+  string time_zone = 3;
+  repeated Layer layers = 4;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
+  repeated string team_ids = 7;
+}
+
+message Layer {
+  string name = 1;
+  repeated string participants = 2;
+  google.protobuf.Duration turn_length = 3;
+  google.protobuf.Timestamp starts_at = 4;
+  string id = 5;
+}
+
+message Override {
+  string id = 1;
+  string schedule_id = 2;
+  string user_id = 3;
+  google.protobuf.Timestamp starts_at = 4;
+  google.protobuf.Timestamp ends_at = 5;
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp updated_at = 7;
+}

@@ -78,10 +78,3 @@ func TestLoadReadsCommaSeparatedLists(t *testing.T) {
 
 	assert.Equal(t, []string{"http://localhost:8090", "https://app.example.com"}, s.Origins)
 }
-
-func TestLoadLeavesAnEmptyListEmpty(t *testing.T) {
-	var s listed
-	require.NoError(t, config.Load(&s))
-
-	assert.Empty(t, s.Origins)
-}

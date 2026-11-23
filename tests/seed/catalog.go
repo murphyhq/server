@@ -8,32 +8,27 @@ import (
 	"github.com/murphyhq/server/client"
 )
 
-const (
-	platformPolicy = "0195f3a0-0000-7000-8000-000000000002"
-	paymentsPolicy = "0195f3a0-0000-7000-8000-000000000004"
-)
-
 type seededService struct {
 	input        client.ServiceInput
 	integrations []client.IntegrationCreate
 }
 
-func seedCatalog(ctx context.Context, api *client.ClientWithResponses) error {
+func seedCatalog(ctx context.Context, api *client.ClientWithResponses, policies map[string]string) error {
 	low := client.Low
 	services := []seededService{
 		{
-			input: client.ServiceInput{Name: "checkout-api", Description: new("Takes orders and payments from the storefront."), EscalationPolicyId: paymentsPolicy},
+			input: client.ServiceInput{Name: "checkout-api", Description: new("Takes orders and payments from the storefront."), EscalationPolicyId: policies["payments"]},
 			integrations: []client.IntegrationCreate{
 				{Name: "Alertmanager", Type: client.Alertmanager},
 				{Name: "Grafana", Type: client.Grafana},
 			},
 		},
 		{
-			input:        client.ServiceInput{Name: "payments-api", Description: new("Charges cards through the payment provider."), EscalationPolicyId: paymentsPolicy},
+			input:        client.ServiceInput{Name: "payments-api", Description: new("Charges cards through the payment provider."), EscalationPolicyId: policies["payments"]},
 			integrations: []client.IntegrationCreate{{Name: "Datadog", Type: client.Datadog}},
 		},
 		{
-			input:        client.ServiceInput{Name: "internal-wiki", Description: new("Company documentation."), EscalationPolicyId: platformPolicy, Urgency: &low},
+			input:        client.ServiceInput{Name: "internal-wiki", Description: new("Company documentation."), EscalationPolicyId: policies["platform"], Urgency: &low},
 			integrations: []client.IntegrationCreate{{Name: "Uptime checks", Type: client.Generic}},
 		},
 	}

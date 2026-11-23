@@ -5,28 +5,46 @@ import (
 	"fmt"
 
 	catalogdb "github.com/murphyhq/server/services/catalog/db"
+	escalationdb "github.com/murphyhq/server/services/escalation/db"
 	incidentsdb "github.com/murphyhq/server/services/incidents/db"
+	oncalldb "github.com/murphyhq/server/services/oncall/db"
+	peopledb "github.com/murphyhq/server/services/people/db"
 )
 
 type Settings struct {
-	CatalogDatabaseURL   string `env:"CATALOG_DATABASE_URL" required:"true"`
-	IncidentsDatabaseURL string `env:"INCIDENTS_DATABASE_URL" required:"true"`
+	CatalogDatabaseURL    string `env:"CATALOG_DATABASE_URL" required:"true"`
+	IncidentsDatabaseURL  string `env:"INCIDENTS_DATABASE_URL" required:"true"`
+	PeopleDatabaseURL     string `env:"PEOPLE_DATABASE_URL" required:"true"`
+	OnCallDatabaseURL     string `env:"ONCALL_DATABASE_URL" required:"true"`
+	EscalationDatabaseURL string `env:"ESCALATION_DATABASE_URL" required:"true"`
+}
+
+type storage interface {
+	Migrate(ctx context.Context) error
+	Close()
 }
 
 func Migrate(ctx context.Context, s Settings) error {
-	catalogStorage, err := catalogdb.Open(ctx, s.CatalogDatabaseURL)
-	if err != nil {
-		return fmt.Errorf("MURPHY_CATALOG_DATABASE_URL: %w", err)
+	domains := []struct {
+		setting string
+		open    func() (storage, error)
+	}{
+		{"MURPHY_CATALOG_DATABASE_URL", func() (storage, error) { return catalogdb.Open(ctx, s.CatalogDatabaseURL) }},
+		{"MURPHY_INCIDENTS_DATABASE_URL", func() (storage, error) { return incidentsdb.Open(ctx, s.IncidentsDatabaseURL) }},
+		{"MURPHY_PEOPLE_DATABASE_URL", func() (storage, error) { return peopledb.Open(ctx, s.PeopleDatabaseURL) }},
+		{"MURPHY_ONCALL_DATABASE_URL", func() (storage, error) { return oncalldb.Open(ctx, s.OnCallDatabaseURL) }},
+		{"MURPHY_ESCALATION_DATABASE_URL", func() (storage, error) { return escalationdb.Open(ctx, s.EscalationDatabaseURL) }},
 	}
-	defer catalogStorage.Close()
-	if err := catalogStorage.Migrate(ctx); err != nil {
-		return err
+	for _, domain := range domains {
+		store, err := domain.open()
+		if err != nil {
+			return fmt.Errorf("%s: %w", domain.setting, err)
+		}
+		err = store.Migrate(ctx)
+		store.Close()
+		if err != nil {
+			return err
+		}
 	}
-
-	incidentsStorage, err := incidentsdb.Open(ctx, s.IncidentsDatabaseURL)
-	if err != nil {
-		return fmt.Errorf("MURPHY_INCIDENTS_DATABASE_URL: %w", err)
-	}
-	defer incidentsStorage.Close()
-	return incidentsStorage.Migrate(ctx)
+	return nil
 }

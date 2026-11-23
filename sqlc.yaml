@@ -89,3 +89,96 @@ sql:
             go_type:
               type: string
               pointer: true
+  - engine: postgresql
+    schema: services/people/db/postgres/migrations
+    queries: services/people/db/postgres/queries.sql
+    gen:
+      go:
+        package: postgres
+        out: services/people/db/postgres
+        sql_package: pgx/v5
+  - engine: mysql
+    schema: services/people/db/mysql/migrations
+    queries: services/people/db/mysql/queries.sql
+    gen:
+      go:
+        package: mysql
+        out: services/people/db/mysql
+        overrides:
+          - db_type: datetime
+            nullable: true
+            go_type:
+              type: time.Time
+              pointer: true
+          - db_type: char
+            nullable: true
+            go_type:
+              type: string
+              pointer: true
+          - db_type: varchar
+            nullable: true
+            go_type:
+              type: string
+              pointer: true
+  - engine: postgresql
+    schema: services/oncall/db/postgres/migrations
+    queries: services/oncall/db/postgres/queries.sql
+    gen:
+      go:
+        package: postgres
+        out: services/oncall/db/postgres
+        sql_package: pgx/v5
+  - engine: mysql
+    schema: services/oncall/db/mysql/migrations
+    queries: services/oncall/db/mysql/queries.sql
+    gen:
+      go:
+        package: mysql
+        out: services/oncall/db/mysql
+        overrides:
+          - db_type: datetime
+            nullable: true
+            go_type:
+              type: time.Time
+              pointer: true
+          - db_type: char
+            nullable: true
+            go_type:
+              type: string
+              pointer: true
+          - db_type: varchar
+            nullable: true
+            go_type:
+              type: string
+              pointer: true
+  - engine: postgresql
+    schema: services/escalation/db/postgres/migrations
+    queries: services/escalation/db/postgres/queries.sql
+    gen:
+      go:
+        package: postgres
+        out: services/escalation/db/postgres
+        sql_package: pgx/v5
+  - engine: mysql
+    schema: services/escalation/db/mysql/migrations
+    queries: services/escalation/db/mysql/queries.sql
+    gen:
+      go:
+        package: mysql
+        out: services/escalation/db/mysql
+        overrides:
+          - db_type: datetime
+            nullable: true
+            go_type:
+              type: time.Time
+              pointer: true
+          - db_type: char
+            nullable: true
+            go_type:
+              type: string
+              pointer: true
+          - db_type: varchar
+            nullable: true
+            go_type:
+              type: string
+              pointer: true

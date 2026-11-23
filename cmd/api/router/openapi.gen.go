@@ -23,6 +23,51 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// Defines values for ContactMethodType.
+const (
+	Email   ContactMethodType = "email"
+	Push    ContactMethodType = "push"
+	Sms     ContactMethodType = "sms"
+	Voice   ContactMethodType = "voice"
+	Webhook ContactMethodType = "webhook"
+)
+
+// Valid indicates whether the value is a known member of the ContactMethodType enum.
+func (e ContactMethodType) Valid() bool {
+	switch e {
+	case Email:
+		return true
+	case Push:
+		return true
+	case Sms:
+		return true
+	case Voice:
+		return true
+	case Webhook:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for EscalationTargetType.
+const (
+	EscalationTargetTypeSchedule EscalationTargetType = "schedule"
+	EscalationTargetTypeUser     EscalationTargetType = "user"
+)
+
+// Valid indicates whether the value is a known member of the EscalationTargetType enum.
+func (e EscalationTargetType) Valid() bool {
+	switch e {
+	case EscalationTargetTypeSchedule:
+		return true
+	case EscalationTargetTypeUser:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for IncidentStatus.
 const (
 	IncidentStatusAcknowledged IncidentStatus = "acknowledged"
@@ -110,6 +155,27 @@ func (e ServiceStatus) Valid() bool {
 	}
 }
 
+// Defines values for TeamRole.
+const (
+	Manager   TeamRole = "manager"
+	Observer  TeamRole = "observer"
+	Responder TeamRole = "responder"
+)
+
+// Valid indicates whether the value is a known member of the TeamRole enum.
+func (e TeamRole) Valid() bool {
+	switch e {
+	case Manager:
+		return true
+	case Observer:
+		return true
+	case Responder:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for TimelineEntryType.
 const (
 	TimelineEntryTypeAcknowledged TimelineEntryType = "acknowledged"
@@ -151,6 +217,96 @@ func (e Urgency) Valid() bool {
 		return false
 	}
 }
+
+// Defines values for UserStatus.
+const (
+	UserStatusActive      UserStatus = "active"
+	UserStatusDeactivated UserStatus = "deactivated"
+)
+
+// Valid indicates whether the value is a known member of the UserStatus enum.
+func (e UserStatus) Valid() bool {
+	switch e {
+	case UserStatusActive:
+		return true
+	case UserStatusDeactivated:
+		return true
+	default:
+		return false
+	}
+}
+
+// ContactMethod defines model for ContactMethod.
+type ContactMethod struct {
+	// Address An email address, an E.164 phone number, a webhook URL, or a push device's relay handle.
+	Address   string            `json:"address"`
+	CreatedAt time.Time         `json:"created_at"`
+	Id        string            `json:"id"`
+	Type      ContactMethodType `json:"type"`
+	UpdatedAt time.Time         `json:"updated_at"`
+	UserId    string            `json:"user_id"`
+}
+
+// ContactMethodInput defines model for ContactMethodInput.
+type ContactMethodInput struct {
+	Address string            `json:"address"`
+	Type    ContactMethodType `json:"type"`
+}
+
+// ContactMethodList defines model for ContactMethodList.
+type ContactMethodList struct {
+	Items []ContactMethod `json:"items"`
+}
+
+// ContactMethodType defines model for ContactMethodType.
+type ContactMethodType string
+
+// EscalationLevel defines model for EscalationLevel.
+type EscalationLevel struct {
+	// DelaySeconds How long to wait for an acknowledgement before the next level.
+	DelaySeconds int64              `json:"delay_seconds"`
+	Targets      []EscalationTarget `json:"targets"`
+}
+
+// EscalationPolicy defines model for EscalationPolicy.
+type EscalationPolicy struct {
+	CreatedAt time.Time         `json:"created_at"`
+	Id        string            `json:"id"`
+	Levels    []EscalationLevel `json:"levels"`
+	Name      string            `json:"name"`
+
+	// RepeatCount How many times to go through the levels again when nobody acknowledges.
+	RepeatCount int32 `json:"repeat_count"`
+
+	// TeamId The team that owns the policy, and with it the services that page through it.
+	TeamId    string    `json:"team_id"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// EscalationPolicyInput defines model for EscalationPolicyInput.
+type EscalationPolicyInput struct {
+	Levels      []EscalationLevel `json:"levels"`
+	Name        string            `json:"name"`
+	RepeatCount *int32            `json:"repeat_count,omitempty"`
+	TeamId      string            `json:"team_id"`
+}
+
+// EscalationPolicyPage defines model for EscalationPolicyPage.
+type EscalationPolicyPage struct {
+	Items []EscalationPolicy `json:"items"`
+
+	// NextCursor Empty on the last page.
+	NextCursor string `json:"next_cursor"`
+}
+
+// EscalationTarget defines model for EscalationTarget.
+type EscalationTarget struct {
+	Id   string               `json:"id"`
+	Type EscalationTargetType `json:"type"`
+}
+
+// EscalationTargetType defines model for EscalationTargetType.
+type EscalationTargetType string
 
 // Incident defines model for Incident.
 type Incident struct {
@@ -252,6 +408,48 @@ type IntegrationWithKey struct {
 	UpdatedAt             time.Time         `json:"updated_at"`
 }
 
+// Layer defines model for Layer.
+type Layer struct {
+	Name *string `json:"name,omitempty"`
+
+	// Participants User IDs, in the order they take turns.
+	Participants []string  `json:"participants"`
+	StartsAt     time.Time `json:"starts_at"`
+
+	// TurnLengthSeconds How long each turn lasts. Whole days hand over at the same local time every day, in the schedule's time zone.
+	TurnLengthSeconds int64 `json:"turn_length_seconds"`
+}
+
+// OnCall defines model for OnCall.
+type OnCall struct {
+	At time.Time `json:"at"`
+
+	// UserId Absent when nobody is on call.
+	UserId *string `json:"user_id,omitempty"`
+}
+
+// Override defines model for Override.
+type Override struct {
+	CreatedAt  time.Time `json:"created_at"`
+	EndsAt     time.Time `json:"ends_at"`
+	Id         string    `json:"id"`
+	ScheduleId string    `json:"schedule_id"`
+	StartsAt   time.Time `json:"starts_at"`
+	UserId     string    `json:"user_id"`
+}
+
+// OverrideInput defines model for OverrideInput.
+type OverrideInput struct {
+	EndsAt   time.Time `json:"ends_at"`
+	StartsAt time.Time `json:"starts_at"`
+	UserId   string    `json:"user_id"`
+}
+
+// OverrideList defines model for OverrideList.
+type OverrideList struct {
+	Items []Override `json:"items"`
+}
+
 // Problem defines model for Problem.
 type Problem struct {
 	Detail *string `json:"detail,omitempty"`
@@ -260,6 +458,39 @@ type Problem struct {
 
 	// TraceId The trace of this request, to find it in your tracing backend.
 	TraceId *string `json:"trace_id,omitempty"`
+}
+
+// Schedule defines model for Schedule.
+type Schedule struct {
+	CreatedAt time.Time `json:"created_at"`
+	Id        string    `json:"id"`
+
+	// Layers Later layers take precedence over earlier ones once they start.
+	Layers []Layer `json:"layers"`
+	Name   string  `json:"name"`
+
+	// TeamIds The teams that use this schedule.
+	TeamIds   []string  `json:"team_ids"`
+	TimeZone  string    `json:"time_zone"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// ScheduleInput defines model for ScheduleInput.
+type ScheduleInput struct {
+	Layers  []Layer   `json:"layers"`
+	Name    string    `json:"name"`
+	TeamIds *[]string `json:"team_ids,omitempty"`
+
+	// TimeZone IANA time zone; UTC by default.
+	TimeZone *string `json:"time_zone,omitempty"`
+}
+
+// SchedulePage defines model for SchedulePage.
+type SchedulePage struct {
+	Items []Schedule `json:"items"`
+
+	// NextCursor Empty on the last page.
+	NextCursor string `json:"next_cursor"`
 }
 
 // Service defines model for Service.
@@ -294,6 +525,49 @@ type ServicePage struct {
 // ServiceStatus defines model for ServiceStatus.
 type ServiceStatus string
 
+// Team defines model for Team.
+type Team struct {
+	CreatedAt time.Time `json:"created_at"`
+	Id        string    `json:"id"`
+	Name      string    `json:"name"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// TeamInput defines model for TeamInput.
+type TeamInput struct {
+	Name string `json:"name"`
+}
+
+// TeamMemberInput defines model for TeamMemberInput.
+type TeamMemberInput struct {
+	Role TeamRole `json:"role"`
+}
+
+// TeamMembership defines model for TeamMembership.
+type TeamMembership struct {
+	CreatedAt time.Time `json:"created_at"`
+	Role      TeamRole  `json:"role"`
+	TeamId    string    `json:"team_id"`
+	UpdatedAt time.Time `json:"updated_at"`
+	UserId    string    `json:"user_id"`
+}
+
+// TeamMembershipList defines model for TeamMembershipList.
+type TeamMembershipList struct {
+	Items []TeamMembership `json:"items"`
+}
+
+// TeamPage defines model for TeamPage.
+type TeamPage struct {
+	Items []Team `json:"items"`
+
+	// NextCursor Empty on the last page.
+	NextCursor string `json:"next_cursor"`
+}
+
+// TeamRole defines model for TeamRole.
+type TeamRole string
+
 // TimelineEntry defines model for TimelineEntry.
 type TimelineEntry struct {
 	AlertId *string           `json:"alert_id,omitempty"`
@@ -309,6 +583,40 @@ type TimelineEntryType string
 // Urgency defines model for Urgency.
 type Urgency string
 
+// User defines model for User.
+type User struct {
+	CreatedAt time.Time  `json:"created_at"`
+	Email     string     `json:"email"`
+	Id        string     `json:"id"`
+	Name      string     `json:"name"`
+	Status    UserStatus `json:"status"`
+
+	// TimeZone IANA time zone, as in Europe/Malta.
+	TimeZone  string    `json:"time_zone"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// UserInput defines model for UserInput.
+type UserInput struct {
+	Email  string      `json:"email"`
+	Name   string      `json:"name"`
+	Status *UserStatus `json:"status,omitempty"`
+
+	// TimeZone IANA time zone; UTC by default.
+	TimeZone *string `json:"time_zone,omitempty"`
+}
+
+// UserPage defines model for UserPage.
+type UserPage struct {
+	Items []User `json:"items"`
+
+	// NextCursor Empty on the last page.
+	NextCursor string `json:"next_cursor"`
+}
+
+// UserStatus defines model for UserStatus.
+type UserStatus string
+
 // Cursor defines model for Cursor.
 type Cursor = string
 
@@ -320,6 +628,24 @@ type IdempotencyKey = string
 
 // Limit defines model for Limit.
 type Limit = int
+
+// ListEscalationPoliciesParams defines parameters for ListEscalationPolicies.
+type ListEscalationPoliciesParams struct {
+	// Limit Items per page, 50 by default and at most 100.
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Cursor The next_cursor of the previous page.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// TeamId Only those owned by this team.
+	TeamId *string `form:"team_id,omitempty" json:"team_id,omitempty"`
+}
+
+// CreateEscalationPolicyParams defines parameters for CreateEscalationPolicy.
+type CreateEscalationPolicyParams struct {
+	// IdempotencyKey Makes retries safe. A retry with the same key and request returns the original response for 24 hours; the same key with a different request is rejected with 422, and a retry while the first request is still running gets 409.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
 
 // ListIncidentsParams defines parameters for ListIncidents.
 type ListIncidentsParams struct {
@@ -335,6 +661,42 @@ type ListIncidentsParams struct {
 
 // RotateIntegrationKeyParams defines parameters for RotateIntegrationKey.
 type RotateIntegrationKeyParams struct {
+	// IdempotencyKey Makes retries safe. A retry with the same key and request returns the original response for 24 hours; the same key with a different request is rejected with 422, and a retry while the first request is still running gets 409.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// ListSchedulesParams defines parameters for ListSchedules.
+type ListSchedulesParams struct {
+	// Limit Items per page, 50 by default and at most 100.
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Cursor The next_cursor of the previous page.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// TeamId Only those associated with this team.
+	TeamId *string `form:"team_id,omitempty" json:"team_id,omitempty"`
+}
+
+// CreateScheduleParams defines parameters for CreateSchedule.
+type CreateScheduleParams struct {
+	// IdempotencyKey Makes retries safe. A retry with the same key and request returns the original response for 24 hours; the same key with a different request is rejected with 422, and a retry while the first request is still running gets 409.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// GetOnCallParams defines parameters for GetOnCall.
+type GetOnCallParams struct {
+	// At The moment to ask about; now by default.
+	At *time.Time `form:"at,omitempty" json:"at,omitempty"`
+}
+
+// ListOverridesParams defines parameters for ListOverrides.
+type ListOverridesParams struct {
+	// EndsAfter Only overrides that end after this time; now by default.
+	EndsAfter *time.Time `form:"ends_after,omitempty" json:"ends_after,omitempty"`
+}
+
+// CreateOverrideParams defines parameters for CreateOverride.
+type CreateOverrideParams struct {
 	// IdempotencyKey Makes retries safe. A retry with the same key and request returns the original response for 24 hours; the same key with a different request is rejected with 422, and a retry while the first request is still running gets 409.
 	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
@@ -369,8 +731,62 @@ type CreateIntegrationParams struct {
 	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
 
+// ListTeamsParams defines parameters for ListTeams.
+type ListTeamsParams struct {
+	// Limit Items per page, 50 by default and at most 100.
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Cursor The next_cursor of the previous page.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+}
+
+// CreateTeamParams defines parameters for CreateTeam.
+type CreateTeamParams struct {
+	// IdempotencyKey Makes retries safe. A retry with the same key and request returns the original response for 24 hours; the same key with a different request is rejected with 422, and a retry while the first request is still running gets 409.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// ListUsersParams defines parameters for ListUsers.
+type ListUsersParams struct {
+	// Limit Items per page, 50 by default and at most 100.
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Cursor The next_cursor of the previous page.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+}
+
+// CreateUserParams defines parameters for CreateUser.
+type CreateUserParams struct {
+	// IdempotencyKey Makes retries safe. A retry with the same key and request returns the original response for 24 hours; the same key with a different request is rejected with 422, and a retry while the first request is still running gets 409.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// CreateContactMethodParams defines parameters for CreateContactMethod.
+type CreateContactMethodParams struct {
+	// IdempotencyKey Makes retries safe. A retry with the same key and request returns the original response for 24 hours; the same key with a different request is rejected with 422, and a retry while the first request is still running gets 409.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// UpdateContactMethodJSONRequestBody defines body for UpdateContactMethod for application/json ContentType.
+type UpdateContactMethodJSONRequestBody = ContactMethodInput
+
+// CreateEscalationPolicyJSONRequestBody defines body for CreateEscalationPolicy for application/json ContentType.
+type CreateEscalationPolicyJSONRequestBody = EscalationPolicyInput
+
+// UpdateEscalationPolicyJSONRequestBody defines body for UpdateEscalationPolicy for application/json ContentType.
+type UpdateEscalationPolicyJSONRequestBody = EscalationPolicyInput
+
 // UpdateIntegrationJSONRequestBody defines body for UpdateIntegration for application/json ContentType.
 type UpdateIntegrationJSONRequestBody = IntegrationUpdate
+
+// CreateScheduleJSONRequestBody defines body for CreateSchedule for application/json ContentType.
+type CreateScheduleJSONRequestBody = ScheduleInput
+
+// UpdateScheduleJSONRequestBody defines body for UpdateSchedule for application/json ContentType.
+type UpdateScheduleJSONRequestBody = ScheduleInput
+
+// CreateOverrideJSONRequestBody defines body for CreateOverride for application/json ContentType.
+type CreateOverrideJSONRequestBody = OverrideInput
 
 // CreateServiceJSONRequestBody defines body for CreateService for application/json ContentType.
 type CreateServiceJSONRequestBody = ServiceInput
@@ -381,8 +797,50 @@ type UpdateServiceJSONRequestBody = ServiceInput
 // CreateIntegrationJSONRequestBody defines body for CreateIntegration for application/json ContentType.
 type CreateIntegrationJSONRequestBody = IntegrationCreate
 
+// CreateTeamJSONRequestBody defines body for CreateTeam for application/json ContentType.
+type CreateTeamJSONRequestBody = TeamInput
+
+// UpdateTeamJSONRequestBody defines body for UpdateTeam for application/json ContentType.
+type UpdateTeamJSONRequestBody = TeamInput
+
+// SetTeamMemberJSONRequestBody defines body for SetTeamMember for application/json ContentType.
+type SetTeamMemberJSONRequestBody = TeamMemberInput
+
+// CreateUserJSONRequestBody defines body for CreateUser for application/json ContentType.
+type CreateUserJSONRequestBody = UserInput
+
+// UpdateUserJSONRequestBody defines body for UpdateUser for application/json ContentType.
+type UpdateUserJSONRequestBody = UserInput
+
+// CreateContactMethodJSONRequestBody defines body for CreateContactMethod for application/json ContentType.
+type CreateContactMethodJSONRequestBody = ContactMethodInput
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// DeleteContactMethod Delete a contact method
+	// (DELETE /v1/contact-methods/{id})
+	DeleteContactMethod(w http.ResponseWriter, r *http.Request, id ID)
+	// GetContactMethod Get a contact method
+	// (GET /v1/contact-methods/{id})
+	GetContactMethod(w http.ResponseWriter, r *http.Request, id ID)
+	// UpdateContactMethod Update a contact method
+	// (PUT /v1/contact-methods/{id})
+	UpdateContactMethod(w http.ResponseWriter, r *http.Request, id ID)
+	// ListEscalationPolicies List escalation policies
+	// (GET /v1/escalation-policies)
+	ListEscalationPolicies(w http.ResponseWriter, r *http.Request, params ListEscalationPoliciesParams)
+	// CreateEscalationPolicy Create an escalation policy
+	// (POST /v1/escalation-policies)
+	CreateEscalationPolicy(w http.ResponseWriter, r *http.Request, params CreateEscalationPolicyParams)
+	// DeleteEscalationPolicy Delete an escalation policy
+	// (DELETE /v1/escalation-policies/{id})
+	DeleteEscalationPolicy(w http.ResponseWriter, r *http.Request, id ID)
+	// GetEscalationPolicy Get an escalation policy
+	// (GET /v1/escalation-policies/{id})
+	GetEscalationPolicy(w http.ResponseWriter, r *http.Request, id ID)
+	// UpdateEscalationPolicy Update an escalation policy
+	// (PUT /v1/escalation-policies/{id})
+	UpdateEscalationPolicy(w http.ResponseWriter, r *http.Request, id ID)
 	// ListIncidents List incidents
 	// (GET /v1/incidents)
 	ListIncidents(w http.ResponseWriter, r *http.Request, params ListIncidentsParams)
@@ -401,6 +859,33 @@ type ServerInterface interface {
 	// RotateIntegrationKey Rotate an integration's key
 	// (POST /v1/integrations/{id}/key)
 	RotateIntegrationKey(w http.ResponseWriter, r *http.Request, id ID, params RotateIntegrationKeyParams)
+	// DeleteOverride Delete an override
+	// (DELETE /v1/overrides/{id})
+	DeleteOverride(w http.ResponseWriter, r *http.Request, id ID)
+	// ListSchedules List schedules
+	// (GET /v1/schedules)
+	ListSchedules(w http.ResponseWriter, r *http.Request, params ListSchedulesParams)
+	// CreateSchedule Create a schedule
+	// (POST /v1/schedules)
+	CreateSchedule(w http.ResponseWriter, r *http.Request, params CreateScheduleParams)
+	// DeleteSchedule Delete a schedule
+	// (DELETE /v1/schedules/{id})
+	DeleteSchedule(w http.ResponseWriter, r *http.Request, id ID)
+	// GetSchedule Get a schedule
+	// (GET /v1/schedules/{id})
+	GetSchedule(w http.ResponseWriter, r *http.Request, id ID)
+	// UpdateSchedule Update a schedule
+	// (PUT /v1/schedules/{id})
+	UpdateSchedule(w http.ResponseWriter, r *http.Request, id ID)
+	// GetOnCall Find who is on call
+	// (GET /v1/schedules/{id}/on-call)
+	GetOnCall(w http.ResponseWriter, r *http.Request, id ID, params GetOnCallParams)
+	// ListOverrides List a schedule's overrides
+	// (GET /v1/schedules/{id}/overrides)
+	ListOverrides(w http.ResponseWriter, r *http.Request, id ID, params ListOverridesParams)
+	// CreateOverride Override a schedule for a time range
+	// (POST /v1/schedules/{id}/overrides)
+	CreateOverride(w http.ResponseWriter, r *http.Request, id ID, params CreateOverrideParams)
 	// ListServices List services
 	// (GET /v1/services)
 	ListServices(w http.ResponseWriter, r *http.Request, params ListServicesParams)
@@ -422,6 +907,51 @@ type ServerInterface interface {
 	// CreateIntegration Create an integration
 	// (POST /v1/services/{id}/integrations)
 	CreateIntegration(w http.ResponseWriter, r *http.Request, id ID, params CreateIntegrationParams)
+	// ListTeams List teams
+	// (GET /v1/teams)
+	ListTeams(w http.ResponseWriter, r *http.Request, params ListTeamsParams)
+	// CreateTeam Create a team
+	// (POST /v1/teams)
+	CreateTeam(w http.ResponseWriter, r *http.Request, params CreateTeamParams)
+	// DeleteTeam Delete a team
+	// (DELETE /v1/teams/{id})
+	DeleteTeam(w http.ResponseWriter, r *http.Request, id ID)
+	// GetTeam Get a team
+	// (GET /v1/teams/{id})
+	GetTeam(w http.ResponseWriter, r *http.Request, id ID)
+	// UpdateTeam Update a team
+	// (PUT /v1/teams/{id})
+	UpdateTeam(w http.ResponseWriter, r *http.Request, id ID)
+	// ListTeamMembers List a team's members
+	// (GET /v1/teams/{id}/members)
+	ListTeamMembers(w http.ResponseWriter, r *http.Request, id ID)
+	// RemoveTeamMember Remove a member from a team
+	// (DELETE /v1/teams/{id}/members/{user_id})
+	RemoveTeamMember(w http.ResponseWriter, r *http.Request, id ID, userId string)
+	// SetTeamMember Add a member to a team, or change their role
+	// (PUT /v1/teams/{id}/members/{user_id})
+	SetTeamMember(w http.ResponseWriter, r *http.Request, id ID, userId string)
+	// ListUsers List users
+	// (GET /v1/users)
+	ListUsers(w http.ResponseWriter, r *http.Request, params ListUsersParams)
+	// CreateUser Create a user
+	// (POST /v1/users)
+	CreateUser(w http.ResponseWriter, r *http.Request, params CreateUserParams)
+	// DeleteUser Delete a user
+	// (DELETE /v1/users/{id})
+	DeleteUser(w http.ResponseWriter, r *http.Request, id ID)
+	// GetUser Get a user
+	// (GET /v1/users/{id})
+	GetUser(w http.ResponseWriter, r *http.Request, id ID)
+	// UpdateUser Update a user
+	// (PUT /v1/users/{id})
+	UpdateUser(w http.ResponseWriter, r *http.Request, id ID)
+	// ListContactMethods List a user's contact methods
+	// (GET /v1/users/{id}/contact-methods)
+	ListContactMethods(w http.ResponseWriter, r *http.Request, id ID)
+	// CreateContactMethod Add a contact method to a user
+	// (POST /v1/users/{id}/contact-methods)
+	CreateContactMethod(w http.ResponseWriter, r *http.Request, id ID, params CreateContactMethodParams)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -432,6 +962,262 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// DeleteContactMethod operation middleware
+func (siw *ServerInterfaceWrapper) DeleteContactMethod(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id ID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteContactMethod(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetContactMethod operation middleware
+func (siw *ServerInterfaceWrapper) GetContactMethod(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id ID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetContactMethod(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateContactMethod operation middleware
+func (siw *ServerInterfaceWrapper) UpdateContactMethod(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id ID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateContactMethod(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListEscalationPolicies operation middleware
+func (siw *ServerInterfaceWrapper) ListEscalationPolicies(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListEscalationPoliciesParams
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "team_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "team_id", r.URL.Query(), &params.TeamId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "team_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "team_id", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListEscalationPolicies(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateEscalationPolicy operation middleware
+func (siw *ServerInterfaceWrapper) CreateEscalationPolicy(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateEscalationPolicyParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateEscalationPolicy(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteEscalationPolicy operation middleware
+func (siw *ServerInterfaceWrapper) DeleteEscalationPolicy(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id ID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteEscalationPolicy(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetEscalationPolicy operation middleware
+func (siw *ServerInterfaceWrapper) GetEscalationPolicy(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id ID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetEscalationPolicy(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateEscalationPolicy operation middleware
+func (siw *ServerInterfaceWrapper) UpdateEscalationPolicy(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id ID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateEscalationPolicy(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
 
 // ListIncidents operation middleware
 func (siw *ServerInterfaceWrapper) ListIncidents(w http.ResponseWriter, r *http.Request) {
@@ -637,6 +1423,344 @@ func (siw *ServerInterfaceWrapper) RotateIntegrationKey(w http.ResponseWriter, r
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.RotateIntegrationKey(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteOverride operation middleware
+func (siw *ServerInterfaceWrapper) DeleteOverride(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id ID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteOverride(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListSchedules operation middleware
+func (siw *ServerInterfaceWrapper) ListSchedules(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListSchedulesParams
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "team_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "team_id", r.URL.Query(), &params.TeamId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "team_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "team_id", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListSchedules(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateSchedule operation middleware
+func (siw *ServerInterfaceWrapper) CreateSchedule(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateScheduleParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateSchedule(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteSchedule operation middleware
+func (siw *ServerInterfaceWrapper) DeleteSchedule(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id ID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteSchedule(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetSchedule operation middleware
+func (siw *ServerInterfaceWrapper) GetSchedule(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id ID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetSchedule(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateSchedule operation middleware
+func (siw *ServerInterfaceWrapper) UpdateSchedule(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id ID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateSchedule(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetOnCall operation middleware
+func (siw *ServerInterfaceWrapper) GetOnCall(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id ID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetOnCallParams
+
+	// ------------- Optional query parameter "at" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "at", r.URL.Query(), &params.At, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "at"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "at", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetOnCall(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListOverrides operation middleware
+func (siw *ServerInterfaceWrapper) ListOverrides(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id ID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListOverridesParams
+
+	// ------------- Optional query parameter "ends_after" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "ends_after", r.URL.Query(), &params.EndsAfter, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "ends_after"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "ends_after", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListOverrides(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateOverride operation middleware
+func (siw *ServerInterfaceWrapper) CreateOverride(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id ID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateOverrideParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateOverride(w, r, id, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -916,6 +2040,508 @@ func (siw *ServerInterfaceWrapper) CreateIntegration(w http.ResponseWriter, r *h
 	handler.ServeHTTP(w, r)
 }
 
+// ListTeams operation middleware
+func (siw *ServerInterfaceWrapper) ListTeams(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListTeamsParams
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListTeams(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateTeam operation middleware
+func (siw *ServerInterfaceWrapper) CreateTeam(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateTeamParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateTeam(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteTeam operation middleware
+func (siw *ServerInterfaceWrapper) DeleteTeam(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id ID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteTeam(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetTeam operation middleware
+func (siw *ServerInterfaceWrapper) GetTeam(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id ID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetTeam(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateTeam operation middleware
+func (siw *ServerInterfaceWrapper) UpdateTeam(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id ID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateTeam(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListTeamMembers operation middleware
+func (siw *ServerInterfaceWrapper) ListTeamMembers(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id ID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListTeamMembers(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RemoveTeamMember operation middleware
+func (siw *ServerInterfaceWrapper) RemoveTeamMember(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id ID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "user_id" -------------
+	var userId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "user_id", r.PathValue("user_id"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "user_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RemoveTeamMember(w, r, id, userId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SetTeamMember operation middleware
+func (siw *ServerInterfaceWrapper) SetTeamMember(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id ID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "user_id" -------------
+	var userId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "user_id", r.PathValue("user_id"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "user_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SetTeamMember(w, r, id, userId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListUsers operation middleware
+func (siw *ServerInterfaceWrapper) ListUsers(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListUsersParams
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListUsers(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateUser operation middleware
+func (siw *ServerInterfaceWrapper) CreateUser(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateUserParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateUser(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteUser operation middleware
+func (siw *ServerInterfaceWrapper) DeleteUser(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id ID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteUser(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetUser operation middleware
+func (siw *ServerInterfaceWrapper) GetUser(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id ID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetUser(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateUser operation middleware
+func (siw *ServerInterfaceWrapper) UpdateUser(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id ID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateUser(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListContactMethods operation middleware
+func (siw *ServerInterfaceWrapper) ListContactMethods(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id ID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListContactMethods(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateContactMethod operation middleware
+func (siw *ServerInterfaceWrapper) CreateContactMethod(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id ID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateContactMethodParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateContactMethod(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 type UnescapedCookieParamError struct {
 	ParamName string
 	Err       error
@@ -1049,11 +2675,394 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/integrations/{id}/key", wrapper.RotateIntegrationKey)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/incidents", wrapper.ListIncidents)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/incidents/{id}", wrapper.GetIncident)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/users", wrapper.ListUsers)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/users", wrapper.CreateUser)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/v1/users/{id}", wrapper.DeleteUser)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/users/{id}", wrapper.GetUser)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/v1/users/{id}", wrapper.UpdateUser)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/users/{id}/contact-methods", wrapper.ListContactMethods)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/users/{id}/contact-methods", wrapper.CreateContactMethod)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/v1/contact-methods/{id}", wrapper.DeleteContactMethod)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/contact-methods/{id}", wrapper.GetContactMethod)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/v1/contact-methods/{id}", wrapper.UpdateContactMethod)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/teams", wrapper.ListTeams)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/teams", wrapper.CreateTeam)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/v1/teams/{id}", wrapper.DeleteTeam)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/teams/{id}", wrapper.GetTeam)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/v1/teams/{id}", wrapper.UpdateTeam)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/teams/{id}/members", wrapper.ListTeamMembers)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/v1/teams/{id}/members/{user_id}", wrapper.RemoveTeamMember)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/v1/teams/{id}/members/{user_id}", wrapper.SetTeamMember)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/schedules", wrapper.ListSchedules)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/schedules", wrapper.CreateSchedule)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/v1/schedules/{id}", wrapper.DeleteSchedule)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/schedules/{id}", wrapper.GetSchedule)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/v1/schedules/{id}", wrapper.UpdateSchedule)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/schedules/{id}/overrides", wrapper.ListOverrides)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/schedules/{id}/overrides", wrapper.CreateOverride)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/v1/overrides/{id}", wrapper.DeleteOverride)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/schedules/{id}/on-call", wrapper.GetOnCall)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/escalation-policies", wrapper.ListEscalationPolicies)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/escalation-policies", wrapper.CreateEscalationPolicy)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/v1/escalation-policies/{id}", wrapper.DeleteEscalationPolicy)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/escalation-policies/{id}", wrapper.GetEscalationPolicy)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/v1/escalation-policies/{id}", wrapper.UpdateEscalationPolicy)
 
 	return m
 }
 
 type ProblemApplicationProblemPlusJSONResponse Problem
+
+type DeleteContactMethodRequestObject struct {
+	Id ID `json:"id"`
+}
+
+type DeleteContactMethodResponseObject interface {
+	VisitDeleteContactMethodResponse(w http.ResponseWriter) error
+}
+
+type DeleteContactMethod204Response struct {
+}
+
+func (response DeleteContactMethod204Response) VisitDeleteContactMethodResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DeleteContactMethod404ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteContactMethod404ApplicationProblemPlusJSONResponse) VisitDeleteContactMethodResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetContactMethodRequestObject struct {
+	Id ID `json:"id"`
+}
+
+type GetContactMethodResponseObject interface {
+	VisitGetContactMethodResponse(w http.ResponseWriter) error
+}
+
+type GetContactMethod200JSONResponse ContactMethod
+
+func (response GetContactMethod200JSONResponse) VisitGetContactMethodResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetContactMethod404ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response GetContactMethod404ApplicationProblemPlusJSONResponse) VisitGetContactMethodResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateContactMethodRequestObject struct {
+	Id   ID `json:"id"`
+	Body *UpdateContactMethodJSONRequestBody
+}
+
+type UpdateContactMethodResponseObject interface {
+	VisitUpdateContactMethodResponse(w http.ResponseWriter) error
+}
+
+type UpdateContactMethod200JSONResponse ContactMethod
+
+func (response UpdateContactMethod200JSONResponse) VisitUpdateContactMethodResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateContactMethod400ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateContactMethod400ApplicationProblemPlusJSONResponse) VisitUpdateContactMethodResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateContactMethod404ApplicationProblemPlusJSONResponse Problem
+
+func (response UpdateContactMethod404ApplicationProblemPlusJSONResponse) VisitUpdateContactMethodResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListEscalationPoliciesRequestObject struct {
+	Params ListEscalationPoliciesParams
+}
+
+type ListEscalationPoliciesResponseObject interface {
+	VisitListEscalationPoliciesResponse(w http.ResponseWriter) error
+}
+
+type ListEscalationPolicies200JSONResponse EscalationPolicyPage
+
+func (response ListEscalationPolicies200JSONResponse) VisitListEscalationPoliciesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListEscalationPolicies400ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response ListEscalationPolicies400ApplicationProblemPlusJSONResponse) VisitListEscalationPoliciesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateEscalationPolicyRequestObject struct {
+	Params CreateEscalationPolicyParams
+	Body   *CreateEscalationPolicyJSONRequestBody
+}
+
+type CreateEscalationPolicyResponseObject interface {
+	VisitCreateEscalationPolicyResponse(w http.ResponseWriter) error
+}
+
+type CreateEscalationPolicy201JSONResponse EscalationPolicy
+
+func (response CreateEscalationPolicy201JSONResponse) VisitCreateEscalationPolicyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateEscalationPolicy400ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response CreateEscalationPolicy400ApplicationProblemPlusJSONResponse) VisitCreateEscalationPolicyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateEscalationPolicy409ApplicationProblemPlusJSONResponse Problem
+
+func (response CreateEscalationPolicy409ApplicationProblemPlusJSONResponse) VisitCreateEscalationPolicyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateEscalationPolicy422ApplicationProblemPlusJSONResponse Problem
+
+func (response CreateEscalationPolicy422ApplicationProblemPlusJSONResponse) VisitCreateEscalationPolicyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteEscalationPolicyRequestObject struct {
+	Id ID `json:"id"`
+}
+
+type DeleteEscalationPolicyResponseObject interface {
+	VisitDeleteEscalationPolicyResponse(w http.ResponseWriter) error
+}
+
+type DeleteEscalationPolicy204Response struct {
+}
+
+func (response DeleteEscalationPolicy204Response) VisitDeleteEscalationPolicyResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DeleteEscalationPolicy404ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteEscalationPolicy404ApplicationProblemPlusJSONResponse) VisitDeleteEscalationPolicyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetEscalationPolicyRequestObject struct {
+	Id ID `json:"id"`
+}
+
+type GetEscalationPolicyResponseObject interface {
+	VisitGetEscalationPolicyResponse(w http.ResponseWriter) error
+}
+
+type GetEscalationPolicy200JSONResponse EscalationPolicy
+
+func (response GetEscalationPolicy200JSONResponse) VisitGetEscalationPolicyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetEscalationPolicy404ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response GetEscalationPolicy404ApplicationProblemPlusJSONResponse) VisitGetEscalationPolicyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateEscalationPolicyRequestObject struct {
+	Id   ID `json:"id"`
+	Body *UpdateEscalationPolicyJSONRequestBody
+}
+
+type UpdateEscalationPolicyResponseObject interface {
+	VisitUpdateEscalationPolicyResponse(w http.ResponseWriter) error
+}
+
+type UpdateEscalationPolicy200JSONResponse EscalationPolicy
+
+func (response UpdateEscalationPolicy200JSONResponse) VisitUpdateEscalationPolicyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateEscalationPolicy400ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateEscalationPolicy400ApplicationProblemPlusJSONResponse) VisitUpdateEscalationPolicyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateEscalationPolicy404ApplicationProblemPlusJSONResponse Problem
+
+func (response UpdateEscalationPolicy404ApplicationProblemPlusJSONResponse) VisitUpdateEscalationPolicyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
 
 type ListIncidentsRequestObject struct {
 	Params ListIncidentsParams
@@ -1310,6 +3319,454 @@ func (response RotateIntegrationKey409ApplicationProblemPlusJSONResponse) VisitR
 type RotateIntegrationKey422ApplicationProblemPlusJSONResponse Problem
 
 func (response RotateIntegrationKey422ApplicationProblemPlusJSONResponse) VisitRotateIntegrationKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteOverrideRequestObject struct {
+	Id ID `json:"id"`
+}
+
+type DeleteOverrideResponseObject interface {
+	VisitDeleteOverrideResponse(w http.ResponseWriter) error
+}
+
+type DeleteOverride204Response struct {
+}
+
+func (response DeleteOverride204Response) VisitDeleteOverrideResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DeleteOverride404ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteOverride404ApplicationProblemPlusJSONResponse) VisitDeleteOverrideResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSchedulesRequestObject struct {
+	Params ListSchedulesParams
+}
+
+type ListSchedulesResponseObject interface {
+	VisitListSchedulesResponse(w http.ResponseWriter) error
+}
+
+type ListSchedules200JSONResponse SchedulePage
+
+func (response ListSchedules200JSONResponse) VisitListSchedulesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSchedules400ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response ListSchedules400ApplicationProblemPlusJSONResponse) VisitListSchedulesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateScheduleRequestObject struct {
+	Params CreateScheduleParams
+	Body   *CreateScheduleJSONRequestBody
+}
+
+type CreateScheduleResponseObject interface {
+	VisitCreateScheduleResponse(w http.ResponseWriter) error
+}
+
+type CreateSchedule201JSONResponse Schedule
+
+func (response CreateSchedule201JSONResponse) VisitCreateScheduleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateSchedule400ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response CreateSchedule400ApplicationProblemPlusJSONResponse) VisitCreateScheduleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateSchedule409ApplicationProblemPlusJSONResponse Problem
+
+func (response CreateSchedule409ApplicationProblemPlusJSONResponse) VisitCreateScheduleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateSchedule422ApplicationProblemPlusJSONResponse Problem
+
+func (response CreateSchedule422ApplicationProblemPlusJSONResponse) VisitCreateScheduleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteScheduleRequestObject struct {
+	Id ID `json:"id"`
+}
+
+type DeleteScheduleResponseObject interface {
+	VisitDeleteScheduleResponse(w http.ResponseWriter) error
+}
+
+type DeleteSchedule204Response struct {
+}
+
+func (response DeleteSchedule204Response) VisitDeleteScheduleResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DeleteSchedule404ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteSchedule404ApplicationProblemPlusJSONResponse) VisitDeleteScheduleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetScheduleRequestObject struct {
+	Id ID `json:"id"`
+}
+
+type GetScheduleResponseObject interface {
+	VisitGetScheduleResponse(w http.ResponseWriter) error
+}
+
+type GetSchedule200JSONResponse Schedule
+
+func (response GetSchedule200JSONResponse) VisitGetScheduleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSchedule404ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response GetSchedule404ApplicationProblemPlusJSONResponse) VisitGetScheduleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateScheduleRequestObject struct {
+	Id   ID `json:"id"`
+	Body *UpdateScheduleJSONRequestBody
+}
+
+type UpdateScheduleResponseObject interface {
+	VisitUpdateScheduleResponse(w http.ResponseWriter) error
+}
+
+type UpdateSchedule200JSONResponse Schedule
+
+func (response UpdateSchedule200JSONResponse) VisitUpdateScheduleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateSchedule400ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateSchedule400ApplicationProblemPlusJSONResponse) VisitUpdateScheduleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateSchedule404ApplicationProblemPlusJSONResponse Problem
+
+func (response UpdateSchedule404ApplicationProblemPlusJSONResponse) VisitUpdateScheduleResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetOnCallRequestObject struct {
+	Id     ID `json:"id"`
+	Params GetOnCallParams
+}
+
+type GetOnCallResponseObject interface {
+	VisitGetOnCallResponse(w http.ResponseWriter) error
+}
+
+type GetOnCall200JSONResponse OnCall
+
+func (response GetOnCall200JSONResponse) VisitGetOnCallResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetOnCall400ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response GetOnCall400ApplicationProblemPlusJSONResponse) VisitGetOnCallResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetOnCall404ApplicationProblemPlusJSONResponse Problem
+
+func (response GetOnCall404ApplicationProblemPlusJSONResponse) VisitGetOnCallResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListOverridesRequestObject struct {
+	Id     ID `json:"id"`
+	Params ListOverridesParams
+}
+
+type ListOverridesResponseObject interface {
+	VisitListOverridesResponse(w http.ResponseWriter) error
+}
+
+type ListOverrides200JSONResponse OverrideList
+
+func (response ListOverrides200JSONResponse) VisitListOverridesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListOverrides400ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response ListOverrides400ApplicationProblemPlusJSONResponse) VisitListOverridesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListOverrides404ApplicationProblemPlusJSONResponse Problem
+
+func (response ListOverrides404ApplicationProblemPlusJSONResponse) VisitListOverridesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateOverrideRequestObject struct {
+	Id     ID `json:"id"`
+	Params CreateOverrideParams
+	Body   *CreateOverrideJSONRequestBody
+}
+
+type CreateOverrideResponseObject interface {
+	VisitCreateOverrideResponse(w http.ResponseWriter) error
+}
+
+type CreateOverride201JSONResponse Override
+
+func (response CreateOverride201JSONResponse) VisitCreateOverrideResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateOverride400ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response CreateOverride400ApplicationProblemPlusJSONResponse) VisitCreateOverrideResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateOverride404ApplicationProblemPlusJSONResponse Problem
+
+func (response CreateOverride404ApplicationProblemPlusJSONResponse) VisitCreateOverrideResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateOverride409ApplicationProblemPlusJSONResponse Problem
+
+func (response CreateOverride409ApplicationProblemPlusJSONResponse) VisitCreateOverrideResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateOverride422ApplicationProblemPlusJSONResponse Problem
+
+func (response CreateOverride422ApplicationProblemPlusJSONResponse) VisitCreateOverrideResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -1698,8 +4155,733 @@ func (response CreateIntegration422ApplicationProblemPlusJSONResponse) VisitCrea
 	return err
 }
 
+type ListTeamsRequestObject struct {
+	Params ListTeamsParams
+}
+
+type ListTeamsResponseObject interface {
+	VisitListTeamsResponse(w http.ResponseWriter) error
+}
+
+type ListTeams200JSONResponse TeamPage
+
+func (response ListTeams200JSONResponse) VisitListTeamsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListTeams400ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response ListTeams400ApplicationProblemPlusJSONResponse) VisitListTeamsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateTeamRequestObject struct {
+	Params CreateTeamParams
+	Body   *CreateTeamJSONRequestBody
+}
+
+type CreateTeamResponseObject interface {
+	VisitCreateTeamResponse(w http.ResponseWriter) error
+}
+
+type CreateTeam201JSONResponse Team
+
+func (response CreateTeam201JSONResponse) VisitCreateTeamResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateTeam400ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response CreateTeam400ApplicationProblemPlusJSONResponse) VisitCreateTeamResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateTeam409ApplicationProblemPlusJSONResponse Problem
+
+func (response CreateTeam409ApplicationProblemPlusJSONResponse) VisitCreateTeamResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateTeam422ApplicationProblemPlusJSONResponse Problem
+
+func (response CreateTeam422ApplicationProblemPlusJSONResponse) VisitCreateTeamResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteTeamRequestObject struct {
+	Id ID `json:"id"`
+}
+
+type DeleteTeamResponseObject interface {
+	VisitDeleteTeamResponse(w http.ResponseWriter) error
+}
+
+type DeleteTeam204Response struct {
+}
+
+func (response DeleteTeam204Response) VisitDeleteTeamResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DeleteTeam404ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteTeam404ApplicationProblemPlusJSONResponse) VisitDeleteTeamResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetTeamRequestObject struct {
+	Id ID `json:"id"`
+}
+
+type GetTeamResponseObject interface {
+	VisitGetTeamResponse(w http.ResponseWriter) error
+}
+
+type GetTeam200JSONResponse Team
+
+func (response GetTeam200JSONResponse) VisitGetTeamResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetTeam404ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response GetTeam404ApplicationProblemPlusJSONResponse) VisitGetTeamResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateTeamRequestObject struct {
+	Id   ID `json:"id"`
+	Body *UpdateTeamJSONRequestBody
+}
+
+type UpdateTeamResponseObject interface {
+	VisitUpdateTeamResponse(w http.ResponseWriter) error
+}
+
+type UpdateTeam200JSONResponse Team
+
+func (response UpdateTeam200JSONResponse) VisitUpdateTeamResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateTeam400ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateTeam400ApplicationProblemPlusJSONResponse) VisitUpdateTeamResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateTeam404ApplicationProblemPlusJSONResponse Problem
+
+func (response UpdateTeam404ApplicationProblemPlusJSONResponse) VisitUpdateTeamResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListTeamMembersRequestObject struct {
+	Id ID `json:"id"`
+}
+
+type ListTeamMembersResponseObject interface {
+	VisitListTeamMembersResponse(w http.ResponseWriter) error
+}
+
+type ListTeamMembers200JSONResponse TeamMembershipList
+
+func (response ListTeamMembers200JSONResponse) VisitListTeamMembersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListTeamMembers404ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response ListTeamMembers404ApplicationProblemPlusJSONResponse) VisitListTeamMembersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type RemoveTeamMemberRequestObject struct {
+	Id     ID     `json:"id"`
+	UserId string `json:"user_id"`
+}
+
+type RemoveTeamMemberResponseObject interface {
+	VisitRemoveTeamMemberResponse(w http.ResponseWriter) error
+}
+
+type RemoveTeamMember204Response struct {
+}
+
+func (response RemoveTeamMember204Response) VisitRemoveTeamMemberResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type RemoveTeamMember404ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response RemoveTeamMember404ApplicationProblemPlusJSONResponse) VisitRemoveTeamMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetTeamMemberRequestObject struct {
+	Id     ID     `json:"id"`
+	UserId string `json:"user_id"`
+	Body   *SetTeamMemberJSONRequestBody
+}
+
+type SetTeamMemberResponseObject interface {
+	VisitSetTeamMemberResponse(w http.ResponseWriter) error
+}
+
+type SetTeamMember200JSONResponse TeamMembership
+
+func (response SetTeamMember200JSONResponse) VisitSetTeamMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetTeamMember400ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response SetTeamMember400ApplicationProblemPlusJSONResponse) VisitSetTeamMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetTeamMember404ApplicationProblemPlusJSONResponse Problem
+
+func (response SetTeamMember404ApplicationProblemPlusJSONResponse) VisitSetTeamMemberResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListUsersRequestObject struct {
+	Params ListUsersParams
+}
+
+type ListUsersResponseObject interface {
+	VisitListUsersResponse(w http.ResponseWriter) error
+}
+
+type ListUsers200JSONResponse UserPage
+
+func (response ListUsers200JSONResponse) VisitListUsersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListUsers400ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response ListUsers400ApplicationProblemPlusJSONResponse) VisitListUsersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateUserRequestObject struct {
+	Params CreateUserParams
+	Body   *CreateUserJSONRequestBody
+}
+
+type CreateUserResponseObject interface {
+	VisitCreateUserResponse(w http.ResponseWriter) error
+}
+
+type CreateUser201JSONResponse User
+
+func (response CreateUser201JSONResponse) VisitCreateUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateUser400ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response CreateUser400ApplicationProblemPlusJSONResponse) VisitCreateUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateUser409ApplicationProblemPlusJSONResponse Problem
+
+func (response CreateUser409ApplicationProblemPlusJSONResponse) VisitCreateUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateUser422ApplicationProblemPlusJSONResponse Problem
+
+func (response CreateUser422ApplicationProblemPlusJSONResponse) VisitCreateUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteUserRequestObject struct {
+	Id ID `json:"id"`
+}
+
+type DeleteUserResponseObject interface {
+	VisitDeleteUserResponse(w http.ResponseWriter) error
+}
+
+type DeleteUser204Response struct {
+}
+
+func (response DeleteUser204Response) VisitDeleteUserResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DeleteUser404ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteUser404ApplicationProblemPlusJSONResponse) VisitDeleteUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetUserRequestObject struct {
+	Id ID `json:"id"`
+}
+
+type GetUserResponseObject interface {
+	VisitGetUserResponse(w http.ResponseWriter) error
+}
+
+type GetUser200JSONResponse User
+
+func (response GetUser200JSONResponse) VisitGetUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetUser404ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response GetUser404ApplicationProblemPlusJSONResponse) VisitGetUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateUserRequestObject struct {
+	Id   ID `json:"id"`
+	Body *UpdateUserJSONRequestBody
+}
+
+type UpdateUserResponseObject interface {
+	VisitUpdateUserResponse(w http.ResponseWriter) error
+}
+
+type UpdateUser200JSONResponse User
+
+func (response UpdateUser200JSONResponse) VisitUpdateUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateUser400ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateUser400ApplicationProblemPlusJSONResponse) VisitUpdateUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateUser404ApplicationProblemPlusJSONResponse Problem
+
+func (response UpdateUser404ApplicationProblemPlusJSONResponse) VisitUpdateUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListContactMethodsRequestObject struct {
+	Id ID `json:"id"`
+}
+
+type ListContactMethodsResponseObject interface {
+	VisitListContactMethodsResponse(w http.ResponseWriter) error
+}
+
+type ListContactMethods200JSONResponse ContactMethodList
+
+func (response ListContactMethods200JSONResponse) VisitListContactMethodsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListContactMethods404ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response ListContactMethods404ApplicationProblemPlusJSONResponse) VisitListContactMethodsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateContactMethodRequestObject struct {
+	Id     ID `json:"id"`
+	Params CreateContactMethodParams
+	Body   *CreateContactMethodJSONRequestBody
+}
+
+type CreateContactMethodResponseObject interface {
+	VisitCreateContactMethodResponse(w http.ResponseWriter) error
+}
+
+type CreateContactMethod201JSONResponse ContactMethod
+
+func (response CreateContactMethod201JSONResponse) VisitCreateContactMethodResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateContactMethod400ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response CreateContactMethod400ApplicationProblemPlusJSONResponse) VisitCreateContactMethodResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateContactMethod404ApplicationProblemPlusJSONResponse Problem
+
+func (response CreateContactMethod404ApplicationProblemPlusJSONResponse) VisitCreateContactMethodResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateContactMethod409ApplicationProblemPlusJSONResponse Problem
+
+func (response CreateContactMethod409ApplicationProblemPlusJSONResponse) VisitCreateContactMethodResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateContactMethod422ApplicationProblemPlusJSONResponse Problem
+
+func (response CreateContactMethod422ApplicationProblemPlusJSONResponse) VisitCreateContactMethodResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
+	// DeleteContactMethod Delete a contact method
+	// (DELETE /v1/contact-methods/{id})
+	DeleteContactMethod(ctx context.Context, request DeleteContactMethodRequestObject) (DeleteContactMethodResponseObject, error)
+	// GetContactMethod Get a contact method
+	// (GET /v1/contact-methods/{id})
+	GetContactMethod(ctx context.Context, request GetContactMethodRequestObject) (GetContactMethodResponseObject, error)
+	// UpdateContactMethod Update a contact method
+	// (PUT /v1/contact-methods/{id})
+	UpdateContactMethod(ctx context.Context, request UpdateContactMethodRequestObject) (UpdateContactMethodResponseObject, error)
+	// ListEscalationPolicies List escalation policies
+	// (GET /v1/escalation-policies)
+	ListEscalationPolicies(ctx context.Context, request ListEscalationPoliciesRequestObject) (ListEscalationPoliciesResponseObject, error)
+	// CreateEscalationPolicy Create an escalation policy
+	// (POST /v1/escalation-policies)
+	CreateEscalationPolicy(ctx context.Context, request CreateEscalationPolicyRequestObject) (CreateEscalationPolicyResponseObject, error)
+	// DeleteEscalationPolicy Delete an escalation policy
+	// (DELETE /v1/escalation-policies/{id})
+	DeleteEscalationPolicy(ctx context.Context, request DeleteEscalationPolicyRequestObject) (DeleteEscalationPolicyResponseObject, error)
+	// GetEscalationPolicy Get an escalation policy
+	// (GET /v1/escalation-policies/{id})
+	GetEscalationPolicy(ctx context.Context, request GetEscalationPolicyRequestObject) (GetEscalationPolicyResponseObject, error)
+	// UpdateEscalationPolicy Update an escalation policy
+	// (PUT /v1/escalation-policies/{id})
+	UpdateEscalationPolicy(ctx context.Context, request UpdateEscalationPolicyRequestObject) (UpdateEscalationPolicyResponseObject, error)
 	// ListIncidents List incidents
 	// (GET /v1/incidents)
 	ListIncidents(ctx context.Context, request ListIncidentsRequestObject) (ListIncidentsResponseObject, error)
@@ -1718,6 +4900,33 @@ type StrictServerInterface interface {
 	// RotateIntegrationKey Rotate an integration's key
 	// (POST /v1/integrations/{id}/key)
 	RotateIntegrationKey(ctx context.Context, request RotateIntegrationKeyRequestObject) (RotateIntegrationKeyResponseObject, error)
+	// DeleteOverride Delete an override
+	// (DELETE /v1/overrides/{id})
+	DeleteOverride(ctx context.Context, request DeleteOverrideRequestObject) (DeleteOverrideResponseObject, error)
+	// ListSchedules List schedules
+	// (GET /v1/schedules)
+	ListSchedules(ctx context.Context, request ListSchedulesRequestObject) (ListSchedulesResponseObject, error)
+	// CreateSchedule Create a schedule
+	// (POST /v1/schedules)
+	CreateSchedule(ctx context.Context, request CreateScheduleRequestObject) (CreateScheduleResponseObject, error)
+	// DeleteSchedule Delete a schedule
+	// (DELETE /v1/schedules/{id})
+	DeleteSchedule(ctx context.Context, request DeleteScheduleRequestObject) (DeleteScheduleResponseObject, error)
+	// GetSchedule Get a schedule
+	// (GET /v1/schedules/{id})
+	GetSchedule(ctx context.Context, request GetScheduleRequestObject) (GetScheduleResponseObject, error)
+	// UpdateSchedule Update a schedule
+	// (PUT /v1/schedules/{id})
+	UpdateSchedule(ctx context.Context, request UpdateScheduleRequestObject) (UpdateScheduleResponseObject, error)
+	// GetOnCall Find who is on call
+	// (GET /v1/schedules/{id}/on-call)
+	GetOnCall(ctx context.Context, request GetOnCallRequestObject) (GetOnCallResponseObject, error)
+	// ListOverrides List a schedule's overrides
+	// (GET /v1/schedules/{id}/overrides)
+	ListOverrides(ctx context.Context, request ListOverridesRequestObject) (ListOverridesResponseObject, error)
+	// CreateOverride Override a schedule for a time range
+	// (POST /v1/schedules/{id}/overrides)
+	CreateOverride(ctx context.Context, request CreateOverrideRequestObject) (CreateOverrideResponseObject, error)
 	// ListServices List services
 	// (GET /v1/services)
 	ListServices(ctx context.Context, request ListServicesRequestObject) (ListServicesResponseObject, error)
@@ -1739,6 +4948,51 @@ type StrictServerInterface interface {
 	// CreateIntegration Create an integration
 	// (POST /v1/services/{id}/integrations)
 	CreateIntegration(ctx context.Context, request CreateIntegrationRequestObject) (CreateIntegrationResponseObject, error)
+	// ListTeams List teams
+	// (GET /v1/teams)
+	ListTeams(ctx context.Context, request ListTeamsRequestObject) (ListTeamsResponseObject, error)
+	// CreateTeam Create a team
+	// (POST /v1/teams)
+	CreateTeam(ctx context.Context, request CreateTeamRequestObject) (CreateTeamResponseObject, error)
+	// DeleteTeam Delete a team
+	// (DELETE /v1/teams/{id})
+	DeleteTeam(ctx context.Context, request DeleteTeamRequestObject) (DeleteTeamResponseObject, error)
+	// GetTeam Get a team
+	// (GET /v1/teams/{id})
+	GetTeam(ctx context.Context, request GetTeamRequestObject) (GetTeamResponseObject, error)
+	// UpdateTeam Update a team
+	// (PUT /v1/teams/{id})
+	UpdateTeam(ctx context.Context, request UpdateTeamRequestObject) (UpdateTeamResponseObject, error)
+	// ListTeamMembers List a team's members
+	// (GET /v1/teams/{id}/members)
+	ListTeamMembers(ctx context.Context, request ListTeamMembersRequestObject) (ListTeamMembersResponseObject, error)
+	// RemoveTeamMember Remove a member from a team
+	// (DELETE /v1/teams/{id}/members/{user_id})
+	RemoveTeamMember(ctx context.Context, request RemoveTeamMemberRequestObject) (RemoveTeamMemberResponseObject, error)
+	// SetTeamMember Add a member to a team, or change their role
+	// (PUT /v1/teams/{id}/members/{user_id})
+	SetTeamMember(ctx context.Context, request SetTeamMemberRequestObject) (SetTeamMemberResponseObject, error)
+	// ListUsers List users
+	// (GET /v1/users)
+	ListUsers(ctx context.Context, request ListUsersRequestObject) (ListUsersResponseObject, error)
+	// CreateUser Create a user
+	// (POST /v1/users)
+	CreateUser(ctx context.Context, request CreateUserRequestObject) (CreateUserResponseObject, error)
+	// DeleteUser Delete a user
+	// (DELETE /v1/users/{id})
+	DeleteUser(ctx context.Context, request DeleteUserRequestObject) (DeleteUserResponseObject, error)
+	// GetUser Get a user
+	// (GET /v1/users/{id})
+	GetUser(ctx context.Context, request GetUserRequestObject) (GetUserResponseObject, error)
+	// UpdateUser Update a user
+	// (PUT /v1/users/{id})
+	UpdateUser(ctx context.Context, request UpdateUserRequestObject) (UpdateUserResponseObject, error)
+	// ListContactMethods List a user's contact methods
+	// (GET /v1/users/{id}/contact-methods)
+	ListContactMethods(ctx context.Context, request ListContactMethodsRequestObject) (ListContactMethodsResponseObject, error)
+	// CreateContactMethod Add a contact method to a user
+	// (POST /v1/users/{id}/contact-methods)
+	CreateContactMethod(ctx context.Context, request CreateContactMethodRequestObject) (CreateContactMethodResponseObject, error)
 }
 
 type StrictHandlerFunc func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error)
@@ -1778,6 +5032,235 @@ type strictHandler struct {
 	ssi         StrictServerInterface
 	middlewares []StrictMiddlewareFunc
 	options     StrictHTTPServerOptions
+}
+
+// DeleteContactMethod operation middleware
+func (sh *strictHandler) DeleteContactMethod(w http.ResponseWriter, r *http.Request, id ID) {
+	var request DeleteContactMethodRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteContactMethod(ctx, request.(DeleteContactMethodRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteContactMethod")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteContactMethodResponseObject); ok {
+		if err := validResponse.VisitDeleteContactMethodResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetContactMethod operation middleware
+func (sh *strictHandler) GetContactMethod(w http.ResponseWriter, r *http.Request, id ID) {
+	var request GetContactMethodRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetContactMethod(ctx, request.(GetContactMethodRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetContactMethod")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetContactMethodResponseObject); ok {
+		if err := validResponse.VisitGetContactMethodResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateContactMethod operation middleware
+func (sh *strictHandler) UpdateContactMethod(w http.ResponseWriter, r *http.Request, id ID) {
+	var request UpdateContactMethodRequestObject
+
+	request.Id = id
+
+	var body UpdateContactMethodJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateContactMethod(ctx, request.(UpdateContactMethodRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateContactMethod")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateContactMethodResponseObject); ok {
+		if err := validResponse.VisitUpdateContactMethodResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListEscalationPolicies operation middleware
+func (sh *strictHandler) ListEscalationPolicies(w http.ResponseWriter, r *http.Request, params ListEscalationPoliciesParams) {
+	var request ListEscalationPoliciesRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListEscalationPolicies(ctx, request.(ListEscalationPoliciesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListEscalationPolicies")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListEscalationPoliciesResponseObject); ok {
+		if err := validResponse.VisitListEscalationPoliciesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateEscalationPolicy operation middleware
+func (sh *strictHandler) CreateEscalationPolicy(w http.ResponseWriter, r *http.Request, params CreateEscalationPolicyParams) {
+	var request CreateEscalationPolicyRequestObject
+
+	request.Params = params
+
+	var body CreateEscalationPolicyJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateEscalationPolicy(ctx, request.(CreateEscalationPolicyRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateEscalationPolicy")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateEscalationPolicyResponseObject); ok {
+		if err := validResponse.VisitCreateEscalationPolicyResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteEscalationPolicy operation middleware
+func (sh *strictHandler) DeleteEscalationPolicy(w http.ResponseWriter, r *http.Request, id ID) {
+	var request DeleteEscalationPolicyRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteEscalationPolicy(ctx, request.(DeleteEscalationPolicyRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteEscalationPolicy")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteEscalationPolicyResponseObject); ok {
+		if err := validResponse.VisitDeleteEscalationPolicyResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetEscalationPolicy operation middleware
+func (sh *strictHandler) GetEscalationPolicy(w http.ResponseWriter, r *http.Request, id ID) {
+	var request GetEscalationPolicyRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetEscalationPolicy(ctx, request.(GetEscalationPolicyRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetEscalationPolicy")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetEscalationPolicyResponseObject); ok {
+		if err := validResponse.VisitGetEscalationPolicyResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateEscalationPolicy operation middleware
+func (sh *strictHandler) UpdateEscalationPolicy(w http.ResponseWriter, r *http.Request, id ID) {
+	var request UpdateEscalationPolicyRequestObject
+
+	request.Id = id
+
+	var body UpdateEscalationPolicyJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateEscalationPolicy(ctx, request.(UpdateEscalationPolicyRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateEscalationPolicy")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateEscalationPolicyResponseObject); ok {
+		if err := validResponse.VisitUpdateEscalationPolicyResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
 }
 
 // ListIncidents operation middleware
@@ -1937,6 +5420,264 @@ func (sh *strictHandler) RotateIntegrationKey(w http.ResponseWriter, r *http.Req
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(RotateIntegrationKeyResponseObject); ok {
 		if err := validResponse.VisitRotateIntegrationKeyResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteOverride operation middleware
+func (sh *strictHandler) DeleteOverride(w http.ResponseWriter, r *http.Request, id ID) {
+	var request DeleteOverrideRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteOverride(ctx, request.(DeleteOverrideRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteOverride")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteOverrideResponseObject); ok {
+		if err := validResponse.VisitDeleteOverrideResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListSchedules operation middleware
+func (sh *strictHandler) ListSchedules(w http.ResponseWriter, r *http.Request, params ListSchedulesParams) {
+	var request ListSchedulesRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListSchedules(ctx, request.(ListSchedulesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListSchedules")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListSchedulesResponseObject); ok {
+		if err := validResponse.VisitListSchedulesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateSchedule operation middleware
+func (sh *strictHandler) CreateSchedule(w http.ResponseWriter, r *http.Request, params CreateScheduleParams) {
+	var request CreateScheduleRequestObject
+
+	request.Params = params
+
+	var body CreateScheduleJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateSchedule(ctx, request.(CreateScheduleRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateSchedule")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateScheduleResponseObject); ok {
+		if err := validResponse.VisitCreateScheduleResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteSchedule operation middleware
+func (sh *strictHandler) DeleteSchedule(w http.ResponseWriter, r *http.Request, id ID) {
+	var request DeleteScheduleRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteSchedule(ctx, request.(DeleteScheduleRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteSchedule")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteScheduleResponseObject); ok {
+		if err := validResponse.VisitDeleteScheduleResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetSchedule operation middleware
+func (sh *strictHandler) GetSchedule(w http.ResponseWriter, r *http.Request, id ID) {
+	var request GetScheduleRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetSchedule(ctx, request.(GetScheduleRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetSchedule")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetScheduleResponseObject); ok {
+		if err := validResponse.VisitGetScheduleResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateSchedule operation middleware
+func (sh *strictHandler) UpdateSchedule(w http.ResponseWriter, r *http.Request, id ID) {
+	var request UpdateScheduleRequestObject
+
+	request.Id = id
+
+	var body UpdateScheduleJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateSchedule(ctx, request.(UpdateScheduleRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateSchedule")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateScheduleResponseObject); ok {
+		if err := validResponse.VisitUpdateScheduleResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetOnCall operation middleware
+func (sh *strictHandler) GetOnCall(w http.ResponseWriter, r *http.Request, id ID, params GetOnCallParams) {
+	var request GetOnCallRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetOnCall(ctx, request.(GetOnCallRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetOnCall")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetOnCallResponseObject); ok {
+		if err := validResponse.VisitGetOnCallResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListOverrides operation middleware
+func (sh *strictHandler) ListOverrides(w http.ResponseWriter, r *http.Request, id ID, params ListOverridesParams) {
+	var request ListOverridesRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListOverrides(ctx, request.(ListOverridesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListOverrides")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListOverridesResponseObject); ok {
+		if err := validResponse.VisitListOverridesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateOverride operation middleware
+func (sh *strictHandler) CreateOverride(w http.ResponseWriter, r *http.Request, id ID, params CreateOverrideParams) {
+	var request CreateOverrideRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	var body CreateOverrideJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateOverride(ctx, request.(CreateOverrideRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateOverride")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateOverrideResponseObject); ok {
+		if err := validResponse.VisitCreateOverrideResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -2149,45 +5890,512 @@ func (sh *strictHandler) CreateIntegration(w http.ResponseWriter, r *http.Reques
 	}
 }
 
+// ListTeams operation middleware
+func (sh *strictHandler) ListTeams(w http.ResponseWriter, r *http.Request, params ListTeamsParams) {
+	var request ListTeamsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListTeams(ctx, request.(ListTeamsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListTeams")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListTeamsResponseObject); ok {
+		if err := validResponse.VisitListTeamsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateTeam operation middleware
+func (sh *strictHandler) CreateTeam(w http.ResponseWriter, r *http.Request, params CreateTeamParams) {
+	var request CreateTeamRequestObject
+
+	request.Params = params
+
+	var body CreateTeamJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateTeam(ctx, request.(CreateTeamRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateTeam")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateTeamResponseObject); ok {
+		if err := validResponse.VisitCreateTeamResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteTeam operation middleware
+func (sh *strictHandler) DeleteTeam(w http.ResponseWriter, r *http.Request, id ID) {
+	var request DeleteTeamRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteTeam(ctx, request.(DeleteTeamRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteTeam")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteTeamResponseObject); ok {
+		if err := validResponse.VisitDeleteTeamResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetTeam operation middleware
+func (sh *strictHandler) GetTeam(w http.ResponseWriter, r *http.Request, id ID) {
+	var request GetTeamRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetTeam(ctx, request.(GetTeamRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetTeam")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetTeamResponseObject); ok {
+		if err := validResponse.VisitGetTeamResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateTeam operation middleware
+func (sh *strictHandler) UpdateTeam(w http.ResponseWriter, r *http.Request, id ID) {
+	var request UpdateTeamRequestObject
+
+	request.Id = id
+
+	var body UpdateTeamJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateTeam(ctx, request.(UpdateTeamRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateTeam")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateTeamResponseObject); ok {
+		if err := validResponse.VisitUpdateTeamResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListTeamMembers operation middleware
+func (sh *strictHandler) ListTeamMembers(w http.ResponseWriter, r *http.Request, id ID) {
+	var request ListTeamMembersRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListTeamMembers(ctx, request.(ListTeamMembersRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListTeamMembers")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListTeamMembersResponseObject); ok {
+		if err := validResponse.VisitListTeamMembersResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RemoveTeamMember operation middleware
+func (sh *strictHandler) RemoveTeamMember(w http.ResponseWriter, r *http.Request, id ID, userId string) {
+	var request RemoveTeamMemberRequestObject
+
+	request.Id = id
+	request.UserId = userId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RemoveTeamMember(ctx, request.(RemoveTeamMemberRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RemoveTeamMember")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RemoveTeamMemberResponseObject); ok {
+		if err := validResponse.VisitRemoveTeamMemberResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SetTeamMember operation middleware
+func (sh *strictHandler) SetTeamMember(w http.ResponseWriter, r *http.Request, id ID, userId string) {
+	var request SetTeamMemberRequestObject
+
+	request.Id = id
+	request.UserId = userId
+
+	var body SetTeamMemberJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SetTeamMember(ctx, request.(SetTeamMemberRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SetTeamMember")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SetTeamMemberResponseObject); ok {
+		if err := validResponse.VisitSetTeamMemberResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListUsers operation middleware
+func (sh *strictHandler) ListUsers(w http.ResponseWriter, r *http.Request, params ListUsersParams) {
+	var request ListUsersRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListUsers(ctx, request.(ListUsersRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListUsers")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListUsersResponseObject); ok {
+		if err := validResponse.VisitListUsersResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateUser operation middleware
+func (sh *strictHandler) CreateUser(w http.ResponseWriter, r *http.Request, params CreateUserParams) {
+	var request CreateUserRequestObject
+
+	request.Params = params
+
+	var body CreateUserJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateUser(ctx, request.(CreateUserRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateUser")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateUserResponseObject); ok {
+		if err := validResponse.VisitCreateUserResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteUser operation middleware
+func (sh *strictHandler) DeleteUser(w http.ResponseWriter, r *http.Request, id ID) {
+	var request DeleteUserRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteUser(ctx, request.(DeleteUserRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteUser")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteUserResponseObject); ok {
+		if err := validResponse.VisitDeleteUserResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetUser operation middleware
+func (sh *strictHandler) GetUser(w http.ResponseWriter, r *http.Request, id ID) {
+	var request GetUserRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetUser(ctx, request.(GetUserRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetUser")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetUserResponseObject); ok {
+		if err := validResponse.VisitGetUserResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateUser operation middleware
+func (sh *strictHandler) UpdateUser(w http.ResponseWriter, r *http.Request, id ID) {
+	var request UpdateUserRequestObject
+
+	request.Id = id
+
+	var body UpdateUserJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateUser(ctx, request.(UpdateUserRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateUser")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateUserResponseObject); ok {
+		if err := validResponse.VisitUpdateUserResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListContactMethods operation middleware
+func (sh *strictHandler) ListContactMethods(w http.ResponseWriter, r *http.Request, id ID) {
+	var request ListContactMethodsRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListContactMethods(ctx, request.(ListContactMethodsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListContactMethods")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListContactMethodsResponseObject); ok {
+		if err := validResponse.VisitListContactMethodsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateContactMethod operation middleware
+func (sh *strictHandler) CreateContactMethod(w http.ResponseWriter, r *http.Request, id ID, params CreateContactMethodParams) {
+	var request CreateContactMethodRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	var body CreateContactMethodJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateContactMethod(ctx, request.(CreateContactMethodRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateContactMethod")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateContactMethodResponseObject); ok {
+		if err := validResponse.VisitCreateContactMethodResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // Base64 encoded, compressed with deflate, json marshaled OpenAPI spec.
 // Stored as a slice of fixed-width chunks rather than one concatenated
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
-	"ZpOJxAFLbd3sx+mPU+zx/X8A",
+	"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",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

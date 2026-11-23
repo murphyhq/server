@@ -16,7 +16,13 @@ import (
 
 func Databases(t *testing.T, engine DatabaseEngine) migrateapp.Settings {
 	t.Helper()
-	databases := migrateapp.Settings{CatalogDatabaseURL: engine(t), IncidentsDatabaseURL: engine(t)}
+	databases := migrateapp.Settings{
+		CatalogDatabaseURL:    engine(t),
+		IncidentsDatabaseURL:  engine(t),
+		PeopleDatabaseURL:     engine(t),
+		OnCallDatabaseURL:     engine(t),
+		EscalationDatabaseURL: engine(t),
+	}
 	require.NoError(t, migrateapp.Migrate(t.Context(), databases))
 	return databases
 }
@@ -31,6 +37,9 @@ func APIWith(t *testing.T, databases migrateapp.Settings) (*client.ClientWithRes
 	a, err := apiapp.New(t.Context(), apiapp.Settings{
 		CatalogDatabaseURL:    databases.CatalogDatabaseURL,
 		IncidentsDatabaseURL:  databases.IncidentsDatabaseURL,
+		PeopleDatabaseURL:     databases.PeopleDatabaseURL,
+		OnCallDatabaseURL:     databases.OnCallDatabaseURL,
+		EscalationDatabaseURL: databases.EscalationDatabaseURL,
 		IdempotencyStoreURL:   RedisURL(),
 		IntegrationKeySecrets: IntegrationKeySecrets,
 	})

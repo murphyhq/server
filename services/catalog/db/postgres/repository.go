@@ -170,15 +170,46 @@ func (r *Repository) UpdateIntegration(ctx context.Context, integration *murphy.
 	return murphypostgres.Changed("integration", rows, err)
 }
 
-func (r *Repository) RotateIntegrationKey(ctx context.Context, id string, previousValidUntil, updatedAt time.Time) (_ *murphy.Integration, err error) {
+func (r *Repository) Transaction(ctx context.Context, work func(tx *Tx) error) (err error) {
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
-	row, err := r.queries.RotateIntegrationKey(ctx, RotateIntegrationKeyParams{
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback(context.WithoutCancel(ctx)) }()
+
+	if err := work(&Tx{queries: r.queries.WithTx(tx)}); err != nil {
+		return err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return murphypostgres.Error("integration", err)
+	}
+	return nil
+}
+
+type Tx struct {
+	queries *Queries
+}
+
+func (t *Tx) RotateIntegrationKeyRow(ctx context.Context, id string, previousValidUntil, updatedAt time.Time) (err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	rows, err := t.queries.RotateIntegrationKey(ctx, RotateIntegrationKeyParams{
 		ID:                    id,
 		PreviousKeyValidUntil: &previousValidUntil,
 		UpdatedAt:             updatedAt,
 	})
+	return murphypostgres.Changed("integration", rows, err)
+}
+
+func (t *Tx) GetIntegration(ctx context.Context, id string) (_ *murphy.Integration, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	row, err := t.queries.GetIntegration(ctx, id)
 	if err != nil {
 		return nil, murphypostgres.Error("integration", err)
 	}

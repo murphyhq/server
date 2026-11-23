@@ -21,9 +21,17 @@ func Open(ctx context.Context, url string) (Storage, error) {
 	scheme, _, _ := strings.Cut(url, "://")
 	switch scheme {
 	case "postgres", "postgresql":
-		return postgres.Open(ctx, url)
+		engine, err := postgres.Open(ctx, url)
+		if err != nil {
+			return nil, err
+		}
+		return &Repository[*postgres.Tx]{Engine: engine}, nil
 	case "mysql":
-		return mysql.Open(ctx, url)
+		engine, err := mysql.Open(ctx, url)
+		if err != nil {
+			return nil, err
+		}
+		return &Repository[*mysql.Tx]{Engine: engine}, nil
 	default:
 		return nil, errors.New("unsupported database")
 	}

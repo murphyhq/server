@@ -34,8 +34,8 @@ const (
 	contactPoint   = "murphy"
 )
 
-func seedDogfood(ctx context.Context, api *client.ClientWithResponses, s dogfoodSettings) error {
-	key, err := dogfoodIntegration(ctx, api, s.KeyFile)
+func seedDogfood(ctx context.Context, api *client.ClientWithResponses, policyID string, s dogfoodSettings) error {
+	key, err := dogfoodIntegration(ctx, api, policyID, s.KeyFile)
 	if err != nil {
 		return err
 	}
@@ -43,7 +43,7 @@ func seedDogfood(ctx context.Context, api *client.ClientWithResponses, s dogfood
 	return grafana.configure(ctx, s.IngestURL+"/v1/alerts/grafana", key.Key)
 }
 
-func dogfoodIntegration(ctx context.Context, api *client.ClientWithResponses, file string) (*dogfoodKey, error) {
+func dogfoodIntegration(ctx context.Context, api *client.ClientWithResponses, policyID, file string) (*dogfoodKey, error) {
 	if saved, err := readKey(file); err == nil {
 		got, err := api.GetIntegrationWithResponse(ctx, saved.IntegrationID)
 		if err != nil {
@@ -63,7 +63,7 @@ func dogfoodIntegration(ctx context.Context, api *client.ClientWithResponses, fi
 		created, err := api.CreateServiceWithResponse(ctx, nil, client.ServiceInput{
 			Name:               dogfoodService,
 			Description:        new("Murphy itself, paged by the Grafana that watches it."),
-			EscalationPolicyId: platformPolicy,
+			EscalationPolicyId: policyID,
 		})
 		if err != nil || created.StatusCode() != http.StatusCreated {
 			return nil, fmt.Errorf("create the %s service: %v %s", dogfoodService, err, statusOf(created))

@@ -34,8 +34,54 @@ func run(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("create API client: %w", err)
 	}
-	if err := seedCatalog(ctx, api); err != nil {
+	teams, users, err := seedPeople(ctx, api)
+	if err != nil {
 		return err
 	}
-	return seedDogfood(ctx, api, s.Dogfood)
+	schedules, err := seedSchedules(ctx, api, teams, users)
+	if err != nil {
+		return err
+	}
+	policies, err := seedPolicies(ctx, api, teams, users, schedules)
+	if err != nil {
+		return err
+	}
+	if err := seedCatalog(ctx, api, policies); err != nil {
+		return err
+	}
+	return seedDogfood(ctx, api, policies["platform"], s.Dogfood)
+}
+
+func byName[T any](list func(cursor *string) ([]T, string, error), key func(T) (string, string)) (map[string]string, error) {
+	ids := map[string]string{}
+	var cursor *string
+	for {
+		items, next, err := list(cursor)
+		if err != nil {
+			return nil, err
+		}
+		for _, item := range items {
+			name, id := key(item)
+			ids[name] = id
+		}
+		if next == "" {
+			return ids, nil
+		}
+		cursor = &next
+	}
+}
+
+type response interface {
+	StatusCode() int
+	Status() string
+}
+
+func expect(r response, err error, want int, what string) error {
+	if err != nil {
+		return fmt.Errorf("%s: %w", what, err)
+	}
+	if r.StatusCode() != want {
+		return fmt.Errorf("%s: %s", what, r.Status())
+	}
+	return nil
 }
