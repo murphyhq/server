@@ -72,7 +72,7 @@ func escalationPolicy(t *testing.T, murphy *client.ClientWithResponses, name str
 	require.Equal(t, http.StatusCreated, user.StatusCode(), "create the user: %s", user.Body)
 	policy, err := murphy.CreateEscalationPolicyWithResponse(ctx, nil, client.EscalationPolicyInput{
 		Name:   name,
-		TeamId: team.JSON201.Id,
+		Team:   client.Reference{Id: team.JSON201.Id},
 		Levels: []client.EscalationLevel{{DelaySeconds: 3600, Targets: []client.EscalationTarget{{Type: client.EscalationTargetTypeUser, Id: user.JSON201.Id}}}},
 	})
 	require.NoError(t, err, "create the policy")

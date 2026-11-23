@@ -82,7 +82,7 @@ func (s *Server) GetEscalationPolicyVersion(ctx context.Context, request GetEsca
 }
 
 func fromPolicyInput(in *EscalationPolicyInput) *murphy.EscalationPolicy {
-	policy := &murphy.EscalationPolicy{Name: in.Name, TeamId: in.TeamId}
+	policy := &murphy.EscalationPolicy{Name: in.Name, TeamId: in.Team.Id}
 	if in.RepeatCount != nil {
 		policy.RepeatCount = *in.RepeatCount
 	}
@@ -103,7 +103,7 @@ func toPolicy(policy *murphy.EscalationPolicy) EscalationPolicy {
 	out := EscalationPolicy{
 		Id:          policy.GetId(),
 		Name:        policy.GetName(),
-		TeamId:      policy.GetTeamId(),
+		Team:        ref(policy.GetTeamId()),
 		Version:     policy.GetVersion(),
 		RepeatCount: policy.GetRepeatCount(),
 		Levels:      []EscalationLevel{},

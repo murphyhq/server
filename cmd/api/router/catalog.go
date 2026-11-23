@@ -149,7 +149,7 @@ func fromServiceInput(id string, in *ServiceInput) *murphy.Service {
 		Id:                 id,
 		Name:               in.Name,
 		Description:        text(in.Description),
-		EscalationPolicyId: in.EscalationPolicyId,
+		EscalationPolicyId: in.EscalationPolicy.Id,
 		Urgency:            murphy.UrgencyFromText(text(in.Urgency)),
 		Status:             murphy.ServiceStatusFromText(text(in.Status)),
 	}
@@ -157,21 +157,21 @@ func fromServiceInput(id string, in *ServiceInput) *murphy.Service {
 
 func toService(service *murphy.Service) Service {
 	return Service{
-		Id:                 service.GetId(),
-		Name:               service.GetName(),
-		Description:        service.GetDescription(),
-		EscalationPolicyId: service.GetEscalationPolicyId(),
-		Urgency:            Urgency(service.GetUrgency().Text()),
-		Status:             ServiceStatus(service.GetStatus().Text()),
-		CreatedAt:          service.GetCreatedAt().AsTime(),
-		UpdatedAt:          service.GetUpdatedAt().AsTime(),
+		Id:               service.GetId(),
+		Name:             service.GetName(),
+		Description:      service.GetDescription(),
+		EscalationPolicy: ref(service.GetEscalationPolicyId()),
+		Urgency:          Urgency(service.GetUrgency().Text()),
+		Status:           ServiceStatus(service.GetStatus().Text()),
+		CreatedAt:        service.GetCreatedAt().AsTime(),
+		UpdatedAt:        service.GetUpdatedAt().AsTime(),
 	}
 }
 
 func toIntegration(integration *murphy.Integration) Integration {
 	out := Integration{
 		Id:         integration.GetId(),
-		ServiceId:  integration.GetServiceId(),
+		Service:    ref(integration.GetServiceId()),
 		Name:       integration.GetName(),
 		Type:       IntegrationType(integration.GetType().Text()),
 		KeyVersion: integration.GetKeyVersion(),
@@ -190,7 +190,7 @@ func withKey(integration *murphy.Integration, key string) IntegrationWithKey {
 	out := toIntegration(integration)
 	return IntegrationWithKey{
 		Id:                    out.Id,
-		ServiceId:             out.ServiceId,
+		Service:               out.Service,
 		Name:                  out.Name,
 		Type:                  out.Type,
 		KeyVersion:            out.KeyVersion,

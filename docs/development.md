@@ -111,9 +111,10 @@ The API is the public way to build on Murphy, so its behaviour is predictable ac
 3. List endpoints MUST paginate with cursors and MUST NOT use offsets. A request sets `limit` (with a default and a maximum) and the `cursor` from the previous response; a response returns the items and `next_cursor`, empty on the last page.
 4. Lists MUST come in a stable order, newest first unless the endpoint documents otherwise.
 5. Filters MUST be query parameters named after the field they filter (`status=triggered`). A repeated parameter matches any of its values, and time ranges MUST use `<field>_after` and `<field>_before`.
-6. Unknown parameters MUST be rejected, never ignored.
-7. Errors MUST be answered as `application/problem+json` and MUST NOT expose internal details. Unexpected failures MUST be logged and answered with `500`.
-8. Every request that creates something or triggers an action MUST accept an `Idempotency-Key` header. A retry with the same key and the same request MUST return the original response without doing the work again; the same key with a different request MUST be rejected. Keys MUST be kept for 24 hours.
+6. A reference to another resource MUST be an object with at least its `id` (`"team": { "id": "…" }`), shaped the same in requests and responses. Fields MAY be added to a reference and MUST NOT be removed. Filters on a reference take its ID (`team_id=…`).
+7. Unknown parameters MUST be rejected, never ignored.
+8. Errors MUST be answered as `application/problem+json` and MUST NOT expose internal details. Unexpected failures MUST be logged and answered with `500`.
+9. Every request that creates something or triggers an action MUST accept an `Idempotency-Key` header. A retry with the same key and the same request MUST return the original response without doing the work again; the same key with a different request MUST be rejected. Keys MUST be kept for 24 hours.
 
 ## Tracing, logs and metrics
 

@@ -27,7 +27,7 @@ func TestEscalationPoliciesBelongToATeam(t *testing.T) {
 		))
 		require.NoError(t, err)
 		require.Equal(t, http.StatusCreated, created.StatusCode())
-		assert.Equal(t, payments, created.JSON201.TeamId)
+		assert.Equal(t, payments, created.JSON201.Team.Id)
 
 		ofPlatform, err := api.ListEscalationPoliciesWithResponse(ctx, &client.ListEscalationPoliciesParams{TeamId: &platform})
 		require.NoError(t, err)
@@ -62,7 +62,7 @@ func TestEscalationPoliciesRefuseUnknownTeamsAndTargets(t *testing.T) {
 func policyInput(name, team string, targets ...client.EscalationTarget) client.EscalationPolicyInput {
 	return client.EscalationPolicyInput{
 		Name:   name,
-		TeamId: team,
+		Team:   client.Reference{Id: team},
 		Levels: []client.EscalationLevel{{DelaySeconds: 5 * 60, Targets: targets}},
 	}
 }
@@ -90,7 +90,7 @@ func TestEscalationPoliciesKeepEveryVersion(t *testing.T) {
 		require.Equal(t, http.StatusOK, first.StatusCode())
 		assert.Equal(t, ana, first.JSON200.Levels[0].Targets[0].Id)
 
-		service, err := api.CreateServiceWithResponse(ctx, nil, client.ServiceInput{Name: "checkout-api", EscalationPolicyId: policy})
+		service, err := api.CreateServiceWithResponse(ctx, nil, client.ServiceInput{Name: "checkout-api", EscalationPolicy: client.Reference{Id: policy}})
 		require.NoError(t, err)
 		require.Equal(t, http.StatusCreated, service.StatusCode())
 		inUse, err := api.DeleteEscalationPolicyWithResponse(ctx, policy)
@@ -99,7 +99,7 @@ func TestEscalationPoliciesKeepEveryVersion(t *testing.T) {
 
 		other, err := api.CreateEscalationPolicyWithResponse(ctx, nil, policyInput("payments-backup", team, client.EscalationTarget{Type: client.EscalationTargetTypeUser, Id: bo}))
 		require.NoError(t, err)
-		moved, err := api.UpdateServiceWithResponse(ctx, service.JSON201.Id, client.ServiceInput{Name: "checkout-api", EscalationPolicyId: other.JSON201.Id})
+		moved, err := api.UpdateServiceWithResponse(ctx, service.JSON201.Id, client.ServiceInput{Name: "checkout-api", EscalationPolicy: client.Reference{Id: other.JSON201.Id}})
 		require.NoError(t, err)
 		require.Equal(t, http.StatusOK, moved.StatusCode())
 		deleted, err := api.DeleteEscalationPolicyWithResponse(ctx, policy)

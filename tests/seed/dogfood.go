@@ -61,9 +61,9 @@ func dogfoodIntegration(ctx context.Context, api *client.ClientWithResponses, po
 	serviceID, ok := existing[dogfoodService]
 	if !ok {
 		created, err := api.CreateServiceWithResponse(ctx, nil, client.ServiceInput{
-			Name:               dogfoodService,
-			Description:        new("Murphy itself, paged by the Grafana that watches it."),
-			EscalationPolicyId: policyID,
+			Name:             dogfoodService,
+			Description:      new("Murphy itself, paged by the Grafana that watches it."),
+			EscalationPolicy: client.Reference{Id: policyID},
 		})
 		if err != nil || created.StatusCode() != http.StatusCreated {
 			return nil, fmt.Errorf("create the %s service: %v %s", dogfoodService, err, statusOf(created))

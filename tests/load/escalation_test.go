@@ -29,7 +29,7 @@ func TestEveryIncidentPagesItsFirstLevel(t *testing.T) {
 	run := uuid.NewV4().String()[:8]
 
 	policyID, _ := escalationPolicy(t, murphy, "load-escalation-"+run)
-	service, err := murphy.CreateServiceWithResponse(ctx, nil, client.ServiceInput{Name: "load-escalation-" + run, EscalationPolicyId: policyID})
+	service, err := murphy.CreateServiceWithResponse(ctx, nil, client.ServiceInput{Name: "load-escalation-" + run, EscalationPolicy: client.Reference{Id: policyID}})
 	require.NoError(t, err, "create the service")
 	require.Equal(t, http.StatusCreated, service.StatusCode(), "create the service: %s", service.Body)
 	integration, err := murphy.CreateIntegrationWithResponse(ctx, service.JSON201.Id, nil, client.IntegrationCreate{Name: "generic", Type: client.Generic})

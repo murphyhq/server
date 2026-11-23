@@ -175,7 +175,7 @@ func TestCatalogNotFoundResponses(t *testing.T) {
 
 func newService(name string) client.ServiceInput {
 	return client.ServiceInput{
-		Name:               name,
-		EscalationPolicyId: uuid.NewV7().String(),
+		Name:             name,
+		EscalationPolicy: client.Reference{Id: uuid.NewV7().String()},
 	}
 }

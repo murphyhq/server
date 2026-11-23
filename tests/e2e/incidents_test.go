@@ -42,8 +42,8 @@ func setup(t *testing.T) (*client.ClientWithResponses, string, string) {
 
 	policyID, _ := escalationPolicy(t, api)
 	service, err := api.CreateServiceWithResponse(ctx, nil, client.ServiceInput{
-		Name:               "e2e-" + uuid.NewV4().String()[:8],
-		EscalationPolicyId: policyID,
+		Name:             "e2e-" + uuid.NewV4().String()[:8],
+		EscalationPolicy: client.Reference{Id: policyID},
 	})
 	require.NoError(t, err)
 	require.Equal(t, http.StatusCreated, service.StatusCode())
@@ -116,7 +116,7 @@ func escalationPolicy(t *testing.T, api *client.ClientWithResponses) (policyID, 
 	require.Equal(t, http.StatusCreated, user.StatusCode())
 	policy, err := api.CreateEscalationPolicyWithResponse(ctx, nil, client.EscalationPolicyInput{
 		Name:   "e2e-" + run,
-		TeamId: team.JSON201.Id,
+		Team:   client.Reference{Id: team.JSON201.Id},
 		Levels: []client.EscalationLevel{{DelaySeconds: 300, Targets: []client.EscalationTarget{{Type: client.EscalationTargetTypeUser, Id: user.JSON201.Id}}}},
 	})
 	require.NoError(t, err)
@@ -142,7 +142,7 @@ func TestAnIncidentPagesItsFirstLevelUntilAcknowledged(t *testing.T) {
 	api, err := client.NewClientWithResponses(apiURL)
 	require.NoError(t, err)
 	policyID, userID := escalationPolicy(t, api)
-	service, err := api.CreateServiceWithResponse(ctx, nil, client.ServiceInput{Name: "e2e-escalation-" + uuid.NewV4().String()[:8], EscalationPolicyId: policyID})
+	service, err := api.CreateServiceWithResponse(ctx, nil, client.ServiceInput{Name: "e2e-escalation-" + uuid.NewV4().String()[:8], EscalationPolicy: client.Reference{Id: policyID}})
 	require.NoError(t, err)
 	require.Equal(t, http.StatusCreated, service.StatusCode())
 	integration, err := api.CreateIntegrationWithResponse(ctx, service.JSON201.Id, nil, client.IntegrationCreate{Name: "generic", Type: client.Generic})
@@ -251,7 +251,7 @@ func TestGrafanaPagesMurphyAndResolvesTheIncident(t *testing.T) {
 	require.NoError(t, err)
 	policyID, _ := escalationPolicy(t, api)
 	service, err := api.CreateServiceWithResponse(ctx, nil, client.ServiceInput{
-		Name: "e2e-grafana-" + uuid.NewV4().String()[:8], EscalationPolicyId: policyID,
+		Name: "e2e-grafana-" + uuid.NewV4().String()[:8], EscalationPolicy: client.Reference{Id: policyID},
 	})
 	require.NoError(t, err)
 	require.Equal(t, http.StatusCreated, service.StatusCode())

@@ -247,7 +247,9 @@ type ContactMethod struct {
 	Id        string            `json:"id"`
 	Type      ContactMethodType `json:"type"`
 	UpdatedAt time.Time         `json:"updated_at"`
-	UserId    string            `json:"user_id"`
+
+	// User Points at another resource.
+	User Reference `json:"user"`
 }
 
 // ContactMethodInput defines model for ContactMethodInput.
@@ -281,8 +283,8 @@ type EscalationPolicy struct {
 	// RepeatCount How many times to go through the levels again when nobody acknowledges.
 	RepeatCount int32 `json:"repeat_count"`
 
-	// TeamId The team that owns the policy, and with it the services that page through it.
-	TeamId    string    `json:"team_id"`
+	// Team The team that owns the policy, and with it the services that page through it.
+	Team      Reference `json:"team"`
 	UpdatedAt time.Time `json:"updated_at"`
 
 	// Version The policy's current version, starting at 1. Every update makes the next one.
@@ -294,7 +296,9 @@ type EscalationPolicyInput struct {
 	Levels      []EscalationLevel `json:"levels"`
 	Name        string            `json:"name"`
 	RepeatCount *int32            `json:"repeat_count,omitempty"`
-	TeamId      string            `json:"team_id"`
+
+	// Team Points at another resource.
+	Team Reference `json:"team"`
 }
 
 // EscalationPolicyPage defines model for EscalationPolicyPage.
@@ -325,13 +329,15 @@ type Incident struct {
 	Id         string              `json:"id"`
 
 	// Number Numbers incidents in the order they were opened, for people to refer to.
-	Number     int64          `json:"number"`
-	ResolvedAt *time.Time     `json:"resolved_at,omitempty"`
-	ServiceId  string         `json:"service_id"`
-	Status     IncidentStatus `json:"status"`
-	Title      string         `json:"title"`
-	UpdatedAt  time.Time      `json:"updated_at"`
-	Urgency    Urgency        `json:"urgency"`
+	Number     int64      `json:"number"`
+	ResolvedAt *time.Time `json:"resolved_at,omitempty"`
+
+	// Service Points at another resource.
+	Service   Reference      `json:"service"`
+	Status    IncidentStatus `json:"status"`
+	Title     string         `json:"title"`
+	UpdatedAt time.Time      `json:"updated_at"`
+	Urgency   Urgency        `json:"urgency"`
 }
 
 // IncidentEscalation Where the incident is in its escalation policy. Level 0 means no level has been paged yet.
@@ -369,27 +375,31 @@ type IncidentWithTimeline struct {
 	Id         string              `json:"id"`
 
 	// Number Numbers incidents in the order they were opened, for people to refer to.
-	Number     int64           `json:"number"`
-	ResolvedAt *time.Time      `json:"resolved_at,omitempty"`
-	ServiceId  string          `json:"service_id"`
-	Status     IncidentStatus  `json:"status"`
-	Timeline   []TimelineEntry `json:"timeline"`
-	Title      string          `json:"title"`
-	UpdatedAt  time.Time       `json:"updated_at"`
-	Urgency    Urgency         `json:"urgency"`
+	Number     int64      `json:"number"`
+	ResolvedAt *time.Time `json:"resolved_at,omitempty"`
+
+	// Service Points at another resource.
+	Service   Reference       `json:"service"`
+	Status    IncidentStatus  `json:"status"`
+	Timeline  []TimelineEntry `json:"timeline"`
+	Title     string          `json:"title"`
+	UpdatedAt time.Time       `json:"updated_at"`
+	Urgency   Urgency         `json:"urgency"`
 }
 
 // Integration defines model for Integration.
 type Integration struct {
-	CreatedAt             time.Time         `json:"created_at"`
-	Id                    string            `json:"id"`
-	KeyVersion            int32             `json:"key_version"`
-	Name                  string            `json:"name"`
-	PreviousKeyValidUntil *time.Time        `json:"previous_key_valid_until,omitempty"`
-	ServiceId             string            `json:"service_id"`
-	Status                IntegrationStatus `json:"status"`
-	Type                  IntegrationType   `json:"type"`
-	UpdatedAt             time.Time         `json:"updated_at"`
+	CreatedAt             time.Time  `json:"created_at"`
+	Id                    string     `json:"id"`
+	KeyVersion            int32      `json:"key_version"`
+	Name                  string     `json:"name"`
+	PreviousKeyValidUntil *time.Time `json:"previous_key_valid_until,omitempty"`
+
+	// Service Points at another resource.
+	Service   Reference         `json:"service"`
+	Status    IntegrationStatus `json:"status"`
+	Type      IntegrationType   `json:"type"`
+	UpdatedAt time.Time         `json:"updated_at"`
 }
 
 // IntegrationCreate defines model for IntegrationCreate.
@@ -425,23 +435,25 @@ type IntegrationWithKey struct {
 	Id        string    `json:"id"`
 
 	// Key The integration key, sent by monitoring tools in the Authorization header.
-	Key                   string            `json:"key"`
-	KeyVersion            int32             `json:"key_version"`
-	Name                  string            `json:"name"`
-	PreviousKeyValidUntil *time.Time        `json:"previous_key_valid_until,omitempty"`
-	ServiceId             string            `json:"service_id"`
-	Status                IntegrationStatus `json:"status"`
-	Type                  IntegrationType   `json:"type"`
-	UpdatedAt             time.Time         `json:"updated_at"`
+	Key                   string     `json:"key"`
+	KeyVersion            int32      `json:"key_version"`
+	Name                  string     `json:"name"`
+	PreviousKeyValidUntil *time.Time `json:"previous_key_valid_until,omitempty"`
+
+	// Service Points at another resource.
+	Service   Reference         `json:"service"`
+	Status    IntegrationStatus `json:"status"`
+	Type      IntegrationType   `json:"type"`
+	UpdatedAt time.Time         `json:"updated_at"`
 }
 
 // Layer defines model for Layer.
 type Layer struct {
 	Name *string `json:"name,omitempty"`
 
-	// Participants User IDs, in the order they take turns.
-	Participants []string  `json:"participants"`
-	StartsAt     time.Time `json:"starts_at"`
+	// Participants The people who take turns, in order.
+	Participants []Reference `json:"participants"`
+	StartsAt     time.Time   `json:"starts_at"`
 
 	// TurnLengthSeconds How long each turn lasts. Whole days hand over at the same local time every day, in the schedule's time zone.
 	TurnLengthSeconds int64 `json:"turn_length_seconds"`
@@ -451,25 +463,31 @@ type Layer struct {
 type OnCall struct {
 	At time.Time `json:"at"`
 
-	// UserId Absent when nobody is on call.
-	UserId *string `json:"user_id,omitempty"`
+	// User Absent when nobody is on call.
+	User *Reference `json:"user,omitempty"`
 }
 
 // Override defines model for Override.
 type Override struct {
-	CreatedAt  time.Time `json:"created_at"`
-	EndsAt     time.Time `json:"ends_at"`
-	Id         string    `json:"id"`
-	ScheduleId string    `json:"schedule_id"`
-	StartsAt   time.Time `json:"starts_at"`
-	UserId     string    `json:"user_id"`
+	CreatedAt time.Time `json:"created_at"`
+	EndsAt    time.Time `json:"ends_at"`
+	Id        string    `json:"id"`
+
+	// Schedule Points at another resource.
+	Schedule Reference `json:"schedule"`
+	StartsAt time.Time `json:"starts_at"`
+
+	// User Points at another resource.
+	User Reference `json:"user"`
 }
 
 // OverrideInput defines model for OverrideInput.
 type OverrideInput struct {
 	EndsAt   time.Time `json:"ends_at"`
 	StartsAt time.Time `json:"starts_at"`
-	UserId   string    `json:"user_id"`
+
+	// User Points at another resource.
+	User Reference `json:"user"`
 }
 
 // OverrideList defines model for OverrideList.
@@ -514,17 +532,17 @@ type Schedule struct {
 	Layers []Layer `json:"layers"`
 	Name   string  `json:"name"`
 
-	// TeamIds The teams that use this schedule.
-	TeamIds   []string  `json:"team_ids"`
-	TimeZone  string    `json:"time_zone"`
-	UpdatedAt time.Time `json:"updated_at"`
+	// Teams The teams that use this schedule.
+	Teams     []Reference `json:"teams"`
+	TimeZone  string      `json:"time_zone"`
+	UpdatedAt time.Time   `json:"updated_at"`
 }
 
 // ScheduleInput defines model for ScheduleInput.
 type ScheduleInput struct {
-	Layers  []Layer   `json:"layers"`
-	Name    string    `json:"name"`
-	TeamIds *[]string `json:"team_ids,omitempty"`
+	Layers []Layer      `json:"layers"`
+	Name   string       `json:"name"`
+	Teams  *[]Reference `json:"teams,omitempty"`
 
 	// TimeZone IANA time zone; UTC by default.
 	TimeZone *string `json:"time_zone,omitempty"`
@@ -540,23 +558,27 @@ type SchedulePage struct {
 
 // Service defines model for Service.
 type Service struct {
-	CreatedAt          time.Time     `json:"created_at"`
-	Description        string        `json:"description"`
-	EscalationPolicyId string        `json:"escalation_policy_id"`
-	Id                 string        `json:"id"`
-	Name               string        `json:"name"`
-	Status             ServiceStatus `json:"status"`
-	UpdatedAt          time.Time     `json:"updated_at"`
-	Urgency            Urgency       `json:"urgency"`
+	CreatedAt   time.Time `json:"created_at"`
+	Description string    `json:"description"`
+
+	// EscalationPolicy Points at another resource.
+	EscalationPolicy Reference     `json:"escalation_policy"`
+	Id               string        `json:"id"`
+	Name             string        `json:"name"`
+	Status           ServiceStatus `json:"status"`
+	UpdatedAt        time.Time     `json:"updated_at"`
+	Urgency          Urgency       `json:"urgency"`
 }
 
 // ServiceInput defines model for ServiceInput.
 type ServiceInput struct {
-	Description        *string        `json:"description,omitempty"`
-	EscalationPolicyId string         `json:"escalation_policy_id"`
-	Name               string         `json:"name"`
-	Status             *ServiceStatus `json:"status,omitempty"`
-	Urgency            *Urgency       `json:"urgency,omitempty"`
+	Description *string `json:"description,omitempty"`
+
+	// EscalationPolicy Points at another resource.
+	EscalationPolicy Reference      `json:"escalation_policy"`
+	Name             string         `json:"name"`
+	Status           *ServiceStatus `json:"status,omitempty"`
+	Urgency          *Urgency       `json:"urgency,omitempty"`
 }
 
 // ServicePage defines model for ServicePage.
@@ -592,9 +614,13 @@ type TeamMemberInput struct {
 type TeamMembership struct {
 	CreatedAt time.Time `json:"created_at"`
 	Role      TeamRole  `json:"role"`
-	TeamId    string    `json:"team_id"`
+
+	// Team Points at another resource.
+	Team      Reference `json:"team"`
 	UpdatedAt time.Time `json:"updated_at"`
-	UserId    string    `json:"user_id"`
+
+	// User Points at another resource.
+	User Reference `json:"user"`
 }
 
 // TeamMembershipList defines model for TeamMembershipList.
@@ -615,7 +641,8 @@ type TeamRole string
 
 // TimelineEntry defines model for TimelineEntry.
 type TimelineEntry struct {
-	AlertId    *string             `json:"alert_id,omitempty"`
+	// Alert Points at another resource.
+	Alert      *Reference          `json:"alert,omitempty"`
 	At         time.Time           `json:"at"`
 	Escalation *TimelineEscalation `json:"escalation,omitempty"`
 	Id         string              `json:"id"`

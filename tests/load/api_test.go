@@ -28,20 +28,20 @@ func TestTheAPIAnswersReadsQuickly(t *testing.T) {
 	require.NoError(t, err, "create the user")
 	require.Equal(t, http.StatusCreated, user.StatusCode(), "create the user: %s", user.Body)
 	schedule, err := murphy.CreateScheduleWithResponse(ctx, nil, client.ScheduleInput{
-		Name:    "load-" + run,
-		TeamIds: &[]string{team.JSON201.Id},
-		Layers:  []client.Layer{{TurnLengthSeconds: 24 * 60 * 60, StartsAt: time.Now().Add(-time.Hour), Participants: []string{user.JSON201.Id}}},
+		Name:   "load-" + run,
+		Teams:  &[]client.Reference{{Id: team.JSON201.Id}},
+		Layers: []client.Layer{{TurnLengthSeconds: 24 * 60 * 60, StartsAt: time.Now().Add(-time.Hour), Participants: []client.Reference{{Id: user.JSON201.Id}}}},
 	})
 	require.NoError(t, err, "create the schedule")
 	require.Equal(t, http.StatusCreated, schedule.StatusCode(), "create the schedule: %s", schedule.Body)
 	policy, err := murphy.CreateEscalationPolicyWithResponse(ctx, nil, client.EscalationPolicyInput{
 		Name:   "load-" + run,
-		TeamId: team.JSON201.Id,
+		Team:   client.Reference{Id: team.JSON201.Id},
 		Levels: []client.EscalationLevel{{DelaySeconds: 300, Targets: []client.EscalationTarget{{Type: client.EscalationTargetTypeSchedule, Id: schedule.JSON201.Id}}}},
 	})
 	require.NoError(t, err, "create the policy")
 	require.Equal(t, http.StatusCreated, policy.StatusCode(), "create the policy: %s", policy.Body)
-	service, err := murphy.CreateServiceWithResponse(ctx, nil, client.ServiceInput{Name: "load-" + run, EscalationPolicyId: policy.JSON201.Id})
+	service, err := murphy.CreateServiceWithResponse(ctx, nil, client.ServiceInput{Name: "load-" + run, EscalationPolicy: client.Reference{Id: policy.JSON201.Id}})
 	require.NoError(t, err, "create the service")
 	require.Equal(t, http.StatusCreated, service.StatusCode(), "create the service: %s", service.Body)
 

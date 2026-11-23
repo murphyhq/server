@@ -96,7 +96,7 @@ func TestEveryAlertBecomesAnIncident(t *testing.T) {
 func integration(t *testing.T, murphy *client.ClientWithResponses, name string, kind client.IntegrationType) (string, string) {
 	t.Helper()
 	policyID, _ := escalationPolicy(t, murphy, name)
-	service, err := murphy.CreateServiceWithResponse(t.Context(), nil, client.ServiceInput{Name: name, EscalationPolicyId: policyID})
+	service, err := murphy.CreateServiceWithResponse(t.Context(), nil, client.ServiceInput{Name: name, EscalationPolicy: client.Reference{Id: policyID}})
 	require.NoError(t, err, "create service %s", name)
 	require.Equal(t, http.StatusCreated, service.StatusCode(), "create service %s: %s", name, service.Body)
 	created, err := murphy.CreateIntegrationWithResponse(t.Context(), service.JSON201.Id, nil, client.IntegrationCreate{Name: name, Type: kind})

@@ -96,7 +96,7 @@ func (s *Server) CreateOverride(ctx context.Context, request CreateOverrideReque
 
 	override, err := s.oncall.CreateOverride(ctx, &murphy.Override{
 		ScheduleId: request.Id,
-		UserId:     request.Body.UserId,
+		UserId:     request.Body.User.Id,
 		StartsAt:   timestamppb.New(request.Body.StartsAt),
 		EndsAt:     timestamppb.New(request.Body.EndsAt),
 	})
@@ -130,20 +130,21 @@ func (s *Server) GetOnCall(ctx context.Context, request GetOnCallRequestObject) 
 	}
 	out := GetOnCall200JSONResponse{At: at}
 	if user != "" {
-		out.UserId = &user
+		reference := ref(user)
+		out.User = &reference
 	}
 	return out, nil
 }
 
 func fromScheduleInput(in *ScheduleInput) *murphy.Schedule {
 	schedule := &murphy.Schedule{Name: in.Name, TimeZone: text(in.TimeZone)}
-	if in.TeamIds != nil {
-		schedule.TeamIds = *in.TeamIds
+	if in.Teams != nil {
+		schedule.TeamIds = ids(*in.Teams)
 	}
 	for _, layer := range in.Layers {
 		schedule.Layers = append(schedule.Layers, &murphy.Layer{
 			Name:         text(layer.Name),
-			Participants: layer.Participants,
+			Participants: ids(layer.Participants),
 			TurnLength:   durationpb.New(time.Duration(layer.TurnLengthSeconds) * time.Second),
 			StartsAt:     timestamppb.New(layer.StartsAt),
 		})
@@ -156,14 +157,14 @@ func toSchedule(schedule *murphy.Schedule) Schedule {
 		Id:        schedule.GetId(),
 		Name:      schedule.GetName(),
 		TimeZone:  schedule.GetTimeZone(),
-		TeamIds:   append([]string{}, schedule.GetTeamIds()...),
+		Teams:     refs(schedule.GetTeamIds()),
 		Layers:    []Layer{},
 		CreatedAt: schedule.GetCreatedAt().AsTime(),
 		UpdatedAt: schedule.GetUpdatedAt().AsTime(),
 	}
 	for _, layer := range schedule.GetLayers() {
 		l := Layer{
-			Participants:      layer.GetParticipants(),
+			Participants:      refs(layer.GetParticipants()),
 			TurnLengthSeconds: int64(layer.GetTurnLength().AsDuration() / time.Second),
 			StartsAt:          layer.GetStartsAt().AsTime(),
 		}
@@ -177,11 +178,11 @@ func toSchedule(schedule *murphy.Schedule) Schedule {
 
 func toOverride(override *murphy.Override) Override {
 	return Override{
-		Id:         override.GetId(),
-		ScheduleId: override.GetScheduleId(),
-		UserId:     override.GetUserId(),
-		StartsAt:   override.GetStartsAt().AsTime(),
-		EndsAt:     override.GetEndsAt().AsTime(),
-		CreatedAt:  override.GetCreatedAt().AsTime(),
+		Id:        override.GetId(),
+		Schedule:  ref(override.GetScheduleId()),
+		User:      ref(override.GetUserId()),
+		StartsAt:  override.GetStartsAt().AsTime(),
+		EndsAt:    override.GetEndsAt().AsTime(),
+		CreatedAt: override.GetCreatedAt().AsTime(),
 	}
 }
