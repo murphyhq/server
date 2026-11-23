@@ -336,7 +336,10 @@ func TestATimerPagesItsLevelAndSchedulesTheNext(t *testing.T) {
 	assert.Equal(t, int32(3), escalated.GetVersion())
 	require.Len(t, f.recorded.Timeline, 1)
 	assert.Equal(t, murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_ESCALATED, f.recorded.Timeline[0].GetType())
-	assert.Equal(t, []string{ana}, f.recorded.Timeline[0].GetEscalation().GetUserIds())
+	paged := f.recorded.Timeline[0].GetEscalation().GetPaged()
+	require.Len(t, paged, 1)
+	assert.Equal(t, ana, paged[0].GetUserId())
+	assert.Equal(t, schedule, paged[0].GetVia().GetId(), "reached through the schedule she is on call for")
 
 	messages := f.messages(t)
 	require.Len(t, messages, 2)
@@ -357,7 +360,8 @@ func TestALevelThatReachesNobodyIsSkipped(t *testing.T) {
 	require.Len(t, f.recorded.Timeline, 2)
 	assert.Equal(t, murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_ESCALATION_SKIPPED, f.recorded.Timeline[0].GetType())
 	assert.Equal(t, murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_ESCALATED, f.recorded.Timeline[1].GetType())
-	assert.Equal(t, []string{bo}, f.recorded.Timeline[1].GetEscalation().GetUserIds())
+	assert.Equal(t, []string{bo}, pagedUsers(f.recorded.Timeline[1]))
+	assert.Equal(t, schedule, f.recorded.Timeline[0].GetEscalation().GetReachedNobody()[0].GetId())
 	assert.Equal(t, int32(2), f.recorded.Updated.GetEscalationLevel())
 	next := f.messages(t)[1].envelope.GetTimer().GetCurrent()
 	assert.Equal(t, int32(1), next.GetEscalationLevel(), "after the last level, back to the first")
@@ -372,7 +376,7 @@ func TestDeactivatedPeopleAreNotPaged(t *testing.T) {
 	require.NoError(t, f.service.TimerExpired(t.Context(), "message-1", timer(incident, 1, 1)))
 
 	assert.Equal(t, murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_ESCALATION_SKIPPED, f.recorded.Timeline[0].GetType())
-	assert.Equal(t, []string{bo}, f.recorded.Timeline[1].GetEscalation().GetUserIds())
+	assert.Equal(t, []string{bo}, pagedUsers(f.recorded.Timeline[1]))
 }
 
 func TestEscalationIsExhaustedAfterItsRepeats(t *testing.T) {
@@ -472,4 +476,12 @@ func TestAcknowledgingRetriesAfterAConcurrentChange(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, murphy.IncidentStatus_INCIDENT_STATUS_ACKNOWLEDGED, acknowledged.GetStatus())
+}
+
+func pagedUsers(entry *murphy.TimelineEntry) []string {
+	var users []string
+	for _, page := range entry.GetEscalation().GetPaged() {
+		users = append(users, page.GetUserId())
+	}
+	return users
 }

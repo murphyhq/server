@@ -7,6 +7,7 @@ import (
 	"time"
 
 	murphy "github.com/murphyhq/server"
+	"github.com/murphyhq/server/internal/messaging"
 	"github.com/murphyhq/server/internal/pagination"
 	"github.com/murphyhq/server/internal/telemetry"
 	"github.com/murphyhq/server/internal/tracer"
@@ -377,20 +378,20 @@ func (s *Service) TimerExpired(ctx context.Context, messageID string, timer *mur
 			break
 		}
 		current := levels[level-1]
-		users, err := s.reach(ctx, current, now.AsTime())
+		paged, unreached, err := s.reach(ctx, current, now.AsTime())
 		if err != nil {
 			return err
 		}
 		incident.EscalationLevel, incident.EscalationRound = level, round
-		if len(users) == 0 {
+		if len(paged) == 0 {
 			entry := note(incident, murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_ESCALATION_SKIPPED, fmt.Sprintf("Level %d reached nobody", level), now)
-			entry.Escalation = &murphy.TimelineEscalation{Level: level, Round: round}
+			entry.Escalation = &murphy.TimelineEscalation{Level: level, Round: round, ReachedNobody: unreached}
 			change.Timeline = append(change.Timeline, entry)
 			level, round = next(level, round, policy)
 			continue
 		}
 		entry := note(incident, murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_ESCALATED, fmt.Sprintf("Level %d paged", level), now)
-		entry.Escalation = &murphy.TimelineEscalation{Level: level, Round: round, UserIds: users}
+		entry.Escalation = &murphy.TimelineEscalation{Level: level, Round: round, Paged: paged, ReachedNobody: unreached}
 		change.Timeline = append(change.Timeline, entry)
 		followingLevel, followingRound := next(level, round, policy)
 		due := now.AsTime().Add(current.GetDelay().AsDuration())
@@ -427,38 +428,41 @@ func next(level, round int32, policy *murphy.EscalationPolicy) (int32, int32) {
 	}
 }
 
-func (s *Service) reach(ctx context.Context, level *murphy.EscalationLevel, at time.Time) ([]string, error) {
-	var users, schedules []string
+func (s *Service) reach(ctx context.Context, level *murphy.EscalationLevel, at time.Time) (paged []*murphy.TimelinePage, unreached []*murphy.EscalationTarget, err error) {
+	var schedules []string
 	for _, target := range level.GetTargets() {
-		switch target.GetType() {
-		case murphy.EscalationTargetType_ESCALATION_TARGET_TYPE_USER:
-			users = append(users, target.GetId())
-		case murphy.EscalationTargetType_ESCALATION_TARGET_TYPE_SCHEDULE:
+		if target.GetType() == murphy.EscalationTargetType_ESCALATION_TARGET_TYPE_SCHEDULE {
 			schedules = append(schedules, target.GetId())
 		}
 	}
 	onCall, err := s.oncall.WhoIsOnCall(ctx, schedules, at)
 	if err != nil {
-		return nil, fmt.Errorf("find who is on call: %w", err)
+		return nil, nil, fmt.Errorf("find who is on call: %w", err)
 	}
-	for _, schedule := range schedules {
-		if user, ok := onCall[schedule]; ok {
-			users = append(users, user)
+	candidates := make([]string, 0, len(level.GetTargets()))
+	for _, target := range level.GetTargets() {
+		user := target.GetId()
+		if target.GetType() == murphy.EscalationTargetType_ESCALATION_TARGET_TYPE_SCHEDULE {
+			user = onCall[target.GetId()]
 		}
+		candidates = append(candidates, user)
 	}
-	active, err := s.people.ActiveUsers(ctx, users)
+	active, err := s.people.ActiveUsers(ctx, candidates)
 	if err != nil {
-		return nil, fmt.Errorf("find active users: %w", err)
+		return nil, nil, fmt.Errorf("find active users: %w", err)
 	}
-	var reached []string
 	seen := map[string]bool{}
-	for _, user := range users {
-		if active[user] && !seen[user] {
+	for i, target := range level.GetTargets() {
+		user := candidates[i]
+		switch {
+		case user == "" || !active[user]:
+			unreached = append(unreached, target)
+		case !seen[user]:
 			seen[user] = true
-			reached = append(reached, user)
+			paged = append(paged, &murphy.TimelinePage{UserId: user, Via: target})
 		}
 	}
-	return reached, nil
+	return paged, unreached, nil
 }
 
 func (s *Service) Acknowledge(ctx context.Context, id string) (_ *murphy.Incident, err error) {
@@ -568,4 +572,29 @@ func note(incident *murphy.Incident, kind murphy.TimelineEntryType, summary stri
 
 func clone(incident *murphy.Incident) *murphy.Incident {
 	return proto.Clone(incident).(*murphy.Incident)
+}
+
+func (s *Service) ClaimDueMessages(ctx context.Context, limit int, lease time.Duration) (_ []messaging.ScheduledMessage, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	claimed, err := s.repo.ClaimDueMessages(ctx, time.Now().UTC(), limit, lease)
+	if err != nil {
+		return nil, fmt.Errorf("claim due messages: %w", err)
+	}
+	due := make([]messaging.ScheduledMessage, len(claimed))
+	for i, message := range claimed {
+		due[i] = messaging.ScheduledMessage{ID: message.ID, Kind: string(message.Kind), DueAt: message.DueAt, Envelope: message.Envelope}
+	}
+	return due, nil
+}
+
+func (s *Service) MessagesSent(ctx context.Context, ids []string) (err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	if err := s.repo.DeleteMessages(ctx, ids); err != nil {
+		return fmt.Errorf("delete sent messages: %w", err)
+	}
+	return nil
 }

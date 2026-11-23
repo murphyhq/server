@@ -172,10 +172,13 @@ func (e TeamRole) Valid() bool {
 
 // Defines values for TimelineEntryType.
 const (
-	TimelineEntryTypeAcknowledged TimelineEntryType = "acknowledged"
-	TimelineEntryTypeAlerted      TimelineEntryType = "alerted"
-	TimelineEntryTypeResolved     TimelineEntryType = "resolved"
-	TimelineEntryTypeTriggered    TimelineEntryType = "triggered"
+	TimelineEntryTypeAcknowledged        TimelineEntryType = "acknowledged"
+	TimelineEntryTypeAlerted             TimelineEntryType = "alerted"
+	TimelineEntryTypeEscalated           TimelineEntryType = "escalated"
+	TimelineEntryTypeEscalationExhausted TimelineEntryType = "escalation_exhausted"
+	TimelineEntryTypeEscalationSkipped   TimelineEntryType = "escalation_skipped"
+	TimelineEntryTypeResolved            TimelineEntryType = "resolved"
+	TimelineEntryTypeTriggered           TimelineEntryType = "triggered"
 )
 
 // Valid indicates whether the value is a known member of the TimelineEntryType enum.
@@ -184,6 +187,12 @@ func (e TimelineEntryType) Valid() bool {
 	case TimelineEntryTypeAcknowledged:
 		return true
 	case TimelineEntryTypeAlerted:
+		return true
+	case TimelineEntryTypeEscalated:
+		return true
+	case TimelineEntryTypeEscalationExhausted:
+		return true
+	case TimelineEntryTypeEscalationSkipped:
 		return true
 	case TimelineEntryTypeResolved:
 		return true
@@ -307,9 +316,13 @@ type EscalationTargetType string
 
 // Incident defines model for Incident.
 type Incident struct {
-	CreatedAt time.Time `json:"created_at"`
-	DedupKey  string    `json:"dedup_key"`
-	Id        string    `json:"id"`
+	AcknowledgedAt *time.Time `json:"acknowledged_at,omitempty"`
+	CreatedAt      time.Time  `json:"created_at"`
+	DedupKey       string     `json:"dedup_key"`
+
+	// Escalation Where the incident is in its escalation policy. Level 0 means no level has been paged yet.
+	Escalation *IncidentEscalation `json:"escalation,omitempty"`
+	Id         string              `json:"id"`
 
 	// Number Numbers incidents in the order they were opened, for people to refer to.
 	Number     int64          `json:"number"`
@@ -319,6 +332,19 @@ type Incident struct {
 	Title      string         `json:"title"`
 	UpdatedAt  time.Time      `json:"updated_at"`
 	Urgency    Urgency        `json:"urgency"`
+}
+
+// IncidentEscalation Where the incident is in its escalation policy. Level 0 means no level has been paged yet.
+type IncidentEscalation struct {
+	// Exhausted Every level and repeat has been paged, or no level could reach anyone.
+	Exhausted bool  `json:"exhausted"`
+	Level     int32 `json:"level"`
+
+	// Policy Points at one version of an escalation policy.
+	Policy PolicyVersionReference `json:"policy"`
+
+	// Round Which pass through the levels, from 1; the policy's repeat count adds more passes.
+	Round int32 `json:"round"`
 }
 
 // IncidentPage defines model for IncidentPage.
@@ -334,9 +360,13 @@ type IncidentStatus string
 
 // IncidentWithTimeline defines model for IncidentWithTimeline.
 type IncidentWithTimeline struct {
-	CreatedAt time.Time `json:"created_at"`
-	DedupKey  string    `json:"dedup_key"`
-	Id        string    `json:"id"`
+	AcknowledgedAt *time.Time `json:"acknowledged_at,omitempty"`
+	CreatedAt      time.Time  `json:"created_at"`
+	DedupKey       string     `json:"dedup_key"`
+
+	// Escalation Where the incident is in its escalation policy. Level 0 means no level has been paged yet.
+	Escalation *IncidentEscalation `json:"escalation,omitempty"`
+	Id         string              `json:"id"`
 
 	// Number Numbers incidents in the order they were opened, for people to refer to.
 	Number     int64           `json:"number"`
@@ -447,6 +477,19 @@ type OverrideList struct {
 	Items []Override `json:"items"`
 }
 
+// Page defines model for Page.
+type Page struct {
+	// User Points at another resource.
+	User Reference        `json:"user"`
+	Via  EscalationTarget `json:"via"`
+}
+
+// PolicyVersionReference Points at one version of an escalation policy.
+type PolicyVersionReference struct {
+	Id      string `json:"id"`
+	Version int32  `json:"version"`
+}
+
 // Problem defines model for Problem.
 type Problem struct {
 	Detail *string `json:"detail,omitempty"`
@@ -455,6 +498,11 @@ type Problem struct {
 
 	// TraceId The trace of this request, to find it in your tracing backend.
 	TraceId *string `json:"trace_id,omitempty"`
+}
+
+// Reference Points at another resource.
+type Reference struct {
+	Id string `json:"id"`
 }
 
 // Schedule defines model for Schedule.
@@ -567,15 +615,28 @@ type TeamRole string
 
 // TimelineEntry defines model for TimelineEntry.
 type TimelineEntry struct {
-	AlertId *string           `json:"alert_id,omitempty"`
-	At      time.Time         `json:"at"`
-	Id      string            `json:"id"`
-	Summary string            `json:"summary"`
-	Type    TimelineEntryType `json:"type"`
+	AlertId    *string             `json:"alert_id,omitempty"`
+	At         time.Time           `json:"at"`
+	Escalation *TimelineEscalation `json:"escalation,omitempty"`
+	Id         string              `json:"id"`
+	Summary    string              `json:"summary"`
+	Type       TimelineEntryType   `json:"type"`
 }
 
 // TimelineEntryType defines model for TimelineEntry.Type.
 type TimelineEntryType string
+
+// TimelineEscalation defines model for TimelineEscalation.
+type TimelineEscalation struct {
+	Level int32 `json:"level"`
+
+	// Paged The people paged, each with the target that reached them.
+	Paged []Page `json:"paged"`
+
+	// ReachedNobody The level's targets that reached nobody, such as a schedule with no one on call.
+	ReachedNobody []EscalationTarget `json:"reached_nobody"`
+	Round         int32              `json:"round"`
+}
 
 // Urgency defines model for Urgency.
 type Urgency string
@@ -657,6 +718,18 @@ type ListIncidentsParams struct {
 
 	// ServiceId Only incidents of one of these services.
 	ServiceId *[]string `form:"service_id,omitempty" json:"service_id,omitempty"`
+}
+
+// AcknowledgeIncidentParams defines parameters for AcknowledgeIncident.
+type AcknowledgeIncidentParams struct {
+	// IdempotencyKey Makes retries safe. A retry with the same key and request returns the original response for 24 hours; the same key with a different request is rejected with 422, and a retry while the first request is still running gets 409.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// ResolveIncidentParams defines parameters for ResolveIncident.
+type ResolveIncidentParams struct {
+	// IdempotencyKey Makes retries safe. A retry with the same key and request returns the original response for 24 hours; the same key with a different request is rejected with 422, and a retry while the first request is still running gets 409.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
 
 // RotateIntegrationKeyParams defines parameters for RotateIntegrationKey.
@@ -974,6 +1047,16 @@ type ClientInterface interface {
 	//
 	// Corresponds with GET /v1/incidents/{id} (the `GetIncident` operationId).
 	GetIncident(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// AcknowledgeIncident Acknowledge an incident, which stops its escalation
+	//
+	// Corresponds with POST /v1/incidents/{id}/acknowledge (the `AcknowledgeIncident` operationId).
+	AcknowledgeIncident(ctx context.Context, id ID, params *AcknowledgeIncidentParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ResolveIncident Resolve an incident
+	//
+	// Corresponds with POST /v1/incidents/{id}/resolve (the `ResolveIncident` operationId).
+	ResolveIncident(ctx context.Context, id ID, params *ResolveIncidentParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DeleteIntegration Delete an integration
 	//
@@ -1488,6 +1571,36 @@ func (c *Client) ListIncidents(ctx context.Context, params *ListIncidentsParams,
 // Corresponds with GET /v1/incidents/{id} (the `GetIncident` operationId).
 func (c *Client) GetIncident(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetIncidentRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// AcknowledgeIncident Acknowledge an incident, which stops its escalation
+//
+// Corresponds with POST /v1/incidents/{id}/acknowledge (the `AcknowledgeIncident` operationId).
+func (c *Client) AcknowledgeIncident(ctx context.Context, id ID, params *AcknowledgeIncidentParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewAcknowledgeIncidentRequest(c.Server, id, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ResolveIncident Resolve an incident
+//
+// Corresponds with POST /v1/incidents/{id}/resolve (the `ResolveIncident` operationId).
+func (c *Client) ResolveIncident(ctx context.Context, id ID, params *ResolveIncidentParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewResolveIncidentRequest(c.Server, id, params)
 	if err != nil {
 		return nil, err
 	}
@@ -2797,6 +2910,104 @@ func NewGetIncidentRequest(server string, id ID) (*http.Request, error) {
 	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
 	if err != nil {
 		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewAcknowledgeIncidentRequest constructs an http.Request for the AcknowledgeIncident method
+func NewAcknowledgeIncidentRequest(server string, id ID, params *AcknowledgeIncidentParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/incidents/%s/acknowledge", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+
+		if params.IdempotencyKey != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Idempotency-Key", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewResolveIncidentRequest constructs an http.Request for the ResolveIncident method
+func NewResolveIncidentRequest(server string, id ID, params *ResolveIncidentParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/incidents/%s/resolve", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+
+		if params.IdempotencyKey != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Idempotency-Key", headerParam0)
+		}
+
 	}
 
 	return req, nil
@@ -4646,6 +4857,20 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with GET /v1/incidents/{id} (the `GetIncident` operationId).
 	GetIncidentWithResponse(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*GetIncidentResponse, error)
 
+	// AcknowledgeIncidentWithResponse Acknowledge an incident, which stops its escalation
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /v1/incidents/{id}/acknowledge (the `AcknowledgeIncident` operationId).
+	AcknowledgeIncidentWithResponse(ctx context.Context, id ID, params *AcknowledgeIncidentParams, reqEditors ...RequestEditorFn) (*AcknowledgeIncidentResponse, error)
+
+	// ResolveIncidentWithResponse Resolve an incident
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /v1/incidents/{id}/resolve (the `ResolveIncident` operationId).
+	ResolveIncidentWithResponse(ctx context.Context, id ID, params *ResolveIncidentParams, reqEditors ...RequestEditorFn) (*ResolveIncidentResponse, error)
+
 	// DeleteIntegrationWithResponse Delete an integration
 	//
 	// Returns a wrapper object for the known response body format(s).
@@ -5530,6 +5755,130 @@ func (r GetIncidentResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r GetIncidentResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type AcknowledgeIncidentResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Incident
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *Problem
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Problem
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Problem
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r AcknowledgeIncidentResponse) GetJSON200() *Incident {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r AcknowledgeIncidentResponse) GetApplicationproblemJSON404() *Problem {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r AcknowledgeIncidentResponse) GetApplicationproblemJSON409() *Problem {
+	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r AcknowledgeIncidentResponse) GetApplicationproblemJSON422() *Problem {
+	return r.ApplicationproblemJSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r AcknowledgeIncidentResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r AcknowledgeIncidentResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r AcknowledgeIncidentResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r AcknowledgeIncidentResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ResolveIncidentResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Incident
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *Problem
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Problem
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Problem
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ResolveIncidentResponse) GetJSON200() *Incident {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r ResolveIncidentResponse) GetApplicationproblemJSON404() *Problem {
+	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r ResolveIncidentResponse) GetApplicationproblemJSON409() *Problem {
+	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r ResolveIncidentResponse) GetApplicationproblemJSON422() *Problem {
+	return r.ApplicationproblemJSON422
+}
+
+// GetBody returns the raw response body bytes
+func (r ResolveIncidentResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ResolveIncidentResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ResolveIncidentResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ResolveIncidentResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -7556,6 +7905,32 @@ func (c *ClientWithResponses) GetIncidentWithResponse(ctx context.Context, id ID
 	return ParseGetIncidentResponse(rsp)
 }
 
+// AcknowledgeIncidentWithResponse Acknowledge an incident, which stops its escalation
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /v1/incidents/{id}/acknowledge (the `AcknowledgeIncident` operationId).
+func (c *ClientWithResponses) AcknowledgeIncidentWithResponse(ctx context.Context, id ID, params *AcknowledgeIncidentParams, reqEditors ...RequestEditorFn) (*AcknowledgeIncidentResponse, error) {
+	rsp, err := c.AcknowledgeIncident(ctx, id, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseAcknowledgeIncidentResponse(rsp)
+}
+
+// ResolveIncidentWithResponse Resolve an incident
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /v1/incidents/{id}/resolve (the `ResolveIncident` operationId).
+func (c *ClientWithResponses) ResolveIncidentWithResponse(ctx context.Context, id ID, params *ResolveIncidentParams, reqEditors ...RequestEditorFn) (*ResolveIncidentResponse, error) {
+	rsp, err := c.ResolveIncident(ctx, id, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseResolveIncidentResponse(rsp)
+}
+
 // DeleteIntegrationWithResponse Delete an integration
 //
 // Returns a wrapper object for the known response body format(s).
@@ -8568,6 +8943,100 @@ func ParseGetIncidentResponse(rsp *http.Response) (*GetIncidentResponse, error) 
 			return nil, err
 		}
 		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseAcknowledgeIncidentResponse parses an HTTP response from a AcknowledgeIncidentWithResponse call
+func ParseAcknowledgeIncidentResponse(rsp *http.Response) (*AcknowledgeIncidentResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &AcknowledgeIncidentResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Incident
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseResolveIncidentResponse parses an HTTP response from a ResolveIncidentWithResponse call
+func ParseResolveIncidentResponse(rsp *http.Response) (*ResolveIncidentResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ResolveIncidentResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Incident
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
 
 	}
 

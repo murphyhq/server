@@ -69,7 +69,10 @@ func Run(t *testing.T, open func(t *testing.T) incidents.Repository) {
 		escalated.Updated.EscalationLevel, escalated.Updated.EscalationRound = 2, 1
 		escalated.Timeline = []*murphy.TimelineEntry{{
 			Id: murphy.NewID(), IncidentId: outcome.IncidentID, Type: murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_ESCALATED,
-			Summary: "level 2", Escalation: &murphy.TimelineEscalation{Level: 2, Round: 1, UserIds: []string{bo, ana}}, At: murphy.Now(),
+			Summary: "level 2", Escalation: &murphy.TimelineEscalation{Level: 2, Round: 1, Paged: []*murphy.TimelinePage{
+				{UserId: bo, Via: &murphy.EscalationTarget{Type: murphy.EscalationTargetType_ESCALATION_TARGET_TYPE_USER, Id: bo}},
+				{UserId: ana, Via: &murphy.EscalationTarget{Type: murphy.EscalationTargetType_ESCALATION_TARGET_TYPE_SCHEDULE, Id: murphy.NewID()}},
+			}}, At: murphy.Now(),
 		}}
 		_, err = repo.Record(t.Context(), escalated)
 		require.NoError(t, err)
@@ -82,7 +85,11 @@ func Run(t *testing.T, open func(t *testing.T) incidents.Repository) {
 		require.NoError(t, err)
 		require.Len(t, timeline, 2)
 		assert.Equal(t, int32(2), timeline[1].GetEscalation().GetLevel())
-		assert.Equal(t, []string{bo, ana}, timeline[1].GetEscalation().GetUserIds())
+		paged := timeline[1].GetEscalation().GetPaged()
+		require.Len(t, paged, 2)
+		assert.Equal(t, bo, paged[0].GetUserId())
+		assert.Equal(t, ana, paged[1].GetUserId())
+		assert.Equal(t, murphy.EscalationTargetType_ESCALATION_TARGET_TYPE_SCHEDULE, paged[1].GetVia().GetType())
 		assert.Equal(t, outcome.Alert.GetId(), timeline[0].GetAlertId())
 	})
 

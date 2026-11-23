@@ -3,6 +3,7 @@ syntax = "proto3";
 package murphy.v1;
 
 import "google/protobuf/timestamp.proto";
+import "murphy/v1/escalation.proto";
 import "murphy/v1/shared.proto";
 
 option go_package = "github.com/murphyhq/server;murphy";
@@ -62,7 +63,13 @@ message TimelineEntry {
 message TimelineEscalation {
   int32 level = 1;
   int32 round = 2;
-  repeated string user_ids = 3;
+  repeated TimelinePage paged = 3;
+  repeated EscalationTarget reached_nobody = 4;
+}
+
+message TimelinePage {
+  string user_id = 1;
+  EscalationTarget via = 2;
 }
 
 enum TimelineEntryType {
