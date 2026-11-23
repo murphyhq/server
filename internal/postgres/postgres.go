@@ -4,11 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 
 	"github.com/exaring/otelpgx"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+const DefaultMaxConns = 4
 
 type Config struct {
 	URL string
@@ -20,6 +23,9 @@ func Open(ctx context.Context, cfg Config) (*pgxpool.Pool, error) {
 		return nil, errors.New("not a valid PostgreSQL connection string")
 	}
 
+	if u, err := url.Parse(cfg.URL); err == nil && !u.Query().Has("pool_max_conns") {
+		poolConfig.MaxConns = DefaultMaxConns
+	}
 	poolConfig.ConnConfig.Tracer = countingTracer{otelpgx.NewTracer(otelpgx.WithSpanNameFunc(queryName))}
 
 	pool, err := pgxpool.NewWithConfig(ctx, poolConfig)

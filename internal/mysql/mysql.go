@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
-	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -50,6 +49,8 @@ func Open(ctx context.Context, cfg Config) (*sql.DB, error) {
 	return db, nil
 }
 
+const DefaultMaxConns = 4
+
 type pool struct {
 	maxConns        int
 	maxConnLifetime time.Duration
@@ -78,7 +79,7 @@ func parse(raw string) (*mysqldriver.Config, pool, error) {
 }
 
 func parsePool(query url.Values) (pool, error) {
-	p := pool{maxConns: max(4, runtime.NumCPU()), maxConnLifetime: time.Hour, maxConnIdleTime: 30 * time.Minute}
+	p := pool{maxConns: DefaultMaxConns, maxConnLifetime: time.Hour, maxConnIdleTime: 30 * time.Minute}
 	if raw := query.Get("pool_max_conns"); raw != "" {
 		n, err := strconv.Atoi(raw)
 		if err != nil || n < 1 {
