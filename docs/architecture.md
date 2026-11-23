@@ -89,7 +89,7 @@ Turns stored messages into published ones. Every message that decides whether so
 
 Sends notifications through providers: webhooks, email, chat, SMS and voice. It publishes the outcome of every notification as `NotificationSent` or `NotificationFailed`, and the provider's later delivery update arrives through `ingest`. Each notification arrives with its destination, so `notifier` only makes outbound calls and doesn't use the database: notifications already queued still go out when the database is unavailable.
 
-Webhooks follow [Standard Webhooks](https://www.standardwebhooks.com). `notifier` signs each one with Murphy's Ed25519 private key, which comes from its configuration as a secret reference and never leaves it. Receivers check the signature with the public key the API serves, and hold no secret of their own. While the key is being replaced, `notifier` signs with both the old and the new key, so receivers switch at their own pace.
+Webhooks follow [Standard Webhooks](https://www.standardwebhooks.com). `notifier` signs each one with Murphy's Ed25519 private key, which is part of its configuration and never leaves it. Receivers check the signature with the public key the API serves, and hold no secret of their own. While the key is being replaced, `notifier` signs with both the old and the new key, so receivers switch at their own pace.
 
 ### Migrate
 
