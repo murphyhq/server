@@ -2,7 +2,6 @@ package mysql
 
 import (
 	"context"
-	"database/sql"
 	"embed"
 	"time"
 
@@ -28,7 +27,7 @@ func Open(ctx context.Context, url string) (*Repository, error) {
 		URL:        url,
 		Service:    "oncall",
 		Migrations: migrations,
-		Tx:         func(tx *sql.Tx) *Tx { return &Tx{tx: tx, queries: New(tx)} },
+		Tx:         func(tx murphymysql.DBTX) *Tx { return &Tx{tx: tx, queries: New(tx)} },
 	})
 	if err != nil {
 		return nil, err
@@ -37,7 +36,7 @@ func Open(ctx context.Context, url string) (*Repository, error) {
 }
 
 type Tx struct {
-	tx      *sql.Tx
+	tx      murphymysql.DBTX
 	queries *Queries
 }
 

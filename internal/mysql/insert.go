@@ -2,7 +2,6 @@ package mysql
 
 import (
 	"context"
-	"database/sql"
 	"strings"
 )
 
@@ -13,7 +12,7 @@ type Rows struct {
 	Values  [][]any
 }
 
-func Insert(ctx context.Context, tx *sql.Tx, rows Rows) error {
+func Insert(ctx context.Context, tx DBTX, rows Rows) error {
 	if len(rows.Values) == 0 {
 		return nil
 	}

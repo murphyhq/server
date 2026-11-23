@@ -2,7 +2,6 @@ package mysql
 
 import (
 	"context"
-	"database/sql"
 	"embed"
 	"time"
 
@@ -27,7 +26,7 @@ func Open(ctx context.Context, url string) (*Repository, error) {
 		URL:        url,
 		Service:    "catalog",
 		Migrations: migrations,
-		Tx:         func(tx *sql.Tx) *Tx { return &Tx{queries: New(tx)} },
+		Tx:         func(tx murphymysql.DBTX) *Tx { return &Tx{queries: New(tx)} },
 	})
 	if err != nil {
 		return nil, err

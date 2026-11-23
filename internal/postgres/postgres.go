@@ -20,7 +20,7 @@ func Open(ctx context.Context, cfg Config) (*pgxpool.Pool, error) {
 		return nil, errors.New("not a valid PostgreSQL connection string")
 	}
 
-	poolConfig.ConnConfig.Tracer = otelpgx.NewTracer(otelpgx.WithSpanNameFunc(queryName))
+	poolConfig.ConnConfig.Tracer = countingTracer{otelpgx.NewTracer(otelpgx.WithSpanNameFunc(queryName))}
 
 	pool, err := pgxpool.NewWithConfig(ctx, poolConfig)
 	if err != nil {

@@ -13,14 +13,14 @@ type DatabaseConfig[T any] struct {
 	URL        string
 	Service    string
 	Migrations fs.FS
-	Tx         func(tx *sql.Tx) T
+	Tx         func(tx DBTX) T
 }
 
 type Database[T any] struct {
 	db         *sql.DB
 	service    string
 	migrations fs.FS
-	tx         func(tx *sql.Tx) T
+	tx         func(tx DBTX) T
 }
 
 func OpenDatabase[T any](ctx context.Context, cfg DatabaseConfig[T]) (*Database[T], error) {
@@ -31,8 +31,8 @@ func OpenDatabase[T any](ctx context.Context, cfg DatabaseConfig[T]) (*Database[
 	return &Database[T]{db: db, service: cfg.Service, migrations: cfg.Migrations, tx: cfg.Tx}, nil
 }
 
-func (d *Database[T]) DB() *sql.DB {
-	return d.db
+func (d *Database[T]) DB() DBTX {
+	return counting{db: d.db}
 }
 
 func (d *Database[T]) Migrate(ctx context.Context) error {
@@ -61,7 +61,7 @@ func (d *Database[T]) Transaction(ctx context.Context, work func(tx T) error) (e
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	if err := work(d.tx(tx)); err != nil {
+	if err := work(d.tx(counting{db: tx})); err != nil {
 		return err
 	}
 	if err := tx.Commit(); err != nil {
