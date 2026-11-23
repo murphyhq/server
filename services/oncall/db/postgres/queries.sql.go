@@ -227,6 +227,38 @@ func (q *Queries) GetSchedule(ctx context.Context, id string) (Schedule, error) 
 	return i, err
 }
 
+const getSchedules = `-- name: GetSchedules :many
+SELECT id, name, time_zone, created_at, updated_at
+FROM schedules
+WHERE id = ANY($1::uuid[])
+`
+
+func (q *Queries) GetSchedules(ctx context.Context, ids []string) ([]Schedule, error) {
+	rows, err := q.db.Query(ctx, getSchedules, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Schedule
+	for rows.Next() {
+		var i Schedule
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.TimeZone,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listLayerParticipants = `-- name: ListLayerParticipants :many
 SELECT lp.layer_id, lp.user_id
 FROM layer_participants AS lp
@@ -317,6 +349,47 @@ type ListOverridesParams struct {
 
 func (q *Queries) ListOverrides(ctx context.Context, arg ListOverridesParams) ([]Override, error) {
 	rows, err := q.db.Query(ctx, listOverrides, arg.ScheduleID, arg.EndsAfter)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Override
+	for rows.Next() {
+		var i Override
+		if err := rows.Scan(
+			&i.ID,
+			&i.ScheduleID,
+			&i.UserID,
+			&i.StartsAt,
+			&i.EndsAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listOverridesAt = `-- name: ListOverridesAt :many
+SELECT id, schedule_id, user_id, starts_at, ends_at, created_at, updated_at
+FROM overrides
+WHERE schedule_id = ANY($1::uuid[]) AND starts_at <= $2 AND ends_at > $3
+ORDER BY schedule_id, starts_at, id
+`
+
+type ListOverridesAtParams struct {
+	ScheduleIds []string
+	At          time.Time
+	After       time.Time
+}
+
+func (q *Queries) ListOverridesAt(ctx context.Context, arg ListOverridesAtParams) ([]Override, error) {
+	rows, err := q.db.Query(ctx, listOverridesAt, arg.ScheduleIds, arg.At, arg.After)
 	if err != nil {
 		return nil, err
 	}

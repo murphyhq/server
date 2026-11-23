@@ -19,8 +19,8 @@ RETURNING number;
 
 -- name: UpdateIncident :execrows
 UPDATE incidents
-SET status = @status, resolved_at = @resolved_at, acknowledged_at = @acknowledged_at, escalation_level = @escalation_level, escalation_round = @escalation_round, escalation_exhausted = @escalation_exhausted, updated_at = @updated_at, version = version + 1
-WHERE id = @id AND version = @version;
+SET status = @status, resolved_at = @resolved_at, acknowledged_at = @acknowledged_at, escalation_level = @escalation_level, escalation_round = @escalation_round, escalation_exhausted = @escalation_exhausted, updated_at = @updated_at, version = @version
+WHERE id = @id AND version = @previous_version;
 
 -- name: GetIncident :one
 SELECT id, number, service_id, dedup_key, title, status, urgency, version, created_at, updated_at, resolved_at, escalation_policy_id, escalation_policy_version, escalation_level, escalation_round, escalation_exhausted, acknowledged_at

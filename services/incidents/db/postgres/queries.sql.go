@@ -472,8 +472,8 @@ func (q *Queries) PurgeHandledMessages(ctx context.Context, before time.Time) (i
 
 const updateIncident = `-- name: UpdateIncident :execrows
 UPDATE incidents
-SET status = $1, resolved_at = $2, acknowledged_at = $3, escalation_level = $4, escalation_round = $5, escalation_exhausted = $6, updated_at = $7, version = version + 1
-WHERE id = $8 AND version = $9
+SET status = $1, resolved_at = $2, acknowledged_at = $3, escalation_level = $4, escalation_round = $5, escalation_exhausted = $6, updated_at = $7, version = $8
+WHERE id = $9 AND version = $10
 `
 
 type UpdateIncidentParams struct {
@@ -484,8 +484,9 @@ type UpdateIncidentParams struct {
 	EscalationRound     int32
 	EscalationExhausted bool
 	UpdatedAt           time.Time
-	ID                  string
 	Version             int32
+	ID                  string
+	PreviousVersion     int32
 }
 
 func (q *Queries) UpdateIncident(ctx context.Context, arg UpdateIncidentParams) (int64, error) {
@@ -497,8 +498,9 @@ func (q *Queries) UpdateIncident(ctx context.Context, arg UpdateIncidentParams) 
 		arg.EscalationRound,
 		arg.EscalationExhausted,
 		arg.UpdatedAt,
-		arg.ID,
 		arg.Version,
+		arg.ID,
+		arg.PreviousVersion,
 	)
 	if err != nil {
 		return 0, err

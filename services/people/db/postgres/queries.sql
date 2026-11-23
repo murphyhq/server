@@ -102,3 +102,8 @@ WHERE id = ANY(@ids::uuid[]);
 SELECT id
 FROM teams
 WHERE id = ANY(@ids::uuid[]);
+
+-- name: ActiveUsers :many
+SELECT id
+FROM users
+WHERE id = ANY(@ids::uuid[]) AND status = 'active';

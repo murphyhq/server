@@ -111,7 +111,7 @@ func Run(t *testing.T, open func(t *testing.T) incidents.Repository) {
 		outcome := opened(murphy.NewID(), "disk-full")
 		now := time.Now().UTC()
 		event, later := message(outcome.IncidentID, incidents.MessageEvent, now), message(outcome.IncidentID, incidents.MessageTimer, now.Add(time.Hour))
-		outcome.Messages = []*incidents.ScheduledMessage{event, later}
+		outcome.Messages = messages(event, later)
 		_, err := repo.Record(t.Context(), outcome)
 		require.NoError(t, err)
 
@@ -141,7 +141,7 @@ func Run(t *testing.T, open func(t *testing.T) incidents.Repository) {
 		repo := open(t)
 		outcome := opened(murphy.NewID(), "disk-full")
 		now := time.Now().UTC()
-		outcome.Messages = []*incidents.ScheduledMessage{message(outcome.IncidentID, incidents.MessageTimer, now)}
+		outcome.Messages = messages(message(outcome.IncidentID, incidents.MessageTimer, now))
 		_, err := repo.Record(t.Context(), outcome)
 		require.NoError(t, err)
 
@@ -150,7 +150,7 @@ func Run(t *testing.T, open func(t *testing.T) incidents.Repository) {
 		acknowledged.Updated.Status = murphy.IncidentStatus_INCIDENT_STATUS_ACKNOWLEDGED
 		acknowledged.CancelTimers = true
 		event := message(outcome.IncidentID, incidents.MessageEvent, now)
-		acknowledged.Messages = []*incidents.ScheduledMessage{event}
+		acknowledged.Messages = messages(event)
 		_, err = repo.Record(t.Context(), acknowledged)
 		require.NoError(t, err)
 
@@ -341,7 +341,7 @@ func joined(incident *murphy.Incident, messageID string) *incidents.Change {
 	a := alert(incident.GetServiceId(), incident.GetDedupKey(), murphy.AlertStatus_ALERT_STATUS_FIRING)
 	updated := &murphy.Incident{
 		Id: incident.GetId(), ServiceId: incident.GetServiceId(), DedupKey: incident.GetDedupKey(), Title: incident.GetTitle(),
-		Status: incident.GetStatus(), Urgency: incident.GetUrgency(), Version: incident.GetVersion(),
+		Status: incident.GetStatus(), Urgency: incident.GetUrgency(), Version: incident.GetVersion() + 1,
 		CreatedAt: incident.GetCreatedAt(), UpdatedAt: murphy.Now(),
 		EscalationPolicyId: incident.GetEscalationPolicyId(), EscalationPolicyVersion: incident.GetEscalationPolicyVersion(),
 		EscalationLevel: incident.GetEscalationLevel(), EscalationRound: incident.GetEscalationRound(),
@@ -370,4 +370,8 @@ func ids(list []*murphy.Incident) []string {
 
 func message(incidentID string, kind incidents.MessageKind, due time.Time) *incidents.ScheduledMessage {
 	return &incidents.ScheduledMessage{ID: murphy.NewID(), IncidentID: incidentID, Kind: kind, DueAt: due, Envelope: []byte("envelope " + murphy.NewID())}
+}
+
+func messages(list ...*incidents.ScheduledMessage) func() ([]*incidents.ScheduledMessage, error) {
+	return func() ([]*incidents.ScheduledMessage, error) { return list, nil }
 }

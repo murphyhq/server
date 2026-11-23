@@ -167,6 +167,51 @@ func (q *Queries) GetSchedule(ctx context.Context, id string) (Schedule, error) 
 	return i, err
 }
 
+const getSchedules = `-- name: GetSchedules :many
+SELECT id, name, time_zone, created_at, updated_at
+FROM schedules
+WHERE id IN (/*SLICE:ids*/?)
+`
+
+func (q *Queries) GetSchedules(ctx context.Context, ids []string) ([]Schedule, error) {
+	query := getSchedules
+	var queryParams []interface{}
+	if len(ids) > 0 {
+		for _, v := range ids {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:ids*/?", strings.Repeat(",?", len(ids))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:ids*/?", "NULL", 1)
+	}
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Schedule
+	for rows.Next() {
+		var i Schedule
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.TimeZone,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listLayerParticipants = `-- name: ListLayerParticipants :many
 SELECT lp.layer_id, lp.user_id
 FROM layer_participants AS lp
@@ -283,6 +328,62 @@ type ListOverridesParams struct {
 
 func (q *Queries) ListOverrides(ctx context.Context, arg ListOverridesParams) ([]Override, error) {
 	rows, err := q.db.QueryContext(ctx, listOverrides, arg.ScheduleID, arg.EndsAfter)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Override
+	for rows.Next() {
+		var i Override
+		if err := rows.Scan(
+			&i.ID,
+			&i.ScheduleID,
+			&i.UserID,
+			&i.StartsAt,
+			&i.EndsAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listOverridesAt = `-- name: ListOverridesAt :many
+SELECT id, schedule_id, user_id, starts_at, ends_at, created_at, updated_at
+FROM overrides
+WHERE schedule_id IN (/*SLICE:schedule_ids*/?) AND starts_at <= ? AND ends_at > ?
+ORDER BY schedule_id, starts_at, id
+`
+
+type ListOverridesAtParams struct {
+	ScheduleIds []string
+	At          time.Time
+	After       time.Time
+}
+
+func (q *Queries) ListOverridesAt(ctx context.Context, arg ListOverridesAtParams) ([]Override, error) {
+	query := listOverridesAt
+	var queryParams []interface{}
+	if len(arg.ScheduleIds) > 0 {
+		for _, v := range arg.ScheduleIds {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:schedule_ids*/?", strings.Repeat(",?", len(arg.ScheduleIds))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:schedule_ids*/?", "NULL", 1)
+	}
+	queryParams = append(queryParams, arg.At)
+	queryParams = append(queryParams, arg.After)
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
 	if err != nil {
 		return nil, err
 	}

@@ -17,8 +17,8 @@ VALUES (sqlc.arg(id), sqlc.arg(service_id), sqlc.arg(dedup_key), sqlc.arg(title)
 
 -- name: UpdateIncident :execrows
 UPDATE incidents
-SET status = sqlc.arg(status), resolved_at = sqlc.narg(resolved_at), acknowledged_at = sqlc.narg(acknowledged_at), escalation_level = sqlc.arg(escalation_level), escalation_round = sqlc.arg(escalation_round), escalation_exhausted = sqlc.arg(escalation_exhausted), updated_at = sqlc.arg(updated_at), version = version + 1
-WHERE id = sqlc.arg(id) AND version = sqlc.arg(version);
+SET status = sqlc.arg(status), resolved_at = sqlc.narg(resolved_at), acknowledged_at = sqlc.narg(acknowledged_at), escalation_level = sqlc.arg(escalation_level), escalation_round = sqlc.arg(escalation_round), escalation_exhausted = sqlc.arg(escalation_exhausted), updated_at = sqlc.arg(updated_at), version = sqlc.arg(version)
+WHERE id = sqlc.arg(id) AND version = sqlc.arg(previous_version);
 
 -- name: GetIncident :one
 SELECT id, number, service_id, dedup_key, title, status, urgency, version, created_at, updated_at, resolved_at, escalation_policy_id, escalation_policy_version, escalation_level, escalation_round, escalation_exhausted, acknowledged_at

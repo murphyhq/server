@@ -21,6 +21,8 @@ type Tx interface {
 
 type Engine[T Tx] interface {
 	GetScheduleRow(ctx context.Context, id string) (*murphy.Schedule, error)
+	GetScheduleRows(ctx context.Context, ids []string) ([]*murphy.Schedule, error)
+	ListOverridesAt(ctx context.Context, scheduleIDs []string, at time.Time) (map[string][]*murphy.Override, error)
 	ListScheduleRows(ctx context.Context, teamID string, before string, limit int) ([]*murphy.Schedule, error)
 	ListScheduleTeams(ctx context.Context, scheduleIDs []string) (map[string][]string, error)
 	ListLayers(ctx context.Context, scheduleIDs []string) (map[string][]*murphy.Layer, error)
@@ -142,4 +144,21 @@ func (r *Repository[T]) complete(ctx context.Context, schedules []*murphy.Schedu
 		}
 	}
 	return nil
+}
+
+func (r *Repository[T]) GetSchedules(ctx context.Context, ids []string) (_ []*murphy.Schedule, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	schedules, err := r.GetScheduleRows(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	if err := r.complete(ctx, schedules); err != nil {
+		return nil, err
+	}
+	return schedules, nil
 }

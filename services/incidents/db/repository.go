@@ -79,8 +79,14 @@ func (r *Repository[T]) Record(ctx context.Context, change *incidents.Change) (r
 				return err
 			}
 		}
-		if err := tx.CreateScheduledMessages(ctx, change.Messages, now); err != nil {
-			return err
+		if change.Messages != nil {
+			messages, err := change.Messages()
+			if err != nil {
+				return err
+			}
+			if err := tx.CreateScheduledMessages(ctx, messages, now); err != nil {
+				return err
+			}
 		}
 		recorded = true
 		return nil

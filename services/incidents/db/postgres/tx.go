@@ -71,6 +71,8 @@ func (t *Tx) UpdateIncident(ctx context.Context, incident *murphy.Incident) (err
 		ResolvedAt: database.Time(incident.GetResolvedAt()),
 		UpdatedAt:  incident.GetUpdatedAt().AsTime(),
 
+		PreviousVersion: incident.GetVersion() - 1,
+
 		AcknowledgedAt:      database.Time(incident.GetAcknowledgedAt()),
 		EscalationLevel:     incident.GetEscalationLevel(),
 		EscalationRound:     incident.GetEscalationRound(),

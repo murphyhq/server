@@ -14,5 +14,6 @@ func New(incidents *incidents.Service) messaging.Handlers {
 	h := &Handlers{incidents: incidents}
 	return messaging.Handlers{
 		messaging.On(murphy.AlertVerb_ALERT_VERB_RECEIVED, h.AlertReceived),
+		messaging.On(murphy.TimerVerb_TIMER_VERB_EXPIRED, h.TimerExpired),
 	}
 }
