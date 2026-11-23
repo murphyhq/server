@@ -275,6 +275,9 @@ type EscalationPolicy struct {
 	// TeamId The team that owns the policy, and with it the services that page through it.
 	TeamId    string    `json:"team_id"`
 	UpdatedAt time.Time `json:"updated_at"`
+
+	// Version The policy's current version, starting at 1. Every update makes the next one.
+	Version int32 `json:"version"`
 }
 
 // EscalationPolicyInput defines model for EscalationPolicyInput.
@@ -931,6 +934,8 @@ type ClientInterface interface {
 
 	// DeleteEscalationPolicy Delete an escalation policy
 	//
+	// A policy that services still page with can't be deleted. Incidents that followed the policy keep reading its versions.
+	//
 	// Corresponds with DELETE /v1/escalation-policies/{id} (the `DeleteEscalationPolicy` operationId).
 	DeleteEscalationPolicy(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -952,6 +957,13 @@ type ClientInterface interface {
 	//
 	// Corresponds with PUT /v1/escalation-policies/{id} (the `UpdateEscalationPolicy` operationId).
 	UpdateEscalationPolicy(ctx context.Context, id ID, body UpdateEscalationPolicyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetEscalationPolicyVersion Get a version of an escalation policy
+	//
+	// Every change to a policy makes a new version, numbered from 1; this returns one of them as it was saved.
+	//
+	// Corresponds with GET /v1/escalation-policies/{id}/versions/{version} (the `GetEscalationPolicyVersion` operationId).
+	GetEscalationPolicyVersion(ctx context.Context, id ID, version int32, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListIncidents List incidents
 	//
@@ -1375,6 +1387,8 @@ func (c *Client) CreateEscalationPolicy(ctx context.Context, params *CreateEscal
 
 // DeleteEscalationPolicy Delete an escalation policy
 //
+// A policy that services still page with can't be deleted. Incidents that followed the policy keep reading its versions.
+//
 // Corresponds with DELETE /v1/escalation-policies/{id} (the `DeleteEscalationPolicy` operationId).
 func (c *Client) DeleteEscalationPolicy(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDeleteEscalationPolicyRequest(c.Server, id)
@@ -1427,6 +1441,23 @@ func (c *Client) UpdateEscalationPolicyWithBody(ctx context.Context, id ID, cont
 // Corresponds with PUT /v1/escalation-policies/{id} (the `UpdateEscalationPolicy` operationId).
 func (c *Client) UpdateEscalationPolicy(ctx context.Context, id ID, body UpdateEscalationPolicyJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUpdateEscalationPolicyRequest(c.Server, id, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetEscalationPolicyVersion Get a version of an escalation policy
+//
+// Every change to a policy makes a new version, numbered from 1; this returns one of them as it was saved.
+//
+// Corresponds with GET /v1/escalation-policies/{id}/versions/{version} (the `GetEscalationPolicyVersion` operationId).
+func (c *Client) GetEscalationPolicyVersion(ctx context.Context, id ID, version int32, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetEscalationPolicyVersionRequest(c.Server, id, version)
 	if err != nil {
 		return nil, err
 	}
@@ -2602,6 +2633,47 @@ func NewUpdateEscalationPolicyRequestWithBody(server string, id ID, contentType 
 	}
 
 	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetEscalationPolicyVersionRequest constructs an http.Request for the GetEscalationPolicyVersion method
+func NewGetEscalationPolicyVersionRequest(server string, id ID, version int32) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "version", version, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "integer", Format: "int32"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/escalation-policies/%s/versions/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
 
 	return req, nil
 }
@@ -4523,6 +4595,8 @@ type ClientWithResponsesInterface interface {
 
 	// DeleteEscalationPolicyWithResponse Delete an escalation policy
 	//
+	// A policy that services still page with can't be deleted. Incidents that followed the policy keep reading its versions.
+	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with DELETE /v1/escalation-policies/{id} (the `DeleteEscalationPolicy` operationId).
@@ -4548,6 +4622,15 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with PUT /v1/escalation-policies/{id} (the `UpdateEscalationPolicy` operationId).
 	UpdateEscalationPolicyWithResponse(ctx context.Context, id ID, body UpdateEscalationPolicyJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateEscalationPolicyResponse, error)
+
+	// GetEscalationPolicyVersionWithResponse Get a version of an escalation policy
+	//
+	// Every change to a policy makes a new version, numbered from 1; this returns one of them as it was saved.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /v1/escalation-policies/{id}/versions/{version} (the `GetEscalationPolicyVersion` operationId).
+	GetEscalationPolicyVersionWithResponse(ctx context.Context, id ID, version int32, reqEditors ...RequestEditorFn) (*GetEscalationPolicyVersionResponse, error)
 
 	// ListIncidentsWithResponse List incidents
 	//
@@ -5163,11 +5246,18 @@ type DeleteEscalationPolicyResponse struct {
 	HTTPResponse *http.Response
 	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
 	ApplicationproblemJSON404 *Problem
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Problem
 }
 
 // GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
 func (r DeleteEscalationPolicyResponse) GetApplicationproblemJSON404() *Problem {
 	return r.ApplicationproblemJSON404
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r DeleteEscalationPolicyResponse) GetApplicationproblemJSON409() *Problem {
+	return r.ApplicationproblemJSON409
 }
 
 // GetBody returns the raw response body bytes
@@ -5296,6 +5386,54 @@ func (r UpdateEscalationPolicyResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r UpdateEscalationPolicyResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetEscalationPolicyVersionResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *EscalationPolicy
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *Problem
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetEscalationPolicyVersionResponse) GetJSON200() *EscalationPolicy {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r GetEscalationPolicyVersionResponse) GetApplicationproblemJSON404() *Problem {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r GetEscalationPolicyVersionResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetEscalationPolicyVersionResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetEscalationPolicyVersionResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetEscalationPolicyVersionResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -7325,6 +7463,8 @@ func (c *ClientWithResponses) CreateEscalationPolicyWithResponse(ctx context.Con
 
 // DeleteEscalationPolicyWithResponse Delete an escalation policy
 //
+// A policy that services still page with can't be deleted. Incidents that followed the policy keep reading its versions.
+//
 // Returns a wrapper object for the known response body format(s).
 //
 // Corresponds with DELETE /v1/escalation-policies/{id} (the `DeleteEscalationPolicy` operationId).
@@ -7373,6 +7513,21 @@ func (c *ClientWithResponses) UpdateEscalationPolicyWithResponse(ctx context.Con
 		return nil, err
 	}
 	return ParseUpdateEscalationPolicyResponse(rsp)
+}
+
+// GetEscalationPolicyVersionWithResponse Get a version of an escalation policy
+//
+// Every change to a policy makes a new version, numbered from 1; this returns one of them as it was saved.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /v1/escalation-policies/{id}/versions/{version} (the `GetEscalationPolicyVersion` operationId).
+func (c *ClientWithResponses) GetEscalationPolicyVersionWithResponse(ctx context.Context, id ID, version int32, reqEditors ...RequestEditorFn) (*GetEscalationPolicyVersionResponse, error) {
+	rsp, err := c.GetEscalationPolicyVersion(ctx, id, version, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetEscalationPolicyVersionResponse(rsp)
 }
 
 // ListIncidentsWithResponse List incidents
@@ -8235,6 +8390,13 @@ func ParseDeleteEscalationPolicyResponse(rsp *http.Response) (*DeleteEscalationP
 		}
 		response.ApplicationproblemJSON404 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
 	}
 
 	return response, nil
@@ -8300,6 +8462,39 @@ func ParseUpdateEscalationPolicyResponse(rsp *http.Response) (*UpdateEscalationP
 			return nil, err
 		}
 		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetEscalationPolicyVersionResponse parses an HTTP response from a GetEscalationPolicyVersionWithResponse call
+func ParseGetEscalationPolicyVersionResponse(rsp *http.Response) (*GetEscalationPolicyVersionResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetEscalationPolicyVersionResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest EscalationPolicy
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest Problem

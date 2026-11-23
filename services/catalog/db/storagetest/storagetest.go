@@ -72,6 +72,19 @@ func Run(t *testing.T, open func(t *testing.T) catalog.Repository) {
 		assert.Equal(t, "payments-api", got.GetName())
 	})
 
+	t.Run("tells whether any service pages with a policy", func(t *testing.T) {
+		repo := open(t)
+		service := newService("checkout-api")
+		require.NoError(t, repo.CreateService(t.Context(), service))
+
+		used, err := repo.PolicyInUse(t.Context(), service.GetEscalationPolicyId())
+		require.NoError(t, err)
+		assert.True(t, used)
+		unused, err := repo.PolicyInUse(t.Context(), murphy.NewID())
+		require.NoError(t, err)
+		assert.False(t, unused)
+	})
+
 	t.Run("reports missing services and integrations", func(t *testing.T) {
 		repo := open(t)
 		_, err := repo.GetService(t.Context(), murphy.NewID())

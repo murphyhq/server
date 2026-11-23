@@ -53,3 +53,8 @@ WHERE id = @id;
 UPDATE integrations
 SET key_version = key_version + 1, previous_key_valid_until = @previous_key_valid_until, updated_at = @updated_at
 WHERE id = @id;
+
+-- name: PolicyInUse :one
+SELECT EXISTS (
+  SELECT 1 FROM services WHERE escalation_policy_id = @escalation_policy_id
+) AS in_use;

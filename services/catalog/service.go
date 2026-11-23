@@ -23,6 +23,7 @@ type Repository interface {
 	UpdateIntegration(ctx context.Context, integration *murphy.Integration) error
 	RotateIntegrationKey(ctx context.Context, id string, previousValidUntil, updatedAt time.Time) (*murphy.Integration, error)
 	DeleteIntegration(ctx context.Context, id string) error
+	PolicyInUse(ctx context.Context, policyID string) (bool, error)
 }
 
 const previousKeyGrace = 24 * time.Hour
@@ -263,4 +264,16 @@ func (s *Service) DeleteIntegration(ctx context.Context, id string) (err error) 
 		return fmt.Errorf("delete integration: %w", err)
 	}
 	return nil
+}
+
+func (s *Service) PolicyInUse(ctx context.Context, policyID string) (_ bool, err error) {
+	ctx, span := tracer.Span(ctx)
+	ctx = span.Set(ctx, telemetry.WithField("escalation_policy.id", policyID))
+	defer span.End(&err)
+
+	inUse, err := s.repo.PolicyInUse(ctx, policyID)
+	if err != nil {
+		return false, fmt.Errorf("check services using the escalation policy: %w", err)
+	}
+	return inUse, nil
 }

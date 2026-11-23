@@ -12,17 +12,17 @@ import (
 )
 
 const createPolicy = `-- name: CreatePolicy :exec
-INSERT INTO escalation_policies (id, name, team_id, repeat_count, created_at, updated_at)
+INSERT INTO escalation_policies (id, name, team_id, version, created_at, updated_at)
 VALUES (?, ?, ?, ?, ?, ?)
 `
 
 type CreatePolicyParams struct {
-	ID          string
-	Name        string
-	TeamID      string
-	RepeatCount int32
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	ID        string
+	Name      string
+	TeamID    string
+	Version   int32
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
 
 func (q *Queries) CreatePolicy(ctx context.Context, arg CreatePolicyParams) error {
@@ -30,30 +30,50 @@ func (q *Queries) CreatePolicy(ctx context.Context, arg CreatePolicyParams) erro
 		arg.ID,
 		arg.Name,
 		arg.TeamID,
-		arg.RepeatCount,
+		arg.Version,
 		arg.CreatedAt,
 		arg.UpdatedAt,
 	)
 	return err
 }
 
-const deleteLevels = `-- name: DeleteLevels :exec
-DELETE FROM escalation_levels
-WHERE policy_id = ?
+const createVersion = `-- name: CreateVersion :exec
+INSERT INTO escalation_policy_versions (id, policy_id, version, repeat_count, created_at)
+VALUES (?, ?, ?, ?, ?)
 `
 
-func (q *Queries) DeleteLevels(ctx context.Context, policyID string) error {
-	_, err := q.db.ExecContext(ctx, deleteLevels, policyID)
+type CreateVersionParams struct {
+	ID          string
+	PolicyID    string
+	Version     int32
+	RepeatCount int32
+	CreatedAt   time.Time
+}
+
+func (q *Queries) CreateVersion(ctx context.Context, arg CreateVersionParams) error {
+	_, err := q.db.ExecContext(ctx, createVersion,
+		arg.ID,
+		arg.PolicyID,
+		arg.Version,
+		arg.RepeatCount,
+		arg.CreatedAt,
+	)
 	return err
 }
 
 const deletePolicy = `-- name: DeletePolicy :execrows
-DELETE FROM escalation_policies
-WHERE id = ?
+UPDATE escalation_policies
+SET deleted_at = ?
+WHERE id = ? AND deleted_at IS NULL
 `
 
-func (q *Queries) DeletePolicy(ctx context.Context, id string) (int64, error) {
-	result, err := q.db.ExecContext(ctx, deletePolicy, id)
+type DeletePolicyParams struct {
+	DeletedAt *time.Time
+	ID        string
+}
+
+func (q *Queries) DeletePolicy(ctx context.Context, arg DeletePolicyParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deletePolicy, arg.DeletedAt, arg.ID)
 	if err != nil {
 		return 0, err
 	}
@@ -61,18 +81,71 @@ func (q *Queries) DeletePolicy(ctx context.Context, id string) (int64, error) {
 }
 
 const getPolicy = `-- name: GetPolicy :one
-SELECT id, name, team_id, repeat_count, created_at, updated_at
-FROM escalation_policies
-WHERE id = ?
+SELECT p.id, p.name, p.team_id, p.version, v.id AS version_id, v.repeat_count, p.created_at, p.updated_at
+FROM escalation_policies AS p
+JOIN escalation_policy_versions AS v ON v.policy_id = p.id AND v.version = p.version
+WHERE p.id = ? AND p.deleted_at IS NULL
 `
 
-func (q *Queries) GetPolicy(ctx context.Context, id string) (EscalationPolicy, error) {
+type GetPolicyRow struct {
+	ID          string
+	Name        string
+	TeamID      string
+	Version     int32
+	VersionID   string
+	RepeatCount int32
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+}
+
+func (q *Queries) GetPolicy(ctx context.Context, id string) (GetPolicyRow, error) {
 	row := q.db.QueryRowContext(ctx, getPolicy, id)
-	var i EscalationPolicy
+	var i GetPolicyRow
 	err := row.Scan(
 		&i.ID,
 		&i.Name,
 		&i.TeamID,
+		&i.Version,
+		&i.VersionID,
+		&i.RepeatCount,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getPolicyVersion = `-- name: GetPolicyVersion :one
+SELECT p.id, p.name, p.team_id, v.version, v.id AS version_id, v.repeat_count, p.created_at, p.updated_at
+FROM escalation_policies AS p
+JOIN escalation_policy_versions AS v ON v.policy_id = p.id
+WHERE p.id = ? AND v.version = ?
+`
+
+type GetPolicyVersionParams struct {
+	ID      string
+	Version int32
+}
+
+type GetPolicyVersionRow struct {
+	ID          string
+	Name        string
+	TeamID      string
+	Version     int32
+	VersionID   string
+	RepeatCount int32
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+}
+
+func (q *Queries) GetPolicyVersion(ctx context.Context, arg GetPolicyVersionParams) (GetPolicyVersionRow, error) {
+	row := q.db.QueryRowContext(ctx, getPolicyVersion, arg.ID, arg.Version)
+	var i GetPolicyVersionRow
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.TeamID,
+		&i.Version,
+		&i.VersionID,
 		&i.RepeatCount,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -84,7 +157,7 @@ const listLevelTargets = `-- name: ListLevelTargets :many
 SELECT lt.level_id, lt.target_type, lt.target_id
 FROM level_targets AS lt
 JOIN escalation_levels AS l ON l.id = lt.level_id
-WHERE l.policy_id IN (/*SLICE:policy_ids*/?)
+WHERE l.version_id IN (/*SLICE:version_ids*/?)
 ORDER BY lt.level_id, lt.position
 `
 
@@ -94,16 +167,16 @@ type ListLevelTargetsRow struct {
 	TargetID   string
 }
 
-func (q *Queries) ListLevelTargets(ctx context.Context, policyIds []string) ([]ListLevelTargetsRow, error) {
+func (q *Queries) ListLevelTargets(ctx context.Context, versionIds []string) ([]ListLevelTargetsRow, error) {
 	query := listLevelTargets
 	var queryParams []interface{}
-	if len(policyIds) > 0 {
-		for _, v := range policyIds {
+	if len(versionIds) > 0 {
+		for _, v := range versionIds {
 			queryParams = append(queryParams, v)
 		}
-		query = strings.Replace(query, "/*SLICE:policy_ids*/?", strings.Repeat(",?", len(policyIds))[1:], 1)
+		query = strings.Replace(query, "/*SLICE:version_ids*/?", strings.Repeat(",?", len(versionIds))[1:], 1)
 	} else {
-		query = strings.Replace(query, "/*SLICE:policy_ids*/?", "NULL", 1)
+		query = strings.Replace(query, "/*SLICE:version_ids*/?", "NULL", 1)
 	}
 	rows, err := q.db.QueryContext(ctx, query, queryParams...)
 	if err != nil {
@@ -128,29 +201,29 @@ func (q *Queries) ListLevelTargets(ctx context.Context, policyIds []string) ([]L
 }
 
 const listLevels = `-- name: ListLevels :many
-SELECT id, policy_id, position, delay_seconds
+SELECT id, version_id, position, delay_seconds
 FROM escalation_levels
-WHERE policy_id IN (/*SLICE:policy_ids*/?)
-ORDER BY policy_id, position
+WHERE version_id IN (/*SLICE:version_ids*/?)
+ORDER BY version_id, position
 `
 
 type ListLevelsRow struct {
 	ID           string
-	PolicyID     string
+	VersionID    string
 	Position     int32
 	DelaySeconds int64
 }
 
-func (q *Queries) ListLevels(ctx context.Context, policyIds []string) ([]ListLevelsRow, error) {
+func (q *Queries) ListLevels(ctx context.Context, versionIds []string) ([]ListLevelsRow, error) {
 	query := listLevels
 	var queryParams []interface{}
-	if len(policyIds) > 0 {
-		for _, v := range policyIds {
+	if len(versionIds) > 0 {
+		for _, v := range versionIds {
 			queryParams = append(queryParams, v)
 		}
-		query = strings.Replace(query, "/*SLICE:policy_ids*/?", strings.Repeat(",?", len(policyIds))[1:], 1)
+		query = strings.Replace(query, "/*SLICE:version_ids*/?", strings.Repeat(",?", len(versionIds))[1:], 1)
 	} else {
-		query = strings.Replace(query, "/*SLICE:policy_ids*/?", "NULL", 1)
+		query = strings.Replace(query, "/*SLICE:version_ids*/?", "NULL", 1)
 	}
 	rows, err := q.db.QueryContext(ctx, query, queryParams...)
 	if err != nil {
@@ -162,7 +235,7 @@ func (q *Queries) ListLevels(ctx context.Context, policyIds []string) ([]ListLev
 		var i ListLevelsRow
 		if err := rows.Scan(
 			&i.ID,
-			&i.PolicyID,
+			&i.VersionID,
 			&i.Position,
 			&i.DelaySeconds,
 		); err != nil {
@@ -180,10 +253,11 @@ func (q *Queries) ListLevels(ctx context.Context, policyIds []string) ([]ListLev
 }
 
 const listPolicies = `-- name: ListPolicies :many
-SELECT id, name, team_id, repeat_count, created_at, updated_at
-FROM escalation_policies
-WHERE id < ? AND (? IS NULL OR team_id = ?)
-ORDER BY id DESC
+SELECT p.id, p.name, p.team_id, p.version, v.id AS version_id, v.repeat_count, p.created_at, p.updated_at
+FROM escalation_policies AS p
+JOIN escalation_policy_versions AS v ON v.policy_id = p.id AND v.version = p.version
+WHERE p.id < ? AND p.deleted_at IS NULL AND (? IS NULL OR p.team_id = ?)
+ORDER BY p.id DESC
 LIMIT ?
 `
 
@@ -193,7 +267,18 @@ type ListPoliciesParams struct {
 	Limit  int32
 }
 
-func (q *Queries) ListPolicies(ctx context.Context, arg ListPoliciesParams) ([]EscalationPolicy, error) {
+type ListPoliciesRow struct {
+	ID          string
+	Name        string
+	TeamID      string
+	Version     int32
+	VersionID   string
+	RepeatCount int32
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+}
+
+func (q *Queries) ListPolicies(ctx context.Context, arg ListPoliciesParams) ([]ListPoliciesRow, error) {
 	rows, err := q.db.QueryContext(ctx, listPolicies,
 		arg.Before,
 		arg.TeamID,
@@ -204,13 +289,15 @@ func (q *Queries) ListPolicies(ctx context.Context, arg ListPoliciesParams) ([]E
 		return nil, err
 	}
 	defer rows.Close()
-	var items []EscalationPolicy
+	var items []ListPoliciesRow
 	for rows.Next() {
-		var i EscalationPolicy
+		var i ListPoliciesRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.Name,
 			&i.TeamID,
+			&i.Version,
+			&i.VersionID,
 			&i.RepeatCount,
 			&i.CreatedAt,
 			&i.UpdatedAt,
@@ -230,25 +317,27 @@ func (q *Queries) ListPolicies(ctx context.Context, arg ListPoliciesParams) ([]E
 
 const updatePolicy = `-- name: UpdatePolicy :execrows
 UPDATE escalation_policies
-SET name = ?, team_id = ?, repeat_count = ?, updated_at = ?
-WHERE id = ?
+SET name = ?, team_id = ?, version = ?, updated_at = ?
+WHERE id = ? AND version = ? AND deleted_at IS NULL
 `
 
 type UpdatePolicyParams struct {
-	Name        string
-	TeamID      string
-	RepeatCount int32
-	UpdatedAt   time.Time
-	ID          string
+	Name            string
+	TeamID          string
+	Version         int32
+	UpdatedAt       time.Time
+	ID              string
+	PreviousVersion int32
 }
 
 func (q *Queries) UpdatePolicy(ctx context.Context, arg UpdatePolicyParams) (int64, error) {
 	result, err := q.db.ExecContext(ctx, updatePolicy,
 		arg.Name,
 		arg.TeamID,
-		arg.RepeatCount,
+		arg.Version,
 		arg.UpdatedAt,
 		arg.ID,
+		arg.PreviousVersion,
 	)
 	if err != nil {
 		return 0, err

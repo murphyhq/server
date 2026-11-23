@@ -96,7 +96,7 @@ func New(ctx context.Context, s Settings) (_ *App, err error) {
 		Incidents:  incidents.New(incidentsStorage, catalogService),
 		People:     peopleService,
 		OnCall:     oncallService,
-		Escalation: escalation.New(escalationStorage, peopleService, oncallService),
+		Escalation: escalation.New(escalationStorage, peopleService, oncallService, catalogService),
 	}, keys)
 	if err != nil {
 		return nil, err

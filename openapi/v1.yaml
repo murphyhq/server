@@ -855,10 +855,37 @@ paths:
     delete:
       operationId: deleteEscalationPolicy
       summary: Delete an escalation policy
+      description: A policy that services still page with can't be deleted. Incidents that followed the policy keep reading its versions.
       tags: [escalation]
       responses:
         "204":
           description: Done.
+        "404":
+          $ref: "#/components/responses/Problem"
+        "409":
+          $ref: "#/components/responses/Problem"
+  /v1/escalation-policies/{id}/versions/{version}:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+      - name: version
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+          minimum: 1
+    get:
+      operationId: getEscalationPolicyVersion
+      summary: Get a version of an escalation policy
+      description: Every change to a policy makes a new version, numbered from 1; this returns one of them as it was saved.
+      tags: [escalation]
+      responses:
+        "200":
+          description: The policy at that version.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EscalationPolicy"
         "404":
           $ref: "#/components/responses/Problem"
 components:
@@ -1386,10 +1413,14 @@ components:
             $ref: "#/components/schemas/EscalationTarget"
     EscalationPolicy:
       type: object
-      required: [id, name, team_id, repeat_count, levels, created_at, updated_at]
+      required: [id, name, team_id, version, repeat_count, levels, created_at, updated_at]
       properties:
         id:
           type: string
+        version:
+          type: integer
+          format: int32
+          description: The policy's current version, starting at 1. Every update makes the next one.
         name:
           type: string
         team_id:

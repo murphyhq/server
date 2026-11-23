@@ -17,6 +17,7 @@ type Repository interface {
 	ListPolicies(ctx context.Context, teamID string, before string, limit int) ([]*murphy.EscalationPolicy, error)
 	UpdatePolicy(ctx context.Context, policy *murphy.EscalationPolicy) error
 	DeletePolicy(ctx context.Context, id string) error
+	GetPolicyVersion(ctx context.Context, id string, version int32) (*murphy.EscalationPolicy, error)
 }
 
 type People interface {
@@ -28,14 +29,19 @@ type Schedules interface {
 	ExistingSchedules(ctx context.Context, ids []string) (map[string]bool, error)
 }
 
+type Catalog interface {
+	PolicyInUse(ctx context.Context, policyID string) (bool, error)
+}
+
 type Service struct {
 	repo      Repository
 	people    People
 	schedules Schedules
+	catalog   Catalog
 }
 
-func New(repo Repository, people People, schedules Schedules) *Service {
-	return &Service{repo: repo, people: people, schedules: schedules}
+func New(repo Repository, people People, schedules Schedules, catalog Catalog) *Service {
+	return &Service{repo: repo, people: people, schedules: schedules, catalog: catalog}
 }
 
 func (s *Service) CreatePolicy(ctx context.Context, in *murphy.EscalationPolicy) (_ *murphy.EscalationPolicy, err error) {
@@ -49,6 +55,7 @@ func (s *Service) CreatePolicy(ctx context.Context, in *murphy.EscalationPolicy)
 		TeamId:      in.GetTeamId(),
 		RepeatCount: in.GetRepeatCount(),
 		Levels:      in.GetLevels(),
+		Version:     1,
 		CreatedAt:   now,
 		UpdatedAt:   now,
 	}
@@ -113,6 +120,7 @@ func (s *Service) UpdatePolicy(ctx context.Context, in *murphy.EscalationPolicy)
 		TeamId:      in.GetTeamId(),
 		RepeatCount: in.GetRepeatCount(),
 		Levels:      in.GetLevels(),
+		Version:     current.GetVersion() + 1,
 		CreatedAt:   current.GetCreatedAt(),
 		UpdatedAt:   murphy.Now(),
 	}
@@ -132,6 +140,13 @@ func (s *Service) DeletePolicy(ctx context.Context, id string) (err error) {
 
 	if err := murphy.LookupID("escalation policy", id); err != nil {
 		return err
+	}
+	inUse, err := s.catalog.PolicyInUse(ctx, id)
+	if err != nil {
+		return fmt.Errorf("check services using the escalation policy: %w", err)
+	}
+	if inUse {
+		return murphy.ErrConflict
 	}
 	if err := s.repo.DeletePolicy(ctx, id); err != nil {
 		return fmt.Errorf("delete escalation policy: %w", err)
@@ -186,4 +201,22 @@ func (s *Service) check(ctx context.Context, policy *murphy.EscalationPolicy) er
 		}
 	}
 	return errors.Join(errs...)
+}
+
+func (s *Service) GetPolicyVersion(ctx context.Context, id string, version int32) (_ *murphy.EscalationPolicy, err error) {
+	ctx, span := tracer.Span(ctx)
+	ctx = span.Set(ctx, telemetry.WithField("escalation_policy.id", id), telemetry.WithField("escalation_policy.version", version))
+	defer span.End(&err)
+
+	if err := murphy.LookupID("escalation policy", id); err != nil {
+		return nil, err
+	}
+	if version < 1 {
+		return nil, &murphy.NotFoundError{Entity: "escalation policy version"}
+	}
+	policy, err := s.repo.GetPolicyVersion(ctx, id, version)
+	if err != nil {
+		return nil, fmt.Errorf("get escalation policy version: %w", err)
+	}
+	return policy, nil
 }
