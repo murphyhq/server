@@ -33,10 +33,10 @@ Requires Docker.
 | `docker compose --profile murphy watch` | the same, restarting components when the code changes |
 | `docker compose up` | the services only, to run a component yourself |
 
-The API is at http://localhost:8080, described by [`openapi/v1.yaml`](openapi/v1.yaml), and a fresh stack is seeded with example data. Monitoring tools send alerts to `ingest` at http://localhost:8081, described by [`openapi/ingest/v1.yaml`](openapi/ingest/v1.yaml). Logs, traces and metrics are in Grafana at http://localhost:3000 (Explore → Loki, Tempo or Prometheus), with three linked dashboards under Dashboards → Murphy:
+The API is at http://localhost:8080, described by [`openapi/v1.yaml`](openapi/v1.yaml), and a fresh stack is seeded with example data. Monitoring tools send alerts to `ingest` at http://localhost:8081, described by [`openapi/ingest/v1.yaml`](openapi/ingest/v1.yaml). Logs, traces and metrics are in Grafana at http://localhost:3000 (Explore → Loki, Tempo or Prometheus), with linked dashboards under Dashboards → Murphy:
 
-- **Overview** follows an alert through each stage, from intake through the queue to the engine.
-- **Component** shows any component's work, database, runtime and container.
+- **Overview** follows an alert through each stage: intake, the queue, the engine, the scheduler and the notifier.
+- **api**, **ingest**, **engine**, **scheduler** and **notifier** each show what that component does (requests, messages or scheduled messages), the database behind it, its runtime and its container.
 - **Infrastructure** shows the containers, PostgreSQL, MySQL, Redis and NATS.
 
 An OpenTelemetry Collector in the stack gathers container and database server metrics, and NATS queue metrics through its exporter.

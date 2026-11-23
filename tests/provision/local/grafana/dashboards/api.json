@@ -1,7 +1,7 @@
 {
-  "uid": "murphy-component",
-  "title": "Murphy: Component",
-  "description": "The same view of any Murphy component: its work, its database, its runtime and its container.",
+  "uid": "murphy-api",
+  "title": "Murphy: api",
+  "description": "The management API: requests by route, the database and idempotency store behind them, runtime and container.",
   "tags": [
     "murphy"
   ],
@@ -17,7 +17,7 @@
     {
       "id": 1,
       "type": "row",
-      "title": "Work",
+      "title": "Requests",
       "collapsed": false,
       "gridPos": {
         "h": 1,
@@ -30,7 +30,7 @@
     {
       "id": 2,
       "type": "timeseries",
-      "title": "HTTP requests per second, by route and status",
+      "title": "Requests per second, by route and status",
       "description": "",
       "datasource": {
         "type": "prometheus",
@@ -71,7 +71,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (http_request_method, http_route, http_response_status_code) (rate(http_server_request_duration_seconds_count{service_namespace=\"murphy\", service_name=\"$component\"}[$__rate_interval]))",
+          "expr": "sum by (http_request_method, http_route, http_response_status_code) (rate(http_server_request_duration_seconds_count{service_namespace=\"murphy\", service_name=\"api\"}[$__rate_interval]))",
           "legendFormat": "{{http_request_method}} {{http_route}} {{http_response_status_code}}"
         }
       ]
@@ -79,7 +79,7 @@
     {
       "id": 3,
       "type": "timeseries",
-      "title": "HTTP response time",
+      "title": "Response time",
       "description": "",
       "datasource": {
         "type": "prometheus",
@@ -120,7 +120,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.5, sum by (le) (rate(http_server_request_duration_seconds_bucket{service_namespace=\"murphy\", service_name=\"$component\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.5, sum by (le) (rate(http_server_request_duration_seconds_bucket{service_namespace=\"murphy\", service_name=\"api\"}[$__rate_interval])))",
           "legendFormat": "all routes p50"
         },
         {
@@ -129,7 +129,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.99, sum by (le) (rate(http_server_request_duration_seconds_bucket{service_namespace=\"murphy\", service_name=\"$component\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(http_server_request_duration_seconds_bucket{service_namespace=\"murphy\", service_name=\"api\"}[$__rate_interval])))",
           "legendFormat": "all routes p99"
         }
       ]
@@ -178,7 +178,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (http_route) (rate(http_server_request_duration_seconds_count{service_namespace=\"murphy\", service_name=\"$component\", http_response_status_code=~\"5..\"}[$__rate_interval]))",
+          "expr": "sum by (http_route) (rate(http_server_request_duration_seconds_count{service_namespace=\"murphy\", service_name=\"api\", http_response_status_code=~\"5..\"}[$__rate_interval]))",
           "legendFormat": "{{http_route}}"
         }
       ]
@@ -186,7 +186,7 @@
     {
       "id": 5,
       "type": "timeseries",
-      "title": "Messages handled per second, by outcome",
+      "title": "Slowest routes, p99",
       "description": "",
       "datasource": {
         "type": "prometheus",
@@ -194,57 +194,8 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 8,
+        "w": 24,
         "x": 0,
-        "y": 9
-      },
-      "links": [],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "ops",
-          "custom": {
-            "lineWidth": 1,
-            "fillOpacity": 10
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum by (murphy_event_type, murphy_outcome) (rate(murphy_messages_processed_total{service_namespace=\"murphy\", service_name=\"$component\"}[$__rate_interval]))",
-          "legendFormat": "{{murphy_event_type}} {{murphy_outcome}}"
-        }
-      ]
-    },
-    {
-      "id": 6,
-      "type": "timeseries",
-      "title": "Message handling time",
-      "description": "",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 8,
         "y": 9
       },
       "links": [],
@@ -276,71 +227,13 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.5, sum by (le, murphy_event_type) (rate(murphy_message_process_duration_seconds_bucket{service_namespace=\"murphy\", service_name=\"$component\"}[$__rate_interval])))",
-          "legendFormat": "{{murphy_event_type}} p50"
-        },
-        {
-          "refId": "B",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "histogram_quantile(0.99, sum by (le, murphy_event_type) (rate(murphy_message_process_duration_seconds_bucket{service_namespace=\"murphy\", service_name=\"$component\"}[$__rate_interval])))",
-          "legendFormat": "{{murphy_event_type}} p99"
+          "expr": "topk(5, histogram_quantile(0.99, sum by (le, http_request_method, http_route) (rate(http_server_request_duration_seconds_bucket{service_namespace=\"murphy\", service_name=\"api\"}[$__rate_interval]))))",
+          "legendFormat": "{{http_request_method}} {{http_route}}"
         }
       ]
     },
     {
-      "id": 7,
-      "type": "timeseries",
-      "title": "Messages published per second",
-      "description": "",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 16,
-        "y": 9
-      },
-      "links": [],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "ops",
-          "custom": {
-            "lineWidth": 1,
-            "fillOpacity": 10
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum by (murphy_topic) (rate(murphy_messages_published_total{service_namespace=\"murphy\", service_name=\"$component\"}[$__rate_interval]))",
-          "legendFormat": "{{murphy_topic}}"
-        }
-      ]
-    },
-    {
-      "id": 8,
+      "id": 6,
       "type": "row",
       "title": "Database",
       "collapsed": false,
@@ -353,7 +246,7 @@
       "panels": []
     },
     {
-      "id": 9,
+      "id": 7,
       "type": "timeseries",
       "title": "Queries per request, by route",
       "description": "Database queries run to answer one request. A line that climbs with the data is an N+1.",
@@ -363,125 +256,9 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 18
-      },
-      "links": [],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "custom": {
-            "lineWidth": 1,
-            "fillOpacity": 10
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum by (murphy_http_request_method, murphy_http_route) (rate(murphy_http_request_db_queries_sum{service_namespace=\"murphy\", service_name=\"$component\"}[$__rate_interval])) / sum by (murphy_http_request_method, murphy_http_route) (rate(murphy_http_request_db_queries_count{service_namespace=\"murphy\", service_name=\"$component\"}[$__rate_interval]))",
-          "legendFormat": "{{murphy_http_request_method}} {{murphy_http_route}} average"
-        },
-        {
-          "refId": "B",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "histogram_quantile(0.99, sum by (le, murphy_http_request_method, murphy_http_route) (rate(murphy_http_request_db_queries_bucket{service_namespace=\"murphy\", service_name=\"$component\"}[$__rate_interval])))",
-          "legendFormat": "{{murphy_http_request_method}} {{murphy_http_route}} p99"
-        }
-      ]
-    },
-    {
-      "id": 10,
-      "type": "timeseries",
-      "title": "Queries per message, by event type",
-      "description": "Database queries run to handle one message.",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 18
-      },
-      "links": [],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "custom": {
-            "lineWidth": 1,
-            "fillOpacity": 10
-          }
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum by (murphy_event_type) (rate(murphy_message_db_queries_sum{service_namespace=\"murphy\", service_name=\"$component\"}[$__rate_interval])) / sum by (murphy_event_type) (rate(murphy_message_db_queries_count{service_namespace=\"murphy\", service_name=\"$component\"}[$__rate_interval]))",
-          "legendFormat": "{{murphy_event_type}} average"
-        },
-        {
-          "refId": "B",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "histogram_quantile(0.99, sum by (le, murphy_event_type) (rate(murphy_message_db_queries_bucket{service_namespace=\"murphy\", service_name=\"$component\"}[$__rate_interval])))",
-          "legendFormat": "{{murphy_event_type}} p99"
-        }
-      ]
-    },
-    {
-      "id": 11,
-      "type": "timeseries",
-      "title": "Idempotency store commands per request, by route",
-      "description": "Redis commands run to answer one request. Requests with an Idempotency-Key read and store their response here.",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "h": 8,
         "w": 24,
         "x": 0,
-        "y": 26
+        "y": 18
       },
       "links": [],
       "fieldConfig": {
@@ -512,7 +289,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (murphy_http_request_method, murphy_http_route) (rate(murphy_http_request_redis_commands_sum{service_namespace=\"murphy\", service_name=\"$component\"}[$__rate_interval])) / sum by (murphy_http_request_method, murphy_http_route) (rate(murphy_http_request_redis_commands_count{service_namespace=\"murphy\", service_name=\"$component\"}[$__rate_interval]))",
+          "expr": "sum by (murphy_http_request_method, murphy_http_route) (rate(murphy_http_request_db_queries_sum{service_namespace=\"murphy\", service_name=\"api\"}[$__rate_interval])) / sum by (murphy_http_request_method, murphy_http_route) (rate(murphy_http_request_db_queries_count{service_namespace=\"murphy\", service_name=\"api\"}[$__rate_interval]))",
           "legendFormat": "{{murphy_http_request_method}} {{murphy_http_route}} average"
         },
         {
@@ -521,13 +298,13 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.99, sum by (le, murphy_http_request_method, murphy_http_route) (rate(murphy_http_request_redis_commands_bucket{service_namespace=\"murphy\", service_name=\"$component\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.99, sum by (le, murphy_http_request_method, murphy_http_route) (rate(murphy_http_request_db_queries_bucket{service_namespace=\"murphy\", service_name=\"api\"}[$__rate_interval])))",
           "legendFormat": "{{murphy_http_request_method}} {{murphy_http_route}} p99"
         }
       ]
     },
     {
-      "id": 12,
+      "id": 8,
       "type": "timeseries",
       "title": "Queries per second",
       "description": "",
@@ -539,7 +316,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 34
+        "y": 26
       },
       "links": [],
       "fieldConfig": {
@@ -570,13 +347,13 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(rate(db_client_operation_duration_seconds_count{service_namespace=\"murphy\", service_name=\"$component\", pgx_operation_type=\"query\"}[$__rate_interval]))",
+          "expr": "sum(rate(db_client_operation_duration_seconds_count{service_namespace=\"murphy\", service_name=\"api\", pgx_operation_type=\"query\"}[$__rate_interval]))",
           "legendFormat": "queries"
         }
       ]
     },
     {
-      "id": 13,
+      "id": 9,
       "type": "timeseries",
       "title": "Query time",
       "description": "",
@@ -588,7 +365,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 34
+        "y": 26
       },
       "links": [],
       "fieldConfig": {
@@ -619,7 +396,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.5, sum by (le) (rate(db_client_operation_duration_seconds_bucket{service_namespace=\"murphy\", service_name=\"$component\", pgx_operation_type=\"query\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.5, sum by (le) (rate(db_client_operation_duration_seconds_bucket{service_namespace=\"murphy\", service_name=\"api\", pgx_operation_type=\"query\"}[$__rate_interval])))",
           "legendFormat": "queries p50"
         },
         {
@@ -628,13 +405,13 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.99, sum by (le) (rate(db_client_operation_duration_seconds_bucket{service_namespace=\"murphy\", service_name=\"$component\", pgx_operation_type=\"query\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(db_client_operation_duration_seconds_bucket{service_namespace=\"murphy\", service_name=\"api\", pgx_operation_type=\"query\"}[$__rate_interval])))",
           "legendFormat": "queries p99"
         }
       ]
     },
     {
-      "id": 14,
+      "id": 10,
       "type": "timeseries",
       "title": "Waiting for a connection, p99",
       "description": "Time to get a connection from the pool. It grows when the pool is too small for the load.",
@@ -646,7 +423,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 34
+        "y": 26
       },
       "links": [],
       "fieldConfig": {
@@ -677,13 +454,13 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.99, sum by (le) (rate(db_client_operation_duration_seconds_bucket{service_namespace=\"murphy\", service_name=\"$component\", pgx_operation_type=\"acquire\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(db_client_operation_duration_seconds_bucket{service_namespace=\"murphy\", service_name=\"api\", pgx_operation_type=\"acquire\"}[$__rate_interval])))",
           "legendFormat": "acquire"
         }
       ]
     },
     {
-      "id": 15,
+      "id": 11,
       "type": "timeseries",
       "title": "Connections in use, by pool",
       "description": "",
@@ -695,7 +472,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 42
+        "y": 34
       },
       "links": [],
       "fieldConfig": {
@@ -726,7 +503,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (db_client_connection_pool_name) (pgxpool_acquired_connections{service_namespace=\"murphy\", service_name=\"$component\"})",
+          "expr": "sum by (db_client_connection_pool_name) (pgxpool_acquired_connections{service_namespace=\"murphy\", service_name=\"api\"})",
           "legendFormat": "{{db_client_connection_pool_name}} in use"
         },
         {
@@ -735,13 +512,13 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "max by (db_client_connection_pool_name) (pgxpool_max_connections{service_namespace=\"murphy\", service_name=\"$component\"})",
+          "expr": "max by (db_client_connection_pool_name) (pgxpool_max_connections{service_namespace=\"murphy\", service_name=\"api\"})",
           "legendFormat": "{{db_client_connection_pool_name}} max"
         }
       ]
     },
     {
-      "id": 16,
+      "id": 12,
       "type": "timeseries",
       "title": "Waits for a free connection per second",
       "description": "",
@@ -753,7 +530,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 42
+        "y": 34
       },
       "links": [],
       "fieldConfig": {
@@ -784,38 +561,38 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (db_client_connection_pool_name) (rate(pgxpool_empty_acquire_total{service_namespace=\"murphy\", service_name=\"$component\"}[$__rate_interval]))",
+          "expr": "sum by (db_client_connection_pool_name) (rate(pgxpool_empty_acquire_total{service_namespace=\"murphy\", service_name=\"api\"}[$__rate_interval]))",
           "legendFormat": "{{db_client_connection_pool_name}}"
         }
       ]
     },
     {
-      "id": 17,
+      "id": 13,
       "type": "row",
-      "title": "Runtime",
+      "title": "Idempotency store",
       "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 50
+        "y": 42
       },
       "panels": []
     },
     {
-      "id": 18,
+      "id": 14,
       "type": "timeseries",
-      "title": "Goroutines",
-      "description": "",
+      "title": "Commands per request, by route",
+      "description": "Redis commands run to answer one request. Requests with an Idempotency-Key read and store their response here.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
       "gridPos": {
         "h": 8,
-        "w": 8,
+        "w": 12,
         "x": 0,
-        "y": 51
+        "y": 43
       },
       "links": [],
       "fieldConfig": {
@@ -846,13 +623,124 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(go_goroutine_count{service_namespace=\"murphy\", service_name=\"$component\"})",
+          "expr": "sum by (murphy_http_request_method, murphy_http_route) (rate(murphy_http_request_redis_commands_sum{service_namespace=\"murphy\", service_name=\"api\"}[$__rate_interval])) / sum by (murphy_http_request_method, murphy_http_route) (rate(murphy_http_request_redis_commands_count{service_namespace=\"murphy\", service_name=\"api\"}[$__rate_interval]))",
+          "legendFormat": "{{murphy_http_request_method}} {{murphy_http_route}} average"
+        }
+      ]
+    },
+    {
+      "id": 15,
+      "type": "timeseries",
+      "title": "Connections",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 43
+      },
+      "links": [],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (state) (db_client_connections_usage{service_namespace=\"murphy\", service_name=\"api\", db_system=\"redis\"})",
+          "legendFormat": "{{state}}"
+        }
+      ]
+    },
+    {
+      "id": 16,
+      "type": "row",
+      "title": "Runtime",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 51
+      },
+      "panels": []
+    },
+    {
+      "id": 17,
+      "type": "timeseries",
+      "title": "Goroutines",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 52
+      },
+      "links": [],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(go_goroutine_count{service_namespace=\"murphy\", service_name=\"api\"})",
           "legendFormat": "goroutines"
         }
       ]
     },
     {
-      "id": 19,
+      "id": 18,
       "type": "timeseries",
       "title": "Memory in use and GC target",
       "description": "",
@@ -864,7 +752,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 51
+        "y": 52
       },
       "links": [],
       "fieldConfig": {
@@ -895,7 +783,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(go_memory_used_bytes{service_namespace=\"murphy\", service_name=\"$component\"})",
+          "expr": "sum(go_memory_used_bytes{service_namespace=\"murphy\", service_name=\"api\"})",
           "legendFormat": "in use"
         },
         {
@@ -904,13 +792,13 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(go_memory_gc_goal_bytes{service_namespace=\"murphy\", service_name=\"$component\"})",
+          "expr": "sum(go_memory_gc_goal_bytes{service_namespace=\"murphy\", service_name=\"api\"})",
           "legendFormat": "GC target"
         }
       ]
     },
     {
-      "id": 20,
+      "id": 19,
       "type": "timeseries",
       "title": "Allocated per second",
       "description": "",
@@ -922,7 +810,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 51
+        "y": 52
       },
       "links": [],
       "fieldConfig": {
@@ -953,13 +841,13 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(rate(go_memory_allocated_bytes_total{service_namespace=\"murphy\", service_name=\"$component\"}[$__rate_interval]))",
+          "expr": "sum(rate(go_memory_allocated_bytes_total{service_namespace=\"murphy\", service_name=\"api\"}[$__rate_interval]))",
           "legendFormat": "allocated"
         }
       ]
     },
     {
-      "id": 21,
+      "id": 20,
       "type": "row",
       "title": "Container",
       "collapsed": false,
@@ -967,12 +855,12 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 59
+        "y": 60
       },
       "panels": []
     },
     {
-      "id": 22,
+      "id": 21,
       "type": "timeseries",
       "title": "CPU",
       "description": "Share of one CPU core; above 100% means more than one core.",
@@ -984,7 +872,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 60
+        "y": 61
       },
       "links": [],
       "fieldConfig": {
@@ -1015,13 +903,13 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(container_cpu_utilization_ratio{compose_service=\"$component\"})",
+          "expr": "sum(container_cpu_utilization_ratio{compose_service=\"api\"})",
           "legendFormat": "CPU"
         }
       ]
     },
     {
-      "id": 23,
+      "id": 22,
       "type": "timeseries",
       "title": "Memory",
       "description": "",
@@ -1033,7 +921,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 60
+        "y": 61
       },
       "links": [],
       "fieldConfig": {
@@ -1064,7 +952,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(container_memory_usage_total_bytes{compose_service=\"$component\"})",
+          "expr": "sum(container_memory_usage_total_bytes{compose_service=\"api\"})",
           "legendFormat": "in use"
         },
         {
@@ -1073,13 +961,13 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(container_memory_usage_limit_bytes{compose_service=\"$component\"})",
+          "expr": "sum(container_memory_usage_limit_bytes{compose_service=\"api\"})",
           "legendFormat": "limit"
         }
       ]
     },
     {
-      "id": 24,
+      "id": 23,
       "type": "timeseries",
       "title": "Network",
       "description": "",
@@ -1091,7 +979,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 60
+        "y": 61
       },
       "links": [],
       "fieldConfig": {
@@ -1122,7 +1010,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(rate(container_network_io_usage_rx_bytes_total{compose_service=\"$component\"}[$__rate_interval]))",
+          "expr": "sum(rate(container_network_io_usage_rx_bytes_total{compose_service=\"api\"}[$__rate_interval]))",
           "legendFormat": "received"
         },
         {
@@ -1131,7 +1019,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(rate(container_network_io_usage_tx_bytes_total{compose_service=\"$component\"}[$__rate_interval]))",
+          "expr": "sum(rate(container_network_io_usage_tx_bytes_total{compose_service=\"api\"}[$__rate_interval]))",
           "legendFormat": "sent"
         }
       ]
@@ -1150,29 +1038,6 @@
     }
   ],
   "templating": {
-    "list": [
-      {
-        "name": "component",
-        "label": "Component",
-        "type": "query",
-        "datasource": {
-          "type": "prometheus",
-          "uid": "prometheus"
-        },
-        "query": {
-          "query": "label_values(target_info{service_namespace=\"murphy\"}, service_name)",
-          "refId": "component"
-        },
-        "definition": "label_values(target_info{service_namespace=\"murphy\"}, service_name)",
-        "includeAll": false,
-        "multi": false,
-        "current": {
-          "text": "ingest",
-          "value": "ingest"
-        },
-        "refresh": 2,
-        "sort": 1
-      }
-    ]
+    "list": []
   }
 }

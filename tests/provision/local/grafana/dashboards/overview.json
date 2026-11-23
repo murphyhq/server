@@ -385,7 +385,7 @@
       "links": [
         {
           "title": "ingest in detail",
-          "url": "/d/murphy-component?var-component=ingest&${__url_time_range}"
+          "url": "/d/murphy-ingest?${__url_time_range}"
         }
       ],
       "fieldConfig": {
@@ -439,7 +439,7 @@
       "links": [
         {
           "title": "ingest in detail",
-          "url": "/d/murphy-component?var-component=ingest&${__url_time_range}"
+          "url": "/d/murphy-ingest?${__url_time_range}"
         }
       ],
       "fieldConfig": {
@@ -502,7 +502,7 @@
       "links": [
         {
           "title": "ingest in detail",
-          "url": "/d/murphy-component?var-component=ingest&${__url_time_range}"
+          "url": "/d/murphy-ingest?${__url_time_range}"
         }
       ],
       "fieldConfig": {
@@ -747,7 +747,7 @@
       "links": [
         {
           "title": "engine in detail",
-          "url": "/d/murphy-component?var-component=engine&${__url_time_range}"
+          "url": "/d/murphy-engine?${__url_time_range}"
         }
       ],
       "fieldConfig": {
@@ -801,7 +801,7 @@
       "links": [
         {
           "title": "engine in detail",
-          "url": "/d/murphy-component?var-component=engine&${__url_time_range}"
+          "url": "/d/murphy-engine?${__url_time_range}"
         }
       ],
       "fieldConfig": {
@@ -864,7 +864,7 @@
       "links": [
         {
           "title": "engine in detail",
-          "url": "/d/murphy-component?var-component=engine&${__url_time_range}"
+          "url": "/d/murphy-engine?${__url_time_range}"
         }
       ],
       "fieldConfig": {
@@ -940,7 +940,7 @@
       "links": [
         {
           "title": "scheduler in detail",
-          "url": "/d/murphy-component?var-component=scheduler&${__url_time_range}"
+          "url": "/d/murphy-scheduler?${__url_time_range}"
         }
       ],
       "fieldConfig": {
@@ -994,7 +994,7 @@
       "links": [
         {
           "title": "scheduler in detail",
-          "url": "/d/murphy-component?var-component=scheduler&${__url_time_range}"
+          "url": "/d/murphy-scheduler?${__url_time_range}"
         }
       ],
       "fieldConfig": {
@@ -1119,7 +1119,7 @@
       "links": [
         {
           "title": "notifier in detail",
-          "url": "/d/murphy-component?var-component=notifier&${__url_time_range}"
+          "url": "/d/murphy-notifier?${__url_time_range}"
         }
       ],
       "fieldConfig": {
@@ -1173,7 +1173,7 @@
       "links": [
         {
           "title": "notifier in detail",
-          "url": "/d/murphy-component?var-component=notifier&${__url_time_range}"
+          "url": "/d/murphy-notifier?${__url_time_range}"
         }
       ],
       "fieldConfig": {
@@ -1249,7 +1249,7 @@
       "links": [
         {
           "title": "api in detail",
-          "url": "/d/murphy-component?var-component=api&${__url_time_range}"
+          "url": "/d/murphy-api?${__url_time_range}"
         }
       ],
       "fieldConfig": {
@@ -1303,7 +1303,7 @@
       "links": [
         {
           "title": "api in detail",
-          "url": "/d/murphy-component?var-component=api&${__url_time_range}"
+          "url": "/d/murphy-api?${__url_time_range}"
         }
       ],
       "fieldConfig": {
@@ -1366,7 +1366,7 @@
       "links": [
         {
           "title": "api in detail",
-          "url": "/d/murphy-component?var-component=api&${__url_time_range}"
+          "url": "/d/murphy-api?${__url_time_range}"
         }
       ],
       "fieldConfig": {
