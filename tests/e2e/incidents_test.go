@@ -42,7 +42,6 @@ func setup(t *testing.T) (*client.ClientWithResponses, string, string) {
 
 	service, err := api.CreateServiceWithResponse(ctx, nil, client.ServiceInput{
 		Name:               "e2e-" + uuid.NewV4().String()[:8],
-		TeamId:             uuid.NewV7().String(),
 		EscalationPolicyId: uuid.NewV7().String(),
 	})
 	require.NoError(t, err)
@@ -176,7 +175,7 @@ func TestGrafanaPagesMurphyAndResolvesTheIncident(t *testing.T) {
 	api, err := client.NewClientWithResponses(apiURL)
 	require.NoError(t, err)
 	service, err := api.CreateServiceWithResponse(ctx, nil, client.ServiceInput{
-		Name: "e2e-grafana-" + uuid.NewV4().String()[:8], TeamId: uuid.NewV7().String(), EscalationPolicyId: uuid.NewV7().String(),
+		Name: "e2e-grafana-" + uuid.NewV4().String()[:8], EscalationPolicyId: uuid.NewV7().String(),
 	})
 	require.NoError(t, err)
 	require.Equal(t, http.StatusCreated, service.StatusCode())

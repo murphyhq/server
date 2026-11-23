@@ -130,10 +130,10 @@ func TestCatalogRejectsInvalidRequests(t *testing.T) {
 		ctx := t.Context()
 
 		medium := client.Urgency("medium")
-		invalid, err := api.CreateServiceWithResponse(ctx, nil, client.ServiceInput{TeamId: "not-a-uuid", Urgency: &medium})
+		invalid, err := api.CreateServiceWithResponse(ctx, nil, client.ServiceInput{Urgency: &medium})
 		require.NoError(t, err)
 		require.Equal(t, http.StatusBadRequest, invalid.StatusCode())
-		for _, field := range []string{"name", "team_id", "escalation_policy_id", "urgency"} {
+		for _, field := range []string{"name", "escalation_policy_id", "urgency"} {
 			assert.Contains(t, *invalid.ApplicationproblemJSON400.Detail, field)
 		}
 
@@ -176,7 +176,6 @@ func TestCatalogNotFoundResponses(t *testing.T) {
 func newService(name string) client.ServiceInput {
 	return client.ServiceInput{
 		Name:               name,
-		TeamId:             uuid.NewV7().String(),
 		EscalationPolicyId: uuid.NewV7().String(),
 	}
 }

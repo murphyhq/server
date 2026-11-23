@@ -9,9 +9,7 @@ import (
 )
 
 const (
-	platformTeam   = "0195f3a0-0000-7000-8000-000000000001"
 	platformPolicy = "0195f3a0-0000-7000-8000-000000000002"
-	paymentsTeam   = "0195f3a0-0000-7000-8000-000000000003"
 	paymentsPolicy = "0195f3a0-0000-7000-8000-000000000004"
 )
 
@@ -24,18 +22,18 @@ func seedCatalog(ctx context.Context, api *client.ClientWithResponses) error {
 	low := client.Low
 	services := []seededService{
 		{
-			input: client.ServiceInput{Name: "checkout-api", Description: new("Takes orders and payments from the storefront."), TeamId: paymentsTeam, EscalationPolicyId: paymentsPolicy},
+			input: client.ServiceInput{Name: "checkout-api", Description: new("Takes orders and payments from the storefront."), EscalationPolicyId: paymentsPolicy},
 			integrations: []client.IntegrationCreate{
 				{Name: "Alertmanager", Type: client.Alertmanager},
 				{Name: "Grafana", Type: client.Grafana},
 			},
 		},
 		{
-			input:        client.ServiceInput{Name: "payments-api", Description: new("Charges cards through the payment provider."), TeamId: paymentsTeam, EscalationPolicyId: paymentsPolicy},
+			input:        client.ServiceInput{Name: "payments-api", Description: new("Charges cards through the payment provider."), EscalationPolicyId: paymentsPolicy},
 			integrations: []client.IntegrationCreate{{Name: "Datadog", Type: client.Datadog}},
 		},
 		{
-			input:        client.ServiceInput{Name: "internal-wiki", Description: new("Company documentation."), TeamId: platformTeam, EscalationPolicyId: platformPolicy, Urgency: &low},
+			input:        client.ServiceInput{Name: "internal-wiki", Description: new("Company documentation."), EscalationPolicyId: platformPolicy, Urgency: &low},
 			integrations: []client.IntegrationCreate{{Name: "Uptime checks", Type: client.Generic}},
 		},
 	}

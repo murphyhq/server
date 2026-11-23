@@ -43,15 +43,14 @@ func (q *Queries) CreateIntegration(ctx context.Context, arg CreateIntegrationPa
 }
 
 const createService = `-- name: CreateService :exec
-INSERT INTO services (id, name, description, team_id, escalation_policy_id, urgency, status, created_at, updated_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+INSERT INTO services (id, name, description, escalation_policy_id, urgency, status, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type CreateServiceParams struct {
 	ID                 string
 	Name               string
 	Description        string
-	TeamID             string
 	EscalationPolicyID string
 	Urgency            string
 	Status             string
@@ -64,7 +63,6 @@ func (q *Queries) CreateService(ctx context.Context, arg CreateServiceParams) er
 		arg.ID,
 		arg.Name,
 		arg.Description,
-		arg.TeamID,
 		arg.EscalationPolicyID,
 		arg.Urgency,
 		arg.Status,
@@ -124,7 +122,7 @@ func (q *Queries) GetIntegration(ctx context.Context, id string) (Integration, e
 }
 
 const getService = `-- name: GetService :one
-SELECT id, name, description, team_id, escalation_policy_id, urgency, status, created_at, updated_at
+SELECT id, name, description, escalation_policy_id, urgency, status, created_at, updated_at
 FROM services
 WHERE id = ?
 `
@@ -136,7 +134,6 @@ func (q *Queries) GetService(ctx context.Context, id string) (Service, error) {
 		&i.ID,
 		&i.Name,
 		&i.Description,
-		&i.TeamID,
 		&i.EscalationPolicyID,
 		&i.Urgency,
 		&i.Status,
@@ -194,7 +191,7 @@ func (q *Queries) ListIntegrations(ctx context.Context, arg ListIntegrationsPara
 }
 
 const listServices = `-- name: ListServices :many
-SELECT id, name, description, team_id, escalation_policy_id, urgency, status, created_at, updated_at
+SELECT id, name, description, escalation_policy_id, urgency, status, created_at, updated_at
 FROM services
 WHERE id < ?
 ORDER BY id DESC
@@ -219,7 +216,6 @@ func (q *Queries) ListServices(ctx context.Context, arg ListServicesParams) ([]S
 			&i.ID,
 			&i.Name,
 			&i.Description,
-			&i.TeamID,
 			&i.EscalationPolicyID,
 			&i.Urgency,
 			&i.Status,
@@ -287,7 +283,7 @@ func (q *Queries) UpdateIntegration(ctx context.Context, arg UpdateIntegrationPa
 
 const updateService = `-- name: UpdateService :execrows
 UPDATE services
-SET name = ?, description = ?, team_id = ?, escalation_policy_id = ?,
+SET name = ?, description = ?, escalation_policy_id = ?,
     urgency = ?, status = ?, updated_at = ?
 WHERE id = ?
 `
@@ -295,7 +291,6 @@ WHERE id = ?
 type UpdateServiceParams struct {
 	Name               string
 	Description        string
-	TeamID             string
 	EscalationPolicyID string
 	Urgency            string
 	Status             string
@@ -307,7 +302,6 @@ func (q *Queries) UpdateService(ctx context.Context, arg UpdateServiceParams) (i
 	result, err := q.db.ExecContext(ctx, updateService,
 		arg.Name,
 		arg.Description,
-		arg.TeamID,
 		arg.EscalationPolicyID,
 		arg.Urgency,
 		arg.Status,

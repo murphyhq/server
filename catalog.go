@@ -7,7 +7,7 @@ import (
 
 func (s *Service) Validate() error {
 	var errs []error
-	errs = append(errs, requireName("name", s.GetName()), requireID("team_id", s.GetTeamId()), requireID("escalation_policy_id", s.GetEscalationPolicyId()))
+	errs = append(errs, requireName("name", s.GetName()), requireID("escalation_policy_id", s.GetEscalationPolicyId()))
 	if !s.GetUrgency().valid() {
 		errs = append(errs, invalid("urgency", "must be high or low"))
 	}

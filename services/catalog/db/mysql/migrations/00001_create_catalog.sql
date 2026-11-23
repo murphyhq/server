@@ -3,7 +3,6 @@ CREATE TABLE services (
   id CHAR(36) NOT NULL,
   name VARCHAR(255) NOT NULL,
   description TEXT NOT NULL,
-  team_id CHAR(36) NOT NULL,
   escalation_policy_id CHAR(36) NOT NULL,
   urgency VARCHAR(16) NOT NULL,
   status VARCHAR(16) NOT NULL,
@@ -27,7 +26,7 @@ CREATE TABLE integrations (
   updated_at DATETIME(6) NOT NULL,
   CONSTRAINT integrations_pkey PRIMARY KEY (id),
   CONSTRAINT integrations_service_id_fkey FOREIGN KEY (service_id) REFERENCES services (id) ON DELETE CASCADE,
-  CONSTRAINT integrations_type_check CHECK (type IN ('generic', 'alertmanager', 'grafana', 'datadog')),
+  CONSTRAINT integrations_type_check CHECK (type IN ('generic', 'alertmanager', 'grafana', 'datadog', 'cloudwatch', 'google_cloud')),
   CONSTRAINT integrations_status_check CHECK (status IN ('active', 'disabled'))
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
 
