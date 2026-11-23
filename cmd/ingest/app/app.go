@@ -60,8 +60,9 @@ func (a *App) Close() {
 
 func (s Settings) CORS() httpserver.CORS {
 	return httpserver.CORS{
-		Origins:      s.CORSOrigins,
-		Methods:      []string{"POST"},
-		AllowHeaders: []string{"Authorization", "Content-Type"},
+		Origins:       s.CORSOrigins,
+		Methods:       []string{"POST"},
+		AllowHeaders:  []string{"Authorization", "Content-Type"},
+		ExposeHeaders: []string{"WWW-Authenticate"},
 	}
 }
