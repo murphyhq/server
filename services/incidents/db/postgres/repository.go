@@ -3,11 +3,9 @@ package postgres
 import (
 	"context"
 	"embed"
-	"fmt"
-	"io/fs"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jackc/pgx/v5"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/murphyhq/server"
@@ -20,32 +18,21 @@ import (
 var migrations embed.FS
 
 type Repository struct {
-	pool    *pgxpool.Pool
+	*murphypostgres.Database[*Tx]
 	queries *Queries
 }
 
 func Open(ctx context.Context, url string) (*Repository, error) {
-	pool, err := murphypostgres.Open(ctx, murphypostgres.Config{URL: url})
+	db, err := murphypostgres.OpenDatabase(ctx, murphypostgres.DatabaseConfig[*Tx]{
+		URL:        url,
+		Service:    "incidents",
+		Migrations: migrations,
+		Tx:         func(tx pgx.Tx) *Tx { return &Tx{queries: New(tx)} },
+	})
 	if err != nil {
 		return nil, err
 	}
-	return &Repository{pool: pool, queries: New(pool)}, nil
-}
-
-func (r *Repository) Migrate(ctx context.Context) error {
-	files, err := fs.Sub(migrations, "migrations")
-	if err != nil {
-		return fmt.Errorf("load incidents migrations: %w", err)
-	}
-	return murphypostgres.Migrate(ctx, r.pool, murphypostgres.Migrations{Service: "incidents", Files: files})
-}
-
-func (r *Repository) Ping(ctx context.Context) error {
-	return r.pool.Ping(ctx)
-}
-
-func (r *Repository) Close() {
-	r.pool.Close()
+	return &Repository{Database: db, queries: New(db.Pool())}, nil
 }
 
 func (r *Repository) FindOpenIncident(ctx context.Context, serviceID, dedupKey string) (_ *murphy.Incident, err error) {
@@ -57,25 +44,6 @@ func (r *Repository) FindOpenIncident(ctx context.Context, serviceID, dedupKey s
 		return nil, murphypostgres.Error("incident", err)
 	}
 	return toIncident(row), nil
-}
-
-func (r *Repository) Transaction(ctx context.Context, work func(tx *Tx) error) (err error) {
-	ctx, span := tracer.Span(ctx)
-	defer span.End(&err)
-
-	pgTx, err := r.pool.Begin(ctx)
-	if err != nil {
-		return fmt.Errorf("begin transaction: %w", err)
-	}
-	defer func() { _ = pgTx.Rollback(context.WithoutCancel(ctx)) }()
-
-	if err := work(&Tx{queries: r.queries.WithTx(pgTx)}); err != nil {
-		return err
-	}
-	if err := pgTx.Commit(ctx); err != nil {
-		return murphypostgres.Error("incident", err)
-	}
-	return nil
 }
 
 func (r *Repository) GetIncident(ctx context.Context, id string) (_ *murphy.Incident, err error) {
