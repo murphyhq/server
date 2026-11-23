@@ -40,9 +40,10 @@ func setup(t *testing.T) (*client.ClientWithResponses, string, string) {
 	api, err := client.NewClientWithResponses(apiURL)
 	require.NoError(t, err)
 
+	policyID, _ := escalationPolicy(t, api)
 	service, err := api.CreateServiceWithResponse(ctx, nil, client.ServiceInput{
 		Name:               "e2e-" + uuid.NewV4().String()[:8],
-		EscalationPolicyId: uuid.NewV7().String(),
+		EscalationPolicyId: policyID,
 	})
 	require.NoError(t, err)
 	require.Equal(t, http.StatusCreated, service.StatusCode())
@@ -68,16 +69,14 @@ func send(t *testing.T, key, dedupKey, status string) int {
 
 func incidentOf(t *testing.T, api *client.ClientWithResponses, serviceID string) *client.IncidentWithTimeline {
 	t.Helper()
-	list, err := api.ListIncidentsWithResponse(t.Context(), nil)
+	list, err := api.ListIncidentsWithResponse(t.Context(), &client.ListIncidentsParams{ServiceId: &[]string{serviceID}})
 	require.NoError(t, err)
-	for _, incident := range list.JSON200.Items {
-		if incident.ServiceId == serviceID {
-			got, err := api.GetIncidentWithResponse(t.Context(), incident.Id)
-			require.NoError(t, err)
-			return got.JSON200
-		}
+	if len(list.JSON200.Items) == 0 {
+		return nil
 	}
-	return nil
+	got, err := api.GetIncidentWithResponse(t.Context(), list.JSON200.Items[0].Id)
+	require.NoError(t, err)
+	return got.JSON200
 }
 
 func TestAnAlertOpensAnIncidentThatItsResolveCloses(t *testing.T) {
@@ -93,7 +92,7 @@ func TestAnAlertOpensAnIncidentThatItsResolveCloses(t *testing.T) {
 
 	require.Equal(t, http.StatusAccepted, send(t, key, "disk-full", "firing"))
 	require.EventuallyWithT(t, func(c *assert.CollectT) {
-		assert.Len(c, incidentOf(t, api, serviceID).Timeline, 2)
+		assert.Len(c, alertEntries(incidentOf(t, api, serviceID)), 2)
 	}, settle, 250*time.Millisecond)
 
 	time.Sleep(1100 * time.Millisecond)
@@ -101,8 +100,84 @@ func TestAnAlertOpensAnIncidentThatItsResolveCloses(t *testing.T) {
 	require.EventuallyWithT(t, func(c *assert.CollectT) {
 		incident := incidentOf(t, api, serviceID)
 		assert.Equal(c, client.IncidentStatusResolved, incident.Status)
-		assert.Len(c, incident.Timeline, 3)
+		assert.Len(c, alertEntries(incident), 3)
 	}, settle, 250*time.Millisecond)
+}
+
+func escalationPolicy(t *testing.T, api *client.ClientWithResponses) (policyID, userID string) {
+	t.Helper()
+	ctx := t.Context()
+	run := uuid.NewV4().String()[:8]
+	team, err := api.CreateTeamWithResponse(ctx, nil, client.TeamInput{Name: "e2e-" + run})
+	require.NoError(t, err)
+	require.Equal(t, http.StatusCreated, team.StatusCode())
+	user, err := api.CreateUserWithResponse(ctx, nil, client.UserInput{Name: "E2E " + run, Email: "e2e-" + run + "@example.com"})
+	require.NoError(t, err)
+	require.Equal(t, http.StatusCreated, user.StatusCode())
+	policy, err := api.CreateEscalationPolicyWithResponse(ctx, nil, client.EscalationPolicyInput{
+		Name:   "e2e-" + run,
+		TeamId: team.JSON201.Id,
+		Levels: []client.EscalationLevel{{DelaySeconds: 300, Targets: []client.EscalationTarget{{Type: client.EscalationTargetTypeUser, Id: user.JSON201.Id}}}},
+	})
+	require.NoError(t, err)
+	require.Equal(t, http.StatusCreated, policy.StatusCode())
+	return policy.JSON201.Id, user.JSON201.Id
+}
+
+func alertEntries(incident *client.IncidentWithTimeline) []client.TimelineEntry {
+	if incident == nil {
+		return nil
+	}
+	var entries []client.TimelineEntry
+	for _, entry := range incident.Timeline {
+		if entry.Escalation == nil && entry.Type != client.TimelineEntryTypeEscalationExhausted {
+			entries = append(entries, entry)
+		}
+	}
+	return entries
+}
+
+func TestAnIncidentPagesItsFirstLevelUntilAcknowledged(t *testing.T) {
+	ctx := t.Context()
+	api, err := client.NewClientWithResponses(apiURL)
+	require.NoError(t, err)
+	policyID, userID := escalationPolicy(t, api)
+	service, err := api.CreateServiceWithResponse(ctx, nil, client.ServiceInput{Name: "e2e-escalation-" + uuid.NewV4().String()[:8], EscalationPolicyId: policyID})
+	require.NoError(t, err)
+	require.Equal(t, http.StatusCreated, service.StatusCode())
+	integration, err := api.CreateIntegrationWithResponse(ctx, service.JSON201.Id, nil, client.IntegrationCreate{Name: "generic", Type: client.Generic})
+	require.NoError(t, err)
+	require.Equal(t, http.StatusCreated, integration.StatusCode())
+
+	require.Equal(t, http.StatusAccepted, send(t, integration.JSON201.Key, "disk-full", "firing"))
+
+	var incidentID string
+	require.EventuallyWithT(t, func(c *assert.CollectT) {
+		incident := incidentOf(t, api, service.JSON201.Id)
+		if !assert.NotNil(c, incident) {
+			return
+		}
+		incidentID = incident.Id
+		var paged []string
+		for _, entry := range incident.Timeline {
+			if entry.Type == client.TimelineEntryTypeEscalated {
+				for _, page := range entry.Escalation.Paged {
+					paged = append(paged, page.User.Id)
+				}
+			}
+		}
+		assert.Equal(c, []string{userID}, paged)
+	}, settle, 250*time.Millisecond)
+
+	acknowledged, err := api.AcknowledgeIncidentWithResponse(ctx, incidentID, nil)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, acknowledged.StatusCode())
+	assert.Equal(t, client.IncidentStatusAcknowledged, acknowledged.JSON200.Status)
+
+	resolved, err := api.ResolveIncidentWithResponse(ctx, incidentID, nil)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, resolved.StatusCode())
+	assert.Equal(t, client.IncidentStatusResolved, resolved.JSON200.Status)
 }
 
 func TestIngestRefusesAKeyMurphyDidNotSign(t *testing.T) {
@@ -174,8 +249,9 @@ func TestGrafanaPagesMurphyAndResolvesTheIncident(t *testing.T) {
 	ctx := t.Context()
 	api, err := client.NewClientWithResponses(apiURL)
 	require.NoError(t, err)
+	policyID, _ := escalationPolicy(t, api)
 	service, err := api.CreateServiceWithResponse(ctx, nil, client.ServiceInput{
-		Name: "e2e-grafana-" + uuid.NewV4().String()[:8], EscalationPolicyId: uuid.NewV7().String(),
+		Name: "e2e-grafana-" + uuid.NewV4().String()[:8], EscalationPolicyId: policyID,
 	})
 	require.NoError(t, err)
 	require.Equal(t, http.StatusCreated, service.StatusCode())
