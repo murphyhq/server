@@ -1,0 +1,35 @@
+syntax = "proto3";
+
+package murphy.v1;
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/murphyhq/server;murphy";
+
+message EscalationPolicy {
+  string id = 1;
+  string name = 2;
+  int32 repeat_count = 3;
+  repeated EscalationLevel levels = 4;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
+  string team_id = 7;
+}
+
+message EscalationLevel {
+  google.protobuf.Duration delay = 1;
+  repeated EscalationTarget targets = 2;
+  string id = 3;
+}
+
+message EscalationTarget {
+  EscalationTargetType type = 1;
+  string id = 2;
+}
+
+enum EscalationTargetType {
+  ESCALATION_TARGET_TYPE_UNSPECIFIED = 0;
+  ESCALATION_TARGET_TYPE_USER = 1;
+  ESCALATION_TARGET_TYPE_SCHEDULE = 2;
+}

@@ -8,20 +8,34 @@ import (
 	"github.com/murphyhq/server/internal/httpserver"
 	"github.com/murphyhq/server/internal/idempotency"
 	"github.com/murphyhq/server/services/catalog"
+	"github.com/murphyhq/server/services/escalation"
 	"github.com/murphyhq/server/services/incidents"
+	"github.com/murphyhq/server/services/oncall"
+	"github.com/murphyhq/server/services/people"
 )
 
 type Server struct {
-	catalog   *catalog.Service
-	incidents *incidents.Service
+	catalog    *catalog.Service
+	incidents  *incidents.Service
+	people     *people.Service
+	oncall     *oncall.Service
+	escalation *escalation.Service
 }
 
-func New(catalog *catalog.Service, incidents *incidents.Service, keys idempotency.Store) (http.Handler, error) {
+type Services struct {
+	Catalog    *catalog.Service
+	Incidents  *incidents.Service
+	People     *people.Service
+	OnCall     *oncall.Service
+	Escalation *escalation.Service
+}
+
+func New(services Services, keys idempotency.Store) (http.Handler, error) {
 	spec, err := GetSwagger()
 	if err != nil {
 		return nil, fmt.Errorf("load OpenAPI spec: %w", err)
 	}
-	strict := NewStrictHandlerWithOptions(&Server{catalog: catalog, incidents: incidents}, nil, StrictHTTPServerOptions{
+	strict := NewStrictHandlerWithOptions(&Server{catalog: services.Catalog, incidents: services.Incidents, people: services.People, oncall: services.OnCall, escalation: services.Escalation}, nil, StrictHTTPServerOptions{
 		RequestErrorHandlerFunc:  httpserver.BadRequest,
 		ResponseErrorHandlerFunc: httpserver.WriteError,
 	})

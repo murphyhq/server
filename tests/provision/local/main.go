@@ -16,7 +16,7 @@ import (
 )
 
 var (
-	databases = []string{"catalog", "incidents"}
+	databases = []string{"catalog", "incidents", "people", "oncall", "escalation"}
 	topology  = provision.Topology{
 		"engine": {"murphy.v1.alert"},
 	}

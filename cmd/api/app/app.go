@@ -10,14 +10,23 @@ import (
 	"github.com/murphyhq/server/internal/lifecycle"
 	"github.com/murphyhq/server/services/catalog"
 	catalogdb "github.com/murphyhq/server/services/catalog/db"
+	"github.com/murphyhq/server/services/escalation"
+	escalationdb "github.com/murphyhq/server/services/escalation/db"
 	"github.com/murphyhq/server/services/incidents"
 	incidentsdb "github.com/murphyhq/server/services/incidents/db"
+	"github.com/murphyhq/server/services/oncall"
+	oncalldb "github.com/murphyhq/server/services/oncall/db"
+	"github.com/murphyhq/server/services/people"
+	peopledb "github.com/murphyhq/server/services/people/db"
 )
 
 type Settings struct {
 	HTTPAddr              string `env:"HTTP_ADDR" default:":8080"`
 	CatalogDatabaseURL    string `env:"CATALOG_DATABASE_URL" required:"true"`
 	IncidentsDatabaseURL  string `env:"INCIDENTS_DATABASE_URL" required:"true"`
+	PeopleDatabaseURL     string `env:"PEOPLE_DATABASE_URL" required:"true"`
+	OnCallDatabaseURL     string `env:"ONCALL_DATABASE_URL" required:"true"`
+	EscalationDatabaseURL string `env:"ESCALATION_DATABASE_URL" required:"true"`
 	IdempotencyStoreURL   string `env:"IDEMPOTENCY_STORE_URL" required:"true"`
 	IntegrationKeySecrets string `env:"INTEGRATION_KEY_SECRETS" required:"true"`
 }
@@ -48,6 +57,24 @@ func New(ctx context.Context, s Settings) (_ *App, err error) {
 	}
 	a.resources.Add(incidentsStorage.Close, incidentsStorage.Ping)
 
+	peopleStorage, err := peopledb.Open(ctx, s.PeopleDatabaseURL)
+	if err != nil {
+		return nil, fmt.Errorf("MURPHY_PEOPLE_DATABASE_URL: %w", err)
+	}
+	a.resources.Add(peopleStorage.Close, peopleStorage.Ping)
+
+	oncallStorage, err := oncalldb.Open(ctx, s.OnCallDatabaseURL)
+	if err != nil {
+		return nil, fmt.Errorf("MURPHY_ONCALL_DATABASE_URL: %w", err)
+	}
+	a.resources.Add(oncallStorage.Close, oncallStorage.Ping)
+
+	escalationStorage, err := escalationdb.Open(ctx, s.EscalationDatabaseURL)
+	if err != nil {
+		return nil, fmt.Errorf("MURPHY_ESCALATION_DATABASE_URL: %w", err)
+	}
+	a.resources.Add(escalationStorage.Close, escalationStorage.Ping)
+
 	keys, err := idempotencystore.Open(ctx, s.IdempotencyStoreURL)
 	if err != nil {
 		return nil, fmt.Errorf("MURPHY_IDEMPOTENCY_STORE_URL: %w", err)
@@ -60,7 +87,15 @@ func New(ctx context.Context, s Settings) (_ *App, err error) {
 	}
 
 	catalogService := catalog.New(catalogStorage, keyring)
-	a.Handler, err = router.New(catalogService, incidents.New(incidentsStorage, catalogService), keys)
+	peopleService := people.New(peopleStorage)
+	oncallService := oncall.New(oncallStorage, peopleService)
+	a.Handler, err = router.New(router.Services{
+		Catalog:    catalogService,
+		Incidents:  incidents.New(incidentsStorage, catalogService),
+		People:     peopleService,
+		OnCall:     oncallService,
+		Escalation: escalation.New(escalationStorage, peopleService, oncallService),
+	}, keys)
 	if err != nil {
 		return nil, err
 	}
