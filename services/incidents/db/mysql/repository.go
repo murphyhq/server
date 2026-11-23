@@ -29,7 +29,7 @@ func Open(ctx context.Context, url string) (*Repository, error) {
 		URL:        url,
 		Service:    "incidents",
 		Migrations: migrations,
-		Tx:         func(tx *sql.Tx) *Tx { return &Tx{queries: New(tx)} },
+		Tx:         func(tx murphymysql.DBTX) *Tx { return &Tx{queries: New(tx)} },
 	})
 	if err != nil {
 		return nil, err

@@ -224,6 +224,7 @@ func process(ctx context.Context, system, group string, handlers map[string]Hand
 		telemetry.WithField("message.attempt", delivery.Attempt),
 	)...)
 
+	ctx, scope := metrics.StartScope(ctx)
 	if handle, ok := handlers[eventType]; ok {
 		err = handle(ctx, envelope)
 	} else {
@@ -253,6 +254,7 @@ func process(ctx context.Context, system, group string, handlers map[string]Hand
 	dimensions := []metrics.Dimension{{Name: "event.type", Value: eventType}, {Name: "consumer.group", Value: group}, {Name: "outcome", Value: outcome}}
 	processed.Add(ctx, 1, dimensions...)
 	duration.Record(ctx, elapsed.Seconds(), dimensions...)
+	scope.Record(ctx, "message", dimensions...)
 	return err
 }
 

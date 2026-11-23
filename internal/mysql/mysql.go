@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -19,7 +21,7 @@ type Config struct {
 }
 
 func Open(ctx context.Context, cfg Config) (*sql.DB, error) {
-	driverConfig, err := parse(cfg.URL)
+	driverConfig, pool, err := parse(cfg.URL)
 	if err != nil {
 		return nil, err
 	}
@@ -33,7 +35,10 @@ func Open(ctx context.Context, cfg Config) (*sql.DB, error) {
 		otelsql.WithSpanNameFormatter(queryName),
 		otelsql.WithSpanOptions(otelsql.SpanOptions{OmitConnResetSession: true, OmitRows: true, OmitConnPrepare: true}),
 	)
-	db.SetConnMaxLifetime(5 * time.Minute)
+	db.SetMaxOpenConns(pool.maxConns)
+	db.SetMaxIdleConns(pool.maxConns)
+	db.SetConnMaxLifetime(pool.maxConnLifetime)
+	db.SetConnMaxIdleTime(pool.maxConnIdleTime)
 	if _, err := otelsql.RegisterDBStatsMetrics(db, attributes); err != nil {
 		_ = db.Close()
 		return nil, fmt.Errorf("record database pool metrics: %w", err)
@@ -45,10 +50,20 @@ func Open(ctx context.Context, cfg Config) (*sql.DB, error) {
 	return db, nil
 }
 
-func parse(raw string) (*mysqldriver.Config, error) {
+type pool struct {
+	maxConns        int
+	maxConnLifetime time.Duration
+	maxConnIdleTime time.Duration
+}
+
+func parse(raw string) (*mysqldriver.Config, pool, error) {
 	u, err := url.Parse(raw)
 	if err != nil || u.Host == "" || strings.Trim(u.Path, "/") == "" {
-		return nil, errors.New("not a valid MySQL connection string, expected mysql://user:password@host:3306/database")
+		return nil, pool{}, errors.New("not a valid MySQL connection string, expected mysql://user:password@host:3306/database")
+	}
+	p, err := parsePool(u.Query())
+	if err != nil {
+		return nil, pool{}, err
 	}
 	c := mysqldriver.NewConfig()
 	c.Net = "tcp"
@@ -59,7 +74,28 @@ func parse(raw string) (*mysqldriver.Config, error) {
 	c.ParseTime = true
 	c.ClientFoundRows = true
 	c.Loc = time.UTC
-	return c, nil
+	return c, p, nil
+}
+
+func parsePool(query url.Values) (pool, error) {
+	p := pool{maxConns: max(4, runtime.NumCPU()), maxConnLifetime: time.Hour, maxConnIdleTime: 30 * time.Minute}
+	if raw := query.Get("pool_max_conns"); raw != "" {
+		n, err := strconv.Atoi(raw)
+		if err != nil || n < 1 {
+			return pool{}, errors.New("pool_max_conns must be a whole number of at least 1")
+		}
+		p.maxConns = n
+	}
+	for name, target := range map[string]*time.Duration{"pool_max_conn_lifetime": &p.maxConnLifetime, "pool_max_conn_idle_time": &p.maxConnIdleTime} {
+		if raw := query.Get(name); raw != "" {
+			d, err := time.ParseDuration(raw)
+			if err != nil || d <= 0 {
+				return pool{}, errors.New(name + " must be a positive duration, such as 30m")
+			}
+			*target = d
+		}
+	}
+	return p, nil
 }
 
 func queryName(_ context.Context, method otelsql.Method, query string) string {

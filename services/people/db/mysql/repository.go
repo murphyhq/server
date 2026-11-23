@@ -2,7 +2,6 @@ package mysql
 
 import (
 	"context"
-	"database/sql"
 	"embed"
 
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -25,7 +24,7 @@ func Open(ctx context.Context, url string) (*Repository, error) {
 		URL:        url,
 		Service:    "people",
 		Migrations: migrations,
-		Tx:         func(tx *sql.Tx) *Queries { return New(tx) },
+		Tx:         func(tx murphymysql.DBTX) *Queries { return New(tx) },
 	})
 	if err != nil {
 		return nil, err
