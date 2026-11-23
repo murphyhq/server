@@ -39,20 +39,23 @@ func api(t *testing.T) *client.ClientWithResponses {
 	return c
 }
 
-func attack(t *testing.T, p Profile, name string, targeter vegeta.Targeter, thresholds Thresholds) {
+func attack(t *testing.T, p Profile, name string, targeter vegeta.Targeter, thresholds Thresholds, observe func(*vegeta.Result)) {
 	t.Helper()
 	attacker := vegeta.NewAttacker(vegeta.Timeout(10 * time.Second))
 	var metrics vegeta.Metrics
 	for result := range attacker.Attack(targeter, p.Pacer, p.Duration, name) {
 		metrics.Add(result)
+		if observe != nil {
+			observe(result)
+		}
 	}
 	metrics.Close()
 
 	var text bytes.Buffer
 	require.NoError(t, vegeta.NewTextReporter(&metrics).Report(&text))
 	t.Logf("%s\n%s", name, text.String())
-	require.NoError(t, newReport(name, p, &metrics, thresholds).write())
+	require.NoError(t, newReport(name, p, &metrics, thresholds).write(), "write the %s report", name)
 
-	assert.GreaterOrEqual(t, metrics.Success, thresholds.Success, "share of successful requests, by status code: %v", metrics.StatusCodes)
+	assert.GreaterOrEqual(t, metrics.Success, thresholds.Success, "share of successful requests, by status code: %v, errors: %v", metrics.StatusCodes, metrics.Errors)
 	assert.LessOrEqual(t, metrics.Latencies.P99, thresholds.P99, "p99 latency")
 }

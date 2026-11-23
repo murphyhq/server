@@ -3,8 +3,10 @@
 package load
 
 import (
+	"context"
 	"fmt"
 	"net/http"
+	neturl "net/url"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -42,7 +44,7 @@ type feed struct {
 	source
 	serviceID string
 	key       string
-	sent      atomic.Int64
+	accepted  int
 }
 
 func TestEveryAlertBecomesAnIncident(t *testing.T) {
@@ -65,41 +67,60 @@ func TestEveryAlertBecomesAnIncident(t *testing.T) {
 		target.URL = ingestURL + webhook.Path
 		target.Body = webhook.Body
 		target.Header = http.Header{"Content-Type": {webhook.ContentType}, "Authorization": {"Bearer " + f.key}}
-		f.sent.Add(1)
 		return nil
 	}
-	attack(t, p, "alert intake", targeter, Thresholds{Success: 1, P99: 500 * time.Millisecond})
+	byPath := map[string]*feed{}
+	for _, f := range feeds {
+		byPath[f.firing("").Path] = f
+	}
+	accept := func(result *vegeta.Result) {
+		if result.Code != http.StatusAccepted {
+			return
+		}
+		if u, err := neturl.Parse(result.URL); err == nil && byPath[u.Path] != nil {
+			byPath[u.Path].accepted++
+		}
+	}
+	attack(t, p, "alert intake", targeter, Thresholds{Success: 1, P99: 500 * time.Millisecond}, accept)
 
 	for _, f := range feeds {
-		want := int(f.sent.Load())
-		assert.Eventually(t, func() bool { return incidents(t, murphy, f.serviceID) == want }, p.Settle, time.Second,
-			"%s: %d alerts sent, %d incidents opened", f.integration, want, incidents(t, murphy, f.serviceID))
+		var opened int
+		var lastErr error
+		assert.Eventually(t, func() bool {
+			opened, lastErr = incidents(murphy, f.serviceID)
+			return lastErr == nil && opened == f.accepted
+		}, p.Settle, time.Second, "%s: %d alerts accepted, %d incidents opened, last error: %v", f.integration, f.accepted, opened, lastErr)
 	}
 }
 
 func integration(t *testing.T, murphy *client.ClientWithResponses, name string, kind client.IntegrationType) (string, string) {
 	t.Helper()
 	service, err := murphy.CreateServiceWithResponse(t.Context(), nil, client.ServiceInput{Name: name, EscalationPolicyId: uuid.NewV7().String()})
-	require.NoError(t, err)
-	require.Equal(t, http.StatusCreated, service.StatusCode())
+	require.NoError(t, err, "create service %s", name)
+	require.Equal(t, http.StatusCreated, service.StatusCode(), "create service %s: %s", name, service.Body)
 	created, err := murphy.CreateIntegrationWithResponse(t.Context(), service.JSON201.Id, nil, client.IntegrationCreate{Name: name, Type: kind})
-	require.NoError(t, err)
-	require.Equal(t, http.StatusCreated, created.StatusCode())
+	require.NoError(t, err, "create integration %s", name)
+	require.Equal(t, http.StatusCreated, created.StatusCode(), "create integration %s: %s", name, created.Body)
 	return service.JSON201.Id, created.JSON201.Key
 }
 
-func incidents(t *testing.T, murphy *client.ClientWithResponses, serviceID string) int {
-	t.Helper()
+func incidents(murphy *client.ClientWithResponses, serviceID string) (int, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 	limit := 100
 	params := &client.ListIncidentsParams{ServiceId: &[]string{serviceID}, Limit: &limit}
 	count := 0
 	for {
-		page, err := murphy.ListIncidentsWithResponse(t.Context(), params)
-		require.NoError(t, err)
-		require.Equal(t, http.StatusOK, page.StatusCode())
+		page, err := murphy.ListIncidentsWithResponse(ctx, params)
+		if err != nil {
+			return count, fmt.Errorf("list incidents: %w", err)
+		}
+		if page.StatusCode() != http.StatusOK {
+			return count, fmt.Errorf("list incidents: %s", page.Status())
+		}
 		count += len(page.JSON200.Items)
 		if page.JSON200.NextCursor == "" {
-			return count
+			return count, nil
 		}
 		params.Cursor = &page.JSON200.NextCursor
 	}

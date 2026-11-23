@@ -15,4 +15,3 @@ coverage.*
 .env.*
 .DS_Store
 .murphy/
-/tests/load/reports/

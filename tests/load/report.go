@@ -25,6 +25,7 @@ type Report struct {
 	Success     float64        `json:"success"`
 	Latency     Latency        `json:"latency_ms"`
 	StatusCodes map[string]int `json:"status_codes"`
+	Errors      []string       `json:"errors"`
 	Thresholds  Limits         `json:"thresholds"`
 	Passed      bool           `json:"passed"`
 }
@@ -55,6 +56,7 @@ func newReport(scenario string, p Profile, m *vegeta.Metrics, thresholds Thresho
 		Success:     m.Success,
 		Latency:     Latency{Mean: ms(m.Latencies.Mean), P50: ms(m.Latencies.P50), P90: ms(m.Latencies.P90), P95: ms(m.Latencies.P95), P99: ms(m.Latencies.P99), Max: ms(m.Latencies.Max)},
 		StatusCodes: m.StatusCodes,
+		Errors:      append([]string{}, m.Errors...),
 		Thresholds:  Limits{Success: thresholds.Success, P99: ms(thresholds.P99)},
 		Passed:      m.Success >= thresholds.Success && m.Latencies.P99 <= thresholds.P99,
 	}
@@ -80,11 +82,18 @@ func (r Report) markdown() string {
 	fmt.Fprintf(&b, "| %d | %.1f/s | %.2f%% | %.1f ms | %.1f ms | %.1f ms | %.1f ms | %s |\n\n",
 		r.Requests, r.Rate, r.Success*100, r.Latency.P50, r.Latency.P90, r.Latency.P99, r.Latency.Max, strings.Join(codes, ", "))
 	fmt.Fprintf(&b, "Thresholds: success at least %.2f%%, p99 at most %.0f ms.\n\n", r.Thresholds.Success*100, r.Thresholds.P99)
+	if len(r.Errors) > 0 {
+		b.WriteString("Errors:\n\n")
+		for _, e := range r.Errors {
+			fmt.Fprintf(&b, "- `%s`\n", e)
+		}
+		b.WriteString("\n")
+	}
 	return b.String()
 }
 
 func (r Report) write() error {
-	dir := url("MURPHY_LOAD_REPORT_DIR", "reports")
+	dir := reportDir()
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
@@ -110,4 +119,8 @@ func (r Report) write() error {
 		}
 	}
 	return nil
+}
+
+func reportDir() string {
+	return url("MURPHY_LOAD_REPORT_DIR", filepath.Join(os.TempDir(), "murphy-load", profileName()))
 }

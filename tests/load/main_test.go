@@ -17,5 +17,6 @@ func TestMain(m *testing.M) {
 		fmt.Fprintln(os.Stderr, "dashboard snapshot:", err)
 		code = 1
 	}
+	fmt.Println("load reports:", reportDir())
 	os.Exit(code)
 }
