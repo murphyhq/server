@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/murphyhq/server/cmd/api/router"
+	"github.com/murphyhq/server/internal/httpserver"
 	idempotencystore "github.com/murphyhq/server/internal/idempotency/store"
 	"github.com/murphyhq/server/internal/lifecycle"
 	"github.com/murphyhq/server/services/catalog"
@@ -21,14 +22,15 @@ import (
 )
 
 type Settings struct {
-	HTTPAddr              string `env:"HTTP_ADDR" default:":8080"`
-	CatalogDatabaseURL    string `env:"CATALOG_DATABASE_URL" required:"true"`
-	IncidentsDatabaseURL  string `env:"INCIDENTS_DATABASE_URL" required:"true"`
-	PeopleDatabaseURL     string `env:"PEOPLE_DATABASE_URL" required:"true"`
-	OnCallDatabaseURL     string `env:"ONCALL_DATABASE_URL" required:"true"`
-	EscalationDatabaseURL string `env:"ESCALATION_DATABASE_URL" required:"true"`
-	IdempotencyStoreURL   string `env:"IDEMPOTENCY_STORE_URL" required:"true"`
-	IntegrationKeySecrets string `env:"INTEGRATION_KEY_SECRETS" required:"true"`
+	HTTPAddr              string   `env:"HTTP_ADDR" default:":8080"`
+	CatalogDatabaseURL    string   `env:"CATALOG_DATABASE_URL" required:"true"`
+	IncidentsDatabaseURL  string   `env:"INCIDENTS_DATABASE_URL" required:"true"`
+	PeopleDatabaseURL     string   `env:"PEOPLE_DATABASE_URL" required:"true"`
+	OnCallDatabaseURL     string   `env:"ONCALL_DATABASE_URL" required:"true"`
+	EscalationDatabaseURL string   `env:"ESCALATION_DATABASE_URL" required:"true"`
+	IdempotencyStoreURL   string   `env:"IDEMPOTENCY_STORE_URL" required:"true"`
+	IntegrationKeySecrets string   `env:"INTEGRATION_KEY_SECRETS" required:"true"`
+	CORSOrigins           []string `env:"CORS_ORIGINS" validate:"base-url"`
 }
 
 type App struct {
@@ -105,4 +107,13 @@ func New(ctx context.Context, s Settings) (_ *App, err error) {
 
 func (a *App) Close() {
 	a.resources.Close()
+}
+
+func (s Settings) CORS() httpserver.CORS {
+	return httpserver.CORS{
+		Origins:       s.CORSOrigins,
+		Methods:       []string{"GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"},
+		AllowHeaders:  []string{"Authorization", "Content-Type", "Idempotency-Key"},
+		ExposeHeaders: []string{"Idempotent-Replayed"},
+	}
 }

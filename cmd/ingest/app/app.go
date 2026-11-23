@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/murphyhq/server/cmd/ingest/router"
+	"github.com/murphyhq/server/internal/httpserver"
 	"github.com/murphyhq/server/internal/lifecycle"
 	"github.com/murphyhq/server/internal/messaging"
 	"github.com/murphyhq/server/internal/messaging/broker"
@@ -13,9 +14,10 @@ import (
 )
 
 type Settings struct {
-	HTTPAddr              string `env:"HTTP_ADDR" default:":8080"`
-	EventsTopicURL        string `env:"EVENTS_TOPIC_URL" required:"true"`
-	IntegrationKeySecrets string `env:"INTEGRATION_KEY_SECRETS" required:"true"`
+	HTTPAddr              string   `env:"HTTP_ADDR" default:":8080"`
+	EventsTopicURL        string   `env:"EVENTS_TOPIC_URL" required:"true"`
+	IntegrationKeySecrets string   `env:"INTEGRATION_KEY_SECRETS" required:"true"`
+	CORSOrigins           []string `env:"CORS_ORIGINS" validate:"base-url"`
 }
 
 type App struct {
@@ -43,14 +45,24 @@ func New(ctx context.Context, s Settings) (_ *App, err error) {
 	}
 	a.resources.Add(func() { _ = topic.Close() }, topic.Ping)
 
-	a.Handler, err = router.New(messaging.NewPublisher(topic), keyring)
+	handler, err := router.New(messaging.NewPublisher(topic), keyring)
 	if err != nil {
 		return nil, err
 	}
+	a.Handler = handler
 	a.Ready = a.resources.Checks()
 	return a, nil
 }
 
 func (a *App) Close() {
 	a.resources.Close()
+}
+
+func (s Settings) CORS() httpserver.CORS {
+	return httpserver.CORS{
+		Origins:       s.CORSOrigins,
+		Methods:       []string{"POST"},
+		AllowHeaders:  []string{"Authorization", "Content-Type"},
+		ExposeHeaders: []string{"WWW-Authenticate"},
+	}
 }

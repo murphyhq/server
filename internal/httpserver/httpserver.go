@@ -21,6 +21,20 @@ import (
 type Config struct {
 	Addr            string
 	ShutdownTimeout time.Duration
+	CORS            CORS
+}
+
+type Server struct {
+	cfg     Config
+	handler http.Handler
+}
+
+func New(cfg Config, handler http.Handler) *Server {
+	return &Server{cfg: cfg, handler: cors(cfg.CORS)(Handler(handler))}
+}
+
+func (s *Server) Handler() http.Handler {
+	return s.handler
 }
 
 type router interface {
@@ -42,12 +56,12 @@ func Handler(handler http.Handler) http.Handler {
 	)
 }
 
-func Serve(ctx context.Context, cfg Config, handler http.Handler) error {
-	listener, err := net.Listen("tcp", cfg.Addr)
+func (s *Server) Serve(ctx context.Context) error {
+	listener, err := net.Listen("tcp", s.cfg.Addr)
 	if err != nil {
-		return fmt.Errorf("listen for HTTP on %s: %w", cfg.Addr, err)
+		return fmt.Errorf("listen for HTTP on %s: %w", s.cfg.Addr, err)
 	}
-	server := &http.Server{Handler: Handler(handler), ReadHeaderTimeout: 10 * time.Second}
+	server := &http.Server{Handler: s.handler, ReadHeaderTimeout: 10 * time.Second}
 	errs := make(chan error, 1)
 	go func() { errs <- server.Serve(listener) }()
 	logger.Info(ctx, "serving HTTP", telemetry.WithField("http_addr", listener.Addr().String()))
@@ -58,7 +72,7 @@ func Serve(ctx context.Context, cfg Config, handler http.Handler) error {
 	case <-ctx.Done():
 	}
 
-	shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), cfg.ShutdownTimeout)
+	shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), s.cfg.ShutdownTimeout)
 	defer cancel()
 	if err := server.Shutdown(shutdownCtx); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return fmt.Errorf("stop HTTP server: %w", err)

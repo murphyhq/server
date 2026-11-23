@@ -116,3 +116,56 @@ func TestUnmatchedRoutesAnswerWithProblems(t *testing.T) {
 func attributeOf(key, value string) attribute.KeyValue {
 	return attribute.String(key, value)
 }
+
+func corsPolicy(origins ...string) httpserver.CORS {
+	return httpserver.CORS{
+		Origins:       origins,
+		Methods:       []string{"GET", "POST"},
+		AllowHeaders:  []string{"Authorization", "Idempotency-Key"},
+		ExposeHeaders: []string{"Idempotent-Replayed"},
+	}
+}
+
+func corsServer(c httpserver.CORS, route http.Handler) http.Handler {
+	return httpserver.New(httpserver.Config{CORS: c}, route).Handler()
+}
+
+func TestCORSAllowsDeclaredOriginsAndAnswersPreflightsWithTheDeclaredPolicy(t *testing.T) {
+	reached := false
+	route := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		reached = true
+		w.WriteHeader(http.StatusOK)
+	})
+	handler := corsServer(corsPolicy("http://localhost:8090"), route)
+
+	get := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/v1/services", nil)
+	req.Header.Set("Origin", "http://localhost:8090")
+	handler.ServeHTTP(get, req)
+	assert.Equal(t, "http://localhost:8090", get.Header().Get("Access-Control-Allow-Origin"))
+	assert.Equal(t, "X-Trace-Id, traceresponse, Idempotent-Replayed", get.Header().Get("Access-Control-Expose-Headers"))
+
+	preflight := httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodOptions, "/v1/services", nil)
+	req.Header.Set("Origin", "http://localhost:8090")
+	req.Header.Set("Access-Control-Request-Method", http.MethodPost)
+	reached = false
+	handler.ServeHTTP(preflight, req)
+	assert.Equal(t, http.StatusNoContent, preflight.Code)
+	assert.Equal(t, "GET, POST", preflight.Header().Get("Access-Control-Allow-Methods"))
+	assert.Equal(t, "Authorization, Idempotency-Key", preflight.Header().Get("Access-Control-Allow-Headers"))
+	assert.False(t, reached)
+}
+
+func TestCORSSendsNoOriginToUndeclaredCallers(t *testing.T) {
+	ok := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
+
+	for _, c := range []httpserver.CORS{corsPolicy("http://localhost:8090"), corsPolicy()} {
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/v1/services", nil)
+		req.Header.Set("Origin", "https://evil.example")
+		corsServer(c, ok).ServeHTTP(rec, req)
+		assert.Equal(t, http.StatusOK, rec.Code)
+		assert.Empty(t, rec.Header().Get("Access-Control-Allow-Origin"))
+	}
+}

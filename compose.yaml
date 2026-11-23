@@ -192,6 +192,7 @@ services:
       <<: *component-environment
       MURPHY_EVENTS_TOPIC_URL: nats://nats:4222/events
       MURPHY_INTEGRATION_KEY_SECRETS: *integration-key-secrets
+      MURPHY_CORS_ORIGINS: http://localhost:8090
     ports:
       - "8081:8080"
 
@@ -207,6 +208,7 @@ services:
       MURPHY_ESCALATION_DATABASE_URL: postgres://murphy:murphy@postgres:5432/escalation?sslmode=disable
       MURPHY_IDEMPOTENCY_STORE_URL: redis://redis:6379/0
       MURPHY_INTEGRATION_KEY_SECRETS: *integration-key-secrets
+      MURPHY_CORS_ORIGINS: http://localhost:8090
     ports:
       - "8080:8080"
     depends_on:

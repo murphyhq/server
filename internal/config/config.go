@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"reflect"
 	"slices"
@@ -47,6 +48,12 @@ func load(v reflect.Value, errs *[]error) {
 		}
 		if err := set(v.Field(i), field, name); err != nil {
 			*errs = append(*errs, fmt.Errorf("%s: %w", name, err))
+			continue
+		}
+		if rule := field.Tag.Get("validate"); rule != "" {
+			if err := validate(v.Field(i), rule); err != nil {
+				*errs = append(*errs, fmt.Errorf("%s: %w", name, err))
+			}
 		}
 	}
 }
@@ -75,6 +82,17 @@ func parse(v reflect.Value, raw string) error {
 		return nil
 	}
 
+	if v.Type() == reflect.TypeFor[[]string]() {
+		var values []string
+		for _, part := range strings.Split(raw, ",") {
+			if part = strings.TrimSpace(part); part != "" {
+				values = append(values, part)
+			}
+		}
+		v.Set(reflect.ValueOf(values))
+		return nil
+	}
+
 	switch v.Kind() {
 	case reflect.String:
 		v.SetString(raw)
@@ -92,6 +110,38 @@ func parse(v reflect.Value, raw string) error {
 		v.SetBool(b)
 	default:
 		return fmt.Errorf("unsupported type %s", v.Type())
+	}
+	return nil
+}
+
+var rules = map[string]func(string) error{
+	"base-url": baseURL,
+}
+
+func validate(v reflect.Value, rule string) error {
+	check, ok := rules[rule]
+	if !ok {
+		return fmt.Errorf("unknown validation rule %q", rule)
+	}
+	if v.Kind() == reflect.Slice {
+		for i := range v.Len() {
+			if err := check(v.Index(i).String()); err != nil {
+				return fmt.Errorf("entry %d: %w", i+1, err)
+			}
+		}
+		return nil
+	}
+	if v.String() == "" {
+		return nil
+	}
+	return check(v.String())
+}
+
+func baseURL(raw string) error {
+	u, err := url.Parse(raw)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" ||
+		u.Path != "" || u.RawQuery != "" || u.Fragment != "" || u.User != nil {
+		return errors.New("not a base URL of the form scheme://host[:port]")
 	}
 	return nil
 }

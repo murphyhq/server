@@ -65,3 +65,33 @@ func TestLoadNeverPutsValuesInErrors(t *testing.T) {
 	require.Error(t, err)
 	assert.NotContains(t, err.Error(), "s3cr3t")
 }
+
+type listed struct {
+	Origins []string `env:"CORS_ORIGINS"`
+}
+
+func TestLoadReadsCommaSeparatedLists(t *testing.T) {
+	t.Setenv("MURPHY_CORS_ORIGINS", " http://localhost:8090, https://app.example.com ,")
+
+	var s listed
+	require.NoError(t, config.Load(&s))
+
+	assert.Equal(t, []string{"http://localhost:8090", "https://app.example.com"}, s.Origins)
+}
+
+type origins struct {
+	Allowed []string `env:"ALLOWED_ORIGINS" validate:"base-url"`
+}
+
+func TestLoadAcceptsBaseURLsAndRejectsEverythingElseWithoutEchoingIt(t *testing.T) {
+	t.Setenv("MURPHY_ALLOWED_ORIGINS", "http://localhost:8090,https://app.example.com:8443")
+	var ok origins
+	require.NoError(t, config.Load(&ok))
+
+	t.Setenv("MURPHY_ALLOWED_ORIGINS", "https://app.example.com,s3cret-host/path")
+	var bad origins
+	err := config.Load(&bad)
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "MURPHY_ALLOWED_ORIGINS: entry 2")
+	assert.NotContains(t, err.Error(), "s3cret-host")
+}

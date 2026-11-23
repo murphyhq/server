@@ -37,7 +37,13 @@ func run(ctx context.Context) error {
 	}
 	defer a.Close()
 
+	server := httpserver.New(httpserver.Config{
+		Addr:            s.App.HTTPAddr,
+		ShutdownTimeout: s.Lifecycle.ShutdownTimeout,
+		CORS:            s.App.CORS(),
+	}, a.Handler)
+
 	return lifecycle.Run(ctx, "api", s.Lifecycle, func(ctx context.Context) error {
-		return httpserver.Serve(ctx, httpserver.Config{Addr: s.App.HTTPAddr, ShutdownTimeout: s.Lifecycle.ShutdownTimeout}, a.Handler)
+		return server.Serve(ctx)
 	}, a.Ready...)
 }
