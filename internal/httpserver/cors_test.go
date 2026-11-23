@@ -11,9 +11,18 @@ import (
 	"github.com/murphyhq/server/internal/httpserver"
 )
 
-func withOrigins(t *testing.T, route http.Handler, origins ...string) http.Handler {
+func policy(origins ...string) httpserver.CORS {
+	return httpserver.CORS{
+		Origins:       origins,
+		Methods:       []string{"GET", "POST"},
+		AllowHeaders:  []string{"Authorization", "Idempotency-Key"},
+		ExposeHeaders: []string{"Idempotent-Replayed"},
+	}
+}
+
+func withPolicy(t *testing.T, route http.Handler, c httpserver.CORS) http.Handler {
 	t.Helper()
-	server, err := httpserver.New(httpserver.Config{CORSOrigins: origins}, route)
+	server, err := httpserver.New(httpserver.Config{CORS: c}, route)
 	require.NoError(t, err)
 	return server.Handler()
 }
@@ -23,14 +32,13 @@ func ok() http.Handler {
 }
 
 func TestCORSAllowsOnlyConfiguredOrigins(t *testing.T) {
-	handler := withOrigins(t, ok(), "http://localhost:8090")
+	handler := withPolicy(t, ok(), policy("http://localhost:8090"))
 
 	allowed := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/v1/services", nil)
 	req.Header.Set("Origin", "http://localhost:8090")
 	handler.ServeHTTP(allowed, req)
 	assert.Equal(t, "http://localhost:8090", allowed.Header().Get("Access-Control-Allow-Origin"))
-	assert.Contains(t, allowed.Header().Get("Access-Control-Expose-Headers"), "X-Trace-Id")
 
 	denied := httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodGet, "/v1/services", nil)
@@ -39,10 +47,21 @@ func TestCORSAllowsOnlyConfiguredOrigins(t *testing.T) {
 	assert.Empty(t, denied.Header().Get("Access-Control-Allow-Origin"))
 }
 
-func TestCORSAnswersPreflightWithoutReachingTheRoute(t *testing.T) {
+func TestCORSExposesTraceHeadersAndTheDeclaredOnes(t *testing.T) {
+	handler := withPolicy(t, ok(), policy("http://localhost:8090"))
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/v1/services", nil)
+	req.Header.Set("Origin", "http://localhost:8090")
+	handler.ServeHTTP(rec, req)
+
+	assert.Equal(t, "X-Trace-Id, traceresponse, Idempotent-Replayed", rec.Header().Get("Access-Control-Expose-Headers"))
+}
+
+func TestCORSAnswersPreflightWithTheDeclaredPolicy(t *testing.T) {
 	reached := false
 	route := http.HandlerFunc(func(http.ResponseWriter, *http.Request) { reached = true })
-	handler := withOrigins(t, route, "http://localhost:8090")
+	handler := withPolicy(t, route, policy("http://localhost:8090"))
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodOptions, "/v1/services", nil)
@@ -51,7 +70,8 @@ func TestCORSAnswersPreflightWithoutReachingTheRoute(t *testing.T) {
 	handler.ServeHTTP(rec, req)
 
 	assert.Equal(t, http.StatusNoContent, rec.Code)
-	assert.Contains(t, rec.Header().Get("Access-Control-Allow-Headers"), "Idempotency-Key")
+	assert.Equal(t, "GET, POST", rec.Header().Get("Access-Control-Allow-Methods"))
+	assert.Equal(t, "Authorization, Idempotency-Key", rec.Header().Get("Access-Control-Allow-Headers"))
 	assert.False(t, reached)
 }
 
@@ -59,7 +79,7 @@ func TestCORSSendsNothingWithoutConfiguredOrigins(t *testing.T) {
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/v1/services", nil)
 	req.Header.Set("Origin", "http://localhost:8090")
-	withOrigins(t, ok()).ServeHTTP(rec, req)
+	withPolicy(t, ok(), policy()).ServeHTTP(rec, req)
 
 	assert.Equal(t, http.StatusOK, rec.Code)
 	assert.Empty(t, rec.Header().Get("Access-Control-Allow-Origin"))
@@ -67,18 +87,18 @@ func TestCORSSendsNothingWithoutConfiguredOrigins(t *testing.T) {
 
 func TestNewRejectsOnlyBareOrigins(t *testing.T) {
 	for _, valid := range [][]string{nil, {"http://localhost:8090", "https://app.example.com:8443"}} {
-		_, err := httpserver.New(httpserver.Config{CORSOrigins: valid}, ok())
+		_, err := httpserver.New(httpserver.Config{CORS: policy(valid...)}, ok())
 		require.NoError(t, err)
 	}
 
 	for _, bad := range []string{"*", "example.com", "ftp://example.com", "https://app.example.com/", "https://app.example.com/path", "https://user@app.example.com"} {
-		_, err := httpserver.New(httpserver.Config{CORSOrigins: []string{bad}}, ok())
+		_, err := httpserver.New(httpserver.Config{CORS: policy(bad)}, ok())
 		assert.Error(t, err, bad)
 	}
 }
 
 func TestNewErrorsNeverEchoTheValue(t *testing.T) {
-	_, err := httpserver.New(httpserver.Config{CORSOrigins: []string{"https://app.example.com", "s3cret-host"}}, ok())
+	_, err := httpserver.New(httpserver.Config{CORS: policy("https://app.example.com", "s3cret-host")}, ok())
 	require.Error(t, err)
 	assert.ErrorContains(t, err, "entry 2")
 	assert.NotContains(t, err.Error(), "s3cret-host")

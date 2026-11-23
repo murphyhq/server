@@ -8,11 +8,14 @@ import (
 	"strings"
 )
 
-const (
-	corsMethods = "GET, HEAD, POST, PUT, PATCH, DELETE"
-	corsHeaders = "Authorization, Content-Type, Idempotency-Key"
-	corsExposed = "X-Trace-Id, traceresponse, Idempotent-Replayed"
-)
+const traceHeaders = "X-Trace-Id, traceresponse"
+
+type CORS struct {
+	Origins       []string
+	Methods       []string
+	AllowHeaders  []string
+	ExposeHeaders []string
+}
 
 func validateOrigins(origins []string) error {
 	for i, origin := range origins {
@@ -25,15 +28,16 @@ func validateOrigins(origins []string) error {
 	return nil
 }
 
-func cors(origins []string) func(http.Handler) http.Handler {
+func cors(c CORS) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
-		if len(origins) == 0 {
+		if len(c.Origins) == 0 {
 			return next
 		}
-		allowed := make(map[string]bool, len(origins))
-		for _, origin := range origins {
+		allowed := make(map[string]bool, len(c.Origins))
+		for _, origin := range c.Origins {
 			allowed[strings.ToLower(origin)] = true
 		}
+		expose := strings.Join(append([]string{traceHeaders}, c.ExposeHeaders...), ", ")
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			origin := r.Header.Get("Origin")
 			if origin == "" {
@@ -48,10 +52,10 @@ func cors(origins []string) func(http.Handler) http.Handler {
 
 			h := w.Header()
 			h.Set("Access-Control-Allow-Origin", origin)
-			h.Set("Access-Control-Expose-Headers", corsExposed)
+			h.Set("Access-Control-Expose-Headers", expose)
 			if r.Method == http.MethodOptions && r.Header.Get("Access-Control-Request-Method") != "" {
-				h.Set("Access-Control-Allow-Methods", corsMethods)
-				h.Set("Access-Control-Allow-Headers", corsHeaders)
+				h.Set("Access-Control-Allow-Methods", strings.Join(c.Methods, ", "))
+				h.Set("Access-Control-Allow-Headers", strings.Join(c.AllowHeaders, ", "))
 				h.Set("Access-Control-Max-Age", "600")
 				w.WriteHeader(http.StatusNoContent)
 				return

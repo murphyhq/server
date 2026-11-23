@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/murphyhq/server/cmd/ingest/router"
+	"github.com/murphyhq/server/internal/httpserver"
 	"github.com/murphyhq/server/internal/lifecycle"
 	"github.com/murphyhq/server/internal/messaging"
 	"github.com/murphyhq/server/internal/messaging/broker"
@@ -55,4 +56,12 @@ func New(ctx context.Context, s Settings) (_ *App, err error) {
 
 func (a *App) Close() {
 	a.resources.Close()
+}
+
+func (s Settings) CORS() httpserver.CORS {
+	return httpserver.CORS{
+		Origins:      s.CORSOrigins,
+		Methods:      []string{"POST"},
+		AllowHeaders: []string{"Authorization", "Content-Type"},
+	}
 }

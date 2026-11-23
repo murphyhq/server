@@ -21,7 +21,7 @@ import (
 type Config struct {
 	Addr            string
 	ShutdownTimeout time.Duration
-	CORSOrigins     []string
+	CORS            CORS
 }
 
 type Server struct {
@@ -30,10 +30,10 @@ type Server struct {
 }
 
 func New(cfg Config, handler http.Handler) (*Server, error) {
-	if err := validateOrigins(cfg.CORSOrigins); err != nil {
+	if err := validateOrigins(cfg.CORS.Origins); err != nil {
 		return nil, err
 	}
-	return &Server{cfg: cfg, handler: cors(cfg.CORSOrigins)(Handler(handler))}, nil
+	return &Server{cfg: cfg, handler: cors(cfg.CORS)(Handler(handler))}, nil
 }
 
 func (s *Server) Handler() http.Handler {

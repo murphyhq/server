@@ -41,7 +41,7 @@ func run(ctx context.Context) error {
 	server, err := httpserver.New(httpserver.Config{
 		Addr:            s.App.HTTPAddr,
 		ShutdownTimeout: s.Lifecycle.ShutdownTimeout,
-		CORSOrigins:     s.App.CORSOrigins,
+		CORS:            s.App.CORS(),
 	}, a.Handler)
 	if err != nil {
 		return fmt.Errorf("MURPHY_CORS_ORIGINS: %w", err)
