@@ -6,7 +6,7 @@ import (
 )
 
 const (
-	TopologyVersion    = 2
+	TopologyVersion    = 1
 	TopologyVersionKey = "murphy-topology-version"
 )
 
