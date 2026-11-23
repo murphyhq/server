@@ -232,6 +232,15 @@ paths:
             type: array
             items:
               $ref: "#/components/schemas/IncidentStatus"
+        - name: service_id
+          in: query
+          description: Only incidents of one of these services.
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              type: string
       responses:
         "200":
           description: Incidents, newest first.

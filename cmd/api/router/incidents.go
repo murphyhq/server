@@ -5,24 +5,28 @@ import (
 
 	"github.com/murphyhq/server"
 	"github.com/murphyhq/server/internal/tracer"
+	"github.com/murphyhq/server/services/incidents"
 )
 
 func (s *Server) ListIncidents(ctx context.Context, request ListIncidentsRequestObject) (_ ListIncidentsResponseObject, err error) {
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
-	var statuses []murphy.IncidentStatus
+	var filter incidents.Filter
 	if request.Params.Status != nil {
 		for _, status := range *request.Params.Status {
-			statuses = append(statuses, murphy.IncidentStatusFromText(string(status)))
+			filter.Statuses = append(filter.Statuses, murphy.IncidentStatusFromText(string(status)))
 		}
 	}
-	incidents, next, err := s.incidents.ListIncidents(ctx, statuses, page(request.Params.Limit, request.Params.Cursor))
+	if request.Params.ServiceId != nil {
+		filter.ServiceIDs = *request.Params.ServiceId
+	}
+	found, next, err := s.incidents.ListIncidents(ctx, filter, page(request.Params.Limit, request.Params.Cursor))
 	if err != nil {
 		return nil, err
 	}
-	items := make([]Incident, len(incidents))
-	for i, incident := range incidents {
+	items := make([]Incident, len(found))
+	for i, incident := range found {
 		items[i] = toIncident(incident)
 	}
 	return ListIncidents200JSONResponse{Items: items, NextCursor: next}, nil

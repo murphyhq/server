@@ -33,7 +33,13 @@ Requires Docker.
 | `docker compose --profile murphy watch` | the same, restarting components when the code changes |
 | `docker compose up` | the services only, to run a component yourself |
 
-The API is at http://localhost:8080, described by [`openapi/v1.yaml`](openapi/v1.yaml), and a fresh stack is seeded with example data. Monitoring tools send alerts to `ingest` at http://localhost:8081, described by [`openapi/ingest/v1.yaml`](openapi/ingest/v1.yaml). Logs, traces and metrics are in Grafana at http://localhost:3000 (Explore → Loki, Tempo or Prometheus).
+The API is at http://localhost:8080, described by [`openapi/v1.yaml`](openapi/v1.yaml), and a fresh stack is seeded with example data. Monitoring tools send alerts to `ingest` at http://localhost:8081, described by [`openapi/ingest/v1.yaml`](openapi/ingest/v1.yaml). Logs, traces and metrics are in Grafana at http://localhost:3000 (Explore → Loki, Tempo or Prometheus), with three linked dashboards under Dashboards → Murphy:
+
+- **Overview** follows an alert through each stage, from intake through the queue to the engine.
+- **Component** shows any component's work, database, runtime and container.
+- **Infrastructure** shows the containers, PostgreSQL, MySQL, Redis and NATS.
+
+An OpenTelemetry Collector in the stack gathers container and database server metrics, and NATS queue metrics through its exporter.
 
 To run one component yourself against those services, with Go installed:
 
@@ -54,6 +60,14 @@ End-to-end tests run against the whole stack from `docker compose --profile murp
 ```
 go test -tags e2e ./tests/e2e/...
 ```
+
+Load tests run against the same stack. `MURPHY_LOAD_PROFILE` picks the traffic: `smoke` (the default), `load`, `stress` or `soak`. CI runs all four after every merge:
+
+```
+MURPHY_LOAD_PROFILE=load go test -tags load -v ./tests/load/...
+```
+
+Each scenario writes a JSON and a Markdown report to `tests/load/reports/` (or `MURPHY_LOAD_REPORT_DIR`), and the run ends with every dashboard's data over the run in `dashboards/`. Watch a run live on the Overview dashboard.
 
 ## License
 

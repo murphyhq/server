@@ -151,11 +151,12 @@ Every kind of failure Murphy guards against is tested, without changing the code
 4. Tests MUST use `testify`: `require` for anything the rest of the test depends on, `assert` for the checks themselves.
 5. Every consumer MUST have tests for a crash between each step of its delivery handling.
 6. `tests/seed/` MUST give a fresh local stack realistic data, created only through the API and safe to run again. Every domain MUST add its data there in the PR that adds the domain.
-7. `go test ./...` MUST run the unit tests without Docker or network access. Tests under `tests/` MUST use the `integration` build tag, except end-to-end tests, which use `e2e`.
+7. `go test ./...` MUST run the unit tests without Docker or network access. Tests under `tests/` MUST use the `integration` build tag, except end-to-end tests, which use `e2e`, and load tests, which use `load`.
+8. Every load test MUST state its thresholds (share of successful requests, p99 latency) and fail when a run breaks them. Load tests MUST run the same scenarios in every profile (`smoke`, `load`, `stress`, `soak`, chosen with `MURPHY_LOAD_PROFILE`); only the traffic changes. Every run MUST write a JSON and a Markdown report per scenario, and a snapshot of every dashboard's data over the run, to `MURPHY_LOAD_REPORT_DIR`. CI MUST run every profile after every merge to `main`, against the full stack with its seed data, and keep the reports.
 
 ## Code
 
-1. Code MUST use the standard library first: no web framework, no ORM, and no dependency for what a few lines of code can do. Tests are the one exception: they use `testify`.
+1. Code MUST use the standard library first: no web framework, no ORM, and no dependency for what a few lines of code can do. Tests are the one exception: they use `testify`, and load tests generate traffic with `vegeta`.
 2. `context.Context` MUST be the first parameter of anything that does I/O.
 3. Errors MUST be wrapped with what was being done.
 4. Secrets MUST NOT appear in logs or errors.
@@ -165,9 +166,10 @@ Every kind of failure Murphy guards against is tested, without changing the code
 
 1. The Go toolchain MUST be pinned with the `toolchain` directive, and tools (`sqlc`, `oapi-codegen`, `buf`, `protoc-gen-go`, `mockery`, `goose`, `ko`, `govulncheck`) with `tool` directives, all on their latest stable versions.
 2. `gofmt`, `go vet`, `golangci-lint`, `buf lint`, `buf breaking` and `govulncheck` MUST pass.
-3. `compose.yaml` MUST provide every service the components depend on (PostgreSQL, MySQL, Redis, NATS, LocalStack, and Grafana's LGTM stack for telemetry at `localhost:3000`), MUST create every domain's database and the broker's topics and subscriptions on every start, and MUST run every component from source in its `murphy` profile: `docker compose up` starts the services only, `docker compose --profile murphy up` starts everything, and `docker compose --profile murphy watch` also restarts the components when code changes and reruns `migrate` when a migration changes.
-4. Container images MUST be built with `ko`, one per component, from `.ko.yaml`. The release workflow publishes them to `ghcr.io/murphyhq/<component>` for every `v*` tag.
-5. Dependencies MUST be kept current through Dependabot, for Go modules, GitHub Actions and the images in `compose.yaml`.
+3. `compose.yaml` MUST provide every service the components depend on (PostgreSQL, MySQL, Redis, NATS, LocalStack, and Grafana's LGTM stack for telemetry at `localhost:3000`, with an OpenTelemetry Collector that gathers container and dependency metrics), MUST create every domain's database and the broker's topics and subscriptions on every start, and MUST run every component from source in its `murphy` profile: `docker compose up` starts the services only, `docker compose --profile murphy up` starts everything, and `docker compose --profile murphy watch` also restarts the components when code changes and reruns `migrate` when a migration changes.
+4. Dashboards MUST live in `tests/provision/local/grafana/dashboards/` as JSON and be provisioned by `compose.yaml`: Overview follows an alert stage by stage, Component shows any one component, and Infrastructure shows what Murphy depends on. A change that adds a metric MUST add it to the dashboard it belongs to, a new component MUST add its stage to Overview, and a new dependency MUST add its row to Infrastructure.
+5. Container images MUST be built with `ko`, one per component, from `.ko.yaml`. The release workflow publishes them to `ghcr.io/murphyhq/<component>` for every `v*` tag.
+6. Dependencies MUST be kept current through Dependabot, for Go modules, GitHub Actions and the images in `compose.yaml`.
 
 ## Docs and comments
 

@@ -651,6 +651,9 @@ type ListIncidentsParams struct {
 
 	// Status Only incidents with one of these statuses.
 	Status *[]IncidentStatus `form:"status,omitempty" json:"status,omitempty"`
+
+	// ServiceId Only incidents of one of these services.
+	ServiceId *[]string `form:"service_id,omitempty" json:"service_id,omitempty"`
 }
 
 // RotateIntegrationKeyParams defines parameters for RotateIntegrationKey.
@@ -2658,6 +2661,18 @@ func NewListIncidentsRequest(server string, params *ListIncidentsParams) (*http.
 		if params.Status != nil {
 
 			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "status", *params.Status, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "array", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.ServiceId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "service_id", *params.ServiceId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "array", Format: ""}); err != nil {
 				return nil, err
 			} else {
 				for _, qp := range strings.Split(queryFrag, "&") {

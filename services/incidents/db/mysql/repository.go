@@ -13,6 +13,7 @@ import (
 	"github.com/murphyhq/server/internal/database"
 	murphymysql "github.com/murphyhq/server/internal/mysql"
 	"github.com/murphyhq/server/internal/tracer"
+	"github.com/murphyhq/server/services/incidents"
 )
 
 //go:embed migrations/*.sql
@@ -58,19 +59,21 @@ func (r *Repository) GetIncident(ctx context.Context, id string) (_ *murphy.Inci
 	return toIncident(row), nil
 }
 
-func (r *Repository) ListIncidents(ctx context.Context, statuses []murphy.IncidentStatus, before string, limit int) (_ []*murphy.Incident, err error) {
+func (r *Repository) ListIncidents(ctx context.Context, filter incidents.Filter, before string, limit int) (_ []*murphy.Incident, err error) {
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
-	texts := make([]string, len(statuses))
-	for i, status := range statuses {
+	texts := make([]string, len(filter.Statuses))
+	for i, status := range filter.Statuses {
 		texts[i] = status.Text()
 	}
 	rows, err := r.queries.ListIncidents(ctx, ListIncidentsParams{
-		Before:    before,
-		AnyStatus: len(texts) == 0,
-		Statuses:  texts,
-		Limit:     int32(limit),
+		Before:     before,
+		AnyStatus:  len(texts) == 0,
+		Statuses:   texts,
+		AnyService: len(filter.ServiceIDs) == 0,
+		ServiceIds: filter.ServiceIDs,
+		Limit:      int32(limit),
 	})
 	if err != nil {
 		return nil, murphymysql.Error("incident", err)

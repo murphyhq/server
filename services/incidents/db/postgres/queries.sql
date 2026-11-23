@@ -30,7 +30,9 @@ WHERE id = @id;
 -- name: ListIncidents :many
 SELECT id, number, service_id, dedup_key, title, status, urgency, version, created_at, updated_at, resolved_at
 FROM incidents
-WHERE id < @before AND (cardinality(@statuses::text[]) = 0 OR status = ANY(@statuses::text[]))
+WHERE id < @before
+  AND (cardinality(@statuses::text[]) = 0 OR status = ANY(@statuses::text[]))
+  AND (coalesce(cardinality(@service_ids::uuid[]), 0) = 0 OR service_id = ANY(@service_ids::uuid[]))
 ORDER BY id DESC
 LIMIT @max_rows;
 

@@ -17,7 +17,7 @@ type Repository interface {
 	FindOpenIncident(ctx context.Context, serviceID, dedupKey string) (*murphy.Incident, error)
 	RecordAlert(ctx context.Context, outcome *AlertOutcome) (recorded bool, err error)
 	GetIncident(ctx context.Context, id string) (*murphy.Incident, error)
-	ListIncidents(ctx context.Context, statuses []murphy.IncidentStatus, before string, limit int) ([]*murphy.Incident, error)
+	ListIncidents(ctx context.Context, filter Filter, before string, limit int) ([]*murphy.Incident, error)
 	ListTimeline(ctx context.Context, incidentID string) ([]*murphy.TimelineEntry, error)
 	LatestFiringAt(ctx context.Context, incidentID string) (time.Time, error)
 	OpenInstances(ctx context.Context, incidentID string) ([]string, error)
@@ -208,20 +208,30 @@ func (s *Service) GetIncident(ctx context.Context, id string) (_ *murphy.Inciden
 	return incident, timeline, nil
 }
 
-func (s *Service) ListIncidents(ctx context.Context, statuses []murphy.IncidentStatus, page pagination.Page) (_ []*murphy.Incident, _ string, err error) {
+type Filter struct {
+	Statuses   []murphy.IncidentStatus
+	ServiceIDs []string
+}
+
+func (s *Service) ListIncidents(ctx context.Context, filter Filter, page pagination.Page) (_ []*murphy.Incident, _ string, err error) {
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
-	for _, status := range statuses {
+	for _, status := range filter.Statuses {
 		if status == murphy.IncidentStatus_INCIDENT_STATUS_UNSPECIFIED || murphy.IncidentStatus_name[int32(status)] == "" {
 			return nil, "", &murphy.FieldError{Field: "status", Reason: "must be triggered, acknowledged or resolved"}
+		}
+	}
+	for _, id := range filter.ServiceIDs {
+		if err := murphy.LookupID("service", id); err != nil {
+			return nil, "", err
 		}
 	}
 	window, err := pagination.Resolve(page)
 	if err != nil {
 		return nil, "", err
 	}
-	incidents, err := s.repo.ListIncidents(ctx, statuses, window.Before, window.Rows())
+	incidents, err := s.repo.ListIncidents(ctx, filter, window.Before, window.Rows())
 	if err != nil {
 		return nil, "", fmt.Errorf("list incidents: %w", err)
 	}
