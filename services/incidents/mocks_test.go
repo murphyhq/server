@@ -49,6 +49,143 @@ func (_m *MockRepository) EXPECT() *MockRepository_Expecter {
 	return &MockRepository_Expecter{mock: &_m.Mock}
 }
 
+// ClaimDueMessages provides a mock function for the type MockRepository
+func (_mock *MockRepository) ClaimDueMessages(ctx context.Context, now time.Time, limit int, lease time.Duration) ([]*incidents.ScheduledMessage, error) {
+	ret := _mock.Called(ctx, now, limit, lease)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ClaimDueMessages")
+	}
+
+	var r0 []*incidents.ScheduledMessage
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, time.Time, int, time.Duration) ([]*incidents.ScheduledMessage, error)); ok {
+		return returnFunc(ctx, now, limit, lease)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, time.Time, int, time.Duration) []*incidents.ScheduledMessage); ok {
+		r0 = returnFunc(ctx, now, limit, lease)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*incidents.ScheduledMessage)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, time.Time, int, time.Duration) error); ok {
+		r1 = returnFunc(ctx, now, limit, lease)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockRepository_ClaimDueMessages_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ClaimDueMessages'
+type MockRepository_ClaimDueMessages_Call struct {
+	*mock.Call
+}
+
+// ClaimDueMessages is a helper method to define mock.On call
+//   - ctx context.Context
+//   - now time.Time
+//   - limit int
+//   - lease time.Duration
+func (_e *MockRepository_Expecter) ClaimDueMessages(ctx any, now any, limit any, lease any) *MockRepository_ClaimDueMessages_Call {
+	return &MockRepository_ClaimDueMessages_Call{Call: _e.mock.On("ClaimDueMessages", ctx, now, limit, lease)}
+}
+
+func (_c *MockRepository_ClaimDueMessages_Call) Run(run func(ctx context.Context, now time.Time, limit int, lease time.Duration)) *MockRepository_ClaimDueMessages_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 time.Time
+		if args[1] != nil {
+			arg1 = args[1].(time.Time)
+		}
+		var arg2 int
+		if args[2] != nil {
+			arg2 = args[2].(int)
+		}
+		var arg3 time.Duration
+		if args[3] != nil {
+			arg3 = args[3].(time.Duration)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_ClaimDueMessages_Call) Return(scheduledMessages []*incidents.ScheduledMessage, err error) *MockRepository_ClaimDueMessages_Call {
+	_c.Call.Return(scheduledMessages, err)
+	return _c
+}
+
+func (_c *MockRepository_ClaimDueMessages_Call) RunAndReturn(run func(ctx context.Context, now time.Time, limit int, lease time.Duration) ([]*incidents.ScheduledMessage, error)) *MockRepository_ClaimDueMessages_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// DeleteMessages provides a mock function for the type MockRepository
+func (_mock *MockRepository) DeleteMessages(ctx context.Context, ids []string) error {
+	ret := _mock.Called(ctx, ids)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteMessages")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, []string) error); ok {
+		r0 = returnFunc(ctx, ids)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockRepository_DeleteMessages_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteMessages'
+type MockRepository_DeleteMessages_Call struct {
+	*mock.Call
+}
+
+// DeleteMessages is a helper method to define mock.On call
+//   - ctx context.Context
+//   - ids []string
+func (_e *MockRepository_Expecter) DeleteMessages(ctx any, ids any) *MockRepository_DeleteMessages_Call {
+	return &MockRepository_DeleteMessages_Call{Call: _e.mock.On("DeleteMessages", ctx, ids)}
+}
+
+func (_c *MockRepository_DeleteMessages_Call) Run(run func(ctx context.Context, ids []string)) *MockRepository_DeleteMessages_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 []string
+		if args[1] != nil {
+			arg1 = args[1].([]string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_DeleteMessages_Call) Return(err error) *MockRepository_DeleteMessages_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockRepository_DeleteMessages_Call) RunAndReturn(run func(ctx context.Context, ids []string) error) *MockRepository_DeleteMessages_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // FindOpenIncident provides a mock function for the type MockRepository
 func (_mock *MockRepository) FindOpenIncident(ctx context.Context, serviceID string, dedupKey string) (*murphy.Incident, error) {
 	ret := _mock.Called(ctx, serviceID, dedupKey)
@@ -539,53 +676,53 @@ func (_c *MockRepository_PurgeHandledMessages_Call) RunAndReturn(run func(ctx co
 	return _c
 }
 
-// RecordAlert provides a mock function for the type MockRepository
-func (_mock *MockRepository) RecordAlert(ctx context.Context, outcome *incidents.AlertOutcome) (bool, error) {
-	ret := _mock.Called(ctx, outcome)
+// Record provides a mock function for the type MockRepository
+func (_mock *MockRepository) Record(ctx context.Context, change *incidents.Change) (bool, error) {
+	ret := _mock.Called(ctx, change)
 
 	if len(ret) == 0 {
-		panic("no return value specified for RecordAlert")
+		panic("no return value specified for Record")
 	}
 
 	var r0 bool
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *incidents.AlertOutcome) (bool, error)); ok {
-		return returnFunc(ctx, outcome)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *incidents.Change) (bool, error)); ok {
+		return returnFunc(ctx, change)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *incidents.AlertOutcome) bool); ok {
-		r0 = returnFunc(ctx, outcome)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *incidents.Change) bool); ok {
+		r0 = returnFunc(ctx, change)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, *incidents.AlertOutcome) error); ok {
-		r1 = returnFunc(ctx, outcome)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *incidents.Change) error); ok {
+		r1 = returnFunc(ctx, change)
 	} else {
 		r1 = ret.Error(1)
 	}
 	return r0, r1
 }
 
-// MockRepository_RecordAlert_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RecordAlert'
-type MockRepository_RecordAlert_Call struct {
+// MockRepository_Record_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Record'
+type MockRepository_Record_Call struct {
 	*mock.Call
 }
 
-// RecordAlert is a helper method to define mock.On call
+// Record is a helper method to define mock.On call
 //   - ctx context.Context
-//   - outcome *incidents.AlertOutcome
-func (_e *MockRepository_Expecter) RecordAlert(ctx any, outcome any) *MockRepository_RecordAlert_Call {
-	return &MockRepository_RecordAlert_Call{Call: _e.mock.On("RecordAlert", ctx, outcome)}
+//   - change *incidents.Change
+func (_e *MockRepository_Expecter) Record(ctx any, change any) *MockRepository_Record_Call {
+	return &MockRepository_Record_Call{Call: _e.mock.On("Record", ctx, change)}
 }
 
-func (_c *MockRepository_RecordAlert_Call) Run(run func(ctx context.Context, outcome *incidents.AlertOutcome)) *MockRepository_RecordAlert_Call {
+func (_c *MockRepository_Record_Call) Run(run func(ctx context.Context, change *incidents.Change)) *MockRepository_Record_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
 			arg0 = args[0].(context.Context)
 		}
-		var arg1 *incidents.AlertOutcome
+		var arg1 *incidents.Change
 		if args[1] != nil {
-			arg1 = args[1].(*incidents.AlertOutcome)
+			arg1 = args[1].(*incidents.Change)
 		}
 		run(
 			arg0,
@@ -595,12 +732,12 @@ func (_c *MockRepository_RecordAlert_Call) Run(run func(ctx context.Context, out
 	return _c
 }
 
-func (_c *MockRepository_RecordAlert_Call) Return(recorded bool, err error) *MockRepository_RecordAlert_Call {
+func (_c *MockRepository_Record_Call) Return(recorded bool, err error) *MockRepository_Record_Call {
 	_c.Call.Return(recorded, err)
 	return _c
 }
 
-func (_c *MockRepository_RecordAlert_Call) RunAndReturn(run func(ctx context.Context, outcome *incidents.AlertOutcome) (bool, error)) *MockRepository_RecordAlert_Call {
+func (_c *MockRepository_Record_Call) RunAndReturn(run func(ctx context.Context, change *incidents.Change) (bool, error)) *MockRepository_Record_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -18,7 +18,7 @@ type fixture struct {
 	service     *incidents.Service
 	repo        *MockRepository
 	integration *murphy.Integration
-	recorded    *incidents.AlertOutcome
+	recorded    *incidents.Change
 }
 
 func setup(t *testing.T) *fixture {
@@ -42,7 +42,7 @@ func setup(t *testing.T) *fixture {
 		Urgency: murphy.Urgency_URGENCY_LOW,
 		Status:  murphy.ServiceStatus_SERVICE_STATUS_ACTIVE,
 	}, nil).Maybe()
-	repo.EXPECT().RecordAlert(mock.Anything, mock.Anything).RunAndReturn(func(_ context.Context, outcome *incidents.AlertOutcome) (bool, error) {
+	repo.EXPECT().Record(mock.Anything, mock.Anything).RunAndReturn(func(_ context.Context, outcome *incidents.Change) (bool, error) {
 		f.recorded = outcome
 		return true, nil
 	}).Maybe()

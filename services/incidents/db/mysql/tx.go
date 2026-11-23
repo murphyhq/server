@@ -6,13 +6,17 @@ import (
 	"fmt"
 	"time"
 
+	"google.golang.org/protobuf/proto"
+
 	"github.com/murphyhq/server"
 	"github.com/murphyhq/server/internal/database"
 	murphymysql "github.com/murphyhq/server/internal/mysql"
 	"github.com/murphyhq/server/internal/tracer"
+	"github.com/murphyhq/server/services/incidents"
 )
 
 type Tx struct {
+	tx      murphymysql.DBTX
 	queries *Queries
 }
 
@@ -42,6 +46,13 @@ func (t *Tx) CreateIncident(ctx context.Context, incident *murphy.Incident) (err
 		CreatedAt:  incident.GetCreatedAt().AsTime(),
 		UpdatedAt:  incident.GetUpdatedAt().AsTime(),
 		ResolvedAt: database.Time(incident.GetResolvedAt()),
+
+		EscalationPolicyID:      incident.GetEscalationPolicyId(),
+		EscalationPolicyVersion: incident.GetEscalationPolicyVersion(),
+		EscalationLevel:         incident.GetEscalationLevel(),
+		EscalationRound:         incident.GetEscalationRound(),
+		EscalationExhausted:     incident.GetEscalationExhausted(),
+		AcknowledgedAt:          database.Time(incident.GetAcknowledgedAt()),
 	})
 	if err != nil {
 		return murphymysql.Error("incident", err)
@@ -64,6 +75,11 @@ func (t *Tx) UpdateIncident(ctx context.Context, incident *murphy.Incident) (err
 		Status:     incident.GetStatus().Text(),
 		ResolvedAt: database.Time(incident.GetResolvedAt()),
 		UpdatedAt:  incident.GetUpdatedAt().AsTime(),
+
+		AcknowledgedAt:      database.Time(incident.GetAcknowledgedAt()),
+		EscalationLevel:     incident.GetEscalationLevel(),
+		EscalationRound:     incident.GetEscalationRound(),
+		EscalationExhausted: incident.GetEscalationExhausted(),
 	})
 	if err != nil {
 		return murphymysql.Error("incident", err)
@@ -107,12 +123,59 @@ func (t *Tx) CreateTimelineEntry(ctx context.Context, entry *murphy.TimelineEntr
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
+	details, err := proto.Marshal(entry)
+	if err != nil {
+		return fmt.Errorf("encode timeline entry: %w", err)
+	}
 	return murphymysql.Error("timeline entry", t.queries.CreateTimelineEntry(ctx, CreateTimelineEntryParams{
 		ID:         entry.GetId(),
 		IncidentID: entry.GetIncidentId(),
 		Type:       entry.GetType().Text(),
-		AlertID:    database.Text(entry.GetAlertId()),
 		Summary:    entry.GetSummary(),
+		Details:    details,
 		CreatedAt:  entry.GetAt().AsTime(),
 	}))
+}
+
+func (t *Tx) CreateScheduledMessages(ctx context.Context, messages []*incidents.ScheduledMessage, at time.Time) (err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	rows := murphymysql.Rows{Name: "CreateScheduledMessages", Table: "scheduled_messages", Columns: []string{"id", "incident_id", "kind", "due_at", "envelope", "created_at"}}
+	for _, message := range messages {
+		rows.Values = append(rows.Values, []any{message.ID, message.IncidentID, string(message.Kind), message.DueAt.UTC(), message.Envelope, at})
+	}
+	return murphymysql.Error("scheduled message", murphymysql.Insert(ctx, t.tx, rows))
+}
+
+func (t *Tx) DeleteTimers(ctx context.Context, incidentID string) (err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	return murphymysql.Error("scheduled message", t.queries.DeleteTimers(ctx, incidentID))
+}
+
+func (t *Tx) LockDueMessages(ctx context.Context, now time.Time, limit int) (_ []*incidents.ScheduledMessage, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	rows, err := t.queries.LockDueMessages(ctx, LockDueMessagesParams{Now: now.UTC(), ClaimsExpireBy: &now, Limit: int32(limit)})
+	if err != nil {
+		return nil, murphymysql.Error("scheduled message", err)
+	}
+	messages := make([]*incidents.ScheduledMessage, len(rows))
+	for i, row := range rows {
+		messages[i] = &incidents.ScheduledMessage{
+			ID: row.ID, IncidentID: row.IncidentID, Kind: incidents.MessageKind(row.Kind), DueAt: row.DueAt, Envelope: row.Envelope,
+		}
+	}
+	return messages, nil
+}
+
+func (t *Tx) ClaimMessages(ctx context.Context, ids []string, until time.Time) (err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	until = until.UTC()
+	return murphymysql.Error("scheduled message", t.queries.ClaimMessages(ctx, ClaimMessagesParams{ClaimedUntil: &until, Ids: ids}))
 }

@@ -19,6 +19,27 @@ message Incident {
   google.protobuf.Timestamp created_at = 9;
   google.protobuf.Timestamp updated_at = 10;
   google.protobuf.Timestamp resolved_at = 11;
+  string escalation_policy_id = 12;
+  int32 escalation_policy_version = 13;
+  int32 escalation_level = 14;
+  int32 escalation_round = 15;
+  bool escalation_exhausted = 16;
+  google.protobuf.Timestamp acknowledged_at = 17;
+}
+
+message IncidentEvent {
+  IncidentVerb verb = 1;
+  Incident previous = 2;
+  Incident current = 3;
+}
+
+enum IncidentVerb {
+  INCIDENT_VERB_UNSPECIFIED = 0;
+  INCIDENT_VERB_CREATED = 1;
+  INCIDENT_VERB_UPDATED = 2;
+  INCIDENT_VERB_ESCALATED = 3;
+  INCIDENT_VERB_ACKNOWLEDGED = 4;
+  INCIDENT_VERB_RESOLVED = 5;
 }
 
 enum IncidentStatus {
@@ -35,6 +56,13 @@ message TimelineEntry {
   string alert_id = 4;
   string summary = 5;
   google.protobuf.Timestamp at = 6;
+  TimelineEscalation escalation = 7;
+}
+
+message TimelineEscalation {
+  int32 level = 1;
+  int32 round = 2;
+  repeated string user_ids = 3;
 }
 
 enum TimelineEntryType {
@@ -43,4 +71,26 @@ enum TimelineEntryType {
   TIMELINE_ENTRY_TYPE_ALERTED = 2;
   TIMELINE_ENTRY_TYPE_ACKNOWLEDGED = 3;
   TIMELINE_ENTRY_TYPE_RESOLVED = 4;
+  TIMELINE_ENTRY_TYPE_ESCALATED = 5;
+  TIMELINE_ENTRY_TYPE_ESCALATION_SKIPPED = 6;
+  TIMELINE_ENTRY_TYPE_ESCALATION_EXHAUSTED = 7;
+}
+
+message Timer {
+  string id = 1;
+  string incident_id = 2;
+  int32 escalation_level = 3;
+  int32 escalation_round = 4;
+  google.protobuf.Timestamp due_at = 5;
+}
+
+message TimerEvent {
+  TimerVerb verb = 1;
+  Timer previous = 2;
+  Timer current = 3;
+}
+
+enum TimerVerb {
+  TIMER_VERB_UNSPECIFIED = 0;
+  TIMER_VERB_EXPIRED = 1;
 }

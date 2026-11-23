@@ -15,13 +15,15 @@ import (
 
 type Repository interface {
 	FindOpenIncident(ctx context.Context, serviceID, dedupKey string) (*murphy.Incident, error)
-	RecordAlert(ctx context.Context, outcome *AlertOutcome) (recorded bool, err error)
+	Record(ctx context.Context, change *Change) (recorded bool, err error)
 	GetIncident(ctx context.Context, id string) (*murphy.Incident, error)
 	ListIncidents(ctx context.Context, filter Filter, before string, limit int) ([]*murphy.Incident, error)
 	ListTimeline(ctx context.Context, incidentID string) ([]*murphy.TimelineEntry, error)
 	LatestFiringAt(ctx context.Context, incidentID string) (time.Time, error)
 	OpenInstances(ctx context.Context, incidentID string) ([]string, error)
 	PurgeHandledMessages(ctx context.Context, before time.Time) (int64, error)
+	ClaimDueMessages(ctx context.Context, now time.Time, limit int, lease time.Duration) ([]*ScheduledMessage, error)
+	DeleteMessages(ctx context.Context, ids []string) error
 }
 
 type Catalog interface {
@@ -29,13 +31,30 @@ type Catalog interface {
 	GetService(ctx context.Context, id string) (*murphy.Service, error)
 }
 
-type AlertOutcome struct {
-	MessageID  string
-	Alert      *murphy.Alert
+type Change struct {
+	MessageID    string
+	IncidentID   string
+	Created      *murphy.Incident
+	Updated      *murphy.Incident
+	Alert        *murphy.Alert
+	CancelTimers bool
+	Timeline     []*murphy.TimelineEntry
+	Messages     []*ScheduledMessage
+}
+
+type MessageKind string
+
+const (
+	MessageEvent MessageKind = "event"
+	MessageTimer MessageKind = "timer"
+)
+
+type ScheduledMessage struct {
+	ID         string
 	IncidentID string
-	Created    *murphy.Incident
-	Updated    *murphy.Incident
-	Timeline   []*murphy.TimelineEntry
+	Kind       MessageKind
+	DueAt      time.Time
+	Envelope   []byte
 }
 
 const (
@@ -75,7 +94,7 @@ func (s *Service) AlertReceived(ctx context.Context, messageID string, alert *mu
 	}
 
 	now := murphy.Now()
-	outcome := &AlertOutcome{MessageID: messageID, Alert: alert}
+	outcome := &Change{MessageID: messageID, Alert: alert}
 	firing := alert.GetStatus() == murphy.AlertStatus_ALERT_STATUS_FIRING
 	switch {
 	case open == nil && firing:
@@ -116,7 +135,7 @@ func (s *Service) AlertReceived(ctx context.Context, messageID string, alert *mu
 		ctx = span.Set(ctx, telemetry.WithField("incident.id", outcome.IncidentID))
 	}
 
-	recorded, err := s.repo.RecordAlert(ctx, outcome)
+	recorded, err := s.repo.Record(ctx, outcome)
 	if err != nil {
 		return fmt.Errorf("record alert: %w", err)
 	}
