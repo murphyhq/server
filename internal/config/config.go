@@ -75,6 +75,17 @@ func parse(v reflect.Value, raw string) error {
 		return nil
 	}
 
+	if v.Type() == reflect.TypeFor[[]string]() {
+		var values []string
+		for _, part := range strings.Split(raw, ",") {
+			if part = strings.TrimSpace(part); part != "" {
+				values = append(values, part)
+			}
+		}
+		v.Set(reflect.ValueOf(values))
+		return nil
+	}
+
 	switch v.Kind() {
 	case reflect.String:
 		v.SetString(raw)

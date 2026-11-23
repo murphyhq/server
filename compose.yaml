@@ -189,6 +189,7 @@ services:
       MURPHY_INCIDENTS_DATABASE_URL: postgres://murphy:murphy@postgres:5432/incidents?sslmode=disable
       MURPHY_IDEMPOTENCY_STORE_URL: redis://redis:6379/0
       MURPHY_INTEGRATION_KEY_SECRETS: *integration-key-secrets
+      MURPHY_CORS_ORIGINS: http://localhost:8090
     ports:
       - "8080:8080"
     depends_on:

@@ -65,3 +65,23 @@ func TestLoadNeverPutsValuesInErrors(t *testing.T) {
 	require.Error(t, err)
 	assert.NotContains(t, err.Error(), "s3cr3t")
 }
+
+type listed struct {
+	Origins []string `env:"CORS_ORIGINS"`
+}
+
+func TestLoadReadsCommaSeparatedLists(t *testing.T) {
+	t.Setenv("MURPHY_CORS_ORIGINS", " http://localhost:8090, https://app.example.com ,")
+
+	var s listed
+	require.NoError(t, config.Load(&s))
+
+	assert.Equal(t, []string{"http://localhost:8090", "https://app.example.com"}, s.Origins)
+}
+
+func TestLoadLeavesAnEmptyListEmpty(t *testing.T) {
+	var s listed
+	require.NoError(t, config.Load(&s))
+
+	assert.Empty(t, s.Origins)
+}

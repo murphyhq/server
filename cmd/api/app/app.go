@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/murphyhq/server/cmd/api/router"
+	"github.com/murphyhq/server/internal/httpserver"
 	idempotencystore "github.com/murphyhq/server/internal/idempotency/store"
 	"github.com/murphyhq/server/internal/lifecycle"
 	"github.com/murphyhq/server/services/catalog"
@@ -15,11 +16,12 @@ import (
 )
 
 type Settings struct {
-	HTTPAddr              string `env:"HTTP_ADDR" default:":8080"`
-	CatalogDatabaseURL    string `env:"CATALOG_DATABASE_URL" required:"true"`
-	IncidentsDatabaseURL  string `env:"INCIDENTS_DATABASE_URL" required:"true"`
-	IdempotencyStoreURL   string `env:"IDEMPOTENCY_STORE_URL" required:"true"`
-	IntegrationKeySecrets string `env:"INTEGRATION_KEY_SECRETS" required:"true"`
+	HTTPAddr              string   `env:"HTTP_ADDR" default:":8080"`
+	CatalogDatabaseURL    string   `env:"CATALOG_DATABASE_URL" required:"true"`
+	IncidentsDatabaseURL  string   `env:"INCIDENTS_DATABASE_URL" required:"true"`
+	IdempotencyStoreURL   string   `env:"IDEMPOTENCY_STORE_URL" required:"true"`
+	IntegrationKeySecrets string   `env:"INTEGRATION_KEY_SECRETS" required:"true"`
+	CORSOrigins           []string `env:"CORS_ORIGINS"`
 }
 
 type App struct {
@@ -29,6 +31,10 @@ type App struct {
 }
 
 func New(ctx context.Context, s Settings) (_ *App, err error) {
+	if err := httpserver.ValidateOrigins(s.CORSOrigins); err != nil {
+		return nil, fmt.Errorf("MURPHY_CORS_ORIGINS: %w", err)
+	}
+
 	a := &App{}
 	defer func() {
 		if err != nil {
@@ -60,10 +66,11 @@ func New(ctx context.Context, s Settings) (_ *App, err error) {
 	}
 
 	catalogService := catalog.New(catalogStorage, keyring)
-	a.Handler, err = router.New(catalogService, incidents.New(incidentsStorage, catalogService), keys)
+	handler, err := router.New(catalogService, incidents.New(incidentsStorage, catalogService), keys)
 	if err != nil {
 		return nil, err
 	}
+	a.Handler = httpserver.CORS(s.CORSOrigins)(handler)
 	a.Ready = a.resources.Checks()
 	return a, nil
 }
