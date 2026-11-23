@@ -121,6 +121,43 @@ func (q *Queries) GetIntegration(ctx context.Context, id string) (Integration, e
 	return i, err
 }
 
+const getIntegrationAndService = `-- name: GetIntegrationAndService :one
+SELECT i.id, i.service_id, i.name, i.type, i.key_version, i.previous_key_valid_until, i.status, i.created_at, i.updated_at, s.id, s.name, s.description, s.escalation_policy_id, s.urgency, s.status, s.created_at, s.updated_at
+FROM integrations AS i
+JOIN services AS s ON s.id = i.service_id
+WHERE i.id = ?
+`
+
+type GetIntegrationAndServiceRow struct {
+	Integration Integration
+	Service     Service
+}
+
+func (q *Queries) GetIntegrationAndService(ctx context.Context, id string) (GetIntegrationAndServiceRow, error) {
+	row := q.db.QueryRowContext(ctx, getIntegrationAndService, id)
+	var i GetIntegrationAndServiceRow
+	err := row.Scan(
+		&i.Integration.ID,
+		&i.Integration.ServiceID,
+		&i.Integration.Name,
+		&i.Integration.Type,
+		&i.Integration.KeyVersion,
+		&i.Integration.PreviousKeyValidUntil,
+		&i.Integration.Status,
+		&i.Integration.CreatedAt,
+		&i.Integration.UpdatedAt,
+		&i.Service.ID,
+		&i.Service.Name,
+		&i.Service.Description,
+		&i.Service.EscalationPolicyID,
+		&i.Service.Urgency,
+		&i.Service.Status,
+		&i.Service.CreatedAt,
+		&i.Service.UpdatedAt,
+	)
+	return i, err
+}
+
 const getService = `-- name: GetService :one
 SELECT id, name, description, escalation_policy_id, urgency, status, created_at, updated_at
 FROM services

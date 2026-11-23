@@ -58,3 +58,9 @@ WHERE id = @id;
 SELECT EXISTS (
   SELECT 1 FROM services WHERE escalation_policy_id = @escalation_policy_id
 ) AS in_use;
+
+-- name: GetIntegrationAndService :one
+SELECT sqlc.embed(i), sqlc.embed(s)
+FROM integrations AS i
+JOIN services AS s ON s.id = i.service_id
+WHERE i.id = @id;

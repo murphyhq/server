@@ -19,6 +19,7 @@ import (
 type fixture struct {
 	service     *incidents.Service
 	repo        *MockRepository
+	policies    *MockPolicies
 	integration *murphy.Integration
 	policy      *murphy.EscalationPolicy
 	onCall      map[string]string
@@ -37,8 +38,9 @@ func setup(t *testing.T) *fixture {
 	repo, catalog := NewMockRepository(t), NewMockCatalog(t)
 	policies, oncall, people := NewMockPolicies(t), NewMockOnCall(t), NewMockPeople(t)
 	f := &fixture{
-		service: incidents.New(repo, catalog, policies, oncall, people),
-		repo:    repo,
+		service:  incidents.New(repo, catalog, policies, oncall, people),
+		repo:     repo,
+		policies: policies,
 		policy: &murphy.EscalationPolicy{
 			Id: murphy.NewID(), Version: 3, RepeatCount: 1,
 			Levels: []*murphy.EscalationLevel{
@@ -56,18 +58,16 @@ func setup(t *testing.T) *fixture {
 			Status:     murphy.IntegrationStatus_INTEGRATION_STATUS_ACTIVE,
 		},
 	}
-	catalog.EXPECT().GetIntegration(mock.Anything, mock.Anything).RunAndReturn(func(context.Context, string) (*murphy.Integration, error) {
-		return f.integration, nil
-	}).Maybe()
-	catalog.EXPECT().GetService(mock.Anything, mock.Anything).RunAndReturn(func(context.Context, string) (*murphy.Service, error) {
-		return &murphy.Service{
+	catalog.EXPECT().GetIntegrationAndService(mock.Anything, mock.Anything).RunAndReturn(func(context.Context, string) (*murphy.Integration, *murphy.Service, error) {
+		return f.integration, &murphy.Service{
+			Id:                 f.integration.GetServiceId(),
 			Urgency:            murphy.Urgency_URGENCY_LOW,
 			Status:             murphy.ServiceStatus_SERVICE_STATUS_ACTIVE,
 			EscalationPolicyId: f.policy.GetId(),
 		}, nil
 	}).Maybe()
-	policies.EXPECT().GetPolicy(mock.Anything, mock.Anything).RunAndReturn(func(context.Context, string) (*murphy.EscalationPolicy, error) {
-		return f.policy, nil
+	policies.EXPECT().CurrentVersion(mock.Anything, mock.Anything).RunAndReturn(func(context.Context, string) (int32, error) {
+		return f.policy.GetVersion(), nil
 	}).Maybe()
 	policies.EXPECT().GetPolicyVersion(mock.Anything, mock.Anything, mock.Anything).RunAndReturn(func(context.Context, string, int32) (*murphy.EscalationPolicy, error) {
 		return f.policy, nil
@@ -484,4 +484,14 @@ func pagedUsers(entry *murphy.TimelineEntry) []string {
 		users = append(users, page.GetUserId())
 	}
 	return users
+}
+
+func TestAPolicyVersionIsReadOnceAndReused(t *testing.T) {
+	f := setup(t)
+	first, second := f.triggered(0, 1), f.triggered(0, 1)
+
+	require.NoError(t, f.service.TimerExpired(t.Context(), "message-1", timer(first, 1, 1)))
+	require.NoError(t, f.service.TimerExpired(t.Context(), "message-2", timer(second, 1, 1)))
+
+	f.policies.AssertNumberOfCalls(t, "GetPolicyVersion", 1)
 }

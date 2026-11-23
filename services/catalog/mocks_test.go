@@ -344,6 +344,82 @@ func (_c *MockRepository_GetIntegration_Call) RunAndReturn(run func(ctx context.
 	return _c
 }
 
+// GetIntegrationAndService provides a mock function for the type MockRepository
+func (_mock *MockRepository) GetIntegrationAndService(ctx context.Context, integrationID string) (*murphy.Integration, *murphy.Service, error) {
+	ret := _mock.Called(ctx, integrationID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetIntegrationAndService")
+	}
+
+	var r0 *murphy.Integration
+	var r1 *murphy.Service
+	var r2 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (*murphy.Integration, *murphy.Service, error)); ok {
+		return returnFunc(ctx, integrationID)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) *murphy.Integration); ok {
+		r0 = returnFunc(ctx, integrationID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*murphy.Integration)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string) *murphy.Service); ok {
+		r1 = returnFunc(ctx, integrationID)
+	} else {
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(*murphy.Service)
+		}
+	}
+	if returnFunc, ok := ret.Get(2).(func(context.Context, string) error); ok {
+		r2 = returnFunc(ctx, integrationID)
+	} else {
+		r2 = ret.Error(2)
+	}
+	return r0, r1, r2
+}
+
+// MockRepository_GetIntegrationAndService_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetIntegrationAndService'
+type MockRepository_GetIntegrationAndService_Call struct {
+	*mock.Call
+}
+
+// GetIntegrationAndService is a helper method to define mock.On call
+//   - ctx context.Context
+//   - integrationID string
+func (_e *MockRepository_Expecter) GetIntegrationAndService(ctx any, integrationID any) *MockRepository_GetIntegrationAndService_Call {
+	return &MockRepository_GetIntegrationAndService_Call{Call: _e.mock.On("GetIntegrationAndService", ctx, integrationID)}
+}
+
+func (_c *MockRepository_GetIntegrationAndService_Call) Run(run func(ctx context.Context, integrationID string)) *MockRepository_GetIntegrationAndService_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_GetIntegrationAndService_Call) Return(integration *murphy.Integration, service *murphy.Service, err error) *MockRepository_GetIntegrationAndService_Call {
+	_c.Call.Return(integration, service, err)
+	return _c
+}
+
+func (_c *MockRepository_GetIntegrationAndService_Call) RunAndReturn(run func(ctx context.Context, integrationID string) (*murphy.Integration, *murphy.Service, error)) *MockRepository_GetIntegrationAndService_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetService provides a mock function for the type MockRepository
 func (_mock *MockRepository) GetService(ctx context.Context, id string) (*murphy.Service, error) {
 	ret := _mock.Called(ctx, id)

@@ -18,6 +18,7 @@ type Repository interface {
 	UpdatePolicy(ctx context.Context, policy *murphy.EscalationPolicy) error
 	DeletePolicy(ctx context.Context, id string) error
 	GetPolicyVersion(ctx context.Context, id string, version int32) (*murphy.EscalationPolicy, error)
+	CurrentVersion(ctx context.Context, id string) (int32, error)
 }
 
 type People interface {
@@ -219,4 +220,19 @@ func (s *Service) GetPolicyVersion(ctx context.Context, id string, version int32
 		return nil, fmt.Errorf("get escalation policy version: %w", err)
 	}
 	return policy, nil
+}
+
+func (s *Service) CurrentVersion(ctx context.Context, id string) (_ int32, err error) {
+	ctx, span := tracer.Span(ctx)
+	ctx = span.Set(ctx, telemetry.WithField("escalation_policy.id", id))
+	defer span.End(&err)
+
+	if err := murphy.LookupID("escalation policy", id); err != nil {
+		return 0, err
+	}
+	version, err := s.repo.CurrentVersion(ctx, id)
+	if err != nil {
+		return 0, fmt.Errorf("get the escalation policy's current version: %w", err)
+	}
+	return version, nil
 }

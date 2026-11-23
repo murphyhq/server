@@ -110,6 +110,19 @@ func (q *Queries) CreateVersion(ctx context.Context, arg CreateVersionParams) er
 	return err
 }
 
+const currentVersion = `-- name: CurrentVersion :one
+SELECT version
+FROM escalation_policies
+WHERE id = $1 AND deleted_at IS NULL
+`
+
+func (q *Queries) CurrentVersion(ctx context.Context, id string) (int32, error) {
+	row := q.db.QueryRow(ctx, currentVersion, id)
+	var version int32
+	err := row.Scan(&version)
+	return version, err
+}
+
 const deletePolicy = `-- name: DeletePolicy :execrows
 UPDATE escalation_policies
 SET deleted_at = $1

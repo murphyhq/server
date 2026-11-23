@@ -56,3 +56,8 @@ SELECT unnest(@ids::uuid[]), @version_id::uuid, unnest(@positions::integer[]), u
 -- name: CreateLevelTargets :exec
 INSERT INTO level_targets (id, level_id, position, target_type, target_id, created_at)
 SELECT unnest(@ids::uuid[]), unnest(@level_ids::uuid[]), unnest(@positions::integer[]), unnest(@target_types::text[]), unnest(@target_ids::uuid[]), @created_at::timestamptz;
+
+-- name: CurrentVersion :one
+SELECT version
+FROM escalation_policies
+WHERE id = @id AND deleted_at IS NULL;

@@ -228,3 +228,14 @@ func (r *Repository) PolicyInUse(ctx context.Context, policyID string) (_ bool, 
 	}
 	return inUse, nil
 }
+
+func (r *Repository) GetIntegrationAndService(ctx context.Context, integrationID string) (_ *murphy.Integration, _ *murphy.Service, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	row, err := r.queries.GetIntegrationAndService(ctx, integrationID)
+	if err != nil {
+		return nil, nil, murphymysql.Error("integration", err)
+	}
+	return toIntegration(row.Integration), toService(row.Service), nil
+}
