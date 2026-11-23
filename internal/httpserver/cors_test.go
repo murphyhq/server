@@ -11,21 +11,19 @@ import (
 	"github.com/murphyhq/server/internal/httpserver"
 )
 
-func cors(t *testing.T, origins ...string) http.Handler {
+func withOrigins(t *testing.T, route http.Handler, origins ...string) http.Handler {
 	t.Helper()
-	ok := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
-	middleware, err := httpserver.CORS(origins)
+	server, err := httpserver.New(httpserver.Config{CORSOrigins: origins}, route)
 	require.NoError(t, err)
-	return middleware(ok)
+	return server.Handler()
 }
 
-func corsErr(origins ...string) error {
-	_, err := httpserver.CORS(origins)
-	return err
+func ok() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
 }
 
 func TestCORSAllowsOnlyConfiguredOrigins(t *testing.T) {
-	handler := cors(t, "http://localhost:8090")
+	handler := withOrigins(t, ok(), "http://localhost:8090")
 
 	allowed := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/v1/services", nil)
@@ -44,9 +42,7 @@ func TestCORSAllowsOnlyConfiguredOrigins(t *testing.T) {
 func TestCORSAnswersPreflightWithoutReachingTheRoute(t *testing.T) {
 	reached := false
 	route := http.HandlerFunc(func(http.ResponseWriter, *http.Request) { reached = true })
-	middleware, err := httpserver.CORS([]string{"http://localhost:8090"})
-	require.NoError(t, err)
-	handler := middleware(route)
+	handler := withOrigins(t, route, "http://localhost:8090")
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodOptions, "/v1/services", nil)
@@ -63,23 +59,26 @@ func TestCORSSendsNothingWithoutConfiguredOrigins(t *testing.T) {
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/v1/services", nil)
 	req.Header.Set("Origin", "http://localhost:8090")
-	cors(t).ServeHTTP(rec, req)
+	withOrigins(t, ok()).ServeHTTP(rec, req)
 
 	assert.Equal(t, http.StatusOK, rec.Code)
 	assert.Empty(t, rec.Header().Get("Access-Control-Allow-Origin"))
 }
 
-func TestCORSAcceptsOnlyBareOrigins(t *testing.T) {
-	require.NoError(t, corsErr())
-	require.NoError(t, corsErr("http://localhost:8090", "https://app.example.com:8443"))
+func TestNewRejectsOnlyBareOrigins(t *testing.T) {
+	for _, valid := range [][]string{nil, {"http://localhost:8090", "https://app.example.com:8443"}} {
+		_, err := httpserver.New(httpserver.Config{CORSOrigins: valid}, ok())
+		require.NoError(t, err)
+	}
 
 	for _, bad := range []string{"*", "example.com", "ftp://example.com", "https://app.example.com/", "https://app.example.com/path", "https://user@app.example.com"} {
-		assert.Error(t, corsErr(bad), bad)
+		_, err := httpserver.New(httpserver.Config{CORSOrigins: []string{bad}}, ok())
+		assert.Error(t, err, bad)
 	}
 }
 
-func TestCORSErrorsNeverEchoTheValue(t *testing.T) {
-	err := corsErr("https://app.example.com", "s3cret-host")
+func TestNewErrorsNeverEchoTheValue(t *testing.T) {
+	_, err := httpserver.New(httpserver.Config{CORSOrigins: []string{"https://app.example.com", "s3cret-host"}}, ok())
 	require.Error(t, err)
 	assert.ErrorContains(t, err, "entry 2")
 	assert.NotContains(t, err.Error(), "s3cret-host")

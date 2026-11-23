@@ -11,7 +11,7 @@ import (
 const (
 	corsMethods = "GET, HEAD, POST, PUT, PATCH, DELETE"
 	corsHeaders = "Authorization, Content-Type, Idempotency-Key"
-	corsExposed = "X-Trace-Id, traceresponse"
+	corsExposed = "X-Trace-Id, traceresponse, Idempotent-Replayed"
 )
 
 func validateOrigins(origins []string) error {
@@ -25,10 +25,7 @@ func validateOrigins(origins []string) error {
 	return nil
 }
 
-func CORS(origins []string) (func(http.Handler) http.Handler, error) {
-	if err := validateOrigins(origins); err != nil {
-		return nil, err
-	}
+func cors(origins []string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		if len(origins) == 0 {
 			return next
@@ -61,5 +58,5 @@ func CORS(origins []string) (func(http.Handler) http.Handler, error) {
 			}
 			next.ServeHTTP(w, r)
 		})
-	}, nil
+	}
 }

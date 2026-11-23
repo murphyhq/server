@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"os"
 
 	"github.com/murphyhq/server/cmd/api/app"
@@ -37,7 +38,16 @@ func run(ctx context.Context) error {
 	}
 	defer a.Close()
 
+	server, err := httpserver.New(httpserver.Config{
+		Addr:            s.App.HTTPAddr,
+		ShutdownTimeout: s.Lifecycle.ShutdownTimeout,
+		CORSOrigins:     s.App.CORSOrigins,
+	}, a.Handler)
+	if err != nil {
+		return fmt.Errorf("MURPHY_CORS_ORIGINS: %w", err)
+	}
+
 	return lifecycle.Run(ctx, "api", s.Lifecycle, func(ctx context.Context) error {
-		return httpserver.Serve(ctx, httpserver.Config{Addr: s.App.HTTPAddr, ShutdownTimeout: s.Lifecycle.ShutdownTimeout}, a.Handler)
+		return server.Serve(ctx)
 	}, a.Ready...)
 }

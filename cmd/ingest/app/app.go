@@ -6,7 +6,6 @@ import (
 	"net/http"
 
 	"github.com/murphyhq/server/cmd/ingest/router"
-	"github.com/murphyhq/server/internal/httpserver"
 	"github.com/murphyhq/server/internal/lifecycle"
 	"github.com/murphyhq/server/internal/messaging"
 	"github.com/murphyhq/server/internal/messaging/broker"
@@ -49,11 +48,7 @@ func New(ctx context.Context, s Settings) (_ *App, err error) {
 	if err != nil {
 		return nil, err
 	}
-	cors, err := httpserver.CORS(s.CORSOrigins)
-	if err != nil {
-		return nil, fmt.Errorf("MURPHY_CORS_ORIGINS: %w", err)
-	}
-	a.Handler = cors(handler)
+	a.Handler = handler
 	a.Ready = a.resources.Checks()
 	return a, nil
 }
