@@ -49,8 +49,7 @@ WHERE id = @id;
 DELETE FROM integrations
 WHERE id = @id;
 
--- name: RotateIntegrationKey :one
+-- name: RotateIntegrationKey :execrows
 UPDATE integrations
 SET key_version = key_version + 1, previous_key_valid_until = @previous_key_valid_until, updated_at = @updated_at
-WHERE id = @id
-RETURNING id, service_id, name, type, key_version, previous_key_valid_until, status, created_at, updated_at;
+WHERE id = @id;

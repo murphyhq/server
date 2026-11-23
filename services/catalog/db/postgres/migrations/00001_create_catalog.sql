@@ -30,4 +30,6 @@ CREATE TABLE integrations (
   CONSTRAINT integrations_status_check CHECK (status IN ('active', 'disabled'))
 );
 
+CREATE INDEX services_escalation_policy_id_idx ON services (escalation_policy_id);
+
 CREATE INDEX integrations_service_id_id_idx ON integrations (service_id, id);

@@ -136,6 +136,9 @@ services:
       <<: *component-environment
       MURPHY_CATALOG_DATABASE_URL: postgres://murphy:murphy@postgres:5432/catalog?sslmode=disable
       MURPHY_INCIDENTS_DATABASE_URL: postgres://murphy:murphy@postgres:5432/incidents?sslmode=disable
+      MURPHY_PEOPLE_DATABASE_URL: postgres://murphy:murphy@postgres:5432/people?sslmode=disable
+      MURPHY_ONCALL_DATABASE_URL: postgres://murphy:murphy@postgres:5432/oncall?sslmode=disable
+      MURPHY_ESCALATION_DATABASE_URL: postgres://murphy:murphy@postgres:5432/escalation?sslmode=disable
     healthcheck:
       disable: true
     depends_on:
@@ -153,6 +156,18 @@ services:
           path: ./services/incidents/db/postgres/migrations
         - action: restart
           path: ./services/incidents/db/mysql/migrations
+        - action: restart
+          path: ./services/people/db/postgres/migrations
+        - action: restart
+          path: ./services/people/db/mysql/migrations
+        - action: restart
+          path: ./services/oncall/db/postgres/migrations
+        - action: restart
+          path: ./services/oncall/db/mysql/migrations
+        - action: restart
+          path: ./services/escalation/db/postgres/migrations
+        - action: restart
+          path: ./services/escalation/db/mysql/migrations
 
   seed:
     <<: *component
@@ -187,6 +202,9 @@ services:
       <<: *component-environment
       MURPHY_CATALOG_DATABASE_URL: postgres://murphy:murphy@postgres:5432/catalog?sslmode=disable
       MURPHY_INCIDENTS_DATABASE_URL: postgres://murphy:murphy@postgres:5432/incidents?sslmode=disable
+      MURPHY_PEOPLE_DATABASE_URL: postgres://murphy:murphy@postgres:5432/people?sslmode=disable
+      MURPHY_ONCALL_DATABASE_URL: postgres://murphy:murphy@postgres:5432/oncall?sslmode=disable
+      MURPHY_ESCALATION_DATABASE_URL: postgres://murphy:murphy@postgres:5432/escalation?sslmode=disable
       MURPHY_IDEMPOTENCY_STORE_URL: redis://redis:6379/0
       MURPHY_INTEGRATION_KEY_SECRETS: *integration-key-secrets
     ports:

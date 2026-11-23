@@ -1,0 +1,64 @@
+syntax = "proto3";
+
+package murphy.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/murphyhq/server;murphy";
+
+message User {
+  string id = 1;
+  string name = 2;
+  string email = 3;
+  string time_zone = 4;
+  UserStatus status = 5;
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp updated_at = 7;
+}
+
+enum UserStatus {
+  USER_STATUS_UNSPECIFIED = 0;
+  USER_STATUS_ACTIVE = 1;
+  USER_STATUS_DEACTIVATED = 2;
+}
+
+message ContactMethod {
+  string id = 1;
+  string user_id = 2;
+  ContactMethodType type = 3;
+  string address = 4;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
+}
+
+enum ContactMethodType {
+  CONTACT_METHOD_TYPE_UNSPECIFIED = 0;
+  CONTACT_METHOD_TYPE_EMAIL = 1;
+  CONTACT_METHOD_TYPE_SMS = 2;
+  CONTACT_METHOD_TYPE_VOICE = 3;
+  CONTACT_METHOD_TYPE_WEBHOOK = 4;
+  CONTACT_METHOD_TYPE_PUSH = 5;
+}
+
+message Team {
+  string id = 1;
+  string name = 2;
+  google.protobuf.Timestamp created_at = 3;
+  google.protobuf.Timestamp updated_at = 4;
+}
+
+message TeamMembership {
+  string id = 1;
+  string team_id = 2;
+  string user_id = 3;
+  TeamRole role = 4;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
+}
+
+enum TeamRole {
+  TEAM_ROLE_UNSPECIFIED = 0;
+  TEAM_ROLE_MANAGER = 1;
+  TEAM_ROLE_RESPONDER = 2;
+  TEAM_ROLE_OBSERVER = 3;
+}

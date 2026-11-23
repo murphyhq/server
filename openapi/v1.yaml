@@ -257,6 +257,601 @@ paths:
                 $ref: "#/components/schemas/IncidentWithTimeline"
         "404":
           $ref: "#/components/responses/Problem"
+  /v1/users:
+    get:
+      operationId: listUsers
+      summary: List users
+      tags: [people]
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserPage"
+        "400":
+          $ref: "#/components/responses/Problem"
+    post:
+      operationId: createUser
+      summary: Create a user
+      tags: [people]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserInput"
+      responses:
+        "201":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "409":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+  /v1/users/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    get:
+      operationId: getUser
+      summary: Get a user
+      tags: [people]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "404":
+          $ref: "#/components/responses/Problem"
+    put:
+      operationId: updateUser
+      summary: Update a user
+      tags: [people]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserInput"
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+    delete:
+      operationId: deleteUser
+      summary: Delete a user
+      tags: [people]
+      responses:
+        "204":
+          description: Done.
+        "404":
+          $ref: "#/components/responses/Problem"
+  /v1/users/{id}/contact-methods:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    get:
+      operationId: listContactMethods
+      summary: List a user's contact methods
+      tags: [people]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContactMethodList"
+        "404":
+          $ref: "#/components/responses/Problem"
+    post:
+      operationId: createContactMethod
+      summary: Add a contact method to a user
+      tags: [people]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ContactMethodInput"
+      responses:
+        "201":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContactMethod"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "409":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+  /v1/contact-methods/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    get:
+      operationId: getContactMethod
+      summary: Get a contact method
+      tags: [people]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContactMethod"
+        "404":
+          $ref: "#/components/responses/Problem"
+    put:
+      operationId: updateContactMethod
+      summary: Update a contact method
+      tags: [people]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ContactMethodInput"
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContactMethod"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+    delete:
+      operationId: deleteContactMethod
+      summary: Delete a contact method
+      tags: [people]
+      responses:
+        "204":
+          description: Done.
+        "404":
+          $ref: "#/components/responses/Problem"
+  /v1/teams:
+    get:
+      operationId: listTeams
+      summary: List teams
+      tags: [people]
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: Teams, newest first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamPage"
+        "400":
+          $ref: "#/components/responses/Problem"
+    post:
+      operationId: createTeam
+      summary: Create a team
+      tags: [people]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TeamInput"
+      responses:
+        "201":
+          description: The created team.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Team"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "409":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+  /v1/teams/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    get:
+      operationId: getTeam
+      summary: Get a team
+      tags: [people]
+      responses:
+        "200":
+          description: The team.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Team"
+        "404":
+          $ref: "#/components/responses/Problem"
+    put:
+      operationId: updateTeam
+      summary: Update a team
+      tags: [people]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TeamInput"
+      responses:
+        "200":
+          description: The updated team.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Team"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+    delete:
+      operationId: deleteTeam
+      summary: Delete a team
+      tags: [people]
+      responses:
+        "204":
+          description: The team was deleted.
+        "404":
+          $ref: "#/components/responses/Problem"
+  /v1/teams/{id}/members:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    get:
+      operationId: listTeamMembers
+      summary: List a team's members
+      tags: [people]
+      responses:
+        "200":
+          description: The team's members with their roles.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamMembershipList"
+        "404":
+          $ref: "#/components/responses/Problem"
+  /v1/teams/{id}/members/{user_id}:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+      - name: user_id
+        in: path
+        required: true
+        schema:
+          type: string
+    put:
+      operationId: setTeamMember
+      summary: Add a member to a team, or change their role
+      tags: [people]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TeamMemberInput"
+      responses:
+        "200":
+          description: The membership.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamMembership"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+    delete:
+      operationId: removeTeamMember
+      summary: Remove a member from a team
+      tags: [people]
+      responses:
+        "204":
+          description: The member was removed.
+        "404":
+          $ref: "#/components/responses/Problem"
+  /v1/schedules:
+    get:
+      operationId: listSchedules
+      summary: List schedules
+      tags: [on-call]
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+        - name: team_id
+          in: query
+          description: Only those associated with this team.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SchedulePage"
+        "400":
+          $ref: "#/components/responses/Problem"
+    post:
+      operationId: createSchedule
+      summary: Create a schedule
+      tags: [on-call]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ScheduleInput"
+      responses:
+        "201":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Schedule"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "409":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+  /v1/schedules/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    get:
+      operationId: getSchedule
+      summary: Get a schedule
+      tags: [on-call]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Schedule"
+        "404":
+          $ref: "#/components/responses/Problem"
+    put:
+      operationId: updateSchedule
+      summary: Update a schedule
+      tags: [on-call]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ScheduleInput"
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Schedule"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+    delete:
+      operationId: deleteSchedule
+      summary: Delete a schedule
+      tags: [on-call]
+      responses:
+        "204":
+          description: Done.
+        "404":
+          $ref: "#/components/responses/Problem"
+  /v1/schedules/{id}/overrides:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    get:
+      operationId: listOverrides
+      summary: List a schedule's overrides
+      tags: [on-call]
+      parameters:
+        - name: ends_after
+          in: query
+          description: Only overrides that end after this time; now by default.
+          schema:
+            type: string
+            format: date-time
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OverrideList"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+    post:
+      operationId: createOverride
+      summary: Override a schedule for a time range
+      tags: [on-call]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OverrideInput"
+      responses:
+        "201":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Override"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "409":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+  /v1/overrides/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    delete:
+      operationId: deleteOverride
+      summary: Delete an override
+      tags: [on-call]
+      responses:
+        "204":
+          description: Done.
+        "404":
+          $ref: "#/components/responses/Problem"
+  /v1/schedules/{id}/on-call:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    get:
+      operationId: getOnCall
+      summary: Find who is on call
+      description: Computes who is on call at a moment, from the schedule's layers and overrides.
+      tags: [on-call]
+      parameters:
+        - name: at
+          in: query
+          description: The moment to ask about; now by default.
+          schema:
+            type: string
+            format: date-time
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OnCall"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+  /v1/escalation-policies:
+    get:
+      operationId: listEscalationPolicies
+      summary: List escalation policies
+      tags: [escalation]
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+        - name: team_id
+          in: query
+          description: Only those owned by this team.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EscalationPolicyPage"
+        "400":
+          $ref: "#/components/responses/Problem"
+    post:
+      operationId: createEscalationPolicy
+      summary: Create an escalation policy
+      tags: [escalation]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EscalationPolicyInput"
+      responses:
+        "201":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EscalationPolicy"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "409":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+  /v1/escalation-policies/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    get:
+      operationId: getEscalationPolicy
+      summary: Get an escalation policy
+      tags: [escalation]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EscalationPolicy"
+        "404":
+          $ref: "#/components/responses/Problem"
+    put:
+      operationId: updateEscalationPolicy
+      summary: Update an escalation policy
+      tags: [escalation]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EscalationPolicyInput"
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EscalationPolicy"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+    delete:
+      operationId: deleteEscalationPolicy
+      summary: Delete an escalation policy
+      tags: [escalation]
+      responses:
+        "204":
+          description: Done.
+        "404":
+          $ref: "#/components/responses/Problem"
 components:
   parameters:
     IdempotencyKey:
@@ -483,6 +1078,351 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Incident"
+        next_cursor:
+          type: string
+          description: Empty on the last page.
+    UserStatus:
+      type: string
+      enum: [active, deactivated]
+    User:
+      type: object
+      required: [id, name, email, time_zone, status, created_at, updated_at]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+        time_zone:
+          type: string
+          description: IANA time zone, as in Europe/Malta.
+        status:
+          $ref: "#/components/schemas/UserStatus"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    UserInput:
+      type: object
+      required: [name, email]
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+        time_zone:
+          type: string
+          description: IANA time zone; UTC by default.
+        status:
+          $ref: "#/components/schemas/UserStatus"
+    UserPage:
+      type: object
+      required: [items, next_cursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/User"
+        next_cursor:
+          type: string
+          description: Empty on the last page.
+    ContactMethodType:
+      type: string
+      enum: [email, sms, voice, webhook, push]
+    ContactMethod:
+      type: object
+      required: [id, user_id, type, address, created_at, updated_at]
+      properties:
+        id:
+          type: string
+        user_id:
+          type: string
+        type:
+          $ref: "#/components/schemas/ContactMethodType"
+        address:
+          type: string
+          description: An email address, an E.164 phone number, a webhook URL, or a push device's relay handle.
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    ContactMethodInput:
+      type: object
+      required: [type, address]
+      properties:
+        type:
+          $ref: "#/components/schemas/ContactMethodType"
+        address:
+          type: string
+    ContactMethodList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ContactMethod"
+    Team:
+      type: object
+      required: [id, name, created_at, updated_at]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    TeamInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+    TeamPage:
+      type: object
+      required: [items, next_cursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Team"
+        next_cursor:
+          type: string
+          description: Empty on the last page.
+    TeamRole:
+      type: string
+      enum: [manager, responder, observer]
+    TeamMembership:
+      type: object
+      required: [team_id, user_id, role, created_at, updated_at]
+      properties:
+        team_id:
+          type: string
+        user_id:
+          type: string
+        role:
+          $ref: "#/components/schemas/TeamRole"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    TeamMemberInput:
+      type: object
+      required: [role]
+      properties:
+        role:
+          $ref: "#/components/schemas/TeamRole"
+    TeamMembershipList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/TeamMembership"
+    Layer:
+      type: object
+      required: [participants, turn_length_seconds, starts_at]
+      properties:
+        name:
+          type: string
+        participants:
+          type: array
+          description: User IDs, in the order they take turns.
+          items:
+            type: string
+        turn_length_seconds:
+          type: integer
+          format: int64
+          description: How long each turn lasts. Whole days hand over at the same local time every day, in the schedule's time zone.
+        starts_at:
+          type: string
+          format: date-time
+    Schedule:
+      type: object
+      required: [id, name, time_zone, team_ids, layers, created_at, updated_at]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        time_zone:
+          type: string
+        team_ids:
+          type: array
+          description: The teams that use this schedule.
+          items:
+            type: string
+        layers:
+          type: array
+          description: Later layers take precedence over earlier ones once they start.
+          items:
+            $ref: "#/components/schemas/Layer"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    ScheduleInput:
+      type: object
+      required: [name, layers]
+      properties:
+        name:
+          type: string
+        team_ids:
+          type: array
+          items:
+            type: string
+        time_zone:
+          type: string
+          description: IANA time zone; UTC by default.
+        layers:
+          type: array
+          items:
+            $ref: "#/components/schemas/Layer"
+    SchedulePage:
+      type: object
+      required: [items, next_cursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Schedule"
+        next_cursor:
+          type: string
+          description: Empty on the last page.
+    Override:
+      type: object
+      required: [id, schedule_id, user_id, starts_at, ends_at, created_at]
+      properties:
+        id:
+          type: string
+        schedule_id:
+          type: string
+        user_id:
+          type: string
+        starts_at:
+          type: string
+          format: date-time
+        ends_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+    OverrideInput:
+      type: object
+      required: [user_id, starts_at, ends_at]
+      properties:
+        user_id:
+          type: string
+        starts_at:
+          type: string
+          format: date-time
+        ends_at:
+          type: string
+          format: date-time
+    OverrideList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Override"
+    OnCall:
+      type: object
+      required: [at]
+      properties:
+        at:
+          type: string
+          format: date-time
+        user_id:
+          type: string
+          description: Absent when nobody is on call.
+    EscalationTargetType:
+      type: string
+      enum: [user, schedule]
+    EscalationTarget:
+      type: object
+      required: [type, id]
+      properties:
+        type:
+          $ref: "#/components/schemas/EscalationTargetType"
+        id:
+          type: string
+    EscalationLevel:
+      type: object
+      required: [delay_seconds, targets]
+      properties:
+        delay_seconds:
+          type: integer
+          format: int64
+          description: How long to wait for an acknowledgement before the next level.
+        targets:
+          type: array
+          items:
+            $ref: "#/components/schemas/EscalationTarget"
+    EscalationPolicy:
+      type: object
+      required: [id, name, team_id, repeat_count, levels, created_at, updated_at]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        team_id:
+          type: string
+          description: The team that owns the policy, and with it the services that page through it.
+        repeat_count:
+          type: integer
+          format: int32
+          description: How many times to go through the levels again when nobody acknowledges.
+        levels:
+          type: array
+          items:
+            $ref: "#/components/schemas/EscalationLevel"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    EscalationPolicyInput:
+      type: object
+      required: [name, team_id, levels]
+      properties:
+        name:
+          type: string
+        team_id:
+          type: string
+        repeat_count:
+          type: integer
+          format: int32
+        levels:
+          type: array
+          items:
+            $ref: "#/components/schemas/EscalationLevel"
+    EscalationPolicyPage:
+      type: object
+      required: [items, next_cursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/EscalationPolicy"
         next_cursor:
           type: string
           description: Empty on the last page.

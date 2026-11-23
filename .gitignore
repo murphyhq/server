@@ -1,4 +1,13 @@
 /bin/
+/api
+/engine
+/ingest
+/migrate
+/notifier
+/scheduler
+/seed
+/provision
+/local
 *.test
 *.out
 coverage.*

@@ -229,11 +229,10 @@ func (q *Queries) ListServices(ctx context.Context, arg ListServicesParams) ([]S
 	return items, nil
 }
 
-const rotateIntegrationKey = `-- name: RotateIntegrationKey :one
+const rotateIntegrationKey = `-- name: RotateIntegrationKey :execrows
 UPDATE integrations
 SET key_version = key_version + 1, previous_key_valid_until = $1, updated_at = $2
 WHERE id = $3
-RETURNING id, service_id, name, type, key_version, previous_key_valid_until, status, created_at, updated_at
 `
 
 type RotateIntegrationKeyParams struct {
@@ -242,21 +241,12 @@ type RotateIntegrationKeyParams struct {
 	ID                    string
 }
 
-func (q *Queries) RotateIntegrationKey(ctx context.Context, arg RotateIntegrationKeyParams) (Integration, error) {
-	row := q.db.QueryRow(ctx, rotateIntegrationKey, arg.PreviousKeyValidUntil, arg.UpdatedAt, arg.ID)
-	var i Integration
-	err := row.Scan(
-		&i.ID,
-		&i.ServiceID,
-		&i.Name,
-		&i.Type,
-		&i.KeyVersion,
-		&i.PreviousKeyValidUntil,
-		&i.Status,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
+func (q *Queries) RotateIntegrationKey(ctx context.Context, arg RotateIntegrationKeyParams) (int64, error) {
+	result, err := q.db.Exec(ctx, rotateIntegrationKey, arg.PreviousKeyValidUntil, arg.UpdatedAt, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const updateIntegration = `-- name: UpdateIntegration :execrows
