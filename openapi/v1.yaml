@@ -983,7 +983,7 @@ components:
       enum: [active, disabled]
     Service:
       type: object
-      required: [id, name, description, escalation_policy_id, urgency, status, created_at, updated_at]
+      required: [id, name, description, escalation_policy, urgency, status, created_at, updated_at]
       properties:
         id:
           type: string
@@ -991,8 +991,8 @@ components:
           type: string
         description:
           type: string
-        escalation_policy_id:
-          type: string
+        escalation_policy:
+          $ref: "#/components/schemas/Reference"
         urgency:
           $ref: "#/components/schemas/Urgency"
         status:
@@ -1005,14 +1005,14 @@ components:
           format: date-time
     ServiceInput:
       type: object
-      required: [name, escalation_policy_id]
+      required: [name, escalation_policy]
       properties:
         name:
           type: string
         description:
           type: string
-        escalation_policy_id:
-          type: string
+        escalation_policy:
+          $ref: "#/components/schemas/Reference"
         urgency:
           $ref: "#/components/schemas/Urgency"
         status:
@@ -1030,12 +1030,12 @@ components:
           description: Empty on the last page.
     Integration:
       type: object
-      required: [id, service_id, name, type, key_version, status, created_at, updated_at]
+      required: [id, service, name, type, key_version, status, created_at, updated_at]
       properties:
         id:
           type: string
-        service_id:
-          type: string
+        service:
+          $ref: "#/components/schemas/Reference"
         name:
           type: string
         type:
@@ -1097,7 +1097,7 @@ components:
       enum: [triggered, acknowledged, resolved]
     Incident:
       type: object
-      required: [id, number, service_id, dedup_key, title, status, urgency, created_at, updated_at]
+      required: [id, number, service, dedup_key, title, status, urgency, created_at, updated_at]
       properties:
         id:
           type: string
@@ -1105,8 +1105,8 @@ components:
           type: integer
           format: int64
           description: Numbers incidents in the order they were opened, for people to refer to.
-        service_id:
-          type: string
+        service:
+          $ref: "#/components/schemas/Reference"
         dedup_key:
           type: string
         title:
@@ -1155,8 +1155,8 @@ components:
         type:
           type: string
           enum: [triggered, alerted, acknowledged, resolved, escalated, escalation_skipped, escalation_exhausted]
-        alert_id:
-          type: string
+        alert:
+          $ref: "#/components/schemas/Reference"
         summary:
           type: string
         at:
@@ -1283,12 +1283,12 @@ components:
       enum: [email, sms, voice, webhook, push]
     ContactMethod:
       type: object
-      required: [id, user_id, type, address, created_at, updated_at]
+      required: [id, user, type, address, created_at, updated_at]
       properties:
         id:
           type: string
-        user_id:
-          type: string
+        user:
+          $ref: "#/components/schemas/Reference"
         type:
           $ref: "#/components/schemas/ContactMethodType"
         address:
@@ -1352,12 +1352,12 @@ components:
       enum: [manager, responder, observer]
     TeamMembership:
       type: object
-      required: [team_id, user_id, role, created_at, updated_at]
+      required: [team, user, role, created_at, updated_at]
       properties:
-        team_id:
-          type: string
-        user_id:
-          type: string
+        team:
+          $ref: "#/components/schemas/Reference"
+        user:
+          $ref: "#/components/schemas/Reference"
         role:
           $ref: "#/components/schemas/TeamRole"
         created_at:
@@ -1388,9 +1388,9 @@ components:
           type: string
         participants:
           type: array
-          description: User IDs, in the order they take turns.
+          description: The people who take turns, in order.
           items:
-            type: string
+            $ref: "#/components/schemas/Reference"
         turn_length_seconds:
           type: integer
           format: int64
@@ -1400,7 +1400,7 @@ components:
           format: date-time
     Schedule:
       type: object
-      required: [id, name, time_zone, team_ids, layers, created_at, updated_at]
+      required: [id, name, time_zone, teams, layers, created_at, updated_at]
       properties:
         id:
           type: string
@@ -1408,11 +1408,11 @@ components:
           type: string
         time_zone:
           type: string
-        team_ids:
+        teams:
           type: array
           description: The teams that use this schedule.
           items:
-            type: string
+            $ref: "#/components/schemas/Reference"
         layers:
           type: array
           description: Later layers take precedence over earlier ones once they start.
@@ -1430,10 +1430,10 @@ components:
       properties:
         name:
           type: string
-        team_ids:
+        teams:
           type: array
           items:
-            type: string
+            $ref: "#/components/schemas/Reference"
         time_zone:
           type: string
           description: IANA time zone; UTC by default.
@@ -1454,14 +1454,14 @@ components:
           description: Empty on the last page.
     Override:
       type: object
-      required: [id, schedule_id, user_id, starts_at, ends_at, created_at]
+      required: [id, schedule, user, starts_at, ends_at, created_at]
       properties:
         id:
           type: string
-        schedule_id:
-          type: string
-        user_id:
-          type: string
+        schedule:
+          $ref: "#/components/schemas/Reference"
+        user:
+          $ref: "#/components/schemas/Reference"
         starts_at:
           type: string
           format: date-time
@@ -1473,10 +1473,10 @@ components:
           format: date-time
     OverrideInput:
       type: object
-      required: [user_id, starts_at, ends_at]
+      required: [user, starts_at, ends_at]
       properties:
-        user_id:
-          type: string
+        user:
+          $ref: "#/components/schemas/Reference"
         starts_at:
           type: string
           format: date-time
@@ -1498,8 +1498,9 @@ components:
         at:
           type: string
           format: date-time
-        user_id:
-          type: string
+        user:
+          allOf:
+            - $ref: "#/components/schemas/Reference"
           description: Absent when nobody is on call.
     EscalationTargetType:
       type: string
@@ -1526,7 +1527,7 @@ components:
             $ref: "#/components/schemas/EscalationTarget"
     EscalationPolicy:
       type: object
-      required: [id, name, team_id, version, repeat_count, levels, created_at, updated_at]
+      required: [id, name, team, version, repeat_count, levels, created_at, updated_at]
       properties:
         id:
           type: string
@@ -1536,8 +1537,9 @@ components:
           description: The policy's current version, starting at 1. Every update makes the next one.
         name:
           type: string
-        team_id:
-          type: string
+        team:
+          allOf:
+            - $ref: "#/components/schemas/Reference"
           description: The team that owns the policy, and with it the services that page through it.
         repeat_count:
           type: integer
@@ -1555,12 +1557,12 @@ components:
           format: date-time
     EscalationPolicyInput:
       type: object
-      required: [name, team_id, levels]
+      required: [name, team, levels]
       properties:
         name:
           type: string
-        team_id:
-          type: string
+        team:
+          $ref: "#/components/schemas/Reference"
         repeat_count:
           type: integer
           format: int32

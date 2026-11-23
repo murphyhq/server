@@ -50,7 +50,8 @@ func (s *Server) GetIncident(ctx context.Context, request GetIncidentRequestObje
 			At:      entry.GetAt().AsTime(),
 		}
 		if id := entry.GetAlertId(); id != "" {
-			entries[i].AlertId = &id
+			alert := ref(id)
+			entries[i].Alert = &alert
 		}
 		if escalation := entry.GetEscalation(); escalation != nil {
 			out := &TimelineEscalation{Level: escalation.GetLevel(), Round: escalation.GetRound(), Paged: []Page{}, ReachedNobody: []EscalationTarget{}}
@@ -66,7 +67,7 @@ func (s *Server) GetIncident(ctx context.Context, request GetIncidentRequestObje
 	return GetIncident200JSONResponse{
 		Id:         out.Id,
 		Number:     out.Number,
-		ServiceId:  out.ServiceId,
+		Service:    out.Service,
 		DedupKey:   out.DedupKey,
 		Title:      out.Title,
 		Status:     out.Status,
@@ -85,7 +86,7 @@ func toIncident(incident *murphy.Incident) Incident {
 	out := Incident{
 		Id:        incident.GetId(),
 		Number:    incident.GetNumber(),
-		ServiceId: incident.GetServiceId(),
+		Service:   ref(incident.GetServiceId()),
 		DedupKey:  incident.GetDedupKey(),
 		Title:     incident.GetTitle(),
 		Status:    IncidentStatus(incident.GetStatus().Text()),

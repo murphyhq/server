@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	murphy "github.com/murphyhq/server"
@@ -29,12 +30,11 @@ type Repository interface {
 }
 
 type Catalog interface {
-	GetIntegration(ctx context.Context, id string) (*murphy.Integration, error)
-	GetService(ctx context.Context, id string) (*murphy.Service, error)
+	GetIntegrationAndService(ctx context.Context, integrationID string) (*murphy.Integration, *murphy.Service, error)
 }
 
 type Policies interface {
-	GetPolicy(ctx context.Context, id string) (*murphy.EscalationPolicy, error)
+	CurrentVersion(ctx context.Context, id string) (int32, error)
 	GetPolicyVersion(ctx context.Context, id string, version int32) (*murphy.EscalationPolicy, error)
 }
 
@@ -87,6 +87,7 @@ type Service struct {
 	policies Policies
 	oncall   OnCall
 	people   People
+	versions sync.Map
 }
 
 func New(repo Repository, catalog Catalog, policies Policies, oncall OnCall, people People) *Service {
@@ -188,14 +189,14 @@ func (s *Service) open(ctx context.Context, service *murphy.Service, alert *murp
 		EscalationPolicyId: service.GetEscalationPolicyId(),
 		EscalationRound:    1,
 	}
-	policy, err := s.policies.GetPolicy(ctx, service.GetEscalationPolicyId())
+	version, err := s.policies.CurrentVersion(ctx, service.GetEscalationPolicyId())
 	switch {
-	case errors.Is(err, murphy.ErrNotFound):
+	case errors.Is(err, murphy.ErrNotFound), errors.Is(err, murphy.ErrInvalid):
 		incident.EscalationExhausted = true
 	case err != nil:
-		return nil, fmt.Errorf("get the service's escalation policy: %w", err)
+		return nil, fmt.Errorf("get the service's escalation policy version: %w", err)
 	default:
-		incident.EscalationPolicyVersion = policy.GetVersion()
+		incident.EscalationPolicyVersion = version
 	}
 	return incident, nil
 }
@@ -221,7 +222,7 @@ func (s *Service) stillFiring(ctx context.Context, incident *murphy.Incident, re
 }
 
 func (s *Service) accept(ctx context.Context, alert *murphy.Alert) (*murphy.Service, error) {
-	integration, err := s.catalog.GetIntegration(ctx, alert.GetIntegrationId())
+	integration, service, err := s.catalog.GetIntegrationAndService(ctx, alert.GetIntegrationId())
 	if errors.Is(err, murphy.ErrNotFound) {
 		return nil, invalidKey("its integration no longer exists")
 	}
@@ -236,13 +237,6 @@ func (s *Service) accept(ctx context.Context, alert *murphy.Alert) (*murphy.Serv
 	}
 	if !integration.Accepts(alert.GetKeyVersion(), alert.GetReceivedAt().AsTime()) {
 		return nil, invalidKey("the integration is disabled, or the key was rotated")
-	}
-	service, err := s.catalog.GetService(ctx, alert.GetServiceId())
-	if errors.Is(err, murphy.ErrNotFound) {
-		return nil, invalidKey("its service no longer exists")
-	}
-	if err != nil {
-		return nil, err
 	}
 	if service.GetStatus() != murphy.ServiceStatus_SERVICE_STATUS_ACTIVE {
 		return nil, &murphy.FieldError{Field: "service_id", Reason: "the service is disabled"}
@@ -350,7 +344,7 @@ func (s *Service) TimerExpired(ctx context.Context, messageID string, timer *mur
 		return err
 	}
 
-	policy, err := s.policies.GetPolicyVersion(ctx, incident.GetEscalationPolicyId(), incident.GetEscalationPolicyVersion())
+	policy, err := s.policyVersion(ctx, incident.GetEscalationPolicyId(), incident.GetEscalationPolicyVersion())
 	if err != nil && !errors.Is(err, murphy.ErrNotFound) {
 		return fmt.Errorf("get the incident's escalation policy version: %w", err)
 	}
@@ -415,6 +409,19 @@ func (s *Service) TimerExpired(ctx context.Context, messageID string, timer *mur
 	}
 	span.Set(ctx, telemetry.WithField("message.duplicate", !recorded))
 	return nil
+}
+
+func (s *Service) policyVersion(ctx context.Context, id string, version int32) (*murphy.EscalationPolicy, error) {
+	key := fmt.Sprintf("%s/%d", id, version)
+	if cached, ok := s.versions.Load(key); ok {
+		return cached.(*murphy.EscalationPolicy), nil
+	}
+	policy, err := s.policies.GetPolicyVersion(ctx, id, version)
+	if err != nil {
+		return nil, err
+	}
+	s.versions.Store(key, policy)
+	return policy, nil
 }
 
 func next(level, round int32, policy *murphy.EscalationPolicy) (int32, int32) {

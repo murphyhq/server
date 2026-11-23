@@ -70,6 +70,22 @@ func Run(t *testing.T, open func(t *testing.T) escalation.Repository) {
 		assert.Equal(t, []string{second}, targetIDs(previous.GetLevels()[1]))
 	})
 
+	t.Run("reads a policy's current version", func(t *testing.T) {
+		repo := open(t)
+		policy := newPolicy("payments", murphy.NewID(), level(time.Minute, target(murphy.EscalationTargetType_ESCALATION_TARGET_TYPE_USER, murphy.NewID())))
+		require.NoError(t, repo.CreatePolicy(t.Context(), policy))
+		policy.Version = 2
+		require.NoError(t, repo.UpdatePolicy(t.Context(), policy))
+
+		version, err := repo.CurrentVersion(t.Context(), policy.GetId())
+		require.NoError(t, err)
+		assert.Equal(t, int32(2), version)
+
+		require.NoError(t, repo.DeletePolicy(t.Context(), policy.GetId()))
+		_, err = repo.CurrentVersion(t.Context(), policy.GetId())
+		assert.ErrorIs(t, err, murphy.ErrNotFound)
+	})
+
 	t.Run("refuses an update made from an outdated version", func(t *testing.T) {
 		repo := open(t)
 		policy := newPolicy("payments", murphy.NewID(), level(time.Minute, target(murphy.EscalationTargetType_ESCALATION_TARGET_TYPE_USER, murphy.NewID())))

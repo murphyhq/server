@@ -17,18 +17,18 @@ func seedCatalog(ctx context.Context, api *client.ClientWithResponses, policies 
 	low := client.Low
 	services := []seededService{
 		{
-			input: client.ServiceInput{Name: "checkout-api", Description: new("Takes orders and payments from the storefront."), EscalationPolicyId: policies["payments"]},
+			input: client.ServiceInput{Name: "checkout-api", Description: new("Takes orders and payments from the storefront."), EscalationPolicy: client.Reference{Id: policies["payments"]}},
 			integrations: []client.IntegrationCreate{
 				{Name: "Alertmanager", Type: client.Alertmanager},
 				{Name: "Grafana", Type: client.Grafana},
 			},
 		},
 		{
-			input:        client.ServiceInput{Name: "payments-api", Description: new("Charges cards through the payment provider."), EscalationPolicyId: policies["payments"]},
+			input:        client.ServiceInput{Name: "payments-api", Description: new("Charges cards through the payment provider."), EscalationPolicy: client.Reference{Id: policies["payments"]}},
 			integrations: []client.IntegrationCreate{{Name: "Datadog", Type: client.Datadog}},
 		},
 		{
-			input:        client.ServiceInput{Name: "internal-wiki", Description: new("Company documentation."), EscalationPolicyId: policies["platform"], Urgency: &low},
+			input:        client.ServiceInput{Name: "internal-wiki", Description: new("Company documentation."), EscalationPolicy: client.Reference{Id: policies["platform"]}, Urgency: &low},
 			integrations: []client.IntegrationCreate{{Name: "Uptime checks", Type: client.Generic}},
 		},
 	}

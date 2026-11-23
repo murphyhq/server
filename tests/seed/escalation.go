@@ -18,14 +18,14 @@ func seedPolicies(ctx context.Context, api *client.ClientWithResponses, teams, u
 	}
 	policies := []client.EscalationPolicyInput{
 		{
-			Name: "platform", TeamId: teams["platform"], RepeatCount: &repeat,
+			Name: "platform", Team: client.Reference{Id: teams["platform"]}, RepeatCount: &repeat,
 			Levels: []client.EscalationLevel{
 				{DelaySeconds: 5 * minute, Targets: []client.EscalationTarget{schedule("platform primary")}},
 				{DelaySeconds: 15 * minute, Targets: []client.EscalationTarget{user("ana@example.com")}},
 			},
 		},
 		{
-			Name: "payments", TeamId: teams["payments"], RepeatCount: &repeat,
+			Name: "payments", Team: client.Reference{Id: teams["payments"]}, RepeatCount: &repeat,
 			Levels: []client.EscalationLevel{
 				{DelaySeconds: 5 * minute, Targets: []client.EscalationTarget{schedule("payments primary")}},
 				{DelaySeconds: 15 * minute, Targets: []client.EscalationTarget{schedule("incident commanders")}},

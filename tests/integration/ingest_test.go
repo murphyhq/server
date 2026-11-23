@@ -231,7 +231,7 @@ func deliver(t *testing.T, stack testenv.Stack, authorization string, webhook te
 func incidentFor(t *testing.T, api *client.ClientWithResponses, serviceID string) *client.Incident {
 	t.Helper()
 	for _, incident := range incidentsOf(t, api) {
-		if incident.ServiceId == serviceID {
+		if incident.Service.Id == serviceID {
 			return &incident
 		}
 	}

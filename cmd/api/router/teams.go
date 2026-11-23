@@ -111,8 +111,8 @@ func toTeam(team *murphy.Team) Team {
 
 func toMembership(membership *murphy.TeamMembership) TeamMembership {
 	return TeamMembership{
-		TeamId:    membership.GetTeamId(),
-		UserId:    membership.GetUserId(),
+		Team:      ref(membership.GetTeamId()),
+		User:      ref(membership.GetUserId()),
 		Role:      TeamRole(membership.GetRole().Text()),
 		CreatedAt: membership.GetCreatedAt().AsTime(),
 		UpdatedAt: membership.GetUpdatedAt().AsTime(),

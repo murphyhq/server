@@ -307,7 +307,7 @@
       "id": 8,
       "type": "timeseries",
       "title": "Waiting for a connection, p99",
-      "description": "Time to get a connection from the pool. It grows when the pool is too small for the load.",
+      "description": "",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"

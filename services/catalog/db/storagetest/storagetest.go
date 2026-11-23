@@ -72,6 +72,23 @@ func Run(t *testing.T, open func(t *testing.T) catalog.Repository) {
 		assert.Equal(t, "payments-api", got.GetName())
 	})
 
+	t.Run("reads an integration together with its service", func(t *testing.T) {
+		repo := open(t)
+		service := newService("checkout-api")
+		require.NoError(t, repo.CreateService(t.Context(), service))
+		integration := newIntegration(service.GetId())
+		require.NoError(t, repo.CreateIntegration(t.Context(), integration))
+
+		gotIntegration, gotService, err := repo.GetIntegrationAndService(t.Context(), integration.GetId())
+
+		require.NoError(t, err)
+		assert.Equal(t, integration.GetId(), gotIntegration.GetId())
+		assert.Equal(t, service.GetId(), gotService.GetId())
+		assert.Equal(t, service.GetEscalationPolicyId(), gotService.GetEscalationPolicyId())
+		_, _, err = repo.GetIntegrationAndService(t.Context(), murphy.NewID())
+		assert.ErrorIs(t, err, murphy.ErrNotFound)
+	})
+
 	t.Run("tells whether any service pages with a policy", func(t *testing.T) {
 		repo := open(t)
 		service := newService("checkout-api")

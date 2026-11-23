@@ -253,7 +253,9 @@ type ContactMethod struct {
 	Id        string            `json:"id"`
 	Type      ContactMethodType `json:"type"`
 	UpdatedAt time.Time         `json:"updated_at"`
-	UserId    string            `json:"user_id"`
+
+	// User Points at another resource.
+	User Reference `json:"user"`
 }
 
 // ContactMethodInput defines model for ContactMethodInput.
@@ -287,8 +289,8 @@ type EscalationPolicy struct {
 	// RepeatCount How many times to go through the levels again when nobody acknowledges.
 	RepeatCount int32 `json:"repeat_count"`
 
-	// TeamId The team that owns the policy, and with it the services that page through it.
-	TeamId    string    `json:"team_id"`
+	// Team The team that owns the policy, and with it the services that page through it.
+	Team      Reference `json:"team"`
 	UpdatedAt time.Time `json:"updated_at"`
 
 	// Version The policy's current version, starting at 1. Every update makes the next one.
@@ -300,7 +302,9 @@ type EscalationPolicyInput struct {
 	Levels      []EscalationLevel `json:"levels"`
 	Name        string            `json:"name"`
 	RepeatCount *int32            `json:"repeat_count,omitempty"`
-	TeamId      string            `json:"team_id"`
+
+	// Team Points at another resource.
+	Team Reference `json:"team"`
 }
 
 // EscalationPolicyPage defines model for EscalationPolicyPage.
@@ -331,13 +335,15 @@ type Incident struct {
 	Id         string              `json:"id"`
 
 	// Number Numbers incidents in the order they were opened, for people to refer to.
-	Number     int64          `json:"number"`
-	ResolvedAt *time.Time     `json:"resolved_at,omitempty"`
-	ServiceId  string         `json:"service_id"`
-	Status     IncidentStatus `json:"status"`
-	Title      string         `json:"title"`
-	UpdatedAt  time.Time      `json:"updated_at"`
-	Urgency    Urgency        `json:"urgency"`
+	Number     int64      `json:"number"`
+	ResolvedAt *time.Time `json:"resolved_at,omitempty"`
+
+	// Service Points at another resource.
+	Service   Reference      `json:"service"`
+	Status    IncidentStatus `json:"status"`
+	Title     string         `json:"title"`
+	UpdatedAt time.Time      `json:"updated_at"`
+	Urgency   Urgency        `json:"urgency"`
 }
 
 // IncidentEscalation Where the incident is in its escalation policy. Level 0 means no level has been paged yet.
@@ -375,27 +381,31 @@ type IncidentWithTimeline struct {
 	Id         string              `json:"id"`
 
 	// Number Numbers incidents in the order they were opened, for people to refer to.
-	Number     int64           `json:"number"`
-	ResolvedAt *time.Time      `json:"resolved_at,omitempty"`
-	ServiceId  string          `json:"service_id"`
-	Status     IncidentStatus  `json:"status"`
-	Timeline   []TimelineEntry `json:"timeline"`
-	Title      string          `json:"title"`
-	UpdatedAt  time.Time       `json:"updated_at"`
-	Urgency    Urgency         `json:"urgency"`
+	Number     int64      `json:"number"`
+	ResolvedAt *time.Time `json:"resolved_at,omitempty"`
+
+	// Service Points at another resource.
+	Service   Reference       `json:"service"`
+	Status    IncidentStatus  `json:"status"`
+	Timeline  []TimelineEntry `json:"timeline"`
+	Title     string          `json:"title"`
+	UpdatedAt time.Time       `json:"updated_at"`
+	Urgency   Urgency         `json:"urgency"`
 }
 
 // Integration defines model for Integration.
 type Integration struct {
-	CreatedAt             time.Time         `json:"created_at"`
-	Id                    string            `json:"id"`
-	KeyVersion            int32             `json:"key_version"`
-	Name                  string            `json:"name"`
-	PreviousKeyValidUntil *time.Time        `json:"previous_key_valid_until,omitempty"`
-	ServiceId             string            `json:"service_id"`
-	Status                IntegrationStatus `json:"status"`
-	Type                  IntegrationType   `json:"type"`
-	UpdatedAt             time.Time         `json:"updated_at"`
+	CreatedAt             time.Time  `json:"created_at"`
+	Id                    string     `json:"id"`
+	KeyVersion            int32      `json:"key_version"`
+	Name                  string     `json:"name"`
+	PreviousKeyValidUntil *time.Time `json:"previous_key_valid_until,omitempty"`
+
+	// Service Points at another resource.
+	Service   Reference         `json:"service"`
+	Status    IntegrationStatus `json:"status"`
+	Type      IntegrationType   `json:"type"`
+	UpdatedAt time.Time         `json:"updated_at"`
 }
 
 // IntegrationCreate defines model for IntegrationCreate.
@@ -431,23 +441,25 @@ type IntegrationWithKey struct {
 	Id        string    `json:"id"`
 
 	// Key The integration key, sent by monitoring tools in the Authorization header.
-	Key                   string            `json:"key"`
-	KeyVersion            int32             `json:"key_version"`
-	Name                  string            `json:"name"`
-	PreviousKeyValidUntil *time.Time        `json:"previous_key_valid_until,omitempty"`
-	ServiceId             string            `json:"service_id"`
-	Status                IntegrationStatus `json:"status"`
-	Type                  IntegrationType   `json:"type"`
-	UpdatedAt             time.Time         `json:"updated_at"`
+	Key                   string     `json:"key"`
+	KeyVersion            int32      `json:"key_version"`
+	Name                  string     `json:"name"`
+	PreviousKeyValidUntil *time.Time `json:"previous_key_valid_until,omitempty"`
+
+	// Service Points at another resource.
+	Service   Reference         `json:"service"`
+	Status    IntegrationStatus `json:"status"`
+	Type      IntegrationType   `json:"type"`
+	UpdatedAt time.Time         `json:"updated_at"`
 }
 
 // Layer defines model for Layer.
 type Layer struct {
 	Name *string `json:"name,omitempty"`
 
-	// Participants User IDs, in the order they take turns.
-	Participants []string  `json:"participants"`
-	StartsAt     time.Time `json:"starts_at"`
+	// Participants The people who take turns, in order.
+	Participants []Reference `json:"participants"`
+	StartsAt     time.Time   `json:"starts_at"`
 
 	// TurnLengthSeconds How long each turn lasts. Whole days hand over at the same local time every day, in the schedule's time zone.
 	TurnLengthSeconds int64 `json:"turn_length_seconds"`
@@ -457,25 +469,31 @@ type Layer struct {
 type OnCall struct {
 	At time.Time `json:"at"`
 
-	// UserId Absent when nobody is on call.
-	UserId *string `json:"user_id,omitempty"`
+	// User Absent when nobody is on call.
+	User *Reference `json:"user,omitempty"`
 }
 
 // Override defines model for Override.
 type Override struct {
-	CreatedAt  time.Time `json:"created_at"`
-	EndsAt     time.Time `json:"ends_at"`
-	Id         string    `json:"id"`
-	ScheduleId string    `json:"schedule_id"`
-	StartsAt   time.Time `json:"starts_at"`
-	UserId     string    `json:"user_id"`
+	CreatedAt time.Time `json:"created_at"`
+	EndsAt    time.Time `json:"ends_at"`
+	Id        string    `json:"id"`
+
+	// Schedule Points at another resource.
+	Schedule Reference `json:"schedule"`
+	StartsAt time.Time `json:"starts_at"`
+
+	// User Points at another resource.
+	User Reference `json:"user"`
 }
 
 // OverrideInput defines model for OverrideInput.
 type OverrideInput struct {
 	EndsAt   time.Time `json:"ends_at"`
 	StartsAt time.Time `json:"starts_at"`
-	UserId   string    `json:"user_id"`
+
+	// User Points at another resource.
+	User Reference `json:"user"`
 }
 
 // OverrideList defines model for OverrideList.
@@ -520,17 +538,17 @@ type Schedule struct {
 	Layers []Layer `json:"layers"`
 	Name   string  `json:"name"`
 
-	// TeamIds The teams that use this schedule.
-	TeamIds   []string  `json:"team_ids"`
-	TimeZone  string    `json:"time_zone"`
-	UpdatedAt time.Time `json:"updated_at"`
+	// Teams The teams that use this schedule.
+	Teams     []Reference `json:"teams"`
+	TimeZone  string      `json:"time_zone"`
+	UpdatedAt time.Time   `json:"updated_at"`
 }
 
 // ScheduleInput defines model for ScheduleInput.
 type ScheduleInput struct {
-	Layers  []Layer   `json:"layers"`
-	Name    string    `json:"name"`
-	TeamIds *[]string `json:"team_ids,omitempty"`
+	Layers []Layer      `json:"layers"`
+	Name   string       `json:"name"`
+	Teams  *[]Reference `json:"teams,omitempty"`
 
 	// TimeZone IANA time zone; UTC by default.
 	TimeZone *string `json:"time_zone,omitempty"`
@@ -546,23 +564,27 @@ type SchedulePage struct {
 
 // Service defines model for Service.
 type Service struct {
-	CreatedAt          time.Time     `json:"created_at"`
-	Description        string        `json:"description"`
-	EscalationPolicyId string        `json:"escalation_policy_id"`
-	Id                 string        `json:"id"`
-	Name               string        `json:"name"`
-	Status             ServiceStatus `json:"status"`
-	UpdatedAt          time.Time     `json:"updated_at"`
-	Urgency            Urgency       `json:"urgency"`
+	CreatedAt   time.Time `json:"created_at"`
+	Description string    `json:"description"`
+
+	// EscalationPolicy Points at another resource.
+	EscalationPolicy Reference     `json:"escalation_policy"`
+	Id               string        `json:"id"`
+	Name             string        `json:"name"`
+	Status           ServiceStatus `json:"status"`
+	UpdatedAt        time.Time     `json:"updated_at"`
+	Urgency          Urgency       `json:"urgency"`
 }
 
 // ServiceInput defines model for ServiceInput.
 type ServiceInput struct {
-	Description        *string        `json:"description,omitempty"`
-	EscalationPolicyId string         `json:"escalation_policy_id"`
-	Name               string         `json:"name"`
-	Status             *ServiceStatus `json:"status,omitempty"`
-	Urgency            *Urgency       `json:"urgency,omitempty"`
+	Description *string `json:"description,omitempty"`
+
+	// EscalationPolicy Points at another resource.
+	EscalationPolicy Reference      `json:"escalation_policy"`
+	Name             string         `json:"name"`
+	Status           *ServiceStatus `json:"status,omitempty"`
+	Urgency          *Urgency       `json:"urgency,omitempty"`
 }
 
 // ServicePage defines model for ServicePage.
@@ -598,9 +620,13 @@ type TeamMemberInput struct {
 type TeamMembership struct {
 	CreatedAt time.Time `json:"created_at"`
 	Role      TeamRole  `json:"role"`
-	TeamId    string    `json:"team_id"`
+
+	// Team Points at another resource.
+	Team      Reference `json:"team"`
 	UpdatedAt time.Time `json:"updated_at"`
-	UserId    string    `json:"user_id"`
+
+	// User Points at another resource.
+	User Reference `json:"user"`
 }
 
 // TeamMembershipList defines model for TeamMembershipList.
@@ -621,7 +647,8 @@ type TeamRole string
 
 // TimelineEntry defines model for TimelineEntry.
 type TimelineEntry struct {
-	AlertId    *string             `json:"alert_id,omitempty"`
+	// Alert Points at another resource.
+	Alert      *Reference          `json:"alert,omitempty"`
 	At         time.Time           `json:"at"`
 	Escalation *TimelineEscalation `json:"escalation,omitempty"`
 	Id         string              `json:"id"`
@@ -6846,84 +6873,84 @@ func (sh *strictHandler) CreateContactMethod(w http.ResponseWriter, r *http.Requ
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"7D1tb9s4mn+F0B2QD6fGTqez2M18yrW9ueDSnaJNdj4MioCRHlvcSKSWpOLxFPnvB75IoiRKlm3ZcQb7",
-	"LbEp6nl/5UN/DyKW5YwClSK4/B7kmOMMJHD93/uCC8bVXzGIiJNcEkaDy+A2AUThd3kf6QWILZBMAOUc",
-	"nggrBMrxEs6DMCBq8b8K4OsgDCjOILgMzCNBGIgogQyrzeU6V98IyQldBs/PYXD9QX2uH8+xTOqnSRyE",
-	"AYd/FYRDHFxKXsCGnWLIciaBRuv/g3UXlU/4EQTiIDkBgQRewDm60v+v0YrIRCMmcAboEdYI0xipt4OQ",
-	"ak3BqdALGCdLQnGKOIicUQFowTh6+w4lrODip+YmeluMYrJYAAcqqx2JAuSfEEmIzaJ3b9+G+p24hCgh",
-	"KejdFoSLxpNCkjRFvKCU0CVaghTo3fxvFRcSwDHwmpAOXd4owrhUzPDvN0CXMgku3/74Y+ih6g3JiOwS",
-	"81pCJlAOXEtAiH6co4c1imGBi1QaRCTKmJDoYj7vE5BU792Ch2RFFlxezOdhkBFq/6sgI1TCEnjwrGAr",
-	"WaAl+DNnDylk6s+IUQlUQ43zPCURVlDPcrPiv/4pFArfndf+J4dFcBn8x6xWkZn5VszKffUbu8pR8mWB",
-	"SQrxuaaZfVTrFaMSR/ITyITF6oOcsxy4JAZoHMcchOjS94oiyDBJkV2hhAN9PL/4yzuUJ4wCokX2ADxE",
-	"GK3gIWHsEd19uQkR4wijvBAJiuGJRHCmBC3Fa5RgGqdaVVs8DoOIA5YQ32NNsQXjmforiLGEN5Jk4HuG",
-	"xB4lLNcNE7RBklv1wHMYFHm8NQyFAH7vBeTZtRy/GVNSrrYbhRXtGwRoQPKteil7UMqqXtqA/prmhRzk",
-	"6lQUamHUQmEjoDdEeOAkSokbf4yGqkYlwJzjdZfmesuNgN1acgBVev5boIU+CAORKcY8MRIpPK2IB2Gg",
-	"RNvZtabrRxHhVOv5DTxB2kU2VmpwLyBiNPYo3P+yFUoZXSLJ0AoTqc06pghHj5StUoiXkCkL/gALxo1h",
-	"Vn4RpeptSq0qmSVU/uVd0LVYYSAxV9Z6NMVrnG71kxuJ3sSxfqGPDfXmn1lKonWXYhPaBU2lXRA3zOzg",
-	"XboQz6s45IDlfcQKKv1szjBdI4WAUMxeMiQTzoqlCQAMpAgvMaFolQBFlD2weO0Kgmjz+4e3fn4DzqyB",
-	"6joO9SWSCZaIrWxskWtGmDhARwVE6s8FcGXLhVmuHG4FMpFek76LOX0CLgijfmgNaGcCRQXXkYxdHSIh",
-	"MZcqEMESXZyjj0/A18i8H2U65Kp0hVEYRTmf+db8rklag9vieCVr25n1tjb0WPYXlOPt5G3YIXaIafEa",
-	"Q5nPeAn7upL2nl7C1FlHVyQ/ZrlcI0aNymIhq0RkQySgoWtuPoy0tbxdhHcPgNqbD3l4Eo+Cr+1GVbBj",
-	"A+u4SMHrMa9pRGKgHtwcU7edCdnFY8QQF/n9o8nYOt9Chegmqpbo1KQZ8Ecmeu7K1d/15wIRu5n6y6Z9",
-	"MXD11xqtgANiOVCIQx0l5MBylasxxGGhVrGR8QAHwdKnLellncF9D2ZCYlmIscT6alYrwSUy9RuinUJz",
-	"vlT55iYw7uwyv8U3PGpg7IpLCXOFc/3a7Wy/R3I6gvFrAjbqK0VDZeKEIiIFqoXU+slzpO09mqMMMBWI",
-	"MhNXoAQL9ABAtbmK0Rq0+25qH/ye4EJI8MQNxrmarUyBQvmI1q46CazeGLEiVQtxlCBM19YFWxo8MJYC",
-	"plWENtLP5FXAOJg461X/MG76C+gKSKSTPc4KGvtoTKIE5VgIT0QWogVnGbr4yYmUzkRJAe0lVa4sUMY4",
-	"6E1Ghmkt0bO4lQQpgQ0dtgzJ0BTesdzr5Lxiy2o4/kZyslyC2i5seI+gNnKDPuhXIpNbkkFKqCYfTtNf",
-	"FsHlb6MJ1aa4dDYbRfTy7R+p5OuNiVa1fZdM3zRaEpa8MiUHS6seYX3vhO0jVLc33Cwruvd6T5yS+L6g",
-	"kqRHd0wV5RzfNCKoch7cvabkc0MN70Nx/ViT/I4X2s73VGC/14915aWXZcemaE8Sob7bgNo0VrHa7gQN",
-	"Y5vGjm3EkSRPEIRBTAR+SHstYZPazgZLoMBJFIQBToHLDFO81IHRkuMFplhtjSWO2VIJX8qKeIVllKgF",
-	"jC1TuNefbXrrnRbUY4ifT442UFX5B9vUGesaXGlp4/To6w/d6uCuekw1cEIkdM1vjTJGiWQKdSQZS6u8",
-	"4KqQCePkD/OIab1sliv1fr/nuMFrk5eMZEKOuSQRybHt6jVRuhPA0fUHEXrSGIkfAem+loK3UsGejLZW",
-	"NF3vEVt5L/WW+1T3mUYUYHWoqh7RmirO0a8JSwHFeC10FwOxJ+Cq2lS12lIW4VRX9BDoCDnG6wrlMgc+",
-	"E2bFH54qlDc/aweGLqX9OLnE8Qn0L/Q9Tj2l6R2bHq2O0YOWVbdkSYSyeRFO080i2QfyE3BOYpgmjAEa",
-	"iyninpKnA7HGtjK6XTPJBaB+1n1xjWwjIBiicU/NcWuiHRL7YVSHsJuiBVXutUf3yR+KKLQ2vbyRwj4R",
-	"vH33xkPLwGzlhdSfP3cU/zMjVAplEBmFsi6vDmpg6qlMdMoNPSq0TVrh05DyeS9mdau+3aOT2KQcA9GG",
-	"p+7dW7uSHFcZiacFo741R1qIKDv5oSrkLQiNVfeFULRmBdcrle9/wNEj0HizOW2VpnxUGMVSTJlMgCMO",
-	"ghU8gpH863LEB8HXsjx80Nafimg8/v4GS+DIfGuCkZxDBLGiiHHxgHlKgCuxVo4sAhO4aMPTiFmGtNAE",
-	"VNs0XmxXRPS37WwjrhBgJKf0BtsFUoqO9yoamajqOtQ1q17loFexZruMtRSavg5Zxe4jsGdHYreOMl39",
-	"/aoODX9Cd7fvnbNMm1Xd0tgiPkSyKdLgcq+Ty4G/mjrJNLakAfpgW+je+LW+SLDn4z2TWotrXU95sR6J",
-	"kT2XXD3EcZsjO1WqLM49aj8ZwybnzH5UtgT2gj9ApUk03Wx1qoq+a6HrFnB20ICjV4ImdanbqI5CuUdv",
-	"eoAdWyJTO38C1Sft2Z+zdGOhV23yRa1rv1Y/PPxakZB8Gm5uB+nQYZcDnyatT83UybAGfnuhqGk4RXbc",
-	"4sruObLaaAoLpvY5OfNVyZBjueqSujlSbs7PswfV+wHuN2ONfmG3pJcCl33iuY1Yjj8AU0E05gCMKLIM",
-	"8/XgGSZvc1fhNdjmrUCGuOk4xSPJ8/aHvq76kPW1nbcS/LCvbukhhv8w39gjD+pkRc/RSHP8x5690NXr",
-	"apzEHMA16aI+gwGx+jwbnb5qNfSokN3s3lR6/YBp/M6EBUI0oTAPhkgU6mCIQLjKYg30lOlyklM/nujI",
-	"snP8Y9vCUvtIhmFKhxg+ebirw8BSrBOyTIIwSNnKq+B3wteI2anqnfUVtQ4TAyvI3YNdIzPfUIkBoehj",
-	"oTCefcKpxBMdLh6Io8oD/26JYqf85E70BkH9DHgZSu9cYzCI9GE/hctW+5ycy3bI7E03QP+Je7yI0jO6",
-	"YNrikwiogDrwDq5+/nzz5ofzuVNGDj4VPE/W6OrztVPHvgyeLtQilgPFOQkugx/O5+c/aCskEw3Y7Oli",
-	"FpnhljeZnm4Rs+8kfrbTJ2C664o32kBex8Fl8EF/3hytaQ22vZ2/65L8g+5iPofBu/m7Pp5WuzgzbI7n",
-	"t+9GGFmgUVa+X+Kl0D1P7doC1Zi2h6Cb0P8McgPo84F5vO3m8Jov8kzjfS2iCITYlyo/gxxJEneCtuc4",
-	"Qr1kdv0heP6mBpg8dDRnL7qk1A2J/7YOfnoqGnP5/PzcHrR9Ph0+zrfg4158NzwYxfrnUOt6Hca+0UUh",
-	"a3C9mqLyu9bUg1q+rRCZadzncONCO8+tVjap+wtN10gmTICaO4JYuSHdxJCAs75B3Trl7R/A/nZAmfHO",
-	"oEwqOg1RUMzqtE4Nu0pZqL81poAJD9PNib428FszvTXY/vztMKbBPwI1yjpcHAyI6Q3E37Zb//btrlJk",
-	"uO/twvcJUr9h8QQSreM/dmuT5VUTg+auAD0yqNO6CNMzNcSKzD7xObquRl30kwuWpmxl0tRyy0eAXCWO",
-	"sWqBEynKQwb65JgvnvGI/MFCmm156g2BtuBRfyi0Gev5C+rJfgHRVgSaOjDyEvakDOD8FRnAvSOk6Qza",
-	"rDQks+/2r2cngvLNPkUJpks9a4dL62SGjDGisKqnks3wGMTO1JA+4mMucmHUHvuBTBc9JFphgQR+grhr",
-	"0jya/Q9n9vgF5aAezDbHYXE1lj1NErThLNmUBiD03gHkznj3XQTUKSIO3hrzzUpkNeA5GLFXvvGlAvUK",
-	"TOO9a7kVgEyJyky5we95ymIoqeOL4auiWk26rabR2sMj7onwta6bKE5sRoQtWmjYUGUsGu44jgeVEefX",
-	"XWgPmbU0ZgI96lt+L0Jlu/QlQoQLOUn2QhzJLZW0/qwyzNVHVXzZF9yUwAZHIFhjGrDH7pWQ6zlYFZOW",
-	"I3khYmmsiAlU8nWDpPuGQNU77eUc9Ut7qLxTKORlzcxpt7VvbxsfYnmz1Kt6Z4fJE6SoB5aSzZKxkGbY",
-	"xUYN5nasyt2ThforwTHCqUpuyuAiNrHCCq+PkI3slWE6nHPFM1SXx0UJEpLlojWgvo05mNme7sTy9sXs",
-	"+m9Ze1WyZrnmytkmWapG6ca2QdyhvTEVg/bEnqJ0WdeYqDdC3Rc4CEdY4pQtB+sBg+hMKaP1a3rFtFoy",
-	"mSvcRJWpiwBtak6f/3eHYY+c+4/gpG2Cezj6AmWATULQZwlmdv52L6fSiqWFKKoqQHl/60OR5eb6MfVJ",
-	"mRqjW/cC20cw9U2BVow/qgKne59riPQlCKjvdoRuteALk01hNVeunrKL60xZb7YiYR0CW4Ibsj6CnTpN",
-	"10gkbEXNFK4uvRj4T97PMdmV7jMtJ0Myzuxk4lhXV00yHrvZTxGrX12iw+gbdcprz4ylPEA2XFP5Wq16",
-	"0eYnFoJFBFcXMJ98D7QxRHTg3qdweOSVkYF2ZwnnqbY5m/NrR25v1tNbr76tWQmJV0baJmGkWXSE58hn",
-	"oAax6Y/x+wGev4DQ7Fnv30CDqSP6Bu1OQtHnr0DR9z/gtL3izsrv+5pz71mWFxIEWiXMuXZET7CjjGW6",
-	"KqVbca0rWez8d3mtiw6hvC04e3dKRwq7Yap5nW4RikeEH1ghf0KUrVoHbn0+Hjd/jWDU0eZD+nyL9OnI",
-	"0P+oexGaPD5cGGlFrxSLwajyl2rVBgnRIWC1p2maAo2rAh4xRf2xEmNuPlHPnpjkuLeunI786OgSuwaA",
-	"OYybzukMxKdO5nWS8WnzNqAjx6cVcV5UZI4az5YouxNQ+rcfzLwGV2X6QU9p+9fDSW+56OA570FTUGe4",
-	"3ScgFskDtLNFTT9vrXkoHzWPnmw66l6rcOxs1JKmp95np69K4r+exLTieG+5zi4ZnZZWO45rStntq7MJ",
-	"bgXc3B8/cZtqEOeB7LUPr/mxZKwpW/vmr4NEmDx9dYh3CnbhaDwre1D72YWjnfGu894t7UKjcbXhnKCz",
-	"8FW7+PalzcNqe9Y0bXs7/klyCy9ok9qEgWij2aU+yYije+X4kcOO8R3HMgLxdx637zr+aZKWerZoZA9e",
-	"X1s4aMNu9YpXbbyqe2t84qTQO0BmIi3ZfPPBA3ZCgXOqBqK+rurIhkETZYMpMC3aV5KJSMPlvgFi9fXY",
-	"FMQKzLj8Q218iNNwvQj1pxh+uOdHkRlHVvbMLPrxnjqrqOj14np9HB6VycQeer1/R2y0ns4yc7/aRk9q",
-	"72E7tOS3LpAb0IMzgSzs1e1UhCPOUti7eWwD7+ZbJtOWXh7Mvtv79wat5xfI2BPUtBptQ81btBXleo+9",
-	"ragBBeFya90Pnda2+MfonHsKR/+efp+V+gqyRczDGCr3VssXMFfuPYp+pcqqFcc2W1dxXAuRZFaE9MRB",
-	"OR5bKfeAVVNSMWzI7oRR5FecElT3Yh34xFwhgO+QBtyZn4A4yTSgvlDtyGmAJsqf4ICc/X2PQf0bGf1b",
-	"OTnymbg+BPqjfT+c8yOLxp7Bfj/aUwf7FbleXHvnJ669+8f4o7WxfYffoIts3GYmjnb/3bhjPftG9Iom",
-	"6if/GxeiiSlVY8A1tm/DO0kfuet1ehd/xuv0jjv7rIPgpmiaYLhX0e1v1PrPBd7o3xCM4QlSlmdmurXg",
-	"aXAZJFLml7OZ/pHBhAl5+df5X+cqMf3/AQA=",
+	"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",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

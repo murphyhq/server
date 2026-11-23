@@ -778,47 +778,55 @@ func (_m *MockCatalog) EXPECT() *MockCatalog_Expecter {
 	return &MockCatalog_Expecter{mock: &_m.Mock}
 }
 
-// GetIntegration provides a mock function for the type MockCatalog
-func (_mock *MockCatalog) GetIntegration(ctx context.Context, id string) (*murphy.Integration, error) {
-	ret := _mock.Called(ctx, id)
+// GetIntegrationAndService provides a mock function for the type MockCatalog
+func (_mock *MockCatalog) GetIntegrationAndService(ctx context.Context, integrationID string) (*murphy.Integration, *murphy.Service, error) {
+	ret := _mock.Called(ctx, integrationID)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetIntegration")
+		panic("no return value specified for GetIntegrationAndService")
 	}
 
 	var r0 *murphy.Integration
-	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (*murphy.Integration, error)); ok {
-		return returnFunc(ctx, id)
+	var r1 *murphy.Service
+	var r2 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (*murphy.Integration, *murphy.Service, error)); ok {
+		return returnFunc(ctx, integrationID)
 	}
 	if returnFunc, ok := ret.Get(0).(func(context.Context, string) *murphy.Integration); ok {
-		r0 = returnFunc(ctx, id)
+		r0 = returnFunc(ctx, integrationID)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*murphy.Integration)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = returnFunc(ctx, id)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string) *murphy.Service); ok {
+		r1 = returnFunc(ctx, integrationID)
 	} else {
-		r1 = ret.Error(1)
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(*murphy.Service)
+		}
 	}
-	return r0, r1
+	if returnFunc, ok := ret.Get(2).(func(context.Context, string) error); ok {
+		r2 = returnFunc(ctx, integrationID)
+	} else {
+		r2 = ret.Error(2)
+	}
+	return r0, r1, r2
 }
 
-// MockCatalog_GetIntegration_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetIntegration'
-type MockCatalog_GetIntegration_Call struct {
+// MockCatalog_GetIntegrationAndService_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetIntegrationAndService'
+type MockCatalog_GetIntegrationAndService_Call struct {
 	*mock.Call
 }
 
-// GetIntegration is a helper method to define mock.On call
+// GetIntegrationAndService is a helper method to define mock.On call
 //   - ctx context.Context
-//   - id string
-func (_e *MockCatalog_Expecter) GetIntegration(ctx any, id any) *MockCatalog_GetIntegration_Call {
-	return &MockCatalog_GetIntegration_Call{Call: _e.mock.On("GetIntegration", ctx, id)}
+//   - integrationID string
+func (_e *MockCatalog_Expecter) GetIntegrationAndService(ctx any, integrationID any) *MockCatalog_GetIntegrationAndService_Call {
+	return &MockCatalog_GetIntegrationAndService_Call{Call: _e.mock.On("GetIntegrationAndService", ctx, integrationID)}
 }
 
-func (_c *MockCatalog_GetIntegration_Call) Run(run func(ctx context.Context, id string)) *MockCatalog_GetIntegration_Call {
+func (_c *MockCatalog_GetIntegrationAndService_Call) Run(run func(ctx context.Context, integrationID string)) *MockCatalog_GetIntegrationAndService_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -836,80 +844,12 @@ func (_c *MockCatalog_GetIntegration_Call) Run(run func(ctx context.Context, id 
 	return _c
 }
 
-func (_c *MockCatalog_GetIntegration_Call) Return(integration *murphy.Integration, err error) *MockCatalog_GetIntegration_Call {
-	_c.Call.Return(integration, err)
+func (_c *MockCatalog_GetIntegrationAndService_Call) Return(integration *murphy.Integration, service *murphy.Service, err error) *MockCatalog_GetIntegrationAndService_Call {
+	_c.Call.Return(integration, service, err)
 	return _c
 }
 
-func (_c *MockCatalog_GetIntegration_Call) RunAndReturn(run func(ctx context.Context, id string) (*murphy.Integration, error)) *MockCatalog_GetIntegration_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// GetService provides a mock function for the type MockCatalog
-func (_mock *MockCatalog) GetService(ctx context.Context, id string) (*murphy.Service, error) {
-	ret := _mock.Called(ctx, id)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetService")
-	}
-
-	var r0 *murphy.Service
-	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (*murphy.Service, error)); ok {
-		return returnFunc(ctx, id)
-	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) *murphy.Service); ok {
-		r0 = returnFunc(ctx, id)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*murphy.Service)
-		}
-	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = returnFunc(ctx, id)
-	} else {
-		r1 = ret.Error(1)
-	}
-	return r0, r1
-}
-
-// MockCatalog_GetService_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetService'
-type MockCatalog_GetService_Call struct {
-	*mock.Call
-}
-
-// GetService is a helper method to define mock.On call
-//   - ctx context.Context
-//   - id string
-func (_e *MockCatalog_Expecter) GetService(ctx any, id any) *MockCatalog_GetService_Call {
-	return &MockCatalog_GetService_Call{Call: _e.mock.On("GetService", ctx, id)}
-}
-
-func (_c *MockCatalog_GetService_Call) Run(run func(ctx context.Context, id string)) *MockCatalog_GetService_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 context.Context
-		if args[0] != nil {
-			arg0 = args[0].(context.Context)
-		}
-		var arg1 string
-		if args[1] != nil {
-			arg1 = args[1].(string)
-		}
-		run(
-			arg0,
-			arg1,
-		)
-	})
-	return _c
-}
-
-func (_c *MockCatalog_GetService_Call) Return(service *murphy.Service, err error) *MockCatalog_GetService_Call {
-	_c.Call.Return(service, err)
-	return _c
-}
-
-func (_c *MockCatalog_GetService_Call) RunAndReturn(run func(ctx context.Context, id string) (*murphy.Service, error)) *MockCatalog_GetService_Call {
+func (_c *MockCatalog_GetIntegrationAndService_Call) RunAndReturn(run func(ctx context.Context, integrationID string) (*murphy.Integration, *murphy.Service, error)) *MockCatalog_GetIntegrationAndService_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -950,25 +890,23 @@ func (_m *MockPolicies) EXPECT() *MockPolicies_Expecter {
 	return &MockPolicies_Expecter{mock: &_m.Mock}
 }
 
-// GetPolicy provides a mock function for the type MockPolicies
-func (_mock *MockPolicies) GetPolicy(ctx context.Context, id string) (*murphy.EscalationPolicy, error) {
+// CurrentVersion provides a mock function for the type MockPolicies
+func (_mock *MockPolicies) CurrentVersion(ctx context.Context, id string) (int32, error) {
 	ret := _mock.Called(ctx, id)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetPolicy")
+		panic("no return value specified for CurrentVersion")
 	}
 
-	var r0 *murphy.EscalationPolicy
+	var r0 int32
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (*murphy.EscalationPolicy, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (int32, error)); ok {
 		return returnFunc(ctx, id)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) *murphy.EscalationPolicy); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) int32); ok {
 		r0 = returnFunc(ctx, id)
 	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*murphy.EscalationPolicy)
-		}
+		r0 = ret.Get(0).(int32)
 	}
 	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
 		r1 = returnFunc(ctx, id)
@@ -978,19 +916,19 @@ func (_mock *MockPolicies) GetPolicy(ctx context.Context, id string) (*murphy.Es
 	return r0, r1
 }
 
-// MockPolicies_GetPolicy_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetPolicy'
-type MockPolicies_GetPolicy_Call struct {
+// MockPolicies_CurrentVersion_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CurrentVersion'
+type MockPolicies_CurrentVersion_Call struct {
 	*mock.Call
 }
 
-// GetPolicy is a helper method to define mock.On call
+// CurrentVersion is a helper method to define mock.On call
 //   - ctx context.Context
 //   - id string
-func (_e *MockPolicies_Expecter) GetPolicy(ctx any, id any) *MockPolicies_GetPolicy_Call {
-	return &MockPolicies_GetPolicy_Call{Call: _e.mock.On("GetPolicy", ctx, id)}
+func (_e *MockPolicies_Expecter) CurrentVersion(ctx any, id any) *MockPolicies_CurrentVersion_Call {
+	return &MockPolicies_CurrentVersion_Call{Call: _e.mock.On("CurrentVersion", ctx, id)}
 }
 
-func (_c *MockPolicies_GetPolicy_Call) Run(run func(ctx context.Context, id string)) *MockPolicies_GetPolicy_Call {
+func (_c *MockPolicies_CurrentVersion_Call) Run(run func(ctx context.Context, id string)) *MockPolicies_CurrentVersion_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -1008,12 +946,12 @@ func (_c *MockPolicies_GetPolicy_Call) Run(run func(ctx context.Context, id stri
 	return _c
 }
 
-func (_c *MockPolicies_GetPolicy_Call) Return(escalationPolicy *murphy.EscalationPolicy, err error) *MockPolicies_GetPolicy_Call {
-	_c.Call.Return(escalationPolicy, err)
+func (_c *MockPolicies_CurrentVersion_Call) Return(n int32, err error) *MockPolicies_CurrentVersion_Call {
+	_c.Call.Return(n, err)
 	return _c
 }
 
-func (_c *MockPolicies_GetPolicy_Call) RunAndReturn(run func(ctx context.Context, id string) (*murphy.EscalationPolicy, error)) *MockPolicies_GetPolicy_Call {
+func (_c *MockPolicies_CurrentVersion_Call) RunAndReturn(run func(ctx context.Context, id string) (int32, error)) *MockPolicies_CurrentVersion_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -28,20 +28,8 @@ func TestEveryIncidentPagesItsFirstLevel(t *testing.T) {
 	ctx := t.Context()
 	run := uuid.NewV4().String()[:8]
 
-	team, err := murphy.CreateTeamWithResponse(ctx, nil, client.TeamInput{Name: "load-escalation-" + run})
-	require.NoError(t, err, "create the team")
-	require.Equal(t, http.StatusCreated, team.StatusCode(), "create the team: %s", team.Body)
-	user, err := murphy.CreateUserWithResponse(ctx, nil, client.UserInput{Name: "Load " + run, Email: "load-escalation-" + run + "@example.com"})
-	require.NoError(t, err, "create the user")
-	require.Equal(t, http.StatusCreated, user.StatusCode(), "create the user: %s", user.Body)
-	policy, err := murphy.CreateEscalationPolicyWithResponse(ctx, nil, client.EscalationPolicyInput{
-		Name:   "load-escalation-" + run,
-		TeamId: team.JSON201.Id,
-		Levels: []client.EscalationLevel{{DelaySeconds: 3600, Targets: []client.EscalationTarget{{Type: client.EscalationTargetTypeUser, Id: user.JSON201.Id}}}},
-	})
-	require.NoError(t, err, "create the policy")
-	require.Equal(t, http.StatusCreated, policy.StatusCode(), "create the policy: %s", policy.Body)
-	service, err := murphy.CreateServiceWithResponse(ctx, nil, client.ServiceInput{Name: "load-escalation-" + run, EscalationPolicyId: policy.JSON201.Id})
+	policyID, _ := escalationPolicy(t, murphy, "load-escalation-"+run)
+	service, err := murphy.CreateServiceWithResponse(ctx, nil, client.ServiceInput{Name: "load-escalation-" + run, EscalationPolicy: client.Reference{Id: policyID}})
 	require.NoError(t, err, "create the service")
 	require.Equal(t, http.StatusCreated, service.StatusCode(), "create the service: %s", service.Body)
 	integration, err := murphy.CreateIntegrationWithResponse(ctx, service.JSON201.Id, nil, client.IntegrationCreate{Name: "generic", Type: client.Generic})

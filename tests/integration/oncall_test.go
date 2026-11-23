@@ -27,16 +27,16 @@ func TestSchedulesAnswerWhoIsOnCall(t *testing.T) {
 		onCall, err := api.GetOnCallWithResponse(ctx, schedule, &client.GetOnCallParams{At: &second})
 		require.NoError(t, err)
 		require.Equal(t, http.StatusOK, onCall.StatusCode())
-		assert.Equal(t, bo, *onCall.JSON200.UserId)
+		assert.Equal(t, bo, onCall.JSON200.User.Id)
 
 		override, err := api.CreateOverrideWithResponse(ctx, schedule, nil, client.OverrideInput{
-			UserId: cy, StartsAt: second.Add(-time.Hour), EndsAt: second.Add(time.Hour),
+			User: client.Reference{Id: cy}, StartsAt: second.Add(-time.Hour), EndsAt: second.Add(time.Hour),
 		})
 		require.NoError(t, err)
 		require.Equal(t, http.StatusCreated, override.StatusCode())
 		onCall, err = api.GetOnCallWithResponse(ctx, schedule, &client.GetOnCallParams{At: &second})
 		require.NoError(t, err)
-		assert.Equal(t, cy, *onCall.JSON200.UserId)
+		assert.Equal(t, cy, onCall.JSON200.User.Id)
 	})
 }
 
@@ -70,16 +70,25 @@ func TestSchedulesFilterByTeam(t *testing.T) {
 		require.Equal(t, http.StatusOK, page.StatusCode())
 		require.Len(t, page.JSON200.Items, 1)
 		assert.Equal(t, shared, page.JSON200.Items[0].Id)
-		assert.ElementsMatch(t, []string{platform, payments}, page.JSON200.Items[0].TeamIds)
+		assert.ElementsMatch(t, references(platform, payments), page.JSON200.Items[0].Teams)
 	})
 }
 
 func scheduleInput(name string, teams []string, participants ...string) client.ScheduleInput {
+	teamRefs := references(teams...)
 	return client.ScheduleInput{
-		Name:    name,
-		TeamIds: &teams,
-		Layers:  []client.Layer{{TurnLengthSeconds: 24 * 60 * 60, StartsAt: rotationStart, Participants: participants}},
+		Name:   name,
+		Teams:  &teamRefs,
+		Layers: []client.Layer{{TurnLengthSeconds: 24 * 60 * 60, StartsAt: rotationStart, Participants: references(participants...)}},
 	}
+}
+
+func references(ids ...string) []client.Reference {
+	out := make([]client.Reference, len(ids))
+	for i, id := range ids {
+		out[i] = client.Reference{Id: id}
+	}
+	return out
 }
 
 func createSchedule(t *testing.T, api *client.ClientWithResponses, name string, teams []string, participants ...string) string {

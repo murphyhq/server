@@ -157,7 +157,7 @@ func toUser(user *murphy.User) User {
 func toContactMethod(method *murphy.ContactMethod) ContactMethod {
 	return ContactMethod{
 		Id:        method.GetId(),
-		UserId:    method.GetUserId(),
+		User:      ref(method.GetUserId()),
 		Type:      ContactMethodType(method.GetType().Text()),
 		Address:   method.GetAddress(),
 		CreatedAt: method.GetCreatedAt().AsTime(),

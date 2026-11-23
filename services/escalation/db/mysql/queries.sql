@@ -48,3 +48,8 @@ FROM level_targets AS lt
 JOIN escalation_levels AS l ON l.id = lt.level_id
 WHERE l.version_id IN (sqlc.slice(version_ids))
 ORDER BY lt.level_id, lt.position;
+
+-- name: CurrentVersion :one
+SELECT version
+FROM escalation_policies
+WHERE id = sqlc.arg(id) AND deleted_at IS NULL;

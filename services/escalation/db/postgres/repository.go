@@ -198,3 +198,14 @@ func toPolicy(row GetPolicyVersionRow) *murphy.EscalationPolicy {
 		CreatedAt: timestamppb.New(row.CreatedAt), UpdatedAt: timestamppb.New(row.UpdatedAt),
 	}
 }
+
+func (r *Repository) CurrentVersion(ctx context.Context, id string) (_ int32, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	version, err := r.queries.CurrentVersion(ctx, id)
+	if err != nil {
+		return 0, murphypostgres.Error("escalation policy", err)
+	}
+	return version, nil
+}

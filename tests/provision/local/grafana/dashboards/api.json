@@ -247,18 +247,164 @@
     },
     {
       "id": 7,
+      "type": "table",
+      "title": "Database per request",
+      "description": "What one request costs the database, heaviest first. Database time counts the queries' own duration; waiting counts time getting a pooled connection.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 18
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (murphy_http_request_method, murphy_http_route) (rate(murphy_http_request_db_queries_count{service_namespace=\"murphy\", service_name=\"api\"}[$__rate_interval]))",
+          "format": "table",
+          "instant": true
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (murphy_http_request_method, murphy_http_route) (rate(murphy_http_request_db_queries_sum{service_namespace=\"murphy\", service_name=\"api\"}[$__rate_interval])) / sum by (murphy_http_request_method, murphy_http_route) (rate(murphy_http_request_db_queries_count{service_namespace=\"murphy\", service_name=\"api\"}[$__rate_interval]))",
+          "format": "table",
+          "instant": true
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "histogram_quantile(0.99, sum by (le, murphy_http_request_method, murphy_http_route) (rate(murphy_http_request_db_time_seconds_bucket{service_namespace=\"murphy\", service_name=\"api\"}[$__rate_interval])))",
+          "format": "table",
+          "instant": true
+        },
+        {
+          "refId": "D",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (murphy_http_request_method, murphy_http_route) (rate(murphy_http_request_db_time_seconds_sum{service_namespace=\"murphy\", service_name=\"api\"}[$__rate_interval])) / sum by (murphy_http_request_method, murphy_http_route) (label_replace(label_replace(rate(http_server_request_duration_seconds_sum{service_namespace=\"murphy\", service_name=\"api\"}[$__rate_interval]), \"murphy_http_route\", \"$1\", \"http_route\", \"(.*)\"), \"murphy_http_request_method\", \"$1\", \"http_request_method\", \"(.*)\"))",
+          "format": "table",
+          "instant": true
+        },
+        {
+          "refId": "E",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "histogram_quantile(0.99, sum by (le, murphy_http_request_method, murphy_http_route) (rate(murphy_http_request_db_wait_seconds_bucket{service_namespace=\"murphy\", service_name=\"api\"}[$__rate_interval])))",
+          "format": "table",
+          "instant": true
+        }
+      ],
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "renameByName": {
+              "Value #A": "Per second",
+              "Value #B": "Queries, average",
+              "Value #C": "Database time, p99",
+              "Value #D": "Share of time in the database",
+              "Value #E": "Waiting for a connection, p99"
+            }
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "sort": [
+              {
+                "field": "Database time, p99",
+                "desc": true
+              }
+            ]
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 2
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "time|wait"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "s"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "Share"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Per second"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "reqps"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true
+      }
+    },
+    {
+      "id": 8,
       "type": "timeseries",
-      "title": "Queries per request, by route",
-      "description": "Database queries run to answer one request. A line that climbs with the data is an N+1.",
+      "title": "Queries per request",
+      "description": "Database queries run for one request. A line that climbs with the data is an N+1.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
       "gridPos": {
         "h": 8,
-        "w": 24,
+        "w": 8,
         "x": 0,
-        "y": 18
+        "y": 27
       },
       "links": [],
       "fieldConfig": {
@@ -304,7 +450,105 @@
       ]
     },
     {
-      "id": 8,
+      "id": 9,
+      "type": "timeseries",
+      "title": "Database time per request, p99",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 27
+      },
+      "links": [],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "histogram_quantile(0.99, sum by (le, murphy_http_request_method, murphy_http_route) (rate(murphy_http_request_db_time_seconds_bucket{service_namespace=\"murphy\", service_name=\"api\"}[$__rate_interval])))",
+          "legendFormat": "{{murphy_http_request_method}} {{murphy_http_route}}"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Waiting for a connection per request, p99",
+      "description": "Time getting a connection from the pool. It grows when the pool is too small for the load.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 27
+      },
+      "links": [],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "histogram_quantile(0.99, sum by (le, murphy_http_request_method, murphy_http_route) (rate(murphy_http_request_db_wait_seconds_bucket{service_namespace=\"murphy\", service_name=\"api\"}[$__rate_interval])))",
+          "legendFormat": "{{murphy_http_request_method}} {{murphy_http_route}}"
+        }
+      ]
+    },
+    {
+      "id": 11,
       "type": "timeseries",
       "title": "Queries per second",
       "description": "",
@@ -316,7 +560,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 26
+        "y": 35
       },
       "links": [],
       "fieldConfig": {
@@ -353,7 +597,7 @@
       ]
     },
     {
-      "id": 9,
+      "id": 12,
       "type": "timeseries",
       "title": "Query time",
       "description": "",
@@ -365,7 +609,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 26
+        "y": 35
       },
       "links": [],
       "fieldConfig": {
@@ -411,10 +655,10 @@
       ]
     },
     {
-      "id": 10,
+      "id": 13,
       "type": "timeseries",
       "title": "Waiting for a connection, p99",
-      "description": "Time to get a connection from the pool. It grows when the pool is too small for the load.",
+      "description": "",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -423,7 +667,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 26
+        "y": 35
       },
       "links": [],
       "fieldConfig": {
@@ -460,7 +704,7 @@
       ]
     },
     {
-      "id": 11,
+      "id": 14,
       "type": "timeseries",
       "title": "Connections in use, by pool",
       "description": "",
@@ -472,7 +716,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 34
+        "y": 43
       },
       "links": [],
       "fieldConfig": {
@@ -518,7 +762,7 @@
       ]
     },
     {
-      "id": 12,
+      "id": 15,
       "type": "timeseries",
       "title": "Waits for a free connection per second",
       "description": "",
@@ -530,7 +774,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 34
+        "y": 43
       },
       "links": [],
       "fieldConfig": {
@@ -567,7 +811,7 @@
       ]
     },
     {
-      "id": 13,
+      "id": 16,
       "type": "row",
       "title": "Idempotency store",
       "collapsed": false,
@@ -575,12 +819,12 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 42
+        "y": 51
       },
       "panels": []
     },
     {
-      "id": 14,
+      "id": 17,
       "type": "timeseries",
       "title": "Commands per request, by route",
       "description": "Redis commands run to answer one request. Requests with an Idempotency-Key read and store their response here.",
@@ -592,7 +836,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 43
+        "y": 52
       },
       "links": [],
       "fieldConfig": {
@@ -629,7 +873,7 @@
       ]
     },
     {
-      "id": 15,
+      "id": 18,
       "type": "timeseries",
       "title": "Connections",
       "description": "",
@@ -641,7 +885,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 43
+        "y": 52
       },
       "links": [],
       "fieldConfig": {
@@ -678,7 +922,7 @@
       ]
     },
     {
-      "id": 16,
+      "id": 19,
       "type": "row",
       "title": "Runtime",
       "collapsed": false,
@@ -686,12 +930,12 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 51
+        "y": 60
       },
       "panels": []
     },
     {
-      "id": 17,
+      "id": 20,
       "type": "timeseries",
       "title": "Goroutines",
       "description": "",
@@ -703,7 +947,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 52
+        "y": 61
       },
       "links": [],
       "fieldConfig": {
@@ -740,7 +984,7 @@
       ]
     },
     {
-      "id": 18,
+      "id": 21,
       "type": "timeseries",
       "title": "Memory in use and GC target",
       "description": "",
@@ -752,7 +996,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 52
+        "y": 61
       },
       "links": [],
       "fieldConfig": {
@@ -798,7 +1042,7 @@
       ]
     },
     {
-      "id": 19,
+      "id": 22,
       "type": "timeseries",
       "title": "Allocated per second",
       "description": "",
@@ -810,7 +1054,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 52
+        "y": 61
       },
       "links": [],
       "fieldConfig": {
@@ -847,7 +1091,7 @@
       ]
     },
     {
-      "id": 20,
+      "id": 23,
       "type": "row",
       "title": "Container",
       "collapsed": false,
@@ -855,12 +1099,12 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 60
+        "y": 69
       },
       "panels": []
     },
     {
-      "id": 21,
+      "id": 24,
       "type": "timeseries",
       "title": "CPU",
       "description": "Share of one CPU core; above 100% means more than one core.",
@@ -872,7 +1116,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 61
+        "y": 70
       },
       "links": [],
       "fieldConfig": {
@@ -909,7 +1153,7 @@
       ]
     },
     {
-      "id": 22,
+      "id": 25,
       "type": "timeseries",
       "title": "Memory",
       "description": "",
@@ -921,7 +1165,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 61
+        "y": 70
       },
       "links": [],
       "fieldConfig": {
@@ -967,7 +1211,7 @@
       ]
     },
     {
-      "id": 23,
+      "id": 26,
       "type": "timeseries",
       "title": "Network",
       "description": "",
@@ -979,7 +1223,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 61
+        "y": 70
       },
       "links": [],
       "fieldConfig": {

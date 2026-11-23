@@ -4,6 +4,7 @@ package load
 
 import (
 	"bytes"
+	"net/http"
 	"os"
 	"testing"
 	"time"
@@ -58,4 +59,23 @@ func attack(t *testing.T, p Profile, name string, targeter vegeta.Targeter, thre
 
 	assert.GreaterOrEqual(t, metrics.Success, thresholds.Success, "share of successful requests, by status code: %v, errors: %v", metrics.StatusCodes, metrics.Errors)
 	assert.LessOrEqual(t, metrics.Latencies.P99, thresholds.P99, "p99 latency")
+}
+
+func escalationPolicy(t *testing.T, murphy *client.ClientWithResponses, name string) (policyID, userID string) {
+	t.Helper()
+	ctx := t.Context()
+	team, err := murphy.CreateTeamWithResponse(ctx, nil, client.TeamInput{Name: name})
+	require.NoError(t, err, "create the team")
+	require.Equal(t, http.StatusCreated, team.StatusCode(), "create the team: %s", team.Body)
+	user, err := murphy.CreateUserWithResponse(ctx, nil, client.UserInput{Name: name, Email: name + "@example.com"})
+	require.NoError(t, err, "create the user")
+	require.Equal(t, http.StatusCreated, user.StatusCode(), "create the user: %s", user.Body)
+	policy, err := murphy.CreateEscalationPolicyWithResponse(ctx, nil, client.EscalationPolicyInput{
+		Name:   name,
+		Team:   client.Reference{Id: team.JSON201.Id},
+		Levels: []client.EscalationLevel{{DelaySeconds: 3600, Targets: []client.EscalationTarget{{Type: client.EscalationTargetTypeUser, Id: user.JSON201.Id}}}},
+	})
+	require.NoError(t, err, "create the policy")
+	require.Equal(t, http.StatusCreated, policy.StatusCode(), "create the policy: %s", policy.Body)
+	return policy.JSON201.Id, user.JSON201.Id
 }

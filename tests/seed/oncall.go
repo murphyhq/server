@@ -15,16 +15,16 @@ func seedSchedules(ctx context.Context, api *client.ClientWithResponses, teams, 
 	malta := "Europe/Malta"
 	schedules := []client.ScheduleInput{
 		{
-			Name: "platform primary", TimeZone: &malta, TeamIds: &[]string{teams["platform"]},
-			Layers: []client.Layer{{Name: new("weekly"), TurnLengthSeconds: week, StartsAt: rotationStart, Participants: []string{users["ana@example.com"], users["bo@example.com"]}}},
+			Name: "platform primary", TimeZone: &malta, Teams: &[]client.Reference{{Id: teams["platform"]}},
+			Layers: []client.Layer{{Name: new("weekly"), TurnLengthSeconds: week, StartsAt: rotationStart, Participants: []client.Reference{{Id: users["ana@example.com"]}, {Id: users["bo@example.com"]}}}},
 		},
 		{
-			Name: "payments primary", TimeZone: &malta, TeamIds: &[]string{teams["payments"]},
-			Layers: []client.Layer{{Name: new("daily"), TurnLengthSeconds: day, StartsAt: rotationStart, Participants: []string{users["cy@example.com"], users["dee@example.com"]}}},
+			Name: "payments primary", TimeZone: &malta, Teams: &[]client.Reference{{Id: teams["payments"]}},
+			Layers: []client.Layer{{Name: new("daily"), TurnLengthSeconds: day, StartsAt: rotationStart, Participants: []client.Reference{{Id: users["cy@example.com"]}, {Id: users["dee@example.com"]}}}},
 		},
 		{
-			Name: "incident commanders", TimeZone: &malta, TeamIds: &[]string{teams["platform"], teams["payments"]},
-			Layers: []client.Layer{{Name: new("weekly"), TurnLengthSeconds: week, StartsAt: rotationStart, Participants: []string{users["ana@example.com"], users["dee@example.com"]}}},
+			Name: "incident commanders", TimeZone: &malta, Teams: &[]client.Reference{{Id: teams["platform"]}, {Id: teams["payments"]}},
+			Layers: []client.Layer{{Name: new("weekly"), TurnLengthSeconds: week, StartsAt: rotationStart, Participants: []client.Reference{{Id: users["ana@example.com"]}, {Id: users["dee@example.com"]}}}},
 		},
 	}
 
