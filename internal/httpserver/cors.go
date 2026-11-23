@@ -14,7 +14,7 @@ const (
 	corsExposed = "X-Trace-Id, traceresponse"
 )
 
-func ValidateOrigins(origins []string) error {
+func validateOrigins(origins []string) error {
 	for i, origin := range origins {
 		u, err := url.Parse(origin)
 		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" ||
@@ -25,7 +25,10 @@ func ValidateOrigins(origins []string) error {
 	return nil
 }
 
-func CORS(origins []string) func(http.Handler) http.Handler {
+func CORS(origins []string) (func(http.Handler) http.Handler, error) {
+	if err := validateOrigins(origins); err != nil {
+		return nil, err
+	}
 	return func(next http.Handler) http.Handler {
 		if len(origins) == 0 {
 			return next
@@ -58,5 +61,5 @@ func CORS(origins []string) func(http.Handler) http.Handler {
 			}
 			next.ServeHTTP(w, r)
 		})
-	}
+	}, nil
 }

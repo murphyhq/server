@@ -27,10 +27,6 @@ type App struct {
 }
 
 func New(ctx context.Context, s Settings) (_ *App, err error) {
-	if err := httpserver.ValidateOrigins(s.CORSOrigins); err != nil {
-		return nil, fmt.Errorf("MURPHY_CORS_ORIGINS: %w", err)
-	}
-
 	a := &App{}
 	defer func() {
 		if err != nil {
@@ -53,7 +49,11 @@ func New(ctx context.Context, s Settings) (_ *App, err error) {
 	if err != nil {
 		return nil, err
 	}
-	a.Handler = httpserver.CORS(s.CORSOrigins)(handler)
+	cors, err := httpserver.CORS(s.CORSOrigins)
+	if err != nil {
+		return nil, fmt.Errorf("MURPHY_CORS_ORIGINS: %w", err)
+	}
+	a.Handler = cors(handler)
 	a.Ready = a.resources.Checks()
 	return a, nil
 }
