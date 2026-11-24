@@ -70,6 +70,26 @@ func Run(t *testing.T, open func(t *testing.T) notifications.Repository) {
 		}
 	})
 
+	t.Run("records an outcome once per message", func(t *testing.T) {
+		repo := open(t)
+		incident := &murphy.Incident{Id: murphy.NewID()}
+		page := newPage(incident, murphy.NewID())
+		notification := newNotification(incident, page, page.GetReached()[0].GetUserId())
+		_, err := repo.Record(t.Context(), &notifications.Change{MessageID: murphy.NewID(), Page: page, Notifications: []*murphy.Notification{notification}})
+		require.NoError(t, err)
+		sent := copyOf(notification)
+		sent.SentAt = murphy.Now()
+		outcome := &notifications.Change{MessageID: murphy.NewID(), Outcome: sent}
+
+		first, err := repo.Record(t.Context(), outcome)
+		require.NoError(t, err)
+		again, err := repo.Record(t.Context(), outcome)
+		require.NoError(t, err)
+
+		assert.True(t, first)
+		assert.False(t, again, "a redelivered outcome changes nothing")
+	})
+
 	t.Run("hands out each due message once until its claim expires", func(t *testing.T) {
 		repo := open(t)
 		now := time.Now().UTC()

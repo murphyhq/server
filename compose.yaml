@@ -287,7 +287,7 @@ services:
       <<: *component-environment
       MURPHY_EVENTS_SUBSCRIPTION_URL: nats://nats:4222/events/notifier
       MURPHY_EVENTS_TOPIC_URL: nats://nats:4222/events
-      MURPHY_NOTIFICATIONS_DATABASE_URL: postgres://murphy:murphy@postgres:5432/notifications?sslmode=disable
+      MURPHY_NOTIFICATIONS_DATABASE_URL: postgres://murphy:murphy@postgres:5432/notifications?sslmode=disable&pool_max_conns=16
       MURPHY_PEOPLE_DATABASE_URL: postgres://murphy:murphy@postgres:5432/people?sslmode=disable
       MURPHY_ONCALL_DATABASE_URL: postgres://murphy:murphy@postgres:5432/oncall?sslmode=disable
       MURPHY_ESCALATION_DATABASE_URL: postgres://murphy:murphy@postgres:5432/escalation?sslmode=disable
