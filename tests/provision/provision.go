@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -22,8 +24,6 @@ import (
 	murphymysql "github.com/murphyhq/server/internal/mysql"
 	"github.com/murphyhq/server/internal/nats"
 )
-
-type Topology map[string][]string
 
 func PostgresDatabase(ctx context.Context, adminURL, name string) error {
 	conn, err := pgx.Connect(ctx, adminURL)
@@ -69,7 +69,7 @@ func MySQLDatabase(ctx context.Context, adminURL, name, user string) error {
 	return nil
 }
 
-func NATS(ctx context.Context, serverURL, stream string, topology Topology, version int) error {
+func NATS(ctx context.Context, serverURL, stream string, topology messaging.Topology, version int) error {
 	conn, js, err := nats.Open(nats.Config{URL: serverURL})
 	if err != nil {
 		return err
@@ -88,11 +88,17 @@ func NATS(ctx context.Context, serverURL, stream string, topology Topology, vers
 	if err != nil {
 		return fmt.Errorf("create stream %s: %w", stream, err)
 	}
-	for group, topics := range topology {
-		subjects := make([]string, len(topics))
-		for i, topic := range topics {
-			subjects[i] = stream + "." + topic
+	for group, subscriptions := range topology {
+		var subjects []string
+		for entity, verbs := range subscriptions {
+			if len(verbs) == 0 {
+				subjects = append(subjects, stream+"."+entity+".>")
+			}
+			for _, verb := range verbs {
+				subjects = append(subjects, stream+"."+entity+"."+verb)
+			}
 		}
+		slices.Sort(subjects)
 		_, err := js.CreateOrUpdateConsumer(ctx, stream, jetstream.ConsumerConfig{
 			Durable:        group,
 			FilterSubjects: subjects,
@@ -108,12 +114,27 @@ func NATS(ctx context.Context, serverURL, stream string, topology Topology, vers
 	return nil
 }
 
+func filterValues(subscriptions map[string][]string) []any {
+	entities := slices.Sorted(maps.Keys(subscriptions))
+	var values []any
+	for _, entity := range entities {
+		verbs := subscriptions[entity]
+		if len(verbs) == 0 {
+			values = append(values, map[string]string{"prefix": entity + "."})
+		}
+		for _, verb := range verbs {
+			values = append(values, entity+"."+verb)
+		}
+	}
+	return values
+}
+
 type SNSResources struct {
 	TopicARN string
 	Queues   map[string]string
 }
 
-func SNS(ctx context.Context, cfg sdkaws.Config, prefix string, topology Topology, version int) (SNSResources, error) {
+func SNS(ctx context.Context, cfg sdkaws.Config, prefix string, topology messaging.Topology, version int) (SNSResources, error) {
 	snsClient, sqsClient := sns.NewFromConfig(cfg), sqs.NewFromConfig(cfg)
 	tag := strconv.Itoa(version)
 
@@ -129,8 +150,8 @@ func SNS(ctx context.Context, cfg sdkaws.Config, prefix string, topology Topolog
 	}
 
 	resources := SNSResources{TopicARN: *topic.TopicArn, Queues: map[string]string{}}
-	for group, topics := range topology {
-		queueURL, err := queue(ctx, snsClient, sqsClient, *topic.TopicArn, prefix+"-"+group, topics, tag)
+	for group, subscriptions := range topology {
+		queueURL, err := queue(ctx, snsClient, sqsClient, *topic.TopicArn, prefix+"-"+group, subscriptions, tag)
 		if err != nil {
 			return SNSResources{}, err
 		}
@@ -139,7 +160,7 @@ func SNS(ctx context.Context, cfg sdkaws.Config, prefix string, topology Topolog
 	return resources, nil
 }
 
-func queue(ctx context.Context, snsClient *sns.Client, sqsClient *sqs.Client, topicARN, name string, topics []string, version string) (string, error) {
+func queue(ctx context.Context, snsClient *sns.Client, sqsClient *sqs.Client, topicARN, name string, subscriptions map[string][]string, version string) (string, error) {
 	created, err := sqsClient.CreateQueue(ctx, &sqs.CreateQueueInput{QueueName: &name})
 	if err != nil {
 		return "", fmt.Errorf("create queue %s: %w", name, err)
@@ -179,7 +200,7 @@ func queue(ctx context.Context, snsClient *sns.Client, sqsClient *sqs.Client, to
 		return "", fmt.Errorf("allow the topic to send to queue %s: %w", name, err)
 	}
 
-	filter, err := json.Marshal(map[string][]string{"topic": topics})
+	filter, err := json.Marshal(map[string][]any{"type": filterValues(subscriptions)})
 	if err != nil {
 		return "", err
 	}

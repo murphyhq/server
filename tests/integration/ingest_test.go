@@ -51,7 +51,7 @@ func eachBroker(t *testing.T, test func(t *testing.T, ingest ingestFixture)) {
 func startIngest(t *testing.T, env brokertest.Environment) ingestFixture {
 	t.Helper()
 	ctx := t.Context()
-	endpoints := env.Provision(t, brokertest.Topology{"engine": {"murphy.v1.alert"}}, messaging.TopologyVersion)
+	endpoints := env.Provision(t, messaging.Topology{"engine": {"murphy.v1.alert": {"received"}}}, messaging.TopologyVersion)
 
 	subscription, err := broker.OpenSubscription(ctx, endpoints.Subscriptions["engine"])
 	require.NoError(t, err)

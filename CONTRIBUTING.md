@@ -16,5 +16,5 @@ Murphy is licensed under [AGPL-3.0](LICENSE). Outside contributions can only be 
 - `main` is protected: every change goes through a pull request.
 - The PR title is a [Conventional Commit](https://www.conventionalcommits.org): `type(scope): subject`, with a lower-case subject and no trailing period. PRs are squash-merged, so the title becomes the commit message and the description its body.
 - Commits must be signed.
-- A change to the architecture updates `docs/architecture.md` in the same PR.
+- A change to the components, what they depend on or how they communicate updates `docs/architecture.md` in the same PR. Nothing else does.
 - CI must pass: formatting, vet, lint and tests.

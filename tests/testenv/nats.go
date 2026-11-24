@@ -12,17 +12,18 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/murphyhq/server/internal/messaging"
 	"github.com/murphyhq/server/internal/messaging/brokertest"
 	"github.com/murphyhq/server/tests/provision"
 )
 
 func NATS() brokertest.Environment {
 	return brokertest.Environment{
-		Provision: func(t *testing.T, topology brokertest.Topology, version int) brokertest.Endpoints {
+		Provision: func(t *testing.T, topology messaging.Topology, version int) brokertest.Endpoints {
 			t.Helper()
 			stream := name()
 			t.Cleanup(func() { _ = provision.DropNATS(context.Background(), natsServer(), stream) })
-			require.NoError(t, provision.NATS(t.Context(), natsServer(), stream, provision.Topology(topology), version))
+			require.NoError(t, provision.NATS(t.Context(), natsServer(), stream, topology, version))
 
 			endpoints := brokertest.Endpoints{Topic: natsURL(t, stream), Subscriptions: map[string]string{}}
 			for group := range topology {

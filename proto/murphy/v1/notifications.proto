@@ -1,0 +1,66 @@
+syntax = "proto3";
+
+package murphy.v1;
+
+import "google/protobuf/timestamp.proto";
+import "murphy/v1/escalation.proto";
+import "murphy/v1/incident.proto";
+import "murphy/v1/people.proto";
+import "murphy/v1/shared.proto";
+
+option go_package = "github.com/murphyhq/server;murphy";
+
+message Page {
+  string id = 1;
+  Incident incident = 2;
+  int32 escalation_level = 3;
+  int32 escalation_round = 4;
+  repeated PageRecipient reached = 5;
+  repeated EscalationTarget unreached = 6;
+  google.protobuf.Timestamp created_at = 7;
+}
+
+message PageRecipient {
+  string user_id = 1;
+  EscalationTarget via = 2;
+  int32 contact_methods = 3;
+}
+
+message PageEvent {
+  PageVerb verb = 1;
+  Page previous = 2;
+  Page current = 3;
+}
+
+enum PageVerb {
+  PAGE_VERB_UNSPECIFIED = 0;
+  PAGE_VERB_CREATED = 1;
+}
+
+message Notification {
+  string id = 1;
+  NotificationReason reason = 2;
+  Incident incident = 3;
+  string user_id = 4;
+  ContactMethod contact_method = 5;
+  int32 escalation_level = 6;
+  int32 escalation_round = 7;
+  EscalationTarget via = 8;
+  google.protobuf.Timestamp created_at = 9;
+  google.protobuf.Timestamp sent_at = 10;
+  string failure = 11;
+  string page_id = 12;
+}
+
+message NotificationEvent {
+  NotificationVerb verb = 1;
+  Notification previous = 2;
+  Notification current = 3;
+}
+
+enum NotificationVerb {
+  NOTIFICATION_VERB_UNSPECIFIED = 0;
+  NOTIFICATION_VERB_CREATED = 1;
+  NOTIFICATION_VERB_SENT = 2;
+  NOTIFICATION_VERB_FAILED = 3;
+}

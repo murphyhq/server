@@ -19,6 +19,8 @@ import (
 var (
 	apiURL    = url("MURPHY_TEST_API_URL", "http://localhost:8080")
 	ingestURL = url("MURPHY_TEST_INGEST_URL", "http://localhost:8081")
+
+	receiverFromMurphy = url("MURPHY_TEST_RECEIVER_URL_FROM_MURPHY", "http://webhook-receiver:8080")
 )
 
 func url(variable, fallback string) string {
@@ -70,6 +72,9 @@ func escalationPolicy(t *testing.T, murphy *client.ClientWithResponses, name str
 	user, err := murphy.CreateUserWithResponse(ctx, nil, client.UserInput{Name: name, Email: name + "@example.com"})
 	require.NoError(t, err, "create the user")
 	require.Equal(t, http.StatusCreated, user.StatusCode(), "create the user: %s", user.Body)
+	method, err := murphy.CreateContactMethodWithResponse(ctx, user.JSON201.Id, nil, client.ContactMethodInput{Type: client.Webhook, Address: receiverFromMurphy + "/" + name})
+	require.NoError(t, err, "create the webhook")
+	require.Equal(t, http.StatusCreated, method.StatusCode(), "create the webhook: %s", method.Body)
 	policy, err := murphy.CreateEscalationPolicyWithResponse(ctx, nil, client.EscalationPolicyInput{
 		Name:   name,
 		Team:   client.Reference{Id: team.JSON201.Id},

@@ -4,6 +4,7 @@ package murphy.v1;
 
 import "google/protobuf/timestamp.proto";
 import "murphy/v1/escalation.proto";
+import "murphy/v1/people.proto";
 import "murphy/v1/shared.proto";
 
 option go_package = "github.com/murphyhq/server;murphy";
@@ -58,6 +59,7 @@ message TimelineEntry {
   string summary = 5;
   google.protobuf.Timestamp at = 6;
   TimelineEscalation escalation = 7;
+  TimelineNotification notification = 8;
 }
 
 message TimelineEscalation {
@@ -65,6 +67,15 @@ message TimelineEscalation {
   int32 round = 2;
   repeated TimelinePage paged = 3;
   repeated EscalationTarget reached_nobody = 4;
+}
+
+message TimelineNotification {
+  string notification_id = 1;
+  NotificationReason reason = 2;
+  string user_id = 3;
+  string contact_method_id = 4;
+  ContactMethodType channel = 5;
+  string failure = 6;
 }
 
 message TimelinePage {
@@ -81,6 +92,8 @@ enum TimelineEntryType {
   TIMELINE_ENTRY_TYPE_ESCALATED = 5;
   TIMELINE_ENTRY_TYPE_ESCALATION_SKIPPED = 6;
   TIMELINE_ENTRY_TYPE_ESCALATION_EXHAUSTED = 7;
+  TIMELINE_ENTRY_TYPE_NOTIFIED = 8;
+  TIMELINE_ENTRY_TYPE_NOTIFICATION_FAILED = 9;
 }
 
 message Timer {

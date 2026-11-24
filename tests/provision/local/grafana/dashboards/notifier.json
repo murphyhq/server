@@ -1,7 +1,7 @@
 {
   "uid": "murphy-notifier",
   "title": "Murphy: notifier",
-  "description": "Incident events received, runtime and container.",
+  "description": "Pages and notifications: messages handled by event type, the database behind them, webhooks sent, outcomes announced, runtime and container.",
   "tags": [
     "murphy"
   ],
@@ -137,7 +137,7 @@
     {
       "id": 4,
       "type": "row",
-      "title": "Runtime",
+      "title": "Database",
       "collapsed": false,
       "gridPos": {
         "h": 1,
@@ -149,6 +149,766 @@
     },
     {
       "id": 5,
+      "type": "table",
+      "title": "Database per message",
+      "description": "What one message costs the database, heaviest first. Database time counts the queries' own duration; waiting counts time getting a pooled connection.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 10
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (murphy_event_type) (rate(murphy_message_db_queries_count{service_namespace=\"murphy\", service_name=\"notifier\"}[$__rate_interval]))",
+          "format": "table",
+          "instant": true
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (murphy_event_type) (rate(murphy_message_db_queries_sum{service_namespace=\"murphy\", service_name=\"notifier\"}[$__rate_interval])) / sum by (murphy_event_type) (rate(murphy_message_db_queries_count{service_namespace=\"murphy\", service_name=\"notifier\"}[$__rate_interval]))",
+          "format": "table",
+          "instant": true
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "histogram_quantile(0.99, sum by (le, murphy_event_type) (rate(murphy_message_db_time_seconds_bucket{service_namespace=\"murphy\", service_name=\"notifier\"}[$__rate_interval])))",
+          "format": "table",
+          "instant": true
+        },
+        {
+          "refId": "D",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (murphy_event_type) (rate(murphy_message_db_time_seconds_sum{service_namespace=\"murphy\", service_name=\"notifier\"}[$__rate_interval])) / sum by (murphy_event_type) (rate(murphy_message_process_duration_seconds_sum{service_namespace=\"murphy\", service_name=\"notifier\"}[$__rate_interval]))",
+          "format": "table",
+          "instant": true
+        },
+        {
+          "refId": "E",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "histogram_quantile(0.99, sum by (le, murphy_event_type) (rate(murphy_message_db_wait_seconds_bucket{service_namespace=\"murphy\", service_name=\"notifier\"}[$__rate_interval])))",
+          "format": "table",
+          "instant": true
+        }
+      ],
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "renameByName": {
+              "Value #A": "Per second",
+              "Value #B": "Queries, average",
+              "Value #C": "Database time, p99",
+              "Value #D": "Share of time in the database",
+              "Value #E": "Waiting for a connection, p99"
+            }
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "sort": [
+              {
+                "field": "Database time, p99",
+                "desc": true
+              }
+            ]
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 2
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "time|wait"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "s"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "Share"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Per second"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "reqps"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true
+      }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Queries per message",
+      "description": "Database queries run for one message. A line that climbs with the data is an N+1.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 19
+      },
+      "links": [],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (murphy_event_type) (rate(murphy_message_db_queries_sum{service_namespace=\"murphy\", service_name=\"notifier\"}[$__rate_interval])) / sum by (murphy_event_type) (rate(murphy_message_db_queries_count{service_namespace=\"murphy\", service_name=\"notifier\"}[$__rate_interval]))",
+          "legendFormat": "{{murphy_event_type}} average"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "histogram_quantile(0.99, sum by (le, murphy_event_type) (rate(murphy_message_db_queries_bucket{service_namespace=\"murphy\", service_name=\"notifier\"}[$__rate_interval])))",
+          "legendFormat": "{{murphy_event_type}} p99"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Database time per message, p99",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 19
+      },
+      "links": [],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "histogram_quantile(0.99, sum by (le, murphy_event_type) (rate(murphy_message_db_time_seconds_bucket{service_namespace=\"murphy\", service_name=\"notifier\"}[$__rate_interval])))",
+          "legendFormat": "{{murphy_event_type}}"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Waiting for a connection per message, p99",
+      "description": "Time getting a connection from the pool. It grows when the pool is too small for the load.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 19
+      },
+      "links": [],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "histogram_quantile(0.99, sum by (le, murphy_event_type) (rate(murphy_message_db_wait_seconds_bucket{service_namespace=\"murphy\", service_name=\"notifier\"}[$__rate_interval])))",
+          "legendFormat": "{{murphy_event_type}}"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Queries per second",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 27
+      },
+      "links": [],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(rate(db_client_operation_duration_seconds_count{service_namespace=\"murphy\", service_name=\"notifier\", pgx_operation_type=\"query\"}[$__rate_interval]))",
+          "legendFormat": "queries"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Query time",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 27
+      },
+      "links": [],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "histogram_quantile(0.5, sum by (le) (rate(db_client_operation_duration_seconds_bucket{service_namespace=\"murphy\", service_name=\"notifier\", pgx_operation_type=\"query\"}[$__rate_interval])))",
+          "legendFormat": "queries p50"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(db_client_operation_duration_seconds_bucket{service_namespace=\"murphy\", service_name=\"notifier\", pgx_operation_type=\"query\"}[$__rate_interval])))",
+          "legendFormat": "queries p99"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Waiting for a connection, p99",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 27
+      },
+      "links": [],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(db_client_operation_duration_seconds_bucket{service_namespace=\"murphy\", service_name=\"notifier\", pgx_operation_type=\"acquire\"}[$__rate_interval])))",
+          "legendFormat": "acquire"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "Connections in use, by pool",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 35
+      },
+      "links": [],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (db_client_connection_pool_name) (pgxpool_acquired_connections{service_namespace=\"murphy\", service_name=\"notifier\"})",
+          "legendFormat": "{{db_client_connection_pool_name}} in use"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "max by (db_client_connection_pool_name) (pgxpool_max_connections{service_namespace=\"murphy\", service_name=\"notifier\"})",
+          "legendFormat": "{{db_client_connection_pool_name}} max"
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "type": "timeseries",
+      "title": "Waits for a free connection per second",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 35
+      },
+      "links": [],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (db_client_connection_pool_name) (rate(pgxpool_empty_acquire_total{service_namespace=\"murphy\", service_name=\"notifier\"}[$__rate_interval]))",
+          "legendFormat": "{{db_client_connection_pool_name}}"
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "type": "row",
+      "title": "Webhooks",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 43
+      },
+      "panels": []
+    },
+    {
+      "id": 15,
+      "type": "timeseries",
+      "title": "Sent per second, by status",
+      "description": "Answers from webhook receivers. No status means the receiver couldn't be reached or didn't answer in time.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 44
+      },
+      "links": [],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (http_response_status_code) (rate(http_client_request_duration_seconds_count{service_namespace=\"murphy\", service_name=\"notifier\"}[$__rate_interval]))",
+          "legendFormat": "{{http_response_status_code}}"
+        }
+      ]
+    },
+    {
+      "id": 16,
+      "type": "timeseries",
+      "title": "Receivers' response time",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 44
+      },
+      "links": [],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "histogram_quantile(0.5, sum by (le) (rate(http_client_request_duration_seconds_bucket{service_namespace=\"murphy\", service_name=\"notifier\"}[$__rate_interval])))",
+          "legendFormat": "receivers p50"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(http_client_request_duration_seconds_bucket{service_namespace=\"murphy\", service_name=\"notifier\"}[$__rate_interval])))",
+          "legendFormat": "receivers p99"
+        }
+      ]
+    },
+    {
+      "id": 17,
+      "type": "row",
+      "title": "Outcomes announced",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 52
+      },
+      "panels": []
+    },
+    {
+      "id": 18,
+      "type": "timeseries",
+      "title": "Published per second, by event type",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 53
+      },
+      "links": [],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (murphy_event_type) (rate(murphy_messages_published_total{service_namespace=\"murphy\", service_name=\"notifier\"}[$__rate_interval]))",
+          "legendFormat": "{{murphy_event_type}}"
+        }
+      ]
+    },
+    {
+      "id": 19,
+      "type": "row",
+      "title": "Runtime",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 61
+      },
+      "panels": []
+    },
+    {
+      "id": 20,
       "type": "timeseries",
       "title": "Goroutines",
       "description": "",
@@ -160,7 +920,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 10
+        "y": 62
       },
       "links": [],
       "fieldConfig": {
@@ -197,7 +957,7 @@
       ]
     },
     {
-      "id": 6,
+      "id": 21,
       "type": "timeseries",
       "title": "Memory in use and GC target",
       "description": "",
@@ -209,7 +969,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 10
+        "y": 62
       },
       "links": [],
       "fieldConfig": {
@@ -255,7 +1015,7 @@
       ]
     },
     {
-      "id": 7,
+      "id": 22,
       "type": "timeseries",
       "title": "Allocated per second",
       "description": "",
@@ -267,7 +1027,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 10
+        "y": 62
       },
       "links": [],
       "fieldConfig": {
@@ -304,7 +1064,7 @@
       ]
     },
     {
-      "id": 8,
+      "id": 23,
       "type": "row",
       "title": "Container",
       "collapsed": false,
@@ -312,12 +1072,12 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 18
+        "y": 70
       },
       "panels": []
     },
     {
-      "id": 9,
+      "id": 24,
       "type": "timeseries",
       "title": "CPU",
       "description": "Share of one CPU core; above 100% means more than one core.",
@@ -329,7 +1089,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 19
+        "y": 71
       },
       "links": [],
       "fieldConfig": {
@@ -366,7 +1126,7 @@
       ]
     },
     {
-      "id": 10,
+      "id": 25,
       "type": "timeseries",
       "title": "Memory",
       "description": "",
@@ -378,7 +1138,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 19
+        "y": 71
       },
       "links": [],
       "fieldConfig": {
@@ -424,7 +1184,7 @@
       ]
     },
     {
-      "id": 11,
+      "id": 26,
       "type": "timeseries",
       "title": "Network",
       "description": "",
@@ -436,7 +1196,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 19
+        "y": 71
       },
       "links": [],
       "fieldConfig": {

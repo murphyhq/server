@@ -177,6 +177,8 @@ const (
 	TimelineEntryTypeEscalated           TimelineEntryType = "escalated"
 	TimelineEntryTypeEscalationExhausted TimelineEntryType = "escalation_exhausted"
 	TimelineEntryTypeEscalationSkipped   TimelineEntryType = "escalation_skipped"
+	TimelineEntryTypeNotificationFailed  TimelineEntryType = "notification_failed"
+	TimelineEntryTypeNotified            TimelineEntryType = "notified"
 	TimelineEntryTypeResolved            TimelineEntryType = "resolved"
 	TimelineEntryTypeTriggered           TimelineEntryType = "triggered"
 )
@@ -194,9 +196,34 @@ func (e TimelineEntryType) Valid() bool {
 		return true
 	case TimelineEntryTypeEscalationSkipped:
 		return true
+	case TimelineEntryTypeNotificationFailed:
+		return true
+	case TimelineEntryTypeNotified:
+		return true
 	case TimelineEntryTypeResolved:
 		return true
 	case TimelineEntryTypeTriggered:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for TimelineNotificationReason.
+const (
+	TimelineNotificationReasonAcknowledged TimelineNotificationReason = "acknowledged"
+	TimelineNotificationReasonPaged        TimelineNotificationReason = "paged"
+	TimelineNotificationReasonResolved     TimelineNotificationReason = "resolved"
+)
+
+// Valid indicates whether the value is a known member of the TimelineNotificationReason enum.
+func (e TimelineNotificationReason) Valid() bool {
+	switch e {
+	case TimelineNotificationReasonAcknowledged:
+		return true
+	case TimelineNotificationReasonPaged:
+		return true
+	case TimelineNotificationReasonResolved:
 		return true
 	default:
 		return false
@@ -592,6 +619,17 @@ type ServicePage struct {
 // ServiceStatus defines model for ServiceStatus.
 type ServiceStatus string
 
+// SigningKey defines model for SigningKey.
+type SigningKey struct {
+	// PublicKey The Ed25519 public key, as `whpk_` followed by its base64 encoding.
+	PublicKey string `json:"public_key"`
+}
+
+// SigningKeys defines model for SigningKeys.
+type SigningKeys struct {
+	Keys []SigningKey `json:"keys"`
+}
+
 // Team defines model for Team.
 type Team struct {
 	CreatedAt time.Time `json:"created_at"`
@@ -646,8 +684,11 @@ type TimelineEntry struct {
 	At         time.Time           `json:"at"`
 	Escalation *TimelineEscalation `json:"escalation,omitempty"`
 	Id         string              `json:"id"`
-	Summary    string              `json:"summary"`
-	Type       TimelineEntryType   `json:"type"`
+
+	// Notification A notification Murphy sent or failed to send. `notification_failed` without a contact method means the person had none.
+	Notification *TimelineNotification `json:"notification,omitempty"`
+	Summary      string                `json:"summary"`
+	Type         TimelineEntryType     `json:"type"`
 }
 
 // TimelineEntryType defines model for TimelineEntry.Type.
@@ -664,6 +705,24 @@ type TimelineEscalation struct {
 	ReachedNobody []EscalationTarget `json:"reached_nobody"`
 	Round         int32              `json:"round"`
 }
+
+// TimelineNotification A notification Murphy sent or failed to send. `notification_failed` without a contact method means the person had none.
+type TimelineNotification struct {
+	Channel *ContactMethodType `json:"channel,omitempty"`
+
+	// ContactMethod Points at another resource.
+	ContactMethod *Reference `json:"contact_method,omitempty"`
+
+	// Failure Why it failed, on `notification_failed`.
+	Failure *string                    `json:"failure,omitempty"`
+	Reason  TimelineNotificationReason `json:"reason"`
+
+	// User Points at another resource.
+	User Reference `json:"user"`
+}
+
+// TimelineNotificationReason defines model for TimelineNotification.Reason.
+type TimelineNotificationReason string
 
 // Urgency defines model for Urgency.
 type Urgency string
@@ -1251,6 +1310,13 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /v1/services/{id}/integrations (the `CreateIntegration` operationId).
 	CreateIntegration(ctx context.Context, id ID, params *CreateIntegrationParams, body CreateIntegrationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetSigningKeys Get the public keys that sign webhooks
+	//
+	// Webhooks Murphy sends are signed with Ed25519 (Standard Webhooks `v1a`). Check a webhook's signature with any of these keys; while a key is being replaced, both the old and the new one are listed.
+	//
+	// Corresponds with GET /v1/signing-keys (the `GetSigningKeys` operationId).
+	GetSigningKeys(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListTeams List teams
 	//
@@ -2065,6 +2131,23 @@ func (c *Client) CreateIntegrationWithBody(ctx context.Context, id ID, params *C
 // Corresponds with POST /v1/services/{id}/integrations (the `CreateIntegration` operationId).
 func (c *Client) CreateIntegration(ctx context.Context, id ID, params *CreateIntegrationParams, body CreateIntegrationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCreateIntegrationRequest(c.Server, id, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetSigningKeys Get the public keys that sign webhooks
+//
+// Webhooks Murphy sends are signed with Ed25519 (Standard Webhooks `v1a`). Check a webhook's signature with any of these keys; while a key is being replaced, both the old and the new one are listed.
+//
+// Corresponds with GET /v1/signing-keys (the `GetSigningKeys` operationId).
+func (c *Client) GetSigningKeys(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetSigningKeysRequest(c.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -4041,6 +4124,33 @@ func NewCreateIntegrationRequestWithBody(server string, id ID, params *CreateInt
 	return req, nil
 }
 
+// NewGetSigningKeysRequest constructs an http.Request for the GetSigningKeys method
+func NewGetSigningKeysRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/signing-keys")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewListTeamsRequest constructs an http.Request for the ListTeams method
 func NewListTeamsRequest(server string, params *ListTeamsParams) (*http.Request, error) {
 	var err error
@@ -5090,6 +5200,15 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /v1/services/{id}/integrations (the `CreateIntegration` operationId).
 	CreateIntegrationWithResponse(ctx context.Context, id ID, params *CreateIntegrationParams, body CreateIntegrationJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateIntegrationResponse, error)
+
+	// GetSigningKeysWithResponse Get the public keys that sign webhooks
+	//
+	// Webhooks Murphy sends are signed with Ed25519 (Standard Webhooks `v1a`). Check a webhook's signature with any of these keys; while a key is being replaced, both the old and the new one are listed.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /v1/signing-keys (the `GetSigningKeys` operationId).
+	GetSigningKeysWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetSigningKeysResponse, error)
 
 	// ListTeamsWithResponse List teams
 	//
@@ -6977,6 +7096,47 @@ func (r CreateIntegrationResponse) ContentType() string {
 	return ""
 }
 
+type GetSigningKeysResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *SigningKeys
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetSigningKeysResponse) GetJSON200() *SigningKeys {
+	return r.JSON200
+}
+
+// GetBody returns the raw response body bytes
+func (r GetSigningKeysResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetSigningKeysResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetSigningKeysResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetSigningKeysResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type ListTeamsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -8311,6 +8471,21 @@ func (c *ClientWithResponses) CreateIntegrationWithResponse(ctx context.Context,
 		return nil, err
 	}
 	return ParseCreateIntegrationResponse(rsp)
+}
+
+// GetSigningKeysWithResponse Get the public keys that sign webhooks
+//
+// Webhooks Murphy sends are signed with Ed25519 (Standard Webhooks `v1a`). Check a webhook's signature with any of these keys; while a key is being replaced, both the old and the new one are listed.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /v1/signing-keys (the `GetSigningKeys` operationId).
+func (c *ClientWithResponses) GetSigningKeysWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetSigningKeysResponse, error) {
+	rsp, err := c.GetSigningKeys(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetSigningKeysResponse(rsp)
 }
 
 // ListTeamsWithResponse List teams
@@ -9841,6 +10016,32 @@ func ParseCreateIntegrationResponse(rsp *http.Response) (*CreateIntegrationRespo
 			return nil, err
 		}
 		response.ApplicationproblemJSON422 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetSigningKeysResponse parses an HTTP response from a GetSigningKeysWithResponse call
+func ParseGetSigningKeysResponse(rsp *http.Response) (*GetSigningKeysResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetSigningKeysResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SigningKeys
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
 
 	}
 

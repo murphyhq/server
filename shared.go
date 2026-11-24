@@ -1,6 +1,7 @@
 package murphy
 
 import (
+	"crypto/sha256"
 	"errors"
 	"strings"
 	"time"
@@ -44,6 +45,15 @@ func NewID() string {
 	return uuid.NewV7().String()
 }
 
+func DerivedID(parts ...string) string {
+	sum := sha256.Sum256([]byte(strings.Join(parts, "\x00")))
+	var id uuid.UUID
+	copy(id[:], sum[:16])
+	id[6] = id[6]&0x0f | 0x80
+	id[8] = id[8]&0x3f | 0x80
+	return id.String()
+}
+
 func Now() *timestamppb.Timestamp {
 	return timestamppb.New(time.Now().UTC().Truncate(time.Microsecond))
 }
@@ -82,6 +92,10 @@ func requireID(field, value string) error {
 		return invalid(field, "must be a UUID")
 	}
 	return nil
+}
+
+func (r NotificationReason) Text() string {
+	return enumText(r, "NOTIFICATION_REASON_")
 }
 
 func (u Urgency) Text() string {

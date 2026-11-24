@@ -382,6 +382,53 @@ func (q *Queries) ListContactMethods(ctx context.Context, userID string) ([]Cont
 	return items, nil
 }
 
+const listContactMethodsOfUsers = `-- name: ListContactMethodsOfUsers :many
+SELECT id, user_id, type, address, created_at, updated_at
+FROM contact_methods
+WHERE user_id IN (/*SLICE:user_ids*/?)
+ORDER BY user_id, id
+`
+
+func (q *Queries) ListContactMethodsOfUsers(ctx context.Context, userIds []string) ([]ContactMethod, error) {
+	query := listContactMethodsOfUsers
+	var queryParams []interface{}
+	if len(userIds) > 0 {
+		for _, v := range userIds {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:user_ids*/?", strings.Repeat(",?", len(userIds))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:user_ids*/?", "NULL", 1)
+	}
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ContactMethod
+	for rows.Next() {
+		var i ContactMethod
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.Type,
+			&i.Address,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listMemberships = `-- name: ListMemberships :many
 SELECT id, team_id, user_id, role, created_at, updated_at
 FROM team_memberships

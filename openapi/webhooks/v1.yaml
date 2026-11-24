@@ -1,0 +1,162 @@
+openapi: 3.1.0
+info:
+  title: Murphy webhooks
+  description: |
+    Webhooks Murphy sends to webhook contact methods. They follow Standard Webhooks (https://www.standardwebhooks.com): every request carries `webhook-id`, `webhook-timestamp` and `webhook-signature` headers, and the signature is an Ed25519 signature (`v1a`) over `<webhook-id>.<webhook-timestamp>.<body>`. Check it with Murphy's public keys from `GET /v1/signing-keys`; while a key is being replaced, the header holds one signature per key, separated by spaces, and any of them matching is enough. Reject a webhook whose timestamp is more than a few minutes from now.
+
+    Answer with a `2xx` status within 10 seconds. A timeout, a `408`, a `429` or a `5xx` is retried for up to 5 minutes; any other status is final. The same `webhook-id` may arrive more than once.
+  version: v1
+paths: {}
+webhooks:
+  incident.paged:
+    post:
+      summary: Someone is paged for an incident
+      description: Sent to every contact method of each person an escalation level pages.
+      parameters:
+        - $ref: "#/components/parameters/WebhookID"
+        - $ref: "#/components/parameters/WebhookTimestamp"
+        - $ref: "#/components/parameters/WebhookSignature"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Webhook"
+      responses:
+        "200":
+          description: Received.
+  incident.acknowledged:
+    post:
+      summary: An incident someone was paged for is acknowledged
+      description: Sent to every contact method of everyone already paged for the incident.
+      parameters:
+        - $ref: "#/components/parameters/WebhookID"
+        - $ref: "#/components/parameters/WebhookTimestamp"
+        - $ref: "#/components/parameters/WebhookSignature"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Webhook"
+      responses:
+        "200":
+          description: Received.
+  incident.resolved:
+    post:
+      summary: An incident someone was paged for is resolved
+      description: Sent to every contact method of everyone already paged for the incident.
+      parameters:
+        - $ref: "#/components/parameters/WebhookID"
+        - $ref: "#/components/parameters/WebhookTimestamp"
+        - $ref: "#/components/parameters/WebhookSignature"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Webhook"
+      responses:
+        "200":
+          description: Received.
+components:
+  parameters:
+    WebhookID:
+      name: webhook-id
+      in: header
+      required: true
+      description: The notification's ID. Retries of the same notification carry the same one.
+      schema:
+        type: string
+    WebhookTimestamp:
+      name: webhook-timestamp
+      in: header
+      required: true
+      description: When the webhook was sent, in seconds since the Unix epoch.
+      schema:
+        type: string
+    WebhookSignature:
+      name: webhook-signature
+      in: header
+      required: true
+      description: One `v1a,<base64 signature>` per signing key, separated by spaces.
+      schema:
+        type: string
+  schemas:
+    Webhook:
+      type: object
+      required: [type, timestamp, data]
+      properties:
+        type:
+          $ref: "#/components/schemas/WebhookType"
+        timestamp:
+          type: string
+          format: date-time
+        data:
+          $ref: "#/components/schemas/WebhookData"
+    WebhookType:
+      type: string
+      enum: [incident.paged, incident.acknowledged, incident.resolved]
+    WebhookData:
+      type: object
+      required: [incident, user, contact_method]
+      properties:
+        incident:
+          $ref: "#/components/schemas/WebhookIncident"
+        user:
+          $ref: "#/components/schemas/Reference"
+        contact_method:
+          $ref: "#/components/schemas/Reference"
+        escalation:
+          $ref: "#/components/schemas/WebhookEscalation"
+    WebhookIncident:
+      type: object
+      required: [id, number, service, title, status, urgency, created_at]
+      properties:
+        id:
+          type: string
+        number:
+          type: integer
+          format: int64
+        service:
+          $ref: "#/components/schemas/Reference"
+        title:
+          type: string
+        status:
+          type: string
+          enum: [triggered, acknowledged, resolved]
+        urgency:
+          type: string
+          enum: [high, low]
+        created_at:
+          type: string
+          format: date-time
+    WebhookEscalation:
+      type: object
+      required: [level, round, via]
+      description: Why this person was paged. Only on `incident.paged`.
+      properties:
+        level:
+          type: integer
+          format: int32
+        round:
+          type: integer
+          format: int32
+        via:
+          $ref: "#/components/schemas/EscalationTarget"
+    EscalationTarget:
+      type: object
+      required: [type, id]
+      properties:
+        type:
+          type: string
+          enum: [user, schedule]
+        id:
+          type: string
+    Reference:
+      type: object
+      required: [id]
+      description: Points at another resource.
+      properties:
+        id:
+          type: string

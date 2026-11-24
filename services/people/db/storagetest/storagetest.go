@@ -124,6 +124,27 @@ func Run(t *testing.T, open func(t *testing.T) people.Repository) {
 		assert.Equal(t, []string{ana.GetId()}, active)
 	})
 
+	t.Run("lists the contact methods of many users in one call", func(t *testing.T) {
+		repo := open(t)
+		ana, bo, cy := newUser("ana@example.com"), newUser("bo@example.com"), newUser("cy@example.com")
+		for _, user := range []*murphy.User{ana, bo, cy} {
+			require.NoError(t, repo.CreateUser(t.Context(), user))
+		}
+		anaHook, anaEmail, boHook, cyHook := newContactMethod(ana, murphy.ContactMethodType_CONTACT_METHOD_TYPE_WEBHOOK), newContactMethod(ana, murphy.ContactMethodType_CONTACT_METHOD_TYPE_EMAIL), newContactMethod(bo, murphy.ContactMethodType_CONTACT_METHOD_TYPE_WEBHOOK), newContactMethod(cy, murphy.ContactMethodType_CONTACT_METHOD_TYPE_WEBHOOK)
+		for _, method := range []*murphy.ContactMethod{anaHook, anaEmail, boHook, cyHook} {
+			require.NoError(t, repo.CreateContactMethod(t.Context(), method))
+		}
+
+		methods, err := repo.ListContactMethodsOfUsers(t.Context(), []string{ana.GetId(), bo.GetId(), murphy.NewID()})
+
+		require.NoError(t, err)
+		ids := make([]string, len(methods))
+		for i, method := range methods {
+			ids[i] = method.GetId()
+		}
+		assert.ElementsMatch(t, []string{anaHook.GetId(), anaEmail.GetId(), boHook.GetId()}, ids)
+	})
+
 	t.Run("reports missing users, teams and memberships", func(t *testing.T) {
 		repo := open(t)
 		_, err := repo.GetUser(t.Context(), murphy.NewID())
@@ -142,6 +163,11 @@ func newUser(email string) *murphy.User {
 		Id: murphy.NewID(), Name: email, Email: email, TimeZone: "Europe/Malta",
 		Status: murphy.UserStatus_USER_STATUS_ACTIVE, CreatedAt: now, UpdatedAt: now,
 	}
+}
+
+func newContactMethod(user *murphy.User, kind murphy.ContactMethodType) *murphy.ContactMethod {
+	now := murphy.Now()
+	return &murphy.ContactMethod{Id: murphy.NewID(), UserId: user.GetId(), Type: kind, Address: "https://example.com/" + murphy.NewID(), CreatedAt: now, UpdatedAt: now}
 }
 
 func newTeam(name string) *murphy.Team {

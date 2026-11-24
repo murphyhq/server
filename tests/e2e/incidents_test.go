@@ -32,6 +32,9 @@ func url(variable, fallback string) string {
 var (
 	apiURL    = url("MURPHY_TEST_API_URL", "http://localhost:8080")
 	ingestURL = url("MURPHY_TEST_INGEST_URL", "http://localhost:8081")
+
+	receiverURL        = url("MURPHY_TEST_RECEIVER_URL", "http://localhost:8092")
+	receiverFromMurphy = url("MURPHY_TEST_RECEIVER_URL_FROM_MURPHY", "http://webhook-receiver:8080")
 )
 
 func setup(t *testing.T) (*client.ClientWithResponses, string, string) {
@@ -114,6 +117,9 @@ func escalationPolicy(t *testing.T, api *client.ClientWithResponses) (policyID, 
 	user, err := api.CreateUserWithResponse(ctx, nil, client.UserInput{Name: "E2E " + run, Email: "e2e-" + run + "@example.com"})
 	require.NoError(t, err)
 	require.Equal(t, http.StatusCreated, user.StatusCode())
+	method, err := api.CreateContactMethodWithResponse(ctx, user.JSON201.Id, nil, client.ContactMethodInput{Type: client.Webhook, Address: receiverFromMurphy + "/" + user.JSON201.Id})
+	require.NoError(t, err)
+	require.Equal(t, http.StatusCreated, method.StatusCode())
 	policy, err := api.CreateEscalationPolicyWithResponse(ctx, nil, client.EscalationPolicyInput{
 		Name:   "e2e-" + run,
 		Team:   client.Reference{Id: team.JSON201.Id},
@@ -130,7 +136,7 @@ func alertEntries(incident *client.IncidentWithTimeline) []client.TimelineEntry 
 	}
 	var entries []client.TimelineEntry
 	for _, entry := range incident.Timeline {
-		if entry.Escalation == nil && entry.Type != client.TimelineEntryTypeEscalationExhausted {
+		if entry.Escalation == nil && entry.Notification == nil && entry.Type != client.TimelineEntryTypeEscalationExhausted {
 			entries = append(entries, entry)
 		}
 	}
@@ -167,7 +173,20 @@ func TestAnIncidentPagesItsFirstLevelUntilAcknowledged(t *testing.T) {
 			}
 		}
 		assert.Equal(c, []string{userID}, paged)
+		var notified []string
+		for _, entry := range incident.Timeline {
+			if entry.Type == client.TimelineEntryTypeNotified {
+				notified = append(notified, entry.Notification.User.Id)
+			}
+		}
+		assert.Equal(c, []string{userID}, notified, "the webhook was sent")
 	}, settle, 250*time.Millisecond)
+
+	received := webhooksReceived(t, "/"+userID)
+	require.Len(t, received, 1)
+	assert.True(t, received[0].Verified, "signed with the key the API publishes")
+	assert.Equal(t, "incident.paged", received[0].Body.Type)
+	assert.Equal(t, incidentID, received[0].Body.Data.Incident.ID)
 
 	acknowledged, err := api.AcknowledgeIncidentWithResponse(ctx, incidentID, nil)
 	require.NoError(t, err)
@@ -305,4 +324,34 @@ func TestGrafanaPagesMurphyAndResolvesTheIncident(t *testing.T) {
 		incident := incidentOf(t, api, service.JSON201.Id)
 		assert.Equal(c, client.IncidentStatusResolved, incident.Status, fmt.Sprintf("incident %s not resolved yet", incidentID))
 	}, 3*time.Minute, 2*time.Second)
+}
+
+type receivedWebhook struct {
+	Path     string `json:"path"`
+	Verified bool   `json:"verified"`
+	Body     struct {
+		Type string `json:"type"`
+		Data struct {
+			Incident struct {
+				ID string `json:"id"`
+			} `json:"incident"`
+		} `json:"data"`
+	} `json:"body"`
+}
+
+func webhooksReceived(t *testing.T, path string) []receivedWebhook {
+	t.Helper()
+	response, err := http.Get(receiverURL)
+	require.NoError(t, err)
+	defer func() { _ = response.Body.Close() }()
+	require.Equal(t, http.StatusOK, response.StatusCode)
+	var all []receivedWebhook
+	require.NoError(t, json.NewDecoder(response.Body).Decode(&all))
+	var matching []receivedWebhook
+	for _, webhook := range all {
+		if webhook.Path == path {
+			matching = append(matching, webhook)
+		}
+	}
+	return matching
 }

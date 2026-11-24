@@ -10,6 +10,8 @@ const (
 	TopologyVersionKey = "murphy-topology-version"
 )
 
+type Topology map[string]map[string][]string
+
 func CheckTopologyVersion(resource, version string) error {
 	if version == "" {
 		return fmt.Errorf("%s has no %s", resource, TopologyVersionKey)

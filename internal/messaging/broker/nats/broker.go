@@ -52,12 +52,12 @@ func (t *Topic) System() string {
 	return system
 }
 
-func (t *Topic) Publish(ctx context.Context, topic, id string, data []byte) (err error) {
+func (t *Topic) Publish(ctx context.Context, eventType, id string, data []byte) (err error) {
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
-	if _, err := t.js.Publish(ctx, t.stream+"."+topic, data, jetstream.WithMsgID(id)); err != nil {
-		return fmt.Errorf("publish to %s: %w", topic, err)
+	if _, err := t.js.Publish(ctx, t.stream+"."+eventType, data, jetstream.WithMsgID(id)); err != nil {
+		return fmt.Errorf("publish %s: %w", eventType, err)
 	}
 	return nil
 }

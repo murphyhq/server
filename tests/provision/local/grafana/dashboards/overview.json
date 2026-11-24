@@ -533,8 +533,8 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (murphy_topic) (rate(murphy_messages_published_total{service_namespace=\"murphy\", service_name=\"ingest\"}[$__rate_interval]))",
-          "legendFormat": "{{murphy_topic}}"
+          "expr": "sum by (murphy_event_type) (rate(murphy_messages_published_total{service_namespace=\"murphy\", service_name=\"ingest\"}[$__rate_interval]))",
+          "legendFormat": "{{murphy_event_type}}"
         }
       ]
     },
@@ -925,7 +925,7 @@
     {
       "id": 20,
       "type": "timeseries",
-      "title": "Published per second, by topic",
+      "title": "Published per second, by event type",
       "description": "",
       "datasource": {
         "type": "prometheus",
@@ -971,8 +971,8 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (murphy_topic) (rate(murphy_messages_published_total{service_namespace=\"murphy\", service_name=\"scheduler\"}[$__rate_interval]))",
-          "legendFormat": "{{murphy_topic}}"
+          "expr": "sum by (murphy_event_type) (rate(murphy_messages_published_total{service_namespace=\"murphy\", service_name=\"scheduler\"}[$__rate_interval]))",
+          "legendFormat": "{{murphy_event_type}}"
         }
       ]
     },
@@ -1091,7 +1091,7 @@
     {
       "id": 23,
       "type": "row",
-      "title": "5. Notifier: incident events arrive",
+      "title": "5. Notifier: notifications go out",
       "collapsed": false,
       "gridPos": {
         "h": 1,
@@ -1104,15 +1104,15 @@
     {
       "id": 24,
       "type": "timeseries",
-      "title": "Incident events handled per second, by outcome",
-      "description": "",
+      "title": "Notifications handled per second, by outcome",
+      "description": "Retried means a webhook failed in a way that may pass, and the broker will deliver the notification again.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
       "gridPos": {
         "h": 8,
-        "w": 12,
+        "w": 8,
         "x": 0,
         "y": 41
       },
@@ -1158,7 +1158,7 @@
     {
       "id": 25,
       "type": "timeseries",
-      "title": "Handling time",
+      "title": "Outcomes announced per second",
       "description": "",
       "datasource": {
         "type": "prometheus",
@@ -1166,8 +1166,8 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 12,
-        "x": 12,
+        "w": 8,
+        "x": 8,
         "y": 41
       },
       "links": [
@@ -1178,7 +1178,7 @@
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "s",
+          "unit": "ops",
           "custom": {
             "lineWidth": 1,
             "fillOpacity": 10
@@ -1204,22 +1204,67 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.5, sum by (le) (rate(murphy_message_process_duration_seconds_bucket{service_namespace=\"murphy\", service_name=\"notifier\"}[$__rate_interval])))",
-          "legendFormat": "notifier p50"
-        },
-        {
-          "refId": "B",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "histogram_quantile(0.99, sum by (le) (rate(murphy_message_process_duration_seconds_bucket{service_namespace=\"murphy\", service_name=\"notifier\"}[$__rate_interval])))",
-          "legendFormat": "notifier p99"
+          "expr": "sum by (murphy_event_type) (rate(murphy_messages_published_total{service_namespace=\"murphy\", service_name=\"notifier\"}[$__rate_interval]))",
+          "legendFormat": "{{murphy_event_type}}"
         }
       ]
     },
     {
       "id": 26,
+      "type": "timeseries",
+      "title": "Webhooks sent per second, by status",
+      "description": "Answers from webhook receivers. No status means the receiver couldn't be reached or didn't answer in time.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 41
+      },
+      "links": [
+        {
+          "title": "notifier in detail",
+          "url": "/d/murphy-notifier?${__url_time_range}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (http_response_status_code) (rate(http_client_request_duration_seconds_count{service_namespace=\"murphy\", service_name=\"notifier\"}[$__rate_interval]))",
+          "legendFormat": "{{http_response_status_code}}"
+        }
+      ]
+    },
+    {
+      "id": 27,
       "type": "row",
       "title": "API: people and automation",
       "collapsed": false,
@@ -1232,7 +1277,7 @@
       "panels": []
     },
     {
-      "id": 27,
+      "id": 28,
       "type": "timeseries",
       "title": "Requests per second, by status",
       "description": "",
@@ -1286,7 +1331,7 @@
       ]
     },
     {
-      "id": 28,
+      "id": 29,
       "type": "timeseries",
       "title": "Response time",
       "description": "",
@@ -1349,7 +1394,7 @@
       ]
     },
     {
-      "id": 29,
+      "id": 30,
       "type": "timeseries",
       "title": "Slowest routes, p99",
       "description": "",

@@ -932,6 +932,19 @@ paths:
                 $ref: "#/components/schemas/EscalationPolicy"
         "404":
           $ref: "#/components/responses/Problem"
+  /v1/signing-keys:
+    get:
+      operationId: getSigningKeys
+      summary: Get the public keys that sign webhooks
+      description: Webhooks Murphy sends are signed with Ed25519 (Standard Webhooks `v1a`). Check a webhook's signature with any of these keys; while a key is being replaced, both the old and the new one are listed.
+      tags: [notifications]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SigningKeys"
 components:
   parameters:
     IdempotencyKey:
@@ -1154,7 +1167,7 @@ components:
           type: string
         type:
           type: string
-          enum: [triggered, alerted, acknowledged, resolved, escalated, escalation_skipped, escalation_exhausted]
+          enum: [triggered, alerted, acknowledged, resolved, escalated, escalation_skipped, escalation_exhausted, notified, notification_failed]
         alert:
           $ref: "#/components/schemas/Reference"
         summary:
@@ -1164,6 +1177,25 @@ components:
           format: date-time
         escalation:
           $ref: "#/components/schemas/TimelineEscalation"
+        notification:
+          $ref: "#/components/schemas/TimelineNotification"
+    TimelineNotification:
+      type: object
+      required: [reason, user]
+      description: A notification Murphy sent or failed to send. `notification_failed` without a contact method means the person had none.
+      properties:
+        reason:
+          type: string
+          enum: [paged, acknowledged, resolved]
+        user:
+          $ref: "#/components/schemas/Reference"
+        contact_method:
+          $ref: "#/components/schemas/Reference"
+        channel:
+          $ref: "#/components/schemas/ContactMethodType"
+        failure:
+          type: string
+          description: Why it failed, on `notification_failed`.
     TimelineEscalation:
       type: object
       required: [level, round, paged, reached_nobody]
@@ -1192,6 +1224,21 @@ components:
           $ref: "#/components/schemas/Reference"
         via:
           $ref: "#/components/schemas/EscalationTarget"
+    SigningKeys:
+      type: object
+      required: [keys]
+      properties:
+        keys:
+          type: array
+          items:
+            $ref: "#/components/schemas/SigningKey"
+    SigningKey:
+      type: object
+      required: [public_key]
+      properties:
+        public_key:
+          type: string
+          description: The Ed25519 public key, as `whpk_` followed by its base64 encoding.
     Reference:
       type: object
       required: [id]

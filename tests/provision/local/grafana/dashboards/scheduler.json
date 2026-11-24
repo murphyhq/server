@@ -30,7 +30,7 @@
     {
       "id": 2,
       "type": "timeseries",
-      "title": "Published per second, by topic",
+      "title": "Published per second, by event type",
       "description": "",
       "datasource": {
         "type": "prometheus",
@@ -71,8 +71,8 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (murphy_topic) (rate(murphy_messages_published_total{service_namespace=\"murphy\", service_name=\"scheduler\"}[$__rate_interval]))",
-          "legendFormat": "{{murphy_topic}}"
+          "expr": "sum by (murphy_event_type) (rate(murphy_messages_published_total{service_namespace=\"murphy\", service_name=\"scheduler\"}[$__rate_interval]))",
+          "legendFormat": "{{murphy_event_type}}"
         }
       ]
     },

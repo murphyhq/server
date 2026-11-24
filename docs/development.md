@@ -74,8 +74,8 @@ The domain is defined once, in Protobuf, so every component, and later every cli
 
 A page must never be lost or sent twice. The broker delivers at least once and any process can crash at any moment, so every message takes effect exactly once through retries and deduplication.
 
-1. Every message that decides whether someone is paged MUST have something that retries it after a failure: the caller for `ingest` (no `202` means it sends again), redelivery by the broker for what `notifier` reads, and `scheduler` for every scheduled message (it stays until the broker confirms it).
-2. A component without a database MUST publish before it lets go of what caused the message: `ingest` answers only after the broker confirms, and `notifier` acknowledges its incoming message only after the broker confirms what it publishes.
+1. Every message that decides whether someone is paged MUST have something that retries it after a failure: the caller for `ingest` (no `202` means it sends again), redelivery by the broker for every consumer, and `scheduler` for every scheduled message (it stays until the broker confirms it).
+2. A step without a database MUST publish before it lets go of what caused the message: `ingest` answers only after the broker confirms, and `notifier`'s sending step acknowledges its incoming message only after the broker confirms the outcome it publishes.
 3. Messages that decide whether someone is paged (incident events, escalation timers, notifications) MUST be saved as scheduled messages, in the same transaction as the change that causes them, and MUST NOT be published by that component. Only `scheduler` publishes scheduled messages, when they are due, and deletes each one after the broker confirms it. Other messages MAY be published right after the change commits.
 4. Message IDs MUST be fixed when the message is created: stored with the scheduled message, or derived from what caused it otherwise, so every retry sends the same ID.
 5. Every consumer MUST record the IDs it has handled in a table its service owns, in the same transaction as the change the message causes. When a message arrives again, it MUST be skipped: its change is already saved, and so are its scheduled messages. Messages it published directly are not sent again.
@@ -176,4 +176,5 @@ Every kind of failure Murphy guards against is tested, without changing the code
 
 1. Docs MUST describe what the code is and does now: no status tables, TODO lists or history.
 2. Comments MUST explain *why*, never *what*.
-3. Comments are written by people. A coding agent MUST NOT add a comment, not even a single line, without asking for permission first.
+3. `docs/architecture.md` describes the components, what each depends on, how they communicate and the guarantees that follow. It MUST change only when one of those changes, and MUST NOT be updated to record a feature, a rule or the work done in a PR. Features, rules, event names and payloads belong in the specs and the code.
+4. Comments are written by people. A coding agent MUST NOT add a comment, not even a single line, without asking for permission first.

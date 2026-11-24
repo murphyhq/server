@@ -17,11 +17,12 @@ import (
 func Databases(t *testing.T, engine DatabaseEngine) migrateapp.Settings {
 	t.Helper()
 	databases := migrateapp.Settings{
-		CatalogDatabaseURL:    engine(t),
-		IncidentsDatabaseURL:  engine(t),
-		PeopleDatabaseURL:     engine(t),
-		OnCallDatabaseURL:     engine(t),
-		EscalationDatabaseURL: engine(t),
+		CatalogDatabaseURL:       engine(t),
+		IncidentsDatabaseURL:     engine(t),
+		PeopleDatabaseURL:        engine(t),
+		OnCallDatabaseURL:        engine(t),
+		EscalationDatabaseURL:    engine(t),
+		NotificationsDatabaseURL: engine(t),
 	}
 	require.NoError(t, migrateapp.Migrate(t.Context(), databases))
 	return databases
@@ -42,6 +43,7 @@ func APIWith(t *testing.T, databases migrateapp.Settings) (*client.ClientWithRes
 		EscalationDatabaseURL: databases.EscalationDatabaseURL,
 		IdempotencyStoreURL:   RedisURL(),
 		IntegrationKeySecrets: IntegrationKeySecrets,
+		WebhookPublicKeys:     WebhookPublicKey,
 	})
 	require.NoError(t, err)
 	t.Cleanup(a.Close)
