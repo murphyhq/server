@@ -308,7 +308,7 @@ services:
       MURPHY_PUBLIC_URL: http://localhost:8080
       MURPHY_WEBHOOK_ALLOWED_NETWORKS: 10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
 
-  murphy:
+  single:
     image: golang:1.27.4
     profiles: [single]
     working_dir: /src
@@ -334,6 +334,7 @@ services:
         condition: service_started
       provision:
         condition: service_completed_successfully
+        restart: true
       redis:
         condition: service_healthy
 
