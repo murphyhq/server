@@ -6,7 +6,6 @@ import (
 
 	"github.com/murphyhq/server/cmd/ingest/app"
 	"github.com/murphyhq/server/internal/config"
-	"github.com/murphyhq/server/internal/httpserver"
 	"github.com/murphyhq/server/internal/lifecycle"
 	"github.com/murphyhq/server/internal/logger"
 	"github.com/murphyhq/server/internal/telemetry"
@@ -31,19 +30,13 @@ func run(ctx context.Context) error {
 		return err
 	}
 
-	a, err := app.New(ctx, s.App)
+	a, err := app.New(telemetry.WithComponent(ctx, "ingest"), s.App)
 	if err != nil {
 		return err
 	}
 	defer a.Close()
 
-	server := httpserver.New(httpserver.Config{
-		Addr:            s.App.HTTPAddr,
-		ShutdownTimeout: s.Lifecycle.ShutdownTimeout,
-		CORS:            s.App.CORS(),
-	}, a.Handler)
-
-	return lifecycle.Run(ctx, "ingest", s.Lifecycle, func(ctx context.Context) error {
-		return server.Serve(ctx)
-	}, a.Ready...)
+	return lifecycle.Run(ctx, "ingest", s.Lifecycle, lifecycle.Component("ingest", func(ctx context.Context) error {
+		return a.Serve(ctx, s.Lifecycle.ShutdownTimeout)
+	}), a.Ready...)
 }

@@ -22,4 +22,4 @@ jobs:
 
       - run: echo "${{ github.token }}" | go tool ko login ghcr.io --username "${{ github.actor }}" --password-stdin
 
-      - run: go tool -modfile=tools/ko/go.mod ko build --base-import-paths --tags "${GITHUB_REF_NAME},latest" ./cmd/ingest ./cmd/api ./cmd/engine ./cmd/scheduler ./cmd/notifier ./cmd/migrate
+      - run: go tool -modfile=tools/ko/go.mod ko build --base-import-paths --tags "${GITHUB_REF_NAME},latest" ./cmd/ingest ./cmd/api ./cmd/engine ./cmd/scheduler ./cmd/notifier ./cmd/migrate ./cmd/murphy

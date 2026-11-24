@@ -30,11 +30,11 @@ func run(ctx context.Context) error {
 		return err
 	}
 
-	a, err := app.New(ctx, s.App)
+	a, err := app.New(telemetry.WithComponent(ctx, "engine"), s.App)
 	if err != nil {
 		return err
 	}
 	defer a.Close()
 
-	return lifecycle.Run(ctx, "engine", s.Lifecycle, a.Run, a.Ready...)
+	return lifecycle.Run(ctx, "engine", s.Lifecycle, lifecycle.Component("engine", a.Run), a.Ready...)
 }

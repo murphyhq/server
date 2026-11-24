@@ -227,18 +227,18 @@ services:
   ingest:
     <<: *component
     command: ["sh", "-c", "go build -o /tmp/ingest ./cmd/ingest && exec /tmp/ingest"]
-    environment:
+    environment: &ingest-environment
       <<: *component-environment
       MURPHY_EVENTS_TOPIC_URL: nats://nats:4222/events
       MURPHY_INTEGRATION_KEY_SECRETS: *integration-key-secrets
       MURPHY_CORS_ORIGINS: http://localhost:8090
     ports:
-      - "8081:8080"
+      - "8081:8081"
 
   api:
     <<: *component
     command: ["sh", "-c", "go build -o /tmp/api ./cmd/api && exec /tmp/api"]
-    environment:
+    environment: &api-environment
       <<: *component-environment
       MURPHY_CATALOG_DATABASE_URL: postgres://murphy:murphy@postgres:5432/catalog?sslmode=disable
       MURPHY_INCIDENTS_DATABASE_URL: postgres://murphy:murphy@postgres:5432/incidents?sslmode=disable
@@ -275,9 +275,9 @@ services:
   engine:
     <<: *component
     command: ["sh", "-c", "go build -o /tmp/engine ./cmd/engine && exec /tmp/engine"]
-    environment:
+    environment: &engine-environment
       <<: *component-environment
-      MURPHY_EVENTS_SUBSCRIPTION_URL: nats://nats:4222/events/engine
+      MURPHY_ENGINE_SUBSCRIPTION_URL: nats://nats:4222/events/engine
       MURPHY_CATALOG_DATABASE_URL: postgres://murphy:murphy@postgres:5432/catalog?sslmode=disable
       MURPHY_INCIDENTS_DATABASE_URL: postgres://murphy:murphy@postgres:5432/incidents?sslmode=disable&pool_max_conns=16
       MURPHY_ESCALATION_DATABASE_URL: postgres://murphy:murphy@postgres:5432/escalation?sslmode=disable
@@ -285,7 +285,7 @@ services:
   scheduler:
     <<: *component
     command: ["sh", "-c", "go build -o /tmp/scheduler ./cmd/scheduler && exec /tmp/scheduler"]
-    environment:
+    environment: &scheduler-environment
       <<: *component-environment
       MURPHY_EVENTS_TOPIC_URL: nats://nats:4222/events
       MURPHY_INCIDENTS_DATABASE_URL: postgres://murphy:murphy@postgres:5432/incidents?sslmode=disable
@@ -294,9 +294,9 @@ services:
   notifier:
     <<: *component
     command: ["sh", "-c", "go build -o /tmp/notifier ./cmd/notifier && exec /tmp/notifier"]
-    environment:
+    environment: &notifier-environment
       <<: *component-environment
-      MURPHY_EVENTS_SUBSCRIPTION_URL: nats://nats:4222/events/notifier
+      MURPHY_NOTIFIER_SUBSCRIPTION_URL: nats://nats:4222/events/notifier
       MURPHY_EVENTS_TOPIC_URL: nats://nats:4222/events
       MURPHY_NOTIFICATIONS_DATABASE_URL: postgres://murphy:murphy@postgres:5432/notifications?sslmode=disable&pool_max_conns=8
       MURPHY_PEOPLE_DATABASE_URL: postgres://murphy:murphy@postgres:5432/people?sslmode=disable&pool_max_conns=8
@@ -307,6 +307,35 @@ services:
       MURPHY_RELAY_KEY: mik_local-development-key
       MURPHY_PUBLIC_URL: http://localhost:8080
       MURPHY_WEBHOOK_ALLOWED_NETWORKS: 10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
+
+  murphy:
+    image: golang:1.27.4
+    profiles: [single]
+    working_dir: /src
+    volumes:
+      - .:/src
+      - go-mod:/go/pkg/mod
+      - go-build:/root/.cache/go-build
+    command: ["sh", "-c", "go build -o /tmp/murphy ./cmd/murphy && exec /tmp/murphy"]
+    environment:
+      <<: [*api-environment, *ingest-environment, *engine-environment, *scheduler-environment, *notifier-environment]
+    ports:
+      - "8080:8080"
+      - "8081:8081"
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:9000/readyz"]
+      interval: 5s
+      start_period: 120s
+      retries: 3
+    depends_on:
+      dex:
+        condition: service_healthy
+      lgtm:
+        condition: service_started
+      provision:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
 
   dex:
     image: ghcr.io/dexidp/dex:v2.46.1

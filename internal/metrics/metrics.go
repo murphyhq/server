@@ -32,7 +32,7 @@ func NewCounter(name, description string) (*Counter, error) {
 }
 
 func (c *Counter) Add(ctx context.Context, value int64, dimensions ...Dimension) {
-	c.counter.Add(ctx, value, metric.WithAttributes(attributes(dimensions)...))
+	c.counter.Add(ctx, value, metric.WithAttributes(attributes(ctx, dimensions)...))
 }
 
 type Histogram struct {
@@ -54,13 +54,16 @@ func NewHistogram(name, description, unit string) (*Histogram, error) {
 }
 
 func (h *Histogram) Record(ctx context.Context, value float64, dimensions ...Dimension) {
-	h.histogram.Record(ctx, value, metric.WithAttributes(attributes(dimensions)...))
+	h.histogram.Record(ctx, value, metric.WithAttributes(attributes(ctx, dimensions)...))
 }
 
-func attributes(dimensions []Dimension) []attribute.KeyValue {
-	kvs := make([]attribute.KeyValue, len(dimensions))
-	for i, d := range dimensions {
-		kvs[i] = attribute.String(prefixed(d.Name), d.Value)
+func attributes(ctx context.Context, dimensions []Dimension) []attribute.KeyValue {
+	kvs := make([]attribute.KeyValue, 0, len(dimensions)+1)
+	for _, d := range dimensions {
+		kvs = append(kvs, attribute.String(prefixed(d.Name), d.Value))
+	}
+	if component := telemetry.Component(ctx); component != "" {
+		kvs = append(kvs, attribute.String(prefixed("component"), component))
 	}
 	return kvs
 }

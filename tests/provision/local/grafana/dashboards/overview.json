@@ -63,7 +63,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(rate(http_server_request_duration_seconds_count{service_namespace=\"murphy\", service_name=\"ingest\", http_response_status_code=~\"2..\"}[$__rate_interval]))",
+          "expr": "sum(rate(http_server_request_duration_seconds_count{service_namespace=\"murphy\", murphy_component=\"ingest\", http_response_status_code=~\"2..\"}[$__rate_interval]))",
           "legendFormat": ""
         }
       ]
@@ -121,7 +121,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(rate(http_server_request_duration_seconds_count{service_namespace=\"murphy\", service_name=\"ingest\", http_response_status_code!~\"2..\"}[$__rate_interval])) or vector(0)",
+          "expr": "sum(rate(http_server_request_duration_seconds_count{service_namespace=\"murphy\", murphy_component=\"ingest\", http_response_status_code!~\"2..\"}[$__rate_interval])) or vector(0)",
           "legendFormat": ""
         }
       ]
@@ -233,7 +233,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.99, sum by (le) (rate(murphy_message_process_duration_seconds_bucket{service_namespace=\"murphy\", service_name=\"engine\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(murphy_message_process_duration_seconds_bucket{service_namespace=\"murphy\", murphy_component=\"engine\"}[$__rate_interval])))",
           "legendFormat": ""
         }
       ]
@@ -416,7 +416,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (http_response_status_code) (rate(http_server_request_duration_seconds_count{service_namespace=\"murphy\", service_name=\"ingest\"}[$__rate_interval]))",
+          "expr": "sum by (http_response_status_code) (rate(http_server_request_duration_seconds_count{service_namespace=\"murphy\", murphy_component=\"ingest\"}[$__rate_interval]))",
           "legendFormat": "{{http_response_status_code}}"
         }
       ]
@@ -470,7 +470,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.5, sum by (le) (rate(http_server_request_duration_seconds_bucket{service_namespace=\"murphy\", service_name=\"ingest\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.5, sum by (le) (rate(http_server_request_duration_seconds_bucket{service_namespace=\"murphy\", murphy_component=\"ingest\"}[$__rate_interval])))",
           "legendFormat": "ingest p50"
         },
         {
@@ -479,7 +479,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.99, sum by (le) (rate(http_server_request_duration_seconds_bucket{service_namespace=\"murphy\", service_name=\"ingest\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(http_server_request_duration_seconds_bucket{service_namespace=\"murphy\", murphy_component=\"ingest\"}[$__rate_interval])))",
           "legendFormat": "ingest p99"
         }
       ]
@@ -533,7 +533,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (murphy_event_type) (rate(murphy_messages_published_total{service_namespace=\"murphy\", service_name=\"ingest\"}[$__rate_interval]))",
+          "expr": "sum by (murphy_event_type) (rate(murphy_messages_published_total{service_namespace=\"murphy\", murphy_component=\"ingest\"}[$__rate_interval]))",
           "legendFormat": "{{murphy_event_type}}"
         }
       ]
@@ -778,7 +778,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (murphy_event_type, murphy_outcome) (rate(murphy_messages_processed_total{service_namespace=\"murphy\", service_name=\"engine\"}[$__rate_interval]))",
+          "expr": "sum by (murphy_event_type, murphy_outcome) (rate(murphy_messages_processed_total{service_namespace=\"murphy\", murphy_component=\"engine\"}[$__rate_interval]))",
           "legendFormat": "{{murphy_event_type}} {{murphy_outcome}}"
         }
       ]
@@ -832,7 +832,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.5, sum by (le, murphy_event_type) (rate(murphy_message_process_duration_seconds_bucket{service_namespace=\"murphy\", service_name=\"engine\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.5, sum by (le, murphy_event_type) (rate(murphy_message_process_duration_seconds_bucket{service_namespace=\"murphy\", murphy_component=\"engine\"}[$__rate_interval])))",
           "legendFormat": "{{murphy_event_type}} p50"
         },
         {
@@ -841,7 +841,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.99, sum by (le, murphy_event_type) (rate(murphy_message_process_duration_seconds_bucket{service_namespace=\"murphy\", service_name=\"engine\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.99, sum by (le, murphy_event_type) (rate(murphy_message_process_duration_seconds_bucket{service_namespace=\"murphy\", murphy_component=\"engine\"}[$__rate_interval])))",
           "legendFormat": "{{murphy_event_type}} p99"
         }
       ]
@@ -895,7 +895,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(rate(db_client_operation_duration_seconds_count{service_namespace=\"murphy\", service_name=\"engine\", pgx_operation_type=\"query\"}[$__rate_interval]))",
+          "expr": "sum(rate(db_client_operation_duration_seconds_count{service_namespace=\"murphy\", murphy_component=\"engine\", pgx_operation_type=\"query\"}[$__rate_interval]))",
           "legendFormat": "queries/s"
         },
         {
@@ -904,7 +904,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.99, sum by (le) (rate(db_client_operation_duration_seconds_bucket{service_namespace=\"murphy\", service_name=\"engine\", pgx_operation_type=\"query\"}[$__rate_interval]))) * 1000",
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(db_client_operation_duration_seconds_bucket{service_namespace=\"murphy\", murphy_component=\"engine\", pgx_operation_type=\"query\"}[$__rate_interval]))) * 1000",
           "legendFormat": "p99 ms"
         }
       ]
@@ -971,7 +971,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (murphy_event_type) (rate(murphy_messages_published_total{service_namespace=\"murphy\", service_name=\"scheduler\"}[$__rate_interval]))",
+          "expr": "sum by (murphy_event_type) (rate(murphy_messages_published_total{service_namespace=\"murphy\", murphy_component=\"scheduler\"}[$__rate_interval]))",
           "legendFormat": "{{murphy_event_type}}"
         }
       ]
@@ -1025,7 +1025,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.5, sum by (le, murphy_kind) (rate(murphy_scheduled_message_delay_seconds_bucket{service_namespace=\"murphy\", service_name=\"scheduler\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.5, sum by (le, murphy_kind) (rate(murphy_scheduled_message_delay_seconds_bucket{service_namespace=\"murphy\", murphy_component=\"scheduler\"}[$__rate_interval])))",
           "legendFormat": "{{murphy_kind}} p50"
         },
         {
@@ -1034,7 +1034,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.99, sum by (le, murphy_kind) (rate(murphy_scheduled_message_delay_seconds_bucket{service_namespace=\"murphy\", service_name=\"scheduler\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.99, sum by (le, murphy_kind) (rate(murphy_scheduled_message_delay_seconds_bucket{service_namespace=\"murphy\", murphy_component=\"scheduler\"}[$__rate_interval])))",
           "legendFormat": "{{murphy_kind}} p99"
         }
       ]
@@ -1150,7 +1150,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (murphy_event_type, murphy_outcome) (rate(murphy_messages_processed_total{service_namespace=\"murphy\", service_name=\"notifier\"}[$__rate_interval]))",
+          "expr": "sum by (murphy_event_type, murphy_outcome) (rate(murphy_messages_processed_total{service_namespace=\"murphy\", murphy_component=\"notifier\"}[$__rate_interval]))",
           "legendFormat": "{{murphy_event_type}} {{murphy_outcome}}"
         }
       ]
@@ -1204,7 +1204,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (murphy_event_type) (rate(murphy_messages_published_total{service_namespace=\"murphy\", service_name=\"notifier\"}[$__rate_interval]))",
+          "expr": "sum by (murphy_event_type) (rate(murphy_messages_published_total{service_namespace=\"murphy\", murphy_component=\"notifier\"}[$__rate_interval]))",
           "legendFormat": "{{murphy_event_type}}"
         }
       ]
@@ -1258,7 +1258,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (http_response_status_code) (rate(http_client_request_duration_seconds_count{service_namespace=\"murphy\", service_name=\"notifier\"}[$__rate_interval]))",
+          "expr": "sum by (http_response_status_code) (rate(http_client_request_duration_seconds_count{service_namespace=\"murphy\", murphy_component=\"notifier\"}[$__rate_interval]))",
           "legendFormat": "{{http_response_status_code}}"
         }
       ]
@@ -1325,7 +1325,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (http_response_status_code) (rate(http_server_request_duration_seconds_count{service_namespace=\"murphy\", service_name=\"api\"}[$__rate_interval]))",
+          "expr": "sum by (http_response_status_code) (rate(http_server_request_duration_seconds_count{service_namespace=\"murphy\", murphy_component=\"api\"}[$__rate_interval]))",
           "legendFormat": "{{http_response_status_code}}"
         }
       ]
@@ -1379,7 +1379,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.5, sum by (le) (rate(http_server_request_duration_seconds_bucket{service_namespace=\"murphy\", service_name=\"api\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.5, sum by (le) (rate(http_server_request_duration_seconds_bucket{service_namespace=\"murphy\", murphy_component=\"api\"}[$__rate_interval])))",
           "legendFormat": "api p50"
         },
         {
@@ -1388,7 +1388,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.99, sum by (le) (rate(http_server_request_duration_seconds_bucket{service_namespace=\"murphy\", service_name=\"api\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(http_server_request_duration_seconds_bucket{service_namespace=\"murphy\", murphy_component=\"api\"}[$__rate_interval])))",
           "legendFormat": "api p99"
         }
       ]
@@ -1442,7 +1442,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "topk(5, histogram_quantile(0.99, sum by (le, http_request_method, http_route) (rate(http_server_request_duration_seconds_bucket{service_namespace=\"murphy\", service_name=\"api\"}[$__rate_interval]))))",
+          "expr": "topk(5, histogram_quantile(0.99, sum by (le, http_request_method, http_route) (rate(http_server_request_duration_seconds_bucket{service_namespace=\"murphy\", murphy_component=\"api\"}[$__rate_interval]))))",
           "legendFormat": "{{http_request_method}} {{http_route}}"
         }
       ]

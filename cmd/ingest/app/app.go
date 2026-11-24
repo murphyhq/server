@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/murphyhq/server/cmd/ingest/router"
 	"github.com/murphyhq/server/internal/httpserver"
@@ -14,7 +15,7 @@ import (
 )
 
 type Settings struct {
-	HTTPAddr              string   `env:"HTTP_ADDR" default:":8080"`
+	Addr                  string   `env:"INGEST_ADDR" default:":8081"`
 	EventsTopicURL        string   `env:"EVENTS_TOPIC_URL" required:"true"`
 	IntegrationKeySecrets string   `env:"INTEGRATION_KEY_SECRETS" required:"true"`
 	CORSOrigins           []string `env:"CORS_ORIGINS" validate:"base-url"`
@@ -24,10 +25,12 @@ type App struct {
 	Handler   http.Handler
 	Ready     []lifecycle.Check
 	resources lifecycle.Resources
+	addr      string
+	cors      httpserver.CORS
 }
 
 func New(ctx context.Context, s Settings) (_ *App, err error) {
-	a := &App{}
+	a := &App{addr: s.Addr, cors: s.CORS()}
 	defer func() {
 		if err != nil {
 			a.Close()
@@ -65,4 +68,8 @@ func (s Settings) CORS() httpserver.CORS {
 		AllowHeaders:  []string{"Authorization", "Content-Type"},
 		ExposeHeaders: []string{"WWW-Authenticate"},
 	}
+}
+
+func (a *App) Serve(ctx context.Context, shutdownTimeout time.Duration) error {
+	return httpserver.New(httpserver.Config{Addr: a.addr, ShutdownTimeout: shutdownTimeout, CORS: a.cors}, a.Handler).Serve(ctx)
 }

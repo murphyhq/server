@@ -9,6 +9,8 @@ import (
 
 	"github.com/exaring/otelpgx"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/murphyhq/server/internal/telemetry"
 )
 
 const DefaultMaxConns = 4
@@ -26,13 +28,14 @@ func Open(ctx context.Context, cfg Config) (*pgxpool.Pool, error) {
 	if u, err := url.Parse(cfg.URL); err == nil && !u.Query().Has("pool_max_conns") {
 		poolConfig.MaxConns = DefaultMaxConns
 	}
-	poolConfig.ConnConfig.Tracer = countingTracer{otelpgx.NewTracer(otelpgx.WithSpanNameFunc(queryName))}
+	component := telemetry.ComponentAttributes(ctx)
+	poolConfig.ConnConfig.Tracer = countingTracer{otelpgx.NewTracer(otelpgx.WithSpanNameFunc(queryName), otelpgx.WithMeterAttributes(component...))}
 
 	pool, err := pgxpool.NewWithConfig(ctx, poolConfig)
 	if err != nil {
 		return nil, fmt.Errorf("open database pool: %w", err)
 	}
-	if err := otelpgx.RecordStats(pool); err != nil {
+	if err := otelpgx.RecordStats(pool, otelpgx.WithStatsAttributes(component...)); err != nil {
 		pool.Close()
 		return nil, fmt.Errorf("record database pool metrics: %w", err)
 	}
