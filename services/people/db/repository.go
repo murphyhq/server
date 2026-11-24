@@ -14,6 +14,8 @@ type Tx interface {
 	CreateIdentity(ctx context.Context, identity *murphy.Identity) error
 	AdminExists(ctx context.Context) (bool, error)
 	SetUserRole(ctx context.Context, id string, role murphy.UserRole, at time.Time) error
+	RevokeSessionsOfUser(ctx context.Context, userID string, at time.Time) error
+	DiscardOneTimeCodesOfUser(ctx context.Context, userID string, at time.Time) error
 }
 
 type Engine[T Tx] interface {
@@ -25,6 +27,8 @@ type Engine[T Tx] interface {
 	CreateSession(ctx context.Context, session *murphy.Session) error
 	GetActiveSession(ctx context.Context, tokenHash []byte, now time.Time) (*murphy.Session, error)
 	RevokeSession(ctx context.Context, tokenHash []byte, at time.Time) error
+	ListActiveSessions(ctx context.Context, userID, before string, limit int, now time.Time) ([]*murphy.Session, error)
+	RevokeSessionOfUser(ctx context.Context, userID, id string, at time.Time) error
 	CreateOneTimeCode(ctx context.Context, code *murphy.OneTimeCode) error
 	UseOneTimeCode(ctx context.Context, codeHash []byte, now time.Time) (bool, error)
 	GetOneTimeCode(ctx context.Context, codeHash []byte) (*murphy.OneTimeCode, error)
@@ -83,6 +87,18 @@ func (r *Repository[T]) TakeOneTimeCode(ctx context.Context, codeHash []byte, no
 		return nil, &murphy.NotFoundError{Entity: "one-time code"}
 	}
 	return r.GetOneTimeCode(ctx, codeHash)
+}
+
+func (r *Repository[T]) EndSessionsOfUser(ctx context.Context, userID string, at time.Time) (err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	return r.Transaction(ctx, func(tx T) error {
+		if err := tx.RevokeSessionsOfUser(ctx, userID, at); err != nil {
+			return err
+		}
+		return tx.DiscardOneTimeCodesOfUser(ctx, userID, at)
+	})
 }
 
 func (r *Repository[T]) CreateUserWithIdentity(ctx context.Context, user *murphy.User, identity *murphy.Identity) (err error) {

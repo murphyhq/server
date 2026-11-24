@@ -356,7 +356,7 @@ func (r *Repository) CreateSession(ctx context.Context, session *murphy.Session)
 	defer span.End(&err)
 
 	return murphypostgres.Error("session", r.queries.CreateSession(ctx, CreateSessionParams{
-		ID: session.GetId(), UserID: session.GetUserId(), TokenHash: session.GetTokenHash(), ExpiresAt: session.GetExpiresAt().AsTime(),
+		ID: session.GetId(), UserID: session.GetUserId(), TokenHash: session.GetTokenHash(), Client: session.GetClient().Text(), ExpiresAt: session.GetExpiresAt().AsTime(),
 		CreatedAt: session.GetCreatedAt().AsTime(), UpdatedAt: session.GetUpdatedAt().AsTime(),
 	}))
 }
@@ -369,10 +369,7 @@ func (r *Repository) GetActiveSession(ctx context.Context, tokenHash []byte, now
 	if err != nil {
 		return nil, murphypostgres.Error("session", err)
 	}
-	return &murphy.Session{
-		Id: row.ID, UserId: row.UserID, TokenHash: row.TokenHash, ExpiresAt: timestamppb.New(row.ExpiresAt),
-		CreatedAt: timestamppb.New(row.CreatedAt), UpdatedAt: timestamppb.New(row.UpdatedAt),
-	}, nil
+	return toSession(row), nil
 }
 
 func (r *Repository) RevokeSession(ctx context.Context, tokenHash []byte, at time.Time) (err error) {
@@ -470,4 +467,35 @@ func (r *Repository) GetOneTimeCode(ctx context.Context, codeHash []byte) (_ *mu
 		CodeChallenge: database.TextValue(row.CodeChallenge), ExpiresAt: timestamppb.New(row.ExpiresAt),
 		UsedAt: database.Timestamp(row.UsedAt), CreatedAt: timestamppb.New(row.CreatedAt), UpdatedAt: timestamppb.New(row.UpdatedAt),
 	}, nil
+}
+
+func (r *Repository) ListActiveSessions(ctx context.Context, userID, before string, limit int, now time.Time) (_ []*murphy.Session, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	rows, err := r.queries.ListActiveSessions(ctx, ListActiveSessionsParams{UserID: userID, Now: now, Before: before, MaxRows: int32(limit)})
+	if err != nil {
+		return nil, murphypostgres.Error("session", err)
+	}
+	sessions := make([]*murphy.Session, len(rows))
+	for i, row := range rows {
+		sessions[i] = toSession(row)
+	}
+	return sessions, nil
+}
+
+func (r *Repository) RevokeSessionOfUser(ctx context.Context, userID, id string, at time.Time) (err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	rows, err := r.queries.RevokeSessionOfUser(ctx, RevokeSessionOfUserParams{RevokedAt: &at, UpdatedAt: at, ID: id, UserID: userID})
+	return murphypostgres.Changed("session", rows, err)
+}
+
+func toSession(row Session) *murphy.Session {
+	return &murphy.Session{
+		Id: row.ID, UserId: row.UserID, TokenHash: row.TokenHash, Client: murphy.SessionClientFromText(row.Client),
+		ExpiresAt: timestamppb.New(row.ExpiresAt), RevokedAt: database.Timestamp(row.RevokedAt),
+		CreatedAt: timestamppb.New(row.CreatedAt), UpdatedAt: timestamppb.New(row.UpdatedAt),
+	}
 }

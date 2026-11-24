@@ -139,6 +139,74 @@ func (s *Server) CreateConnectCode(ctx context.Context, _ CreateConnectCodeReque
 	return CreateConnectCode201JSONResponse{Code: connect.Code, Link: connect.Link, ExpiresAt: connect.ExpiresAt}, nil
 }
 
+func (s *Server) ListSessions(ctx context.Context, request ListSessionsRequestObject) (_ ListSessionsResponseObject, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	current := sessionFrom(ctx).session
+	sessions, next, err := s.auth.ListSessions(ctx, current.GetUserId(), page(request.Params.Limit, request.Params.Cursor))
+	if err != nil {
+		return nil, err
+	}
+	items := make([]SessionSummary, len(sessions))
+	for i, session := range sessions {
+		items[i] = SessionSummary{
+			Id: session.GetId(), Client: SessionSummaryClient(session.GetClient().Text()), Current: session.GetId() == current.GetId(),
+			CreatedAt: session.GetCreatedAt().AsTime(), ExpiresAt: session.GetExpiresAt().AsTime(),
+		}
+	}
+	return ListSessions200JSONResponse{Items: items, NextCursor: next}, nil
+}
+
+func (s *Server) EndSession(ctx context.Context, request EndSessionRequestObject) (_ EndSessionResponseObject, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	if err := s.auth.EndSession(ctx, sessionFrom(ctx).session.GetUserId(), request.Id); err != nil {
+		return nil, err
+	}
+	return EndSession204Response{}, nil
+}
+
+func (s *Server) SignOutEverywhere(ctx context.Context, _ SignOutEverywhereRequestObject) (_ SignOutEverywhereResponseObject, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	if err := s.auth.EndAllSessions(ctx, sessionFrom(ctx).session.GetUserId()); err != nil {
+		return nil, err
+	}
+	cookie := s.cookie("", time.Unix(0, 0))
+	return SignOutEverywhere204Response{Headers: SignOutEverywhere204ResponseHeaders{SetCookie: &cookie}}, nil
+}
+
+func (s *Server) EndUserSessions(ctx context.Context, request EndUserSessionsRequestObject) (_ EndUserSessionsResponseObject, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	if err := s.requireAdmin(ctx); err != nil {
+		return nil, err
+	}
+	user, err := s.people.GetUser(ctx, request.Id)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.auth.EndAllSessions(ctx, user.GetId()); err != nil {
+		return nil, err
+	}
+	return EndUserSessions204Response{}, nil
+}
+
+func (s *Server) requireAdmin(ctx context.Context) error {
+	caller, err := s.people.GetUser(ctx, sessionFrom(ctx).session.GetUserId())
+	if err != nil {
+		return err
+	}
+	if caller.GetRole() != murphy.UserRole_USER_ROLE_ADMIN {
+		return murphy.ErrForbidden
+	}
+	return nil
+}
+
 func (s *Server) GetSession(ctx context.Context, _ GetSessionRequestObject) (_ GetSessionResponseObject, err error) {
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)

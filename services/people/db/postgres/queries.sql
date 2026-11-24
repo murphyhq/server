@@ -137,11 +137,11 @@ FROM identities
 WHERE issuer = @issuer AND subject = @subject;
 
 -- name: CreateSession :exec
-INSERT INTO sessions (id, user_id, token_hash, expires_at, created_at, updated_at)
-VALUES (@id, @user_id, @token_hash, @expires_at, @created_at, @updated_at);
+INSERT INTO sessions (id, user_id, token_hash, client, expires_at, created_at, updated_at)
+VALUES (@id, @user_id, @token_hash, @client, @expires_at, @created_at, @updated_at);
 
 -- name: GetActiveSession :one
-SELECT sessions.id, sessions.user_id, sessions.token_hash, sessions.expires_at, sessions.revoked_at, sessions.created_at, sessions.updated_at
+SELECT sessions.id, sessions.user_id, sessions.token_hash, sessions.client, sessions.expires_at, sessions.revoked_at, sessions.created_at, sessions.updated_at
 FROM sessions
 JOIN users ON users.id = sessions.user_id
 WHERE sessions.token_hash = @token_hash AND sessions.revoked_at IS NULL AND sessions.expires_at > @now AND users.status = 'active';
@@ -182,3 +182,25 @@ WHERE code_hash = @code_hash AND used_at IS NULL AND expires_at > @now;
 SELECT id, code_hash, user_id, purpose, code_challenge, expires_at, used_at, created_at, updated_at
 FROM one_time_codes
 WHERE code_hash = @code_hash;
+
+-- name: ListActiveSessions :many
+SELECT id, user_id, token_hash, client, expires_at, revoked_at, created_at, updated_at
+FROM sessions
+WHERE user_id = @user_id AND revoked_at IS NULL AND expires_at > @now AND id < @before
+ORDER BY id DESC
+LIMIT @max_rows;
+
+-- name: RevokeSessionOfUser :execrows
+UPDATE sessions
+SET revoked_at = @revoked_at, updated_at = @updated_at
+WHERE id = @id AND user_id = @user_id AND revoked_at IS NULL;
+
+-- name: RevokeSessionsOfUser :execrows
+UPDATE sessions
+SET revoked_at = @revoked_at, updated_at = @updated_at
+WHERE user_id = @user_id AND revoked_at IS NULL;
+
+-- name: DiscardOneTimeCodesOfUser :execrows
+UPDATE one_time_codes
+SET used_at = @used_at, updated_at = @updated_at
+WHERE user_id = @user_id AND used_at IS NULL;

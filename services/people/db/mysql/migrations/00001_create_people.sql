@@ -71,12 +71,14 @@ CREATE TABLE sessions (
   id CHAR(36) NOT NULL,
   user_id CHAR(36) NOT NULL,
   token_hash VARBINARY(32) NOT NULL,
+  client VARCHAR(16) NOT NULL,
   expires_at DATETIME(6) NOT NULL,
   revoked_at DATETIME(6),
   created_at DATETIME(6) NOT NULL,
   updated_at DATETIME(6) NOT NULL,
   CONSTRAINT sessions_pkey PRIMARY KEY (id),
   CONSTRAINT sessions_token_hash_key UNIQUE (token_hash),
+  CONSTRAINT sessions_client_check CHECK (client IN ('browser', 'app', 'token')),
   CONSTRAINT sessions_user_id_fkey FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
 

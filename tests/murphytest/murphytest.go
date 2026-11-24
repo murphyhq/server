@@ -48,6 +48,7 @@ var (
 const (
 	Ana = "ana@murphy.test"
 	Bo  = "bo@murphy.test"
+	Cy  = "cy@murphy.test"
 
 	testPassword     = "murphy"
 	testClientID     = "murphy"
@@ -148,6 +149,16 @@ func (m *Murphy) SessionAs(email string) string {
 	token, err := SignIn(m.t.Context(), m.apiURL, identityProvider, email)
 	require.NoError(m.t, err)
 	return token
+}
+
+func (m *Murphy) SignedOutEverywhere(email string) string {
+	m.t.Helper()
+	api := m.ClientWith(m.SessionAs(email))
+	session, err := api.GetSessionWithResponse(m.t.Context())
+	m.ok(session, err, "read who signed in")
+	signedOut, err := api.SignOutEverywhereWithResponse(m.t.Context())
+	m.expect(signedOut, err, http.StatusNoContent, "sign out everywhere")
+	return session.JSON200.User.Id
 }
 
 func (m *Murphy) ClientWith(token string) *client.ClientWithResponses {

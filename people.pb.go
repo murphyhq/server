@@ -230,6 +230,58 @@ func (TeamRole) EnumDescriptor() ([]byte, []int) {
 	return file_murphy_v1_people_proto_rawDescGZIP(), []int{3}
 }
 
+type SessionClient int32
+
+const (
+	SessionClient_SESSION_CLIENT_UNSPECIFIED SessionClient = 0
+	SessionClient_SESSION_CLIENT_BROWSER     SessionClient = 1
+	SessionClient_SESSION_CLIENT_APP         SessionClient = 2
+	SessionClient_SESSION_CLIENT_TOKEN       SessionClient = 3
+)
+
+// Enum value maps for SessionClient.
+var (
+	SessionClient_name = map[int32]string{
+		0: "SESSION_CLIENT_UNSPECIFIED",
+		1: "SESSION_CLIENT_BROWSER",
+		2: "SESSION_CLIENT_APP",
+		3: "SESSION_CLIENT_TOKEN",
+	}
+	SessionClient_value = map[string]int32{
+		"SESSION_CLIENT_UNSPECIFIED": 0,
+		"SESSION_CLIENT_BROWSER":     1,
+		"SESSION_CLIENT_APP":         2,
+		"SESSION_CLIENT_TOKEN":       3,
+	}
+)
+
+func (x SessionClient) Enum() *SessionClient {
+	p := new(SessionClient)
+	*p = x
+	return p
+}
+
+func (x SessionClient) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (SessionClient) Descriptor() protoreflect.EnumDescriptor {
+	return file_murphy_v1_people_proto_enumTypes[4].Descriptor()
+}
+
+func (SessionClient) Type() protoreflect.EnumType {
+	return &file_murphy_v1_people_proto_enumTypes[4]
+}
+
+func (x SessionClient) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use SessionClient.Descriptor instead.
+func (SessionClient) EnumDescriptor() ([]byte, []int) {
+	return file_murphy_v1_people_proto_rawDescGZIP(), []int{4}
+}
+
 type OneTimeCodePurpose int32
 
 const (
@@ -263,11 +315,11 @@ func (x OneTimeCodePurpose) String() string {
 }
 
 func (OneTimeCodePurpose) Descriptor() protoreflect.EnumDescriptor {
-	return file_murphy_v1_people_proto_enumTypes[4].Descriptor()
+	return file_murphy_v1_people_proto_enumTypes[5].Descriptor()
 }
 
 func (OneTimeCodePurpose) Type() protoreflect.EnumType {
-	return &file_murphy_v1_people_proto_enumTypes[4]
+	return &file_murphy_v1_people_proto_enumTypes[5]
 }
 
 func (x OneTimeCodePurpose) Number() protoreflect.EnumNumber {
@@ -276,7 +328,7 @@ func (x OneTimeCodePurpose) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use OneTimeCodePurpose.Descriptor instead.
 func (OneTimeCodePurpose) EnumDescriptor() ([]byte, []int) {
-	return file_murphy_v1_people_proto_rawDescGZIP(), []int{4}
+	return file_murphy_v1_people_proto_rawDescGZIP(), []int{5}
 }
 
 type User struct {
@@ -708,6 +760,7 @@ type Session struct {
 	RevokedAt     *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=revoked_at,json=revokedAt,proto3" json:"revoked_at,omitempty"`
 	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	Client        SessionClient          `protobuf:"varint,8,opt,name=client,proto3,enum=murphy.v1.SessionClient" json:"client,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -789,6 +842,13 @@ func (x *Session) GetUpdatedAt() *timestamppb.Timestamp {
 		return x.UpdatedAt
 	}
 	return nil
+}
+
+func (x *Session) GetClient() SessionClient {
+	if x != nil {
+		return x.Client
+	}
+	return SessionClient_SESSION_CLIENT_UNSPECIFIED
 }
 
 type SignIn struct {
@@ -1056,7 +1116,7 @@ const file_murphy_v1_people_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"\xbd\x02\n" +
+	"updated_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"\xef\x02\n" +
 	"\aSession\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x12\x1d\n" +
@@ -1069,7 +1129,8 @@ const file_murphy_v1_people_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"\xde\x02\n" +
+	"updated_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x120\n" +
+	"\x06client\x18\b \x01(\x0e2\x18.murphy.v1.SessionClientR\x06client\"\xde\x02\n" +
 	"\x06SignIn\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
 	"\n" +
@@ -1117,7 +1178,12 @@ const file_murphy_v1_people_proto_rawDesc = "" +
 	"\x15TEAM_ROLE_UNSPECIFIED\x10\x00\x12\x15\n" +
 	"\x11TEAM_ROLE_MANAGER\x10\x01\x12\x17\n" +
 	"\x13TEAM_ROLE_RESPONDER\x10\x02\x12\x16\n" +
-	"\x12TEAM_ROLE_OBSERVER\x10\x03*\x85\x01\n" +
+	"\x12TEAM_ROLE_OBSERVER\x10\x03*}\n" +
+	"\rSessionClient\x12\x1e\n" +
+	"\x1aSESSION_CLIENT_UNSPECIFIED\x10\x00\x12\x1a\n" +
+	"\x16SESSION_CLIENT_BROWSER\x10\x01\x12\x16\n" +
+	"\x12SESSION_CLIENT_APP\x10\x02\x12\x18\n" +
+	"\x14SESSION_CLIENT_TOKEN\x10\x03*\x85\x01\n" +
 	"\x12OneTimeCodePurpose\x12%\n" +
 	"!ONE_TIME_CODE_PURPOSE_UNSPECIFIED\x10\x00\x12%\n" +
 	"!ONE_TIME_CODE_PURPOSE_APP_SIGN_IN\x10\x01\x12!\n" +
@@ -1135,56 +1201,58 @@ func file_murphy_v1_people_proto_rawDescGZIP() []byte {
 	return file_murphy_v1_people_proto_rawDescData
 }
 
-var file_murphy_v1_people_proto_enumTypes = make([]protoimpl.EnumInfo, 5)
+var file_murphy_v1_people_proto_enumTypes = make([]protoimpl.EnumInfo, 6)
 var file_murphy_v1_people_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_murphy_v1_people_proto_goTypes = []any{
 	(UserRole)(0),                 // 0: murphy.v1.UserRole
 	(UserStatus)(0),               // 1: murphy.v1.UserStatus
 	(ContactMethodType)(0),        // 2: murphy.v1.ContactMethodType
 	(TeamRole)(0),                 // 3: murphy.v1.TeamRole
-	(OneTimeCodePurpose)(0),       // 4: murphy.v1.OneTimeCodePurpose
-	(*User)(nil),                  // 5: murphy.v1.User
-	(*ContactMethod)(nil),         // 6: murphy.v1.ContactMethod
-	(*Team)(nil),                  // 7: murphy.v1.Team
-	(*TeamMembership)(nil),        // 8: murphy.v1.TeamMembership
-	(*Identity)(nil),              // 9: murphy.v1.Identity
-	(*Session)(nil),               // 10: murphy.v1.Session
-	(*SignIn)(nil),                // 11: murphy.v1.SignIn
-	(*OneTimeCode)(nil),           // 12: murphy.v1.OneTimeCode
-	(*timestamppb.Timestamp)(nil), // 13: google.protobuf.Timestamp
+	(SessionClient)(0),            // 4: murphy.v1.SessionClient
+	(OneTimeCodePurpose)(0),       // 5: murphy.v1.OneTimeCodePurpose
+	(*User)(nil),                  // 6: murphy.v1.User
+	(*ContactMethod)(nil),         // 7: murphy.v1.ContactMethod
+	(*Team)(nil),                  // 8: murphy.v1.Team
+	(*TeamMembership)(nil),        // 9: murphy.v1.TeamMembership
+	(*Identity)(nil),              // 10: murphy.v1.Identity
+	(*Session)(nil),               // 11: murphy.v1.Session
+	(*SignIn)(nil),                // 12: murphy.v1.SignIn
+	(*OneTimeCode)(nil),           // 13: murphy.v1.OneTimeCode
+	(*timestamppb.Timestamp)(nil), // 14: google.protobuf.Timestamp
 }
 var file_murphy_v1_people_proto_depIdxs = []int32{
 	1,  // 0: murphy.v1.User.status:type_name -> murphy.v1.UserStatus
-	13, // 1: murphy.v1.User.created_at:type_name -> google.protobuf.Timestamp
-	13, // 2: murphy.v1.User.updated_at:type_name -> google.protobuf.Timestamp
+	14, // 1: murphy.v1.User.created_at:type_name -> google.protobuf.Timestamp
+	14, // 2: murphy.v1.User.updated_at:type_name -> google.protobuf.Timestamp
 	0,  // 3: murphy.v1.User.role:type_name -> murphy.v1.UserRole
 	2,  // 4: murphy.v1.ContactMethod.type:type_name -> murphy.v1.ContactMethodType
-	13, // 5: murphy.v1.ContactMethod.created_at:type_name -> google.protobuf.Timestamp
-	13, // 6: murphy.v1.ContactMethod.updated_at:type_name -> google.protobuf.Timestamp
-	13, // 7: murphy.v1.Team.created_at:type_name -> google.protobuf.Timestamp
-	13, // 8: murphy.v1.Team.updated_at:type_name -> google.protobuf.Timestamp
+	14, // 5: murphy.v1.ContactMethod.created_at:type_name -> google.protobuf.Timestamp
+	14, // 6: murphy.v1.ContactMethod.updated_at:type_name -> google.protobuf.Timestamp
+	14, // 7: murphy.v1.Team.created_at:type_name -> google.protobuf.Timestamp
+	14, // 8: murphy.v1.Team.updated_at:type_name -> google.protobuf.Timestamp
 	3,  // 9: murphy.v1.TeamMembership.role:type_name -> murphy.v1.TeamRole
-	13, // 10: murphy.v1.TeamMembership.created_at:type_name -> google.protobuf.Timestamp
-	13, // 11: murphy.v1.TeamMembership.updated_at:type_name -> google.protobuf.Timestamp
-	13, // 12: murphy.v1.Identity.created_at:type_name -> google.protobuf.Timestamp
-	13, // 13: murphy.v1.Identity.updated_at:type_name -> google.protobuf.Timestamp
-	13, // 14: murphy.v1.Session.expires_at:type_name -> google.protobuf.Timestamp
-	13, // 15: murphy.v1.Session.revoked_at:type_name -> google.protobuf.Timestamp
-	13, // 16: murphy.v1.Session.created_at:type_name -> google.protobuf.Timestamp
-	13, // 17: murphy.v1.Session.updated_at:type_name -> google.protobuf.Timestamp
-	13, // 18: murphy.v1.SignIn.expires_at:type_name -> google.protobuf.Timestamp
-	13, // 19: murphy.v1.SignIn.created_at:type_name -> google.protobuf.Timestamp
-	13, // 20: murphy.v1.SignIn.updated_at:type_name -> google.protobuf.Timestamp
-	4,  // 21: murphy.v1.OneTimeCode.purpose:type_name -> murphy.v1.OneTimeCodePurpose
-	13, // 22: murphy.v1.OneTimeCode.expires_at:type_name -> google.protobuf.Timestamp
-	13, // 23: murphy.v1.OneTimeCode.used_at:type_name -> google.protobuf.Timestamp
-	13, // 24: murphy.v1.OneTimeCode.created_at:type_name -> google.protobuf.Timestamp
-	13, // 25: murphy.v1.OneTimeCode.updated_at:type_name -> google.protobuf.Timestamp
-	26, // [26:26] is the sub-list for method output_type
-	26, // [26:26] is the sub-list for method input_type
-	26, // [26:26] is the sub-list for extension type_name
-	26, // [26:26] is the sub-list for extension extendee
-	0,  // [0:26] is the sub-list for field type_name
+	14, // 10: murphy.v1.TeamMembership.created_at:type_name -> google.protobuf.Timestamp
+	14, // 11: murphy.v1.TeamMembership.updated_at:type_name -> google.protobuf.Timestamp
+	14, // 12: murphy.v1.Identity.created_at:type_name -> google.protobuf.Timestamp
+	14, // 13: murphy.v1.Identity.updated_at:type_name -> google.protobuf.Timestamp
+	14, // 14: murphy.v1.Session.expires_at:type_name -> google.protobuf.Timestamp
+	14, // 15: murphy.v1.Session.revoked_at:type_name -> google.protobuf.Timestamp
+	14, // 16: murphy.v1.Session.created_at:type_name -> google.protobuf.Timestamp
+	14, // 17: murphy.v1.Session.updated_at:type_name -> google.protobuf.Timestamp
+	4,  // 18: murphy.v1.Session.client:type_name -> murphy.v1.SessionClient
+	14, // 19: murphy.v1.SignIn.expires_at:type_name -> google.protobuf.Timestamp
+	14, // 20: murphy.v1.SignIn.created_at:type_name -> google.protobuf.Timestamp
+	14, // 21: murphy.v1.SignIn.updated_at:type_name -> google.protobuf.Timestamp
+	5,  // 22: murphy.v1.OneTimeCode.purpose:type_name -> murphy.v1.OneTimeCodePurpose
+	14, // 23: murphy.v1.OneTimeCode.expires_at:type_name -> google.protobuf.Timestamp
+	14, // 24: murphy.v1.OneTimeCode.used_at:type_name -> google.protobuf.Timestamp
+	14, // 25: murphy.v1.OneTimeCode.created_at:type_name -> google.protobuf.Timestamp
+	14, // 26: murphy.v1.OneTimeCode.updated_at:type_name -> google.protobuf.Timestamp
+	27, // [27:27] is the sub-list for method output_type
+	27, // [27:27] is the sub-list for method input_type
+	27, // [27:27] is the sub-list for extension type_name
+	27, // [27:27] is the sub-list for extension extendee
+	0,  // [0:27] is the sub-list for field type_name
 }
 
 func init() { file_murphy_v1_people_proto_init() }
@@ -1197,7 +1265,7 @@ func file_murphy_v1_people_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_murphy_v1_people_proto_rawDesc), len(file_murphy_v1_people_proto_rawDesc)),
-			NumEnums:      5,
+			NumEnums:      6,
 			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   0,

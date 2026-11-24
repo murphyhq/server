@@ -611,6 +611,69 @@ func (_c *MockAuthRepository_CreateUserWithIdentity_Call) RunAndReturn(run func(
 	return _c
 }
 
+// EndSessionsOfUser provides a mock function for the type MockAuthRepository
+func (_mock *MockAuthRepository) EndSessionsOfUser(ctx context.Context, userID string, at time.Time) error {
+	ret := _mock.Called(ctx, userID, at)
+
+	if len(ret) == 0 {
+		panic("no return value specified for EndSessionsOfUser")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, time.Time) error); ok {
+		r0 = returnFunc(ctx, userID, at)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockAuthRepository_EndSessionsOfUser_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'EndSessionsOfUser'
+type MockAuthRepository_EndSessionsOfUser_Call struct {
+	*mock.Call
+}
+
+// EndSessionsOfUser is a helper method to define mock.On call
+//   - ctx context.Context
+//   - userID string
+//   - at time.Time
+func (_e *MockAuthRepository_Expecter) EndSessionsOfUser(ctx any, userID any, at any) *MockAuthRepository_EndSessionsOfUser_Call {
+	return &MockAuthRepository_EndSessionsOfUser_Call{Call: _e.mock.On("EndSessionsOfUser", ctx, userID, at)}
+}
+
+func (_c *MockAuthRepository_EndSessionsOfUser_Call) Run(run func(ctx context.Context, userID string, at time.Time)) *MockAuthRepository_EndSessionsOfUser_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 time.Time
+		if args[2] != nil {
+			arg2 = args[2].(time.Time)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockAuthRepository_EndSessionsOfUser_Call) Return(err error) *MockAuthRepository_EndSessionsOfUser_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockAuthRepository_EndSessionsOfUser_Call) RunAndReturn(run func(ctx context.Context, userID string, at time.Time) error) *MockAuthRepository_EndSessionsOfUser_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetActiveSession provides a mock function for the type MockAuthRepository
 func (_mock *MockAuthRepository) GetActiveSession(ctx context.Context, tokenHash []byte, now time.Time) (*murphy.Session, error) {
 	ret := _mock.Called(ctx, tokenHash, now)
@@ -827,6 +890,92 @@ func (_c *MockAuthRepository_GetUserByEmail_Call) RunAndReturn(run func(ctx cont
 	return _c
 }
 
+// ListActiveSessions provides a mock function for the type MockAuthRepository
+func (_mock *MockAuthRepository) ListActiveSessions(ctx context.Context, userID string, before string, limit int, now time.Time) ([]*murphy.Session, error) {
+	ret := _mock.Called(ctx, userID, before, limit, now)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListActiveSessions")
+	}
+
+	var r0 []*murphy.Session
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, int, time.Time) ([]*murphy.Session, error)); ok {
+		return returnFunc(ctx, userID, before, limit, now)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, int, time.Time) []*murphy.Session); ok {
+		r0 = returnFunc(ctx, userID, before, limit, now)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*murphy.Session)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, string, int, time.Time) error); ok {
+		r1 = returnFunc(ctx, userID, before, limit, now)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockAuthRepository_ListActiveSessions_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListActiveSessions'
+type MockAuthRepository_ListActiveSessions_Call struct {
+	*mock.Call
+}
+
+// ListActiveSessions is a helper method to define mock.On call
+//   - ctx context.Context
+//   - userID string
+//   - before string
+//   - limit int
+//   - now time.Time
+func (_e *MockAuthRepository_Expecter) ListActiveSessions(ctx any, userID any, before any, limit any, now any) *MockAuthRepository_ListActiveSessions_Call {
+	return &MockAuthRepository_ListActiveSessions_Call{Call: _e.mock.On("ListActiveSessions", ctx, userID, before, limit, now)}
+}
+
+func (_c *MockAuthRepository_ListActiveSessions_Call) Run(run func(ctx context.Context, userID string, before string, limit int, now time.Time)) *MockAuthRepository_ListActiveSessions_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 int
+		if args[3] != nil {
+			arg3 = args[3].(int)
+		}
+		var arg4 time.Time
+		if args[4] != nil {
+			arg4 = args[4].(time.Time)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+			arg4,
+		)
+	})
+	return _c
+}
+
+func (_c *MockAuthRepository_ListActiveSessions_Call) Return(sessions []*murphy.Session, err error) *MockAuthRepository_ListActiveSessions_Call {
+	_c.Call.Return(sessions, err)
+	return _c
+}
+
+func (_c *MockAuthRepository_ListActiveSessions_Call) RunAndReturn(run func(ctx context.Context, userID string, before string, limit int, now time.Time) ([]*murphy.Session, error)) *MockAuthRepository_ListActiveSessions_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // RevokeSession provides a mock function for the type MockAuthRepository
 func (_mock *MockAuthRepository) RevokeSession(ctx context.Context, tokenHash []byte, at time.Time) error {
 	ret := _mock.Called(ctx, tokenHash, at)
@@ -886,6 +1035,75 @@ func (_c *MockAuthRepository_RevokeSession_Call) Return(err error) *MockAuthRepo
 }
 
 func (_c *MockAuthRepository_RevokeSession_Call) RunAndReturn(run func(ctx context.Context, tokenHash []byte, at time.Time) error) *MockAuthRepository_RevokeSession_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// RevokeSessionOfUser provides a mock function for the type MockAuthRepository
+func (_mock *MockAuthRepository) RevokeSessionOfUser(ctx context.Context, userID string, id string, at time.Time) error {
+	ret := _mock.Called(ctx, userID, id, at)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RevokeSessionOfUser")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, time.Time) error); ok {
+		r0 = returnFunc(ctx, userID, id, at)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockAuthRepository_RevokeSessionOfUser_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RevokeSessionOfUser'
+type MockAuthRepository_RevokeSessionOfUser_Call struct {
+	*mock.Call
+}
+
+// RevokeSessionOfUser is a helper method to define mock.On call
+//   - ctx context.Context
+//   - userID string
+//   - id string
+//   - at time.Time
+func (_e *MockAuthRepository_Expecter) RevokeSessionOfUser(ctx any, userID any, id any, at any) *MockAuthRepository_RevokeSessionOfUser_Call {
+	return &MockAuthRepository_RevokeSessionOfUser_Call{Call: _e.mock.On("RevokeSessionOfUser", ctx, userID, id, at)}
+}
+
+func (_c *MockAuthRepository_RevokeSessionOfUser_Call) Run(run func(ctx context.Context, userID string, id string, at time.Time)) *MockAuthRepository_RevokeSessionOfUser_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 time.Time
+		if args[3] != nil {
+			arg3 = args[3].(time.Time)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *MockAuthRepository_RevokeSessionOfUser_Call) Return(err error) *MockAuthRepository_RevokeSessionOfUser_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockAuthRepository_RevokeSessionOfUser_Call) RunAndReturn(run func(ctx context.Context, userID string, id string, at time.Time) error) *MockAuthRepository_RevokeSessionOfUser_Call {
 	_c.Call.Return(run)
 	return _c
 }

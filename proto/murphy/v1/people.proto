@@ -87,6 +87,14 @@ message Session {
   google.protobuf.Timestamp revoked_at = 5;
   google.protobuf.Timestamp created_at = 6;
   google.protobuf.Timestamp updated_at = 7;
+  SessionClient client = 8;
+}
+
+enum SessionClient {
+  SESSION_CLIENT_UNSPECIFIED = 0;
+  SESSION_CLIENT_BROWSER = 1;
+  SESSION_CLIENT_APP = 2;
+  SESSION_CLIENT_TOKEN = 3;
 }
 
 message SignIn {

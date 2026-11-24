@@ -155,6 +155,68 @@ func Run(t *testing.T, open func(t *testing.T) Storage) {
 		assert.ErrorIs(t, err, murphy.ErrNotFound)
 	})
 
+	t.Run("lists only a user's active sessions, newest first", func(t *testing.T) {
+		repo := open(t)
+		ana, bo := newUser("ana@example.com"), newUser("bo@example.com")
+		now := time.Now().UTC()
+		require.NoError(t, repo.CreateUser(t.Context(), ana))
+		require.NoError(t, repo.CreateUser(t.Context(), bo))
+		older, newer := newSession(ana, "older", now.Add(time.Hour)), newSession(ana, "newer", now.Add(time.Hour))
+		require.NoError(t, repo.CreateSession(t.Context(), older))
+		require.NoError(t, repo.CreateSession(t.Context(), newer))
+		require.NoError(t, repo.CreateSession(t.Context(), newSession(ana, "expired", now.Add(-time.Minute))))
+		require.NoError(t, repo.CreateSession(t.Context(), newSession(bo, "bos", now.Add(time.Hour))))
+
+		got, err := repo.ListActiveSessions(t.Context(), ana.GetId(), maxID, 10, now)
+
+		require.NoError(t, err)
+		require.Len(t, got, 2)
+		assert.Equal(t, []string{newer.GetId(), older.GetId()}, []string{got[0].GetId(), got[1].GetId()})
+		assert.Equal(t, murphy.SessionClient_SESSION_CLIENT_TOKEN, got[0].GetClient())
+	})
+
+	t.Run("a session is ended only by its own user", func(t *testing.T) {
+		repo := open(t)
+		ana, bo := newUser("ana@example.com"), newUser("bo@example.com")
+		now := time.Now().UTC()
+		require.NoError(t, repo.CreateUser(t.Context(), ana))
+		require.NoError(t, repo.CreateUser(t.Context(), bo))
+		anas := newSession(ana, "anas", now.Add(time.Hour))
+		require.NoError(t, repo.CreateSession(t.Context(), anas))
+
+		byBo := repo.RevokeSessionOfUser(t.Context(), bo.GetId(), anas.GetId(), now)
+		_, stillActive := repo.GetActiveSession(t.Context(), []byte("anas"), now)
+		byAna := repo.RevokeSessionOfUser(t.Context(), ana.GetId(), anas.GetId(), now)
+		_, ended := repo.GetActiveSession(t.Context(), []byte("anas"), now)
+
+		assert.ErrorIs(t, byBo, murphy.ErrNotFound)
+		assert.NoError(t, stillActive)
+		assert.NoError(t, byAna)
+		assert.ErrorIs(t, ended, murphy.ErrNotFound)
+	})
+
+	t.Run("ending all of a user's sessions also discards their unused codes", func(t *testing.T) {
+		repo := open(t)
+		ana, bo := newUser("ana@example.com"), newUser("bo@example.com")
+		now := time.Now().UTC()
+		require.NoError(t, repo.CreateUser(t.Context(), ana))
+		require.NoError(t, repo.CreateUser(t.Context(), bo))
+		require.NoError(t, repo.CreateSession(t.Context(), newSession(ana, "phone", now.Add(time.Hour))))
+		require.NoError(t, repo.CreateSession(t.Context(), newSession(ana, "laptop", now.Add(time.Hour))))
+		require.NoError(t, repo.CreateSession(t.Context(), newSession(bo, "bos", now.Add(time.Hour))))
+		require.NoError(t, repo.CreateOneTimeCode(t.Context(), newOneTimeCode(ana, "connect", "", now.Add(time.Minute))))
+
+		require.NoError(t, repo.EndSessionsOfUser(t.Context(), ana.GetId(), now))
+		anas, err := repo.ListActiveSessions(t.Context(), ana.GetId(), maxID, 10, now)
+		require.NoError(t, err)
+		_, code := repo.TakeOneTimeCode(t.Context(), []byte("connect"), now)
+		_, bos := repo.GetActiveSession(t.Context(), []byte("bos"), now)
+
+		assert.Empty(t, anas)
+		assert.ErrorIs(t, code, murphy.ErrNotFound)
+		assert.NoError(t, bos, "other people's sessions are untouched")
+	})
+
 	t.Run("the first admin is claimed once", func(t *testing.T) {
 		repo := open(t)
 		ana, bo := newUser("ana@example.com"), newUser("bo@example.com")
@@ -327,7 +389,10 @@ func newIdentity(user *murphy.User, subject string) *murphy.Identity {
 
 func newSession(user *murphy.User, token string, expiresAt time.Time) *murphy.Session {
 	now := murphy.Now()
-	return &murphy.Session{Id: murphy.NewID(), UserId: user.GetId(), TokenHash: []byte(token), ExpiresAt: timestamppb.New(expiresAt), CreatedAt: now, UpdatedAt: now}
+	return &murphy.Session{
+		Id: murphy.NewID(), UserId: user.GetId(), TokenHash: []byte(token), Client: murphy.SessionClient_SESSION_CLIENT_TOKEN,
+		ExpiresAt: timestamppb.New(expiresAt), CreatedAt: now, UpdatedAt: now,
+	}
 }
 
 func newContactMethod(user *murphy.User, kind murphy.ContactMethodType) *murphy.ContactMethod {

@@ -120,3 +120,11 @@ func (p OneTimeCodePurpose) Text() string {
 func OneTimeCodePurposeFromText(text string) OneTimeCodePurpose {
 	return enumFromText[OneTimeCodePurpose](OneTimeCodePurpose_value, "ONE_TIME_CODE_PURPOSE_", text)
 }
+
+func (c SessionClient) Text() string {
+	return enumText(c, "SESSION_CLIENT_")
+}
+
+func SessionClientFromText(text string) SessionClient {
+	return enumFromText[SessionClient](SessionClient_value, "SESSION_CLIENT_", text)
+}

@@ -136,11 +136,11 @@ FROM identities
 WHERE issuer = sqlc.arg(issuer) AND subject = sqlc.arg(subject);
 
 -- name: CreateSession :exec
-INSERT INTO sessions (id, user_id, token_hash, expires_at, created_at, updated_at)
-VALUES (sqlc.arg(id), sqlc.arg(user_id), sqlc.arg(token_hash), sqlc.arg(expires_at), sqlc.arg(created_at), sqlc.arg(updated_at));
+INSERT INTO sessions (id, user_id, token_hash, client, expires_at, created_at, updated_at)
+VALUES (sqlc.arg(id), sqlc.arg(user_id), sqlc.arg(token_hash), sqlc.arg(client), sqlc.arg(expires_at), sqlc.arg(created_at), sqlc.arg(updated_at));
 
 -- name: GetActiveSession :one
-SELECT sessions.id, sessions.user_id, sessions.token_hash, sessions.expires_at, sessions.revoked_at, sessions.created_at, sessions.updated_at
+SELECT sessions.id, sessions.user_id, sessions.token_hash, sessions.client, sessions.expires_at, sessions.revoked_at, sessions.created_at, sessions.updated_at
 FROM sessions
 JOIN users ON users.id = sessions.user_id
 WHERE sessions.token_hash = sqlc.arg(token_hash) AND sessions.revoked_at IS NULL AND sessions.expires_at > sqlc.arg(now) AND users.status = 'active';
@@ -181,3 +181,25 @@ WHERE code_hash = sqlc.arg(code_hash) AND used_at IS NULL AND expires_at > sqlc.
 SELECT id, code_hash, user_id, purpose, code_challenge, expires_at, used_at, created_at, updated_at
 FROM one_time_codes
 WHERE code_hash = sqlc.arg(code_hash);
+
+-- name: ListActiveSessions :many
+SELECT id, user_id, token_hash, client, expires_at, revoked_at, created_at, updated_at
+FROM sessions
+WHERE user_id = sqlc.arg(user_id) AND revoked_at IS NULL AND expires_at > sqlc.arg(now) AND id < sqlc.arg(before)
+ORDER BY id DESC
+LIMIT ?;
+
+-- name: RevokeSessionOfUser :execrows
+UPDATE sessions
+SET revoked_at = sqlc.arg(revoked_at), updated_at = sqlc.arg(updated_at)
+WHERE id = sqlc.arg(id) AND user_id = sqlc.arg(user_id) AND revoked_at IS NULL;
+
+-- name: RevokeSessionsOfUser :execrows
+UPDATE sessions
+SET revoked_at = sqlc.arg(revoked_at), updated_at = sqlc.arg(updated_at)
+WHERE user_id = sqlc.arg(user_id) AND revoked_at IS NULL;
+
+-- name: DiscardOneTimeCodesOfUser :execrows
+UPDATE one_time_codes
+SET used_at = sqlc.arg(used_at), updated_at = sqlc.arg(updated_at)
+WHERE user_id = sqlc.arg(user_id) AND used_at IS NULL;

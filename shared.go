@@ -16,6 +16,7 @@ var (
 	ErrConflict = errors.New("conflict")
 
 	ErrUnauthenticated = errors.New("unauthenticated")
+	ErrForbidden       = errors.New("forbidden")
 )
 
 type FieldError struct {
