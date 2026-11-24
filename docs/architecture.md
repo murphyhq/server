@@ -96,7 +96,7 @@ Publishes stored messages. Every message that decides whether someone is paged i
 
 ### Notifier
 
-Reaches people outside Murphy. It decides whom to notify and how, and sends through providers: webhooks, email, chat, SMS and voice. Its work waits on receivers that can be slow or down, so it runs apart from `engine`, and a failing receiver delays notifications without delaying incidents. Sending doesn't use the database, so notifications already handed to the broker still go out when the database is unavailable. Webhooks are signed with a private key that only `notifier` holds, and receivers check them with the public key `api` serves. Webhooks only reach public addresses, checked when each connection is made, unless the install trusts a network explicitly, so a person's webhook can't reach Murphy's own network. Pushes to the official app go through the push relay.
+Reaches people outside Murphy. It decides whom to notify and how, and sends through providers: webhooks, email, chat, SMS and voice. Its work waits on receivers that can be slow or down, so it runs apart from `engine`, and a failing receiver delays notifications without delaying incidents. Sending doesn't use the database, so notifications already handed to the broker still go out when the database is unavailable. Webhooks are signed with a private key that only `notifier` holds, and receivers check them with the public key `api` serves. Pushes to the official app go through the push relay.
 
 ### Migrate
 
