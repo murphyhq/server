@@ -29,7 +29,8 @@ func (p *Pushes) Send(ctx context.Context, notification *murphy.Notification) (e
 
 	response, err := p.client.SendPush(ctx, relay.SendPushJSONRequestBody{
 		Id:         notification.GetId(),
-		Handle:     notification.GetContactMethod().GetAddress(),
+		Platform:   relay.Platform(notification.GetContactMethod().GetPushPlatform().Text()),
+		Token:      notification.GetContactMethod().GetAddress(),
 		Event:      eventOf(notification.GetReason()),
 		Server:     p.server,
 		IncidentId: notification.GetIncident().GetId(),

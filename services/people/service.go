@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/murphyhq/server"
-	"github.com/murphyhq/server/internal/logger"
 	"github.com/murphyhq/server/internal/pagination"
 	"github.com/murphyhq/server/internal/telemetry"
 	"github.com/murphyhq/server/internal/tracer"
@@ -37,18 +36,12 @@ type Repository interface {
 	ActiveUsers(ctx context.Context, ids []string) ([]string, error)
 }
 
-type Devices interface {
-	Register(ctx context.Context, platform murphy.PushPlatform, token string) (handle string, err error)
-	Forget(ctx context.Context, handle string) error
-}
-
 type Service struct {
-	repo    Repository
-	devices Devices
+	repo Repository
 }
 
-func New(repo Repository, devices Devices) *Service {
-	return &Service{repo: repo, devices: devices}
+func New(repo Repository) *Service {
+	return &Service{repo: repo}
 }
 
 func (s *Service) CreateUser(ctx context.Context, in *murphy.User) (_ *murphy.User, err error) {
@@ -170,16 +163,6 @@ func (s *Service) CreateContactMethod(ctx context.Context, in *murphy.ContactMet
 	if _, err := s.GetUser(ctx, method.GetUserId()); err != nil {
 		return nil, err
 	}
-	if method.GetType() == murphy.ContactMethodType_CONTACT_METHOD_TYPE_PUSH {
-		if s.devices == nil {
-			return nil, &murphy.FieldError{Field: "type", Reason: "push isn't set up on this install"}
-		}
-		handle, err := s.devices.Register(ctx, method.GetPushPlatform(), method.GetAddress())
-		if err != nil {
-			return nil, fmt.Errorf("register the device for pushes: %w", err)
-		}
-		method.Address = handle
-	}
 	if err := s.repo.CreateContactMethod(ctx, method); err != nil {
 		return nil, fmt.Errorf("create contact method: %w", err)
 	}
@@ -225,16 +208,14 @@ func (s *Service) UpdateContactMethod(ctx context.Context, in *murphy.ContactMet
 	if err != nil {
 		return nil, err
 	}
-	if current.GetType() == murphy.ContactMethodType_CONTACT_METHOD_TYPE_PUSH || in.GetType() == murphy.ContactMethodType_CONTACT_METHOD_TYPE_PUSH {
-		return nil, &murphy.FieldError{Field: "type", Reason: "push contact methods can't be changed: add a new one and delete the old one"}
-	}
 	method := &murphy.ContactMethod{
-		Id:        current.GetId(),
-		UserId:    current.GetUserId(),
-		Type:      murphy.Or(in.GetType(), current.GetType()),
-		Address:   in.GetAddress(),
-		CreatedAt: current.GetCreatedAt(),
-		UpdatedAt: murphy.Now(),
+		Id:           current.GetId(),
+		UserId:       current.GetUserId(),
+		Type:         murphy.Or(in.GetType(), current.GetType()),
+		Address:      in.GetAddress(),
+		PushPlatform: murphy.Or(in.GetPushPlatform(), current.GetPushPlatform()),
+		CreatedAt:    current.GetCreatedAt(),
+		UpdatedAt:    murphy.Now(),
 	}
 	if err := method.Validate(); err != nil {
 		return nil, err
@@ -250,17 +231,11 @@ func (s *Service) DeleteContactMethod(ctx context.Context, id string) (err error
 	ctx = span.Set(ctx, telemetry.WithField("contact_method.id", id))
 	defer span.End(&err)
 
-	method, err := s.GetContactMethod(ctx, id)
-	if err != nil {
+	if err := murphy.LookupID("contact method", id); err != nil {
 		return err
 	}
 	if err := s.repo.DeleteContactMethod(ctx, id); err != nil {
 		return fmt.Errorf("delete contact method: %w", err)
-	}
-	if method.GetType() == murphy.ContactMethodType_CONTACT_METHOD_TYPE_PUSH && s.devices != nil {
-		if err := s.devices.Forget(ctx, method.GetAddress()); err != nil {
-			logger.Warn(ctx, "the relay didn't forget a deleted push contact method's device", telemetry.WithError(err))
-		}
 	}
 	return nil
 }

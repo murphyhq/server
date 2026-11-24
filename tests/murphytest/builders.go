@@ -88,7 +88,7 @@ func (m *Murphy) User(options ...UserOption) *User {
 		ios := client.Ios
 		added, err := m.API.CreateContactMethodWithResponse(m.t.Context(), user.ID, nil, client.ContactMethodInput{Type: client.Push, Address: token, Platform: &ios})
 		m.created(added, err, "add a phone")
-		user.phones = append(user.phones, &Phone{Handle: added.JSON201.Address, receiver: m.Receiver()})
+		user.phones = append(user.phones, &Phone{Token: added.JSON201.Address, receiver: m.Receiver()})
 	}
 	return user
 }

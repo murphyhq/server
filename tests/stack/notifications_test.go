@@ -45,14 +45,14 @@ func TestAPageReachesAPhoneThroughTheRelay(t *testing.T) {
 	incident := service.Fire("disk-full")
 
 	incident.WaitFor(murphytest.Paged(ana), murphytest.Notified(ana, client.Push))
-	assert.Regexp(t, `^mdh_device-`, ana.Phone().Handle, "the contact method keeps the relay's handle, not the token")
 	push := ana.Phone().WaitForPushes(1)[0]
+	assert.Equal(t, "ios", push.Platform)
 	assert.Equal(t, "paged", push.Event)
 	assert.Equal(t, incident.ID, push.IncidentID)
 	assert.Equal(t, m.APIURL(), push.Server)
 }
 
-func TestAPhoneTheRelayNoLongerKnowsFailsTheNotification(t *testing.T) {
+func TestAPhoneWhoseTokenIsGoneFailsTheNotification(t *testing.T) {
 	m := murphytest.New(t)
 	ana := m.User(murphytest.WithGonePhone())
 	service := m.Service(murphytest.Pages(ana.Target()))

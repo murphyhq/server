@@ -334,12 +334,12 @@ type ConnectCode struct {
 
 // ContactMethod defines model for ContactMethod.
 type ContactMethod struct {
-	// Address An email address, an E.164 phone number, a webhook URL, or for push, the handle the push relay gave the device.
+	// Address An email address, an E.164 phone number, a webhook URL, or the push token iOS or Android gave the app.
 	Address   string    `json:"address"`
 	CreatedAt time.Time `json:"created_at"`
 	Id        string    `json:"id"`
 
-	// Platform Push only. Push contact methods can't be changed; add a new one and delete the old one.
+	// Platform Push only. The phone's platform, which decides whether the push relay sends through Apple or Google.
 	Platform  *PushPlatform     `json:"platform,omitempty"`
 	Type      ContactMethodType `json:"type"`
 	UpdatedAt time.Time         `json:"updated_at"`
@@ -350,10 +350,10 @@ type ContactMethod struct {
 
 // ContactMethodInput defines model for ContactMethodInput.
 type ContactMethodInput struct {
-	// Address An email address, an E.164 phone number, a webhook URL, or for push, the push token iOS or Android gave the app. A push token is registered with the push relay, and the contact method keeps the relay's handle instead.
+	// Address An email address, an E.164 phone number, a webhook URL, or the push token iOS or Android gave the app. When the app's token changes, update the contact method.
 	Address string `json:"address"`
 
-	// Platform Push only. Push contact methods can't be changed; add a new one and delete the old one.
+	// Platform Push only. The phone's platform, which decides whether the push relay sends through Apple or Google.
 	Platform *PushPlatform     `json:"platform,omitempty"`
 	Type     ContactMethodType `json:"type"`
 }
@@ -618,7 +618,7 @@ type Problem struct {
 	TraceId *string `json:"trace_id,omitempty"`
 }
 
-// PushPlatform Push only. Push contact methods can't be changed; add a new one and delete the old one.
+// PushPlatform Push only. The phone's platform, which decides whether the push relay sends through Apple or Google.
 type PushPlatform string
 
 // Reference Points at another resource.

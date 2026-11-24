@@ -107,7 +107,7 @@ func New(ctx context.Context, s Settings) (_ *App, err error) {
 		providers[murphy.ContactMethodType_CONTACT_METHOD_TYPE_PUSH] = pushes
 	}
 
-	peopleService := people.New(peopleStorage, nil)
+	peopleService := people.New(peopleStorage)
 	a.notifications = notifications.New(notificationsStorage, escalation.New(escalationStorage, nil, nil, nil, 0), oncall.New(oncallStorage, peopleService), peopleService)
 	a.sender = notifications.NewSender(messaging.NewPublisher(topic), providers)
 	a.Ready = a.resources.Checks()

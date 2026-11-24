@@ -114,9 +114,10 @@ func (s *Server) UpdateContactMethod(ctx context.Context, request UpdateContactM
 	defer span.End(&err)
 
 	method, err := s.people.UpdateContactMethod(ctx, &murphy.ContactMethod{
-		Id:      request.Id,
-		Type:    murphy.ContactMethodTypeFromText(string(request.Body.Type)),
-		Address: request.Body.Address,
+		Id:           request.Id,
+		Type:         murphy.ContactMethodTypeFromText(string(request.Body.Type)),
+		Address:      request.Body.Address,
+		PushPlatform: murphy.PushPlatformFromText(string(*murphy.Or(request.Body.Platform, new(PushPlatform)))),
 	})
 	if err != nil {
 		return nil, err

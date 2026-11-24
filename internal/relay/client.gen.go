@@ -12,8 +12,6 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-
-	"github.com/oapi-codegen/runtime"
 )
 
 // Defines values for Platform.
@@ -73,20 +71,6 @@ func (e PushInputEvent) Valid() bool {
 	}
 }
 
-// Device defines model for Device.
-type Device struct {
-	Handle   string   `json:"handle"`
-	Platform Platform `json:"platform"`
-}
-
-// DeviceInput defines model for DeviceInput.
-type DeviceInput struct {
-	Platform Platform `json:"platform"`
-
-	// Token The push token iOS or Android gave the app.
-	Token string `json:"token"`
-}
-
 // Platform defines model for Platform.
 type Platform string
 
@@ -110,25 +94,22 @@ type PushStatus string
 
 // PushInput defines model for PushInput.
 type PushInput struct {
-	Event  PushInputEvent `json:"event"`
-	Handle string         `json:"handle"`
+	Event PushInputEvent `json:"event"`
 
 	// Id The ID of the notification this push delivers. Retries use the same ID.
-	Id         string `json:"id"`
-	IncidentId string `json:"incident_id"`
+	Id         string   `json:"id"`
+	IncidentId string   `json:"incident_id"`
+	Platform   Platform `json:"platform"`
 
 	// Server The Murphy server the app should fetch the incident from.
 	Server string `json:"server"`
+
+	// Token The push token iOS or Android gave the app.
+	Token string `json:"token"`
 }
 
 // PushInputEvent defines model for PushInput.Event.
 type PushInputEvent string
-
-// Handle defines model for Handle.
-type Handle = string
-
-// RegisterDeviceJSONRequestBody defines body for RegisterDevice for application/json ContentType.
-type RegisterDeviceJSONRequestBody = DeviceInput
 
 // SendPushJSONRequestBody defines body for SendPush for application/json ContentType.
 type SendPushJSONRequestBody = PushInput
@@ -207,32 +188,9 @@ func WithRequestEditorFn(fn RequestEditorFn) ClientOption {
 // The interface specification for the client above.
 type ClientInterface interface {
 
-	// RegisterDeviceWithBody Register a device
-	//
-	// Registers a phone's push token for this install and returns the handle to push to. Registering the same token again returns the same handle. Only the install that registered a device can push to it.
-	//
-	// Takes any type of body and a specified content type.
-	//
-	// Corresponds with POST /v1/devices (the `RegisterDevice` operationId).
-	RegisterDeviceWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// RegisterDevice Register a device
-	//
-	// Registers a phone's push token for this install and returns the handle to push to. Registering the same token again returns the same handle. Only the install that registered a device can push to it.
-	//
-	// Takes a body of the `application/json` content type.
-	//
-	// Corresponds with POST /v1/devices (the `RegisterDevice` operationId).
-	RegisterDevice(ctx context.Context, body RegisterDeviceJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// ForgetDevice Forget a device
-	//
-	// Corresponds with DELETE /v1/devices/{handle} (the `ForgetDevice` operationId).
-	ForgetDevice(ctx context.Context, handle Handle, reqEditors ...RequestEditorFn) (*http.Response, error)
-
 	// SendPushWithBody Send a push
 	//
-	// Sends a push to a device and answers once Apple or Google accepted it. A retry with the same `id` within a day isn't sent again.
+	// Sends a push to a phone and answers once Apple or Google accepted it. A retry with the same `id` within a day isn't sent again.
 	//
 	// Takes any type of body and a specified content type.
 	//
@@ -241,7 +199,7 @@ type ClientInterface interface {
 
 	// SendPush Send a push
 	//
-	// Sends a push to a device and answers once Apple or Google accepted it. A retry with the same `id` within a day isn't sent again.
+	// Sends a push to a phone and answers once Apple or Google accepted it. A retry with the same `id` within a day isn't sent again.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -249,62 +207,9 @@ type ClientInterface interface {
 	SendPush(ctx context.Context, body SendPushJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
-// RegisterDeviceWithBody Register a device
-//
-// Registers a phone's push token for this install and returns the handle to push to. Registering the same token again returns the same handle. Only the install that registered a device can push to it.
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with POST /v1/devices (the `RegisterDevice` operationId).
-func (c *Client) RegisterDeviceWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewRegisterDeviceRequestWithBody(c.Server, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// RegisterDevice Register a device
-//
-// Registers a phone's push token for this install and returns the handle to push to. Registering the same token again returns the same handle. Only the install that registered a device can push to it.
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with POST /v1/devices (the `RegisterDevice` operationId).
-func (c *Client) RegisterDevice(ctx context.Context, body RegisterDeviceJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewRegisterDeviceRequest(c.Server, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// ForgetDevice Forget a device
-//
-// Corresponds with DELETE /v1/devices/{handle} (the `ForgetDevice` operationId).
-func (c *Client) ForgetDevice(ctx context.Context, handle Handle, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewForgetDeviceRequest(c.Server, handle)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
 // SendPushWithBody Send a push
 //
-// Sends a push to a device and answers once Apple or Google accepted it. A retry with the same `id` within a day isn't sent again.
+// Sends a push to a phone and answers once Apple or Google accepted it. A retry with the same `id` within a day isn't sent again.
 //
 // Takes any type of body and a specified content type.
 //
@@ -323,7 +228,7 @@ func (c *Client) SendPushWithBody(ctx context.Context, contentType string, body 
 
 // SendPush Send a push
 //
-// Sends a push to a device and answers once Apple or Google accepted it. A retry with the same `id` within a day isn't sent again.
+// Sends a push to a phone and answers once Apple or Google accepted it. A retry with the same `id` within a day isn't sent again.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -338,80 +243,6 @@ func (c *Client) SendPush(ctx context.Context, body SendPushJSONRequestBody, req
 		return nil, err
 	}
 	return c.Client.Do(req)
-}
-
-// NewRegisterDeviceRequest calls the generic RegisterDevice builder with application/json body
-func NewRegisterDeviceRequest(server string, body RegisterDeviceJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewRegisterDeviceRequestWithBody(server, "application/json", bodyReader)
-}
-
-// NewRegisterDeviceRequestWithBody constructs an http.Request for the RegisterDevice method, with any body, and a specified content type
-func NewRegisterDeviceRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/v1/devices")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
-// NewForgetDeviceRequest constructs an http.Request for the ForgetDevice method
-func NewForgetDeviceRequest(server string, handle Handle) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "handle", handle, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/v1/devices/%s", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
 }
 
 // NewSendPushRequest calls the generic SendPush builder with application/json body
@@ -498,34 +329,9 @@ func WithBaseURL(baseURL string) ClientOption {
 // ClientWithResponsesInterface is the interface specification for the client with responses above.
 type ClientWithResponsesInterface interface {
 
-	// RegisterDeviceWithBodyWithResponse Register a device
-	//
-	// Registers a phone's push token for this install and returns the handle to push to. Registering the same token again returns the same handle. Only the install that registered a device can push to it.
-	//
-	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
-	//
-	// Corresponds with POST /v1/devices (the `RegisterDevice` operationId).
-	RegisterDeviceWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*RegisterDeviceResponse, error)
-
-	// RegisterDeviceWithResponse Register a device
-	//
-	// Registers a phone's push token for this install and returns the handle to push to. Registering the same token again returns the same handle. Only the install that registered a device can push to it.
-	//
-	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
-	//
-	// Corresponds with POST /v1/devices (the `RegisterDevice` operationId).
-	RegisterDeviceWithResponse(ctx context.Context, body RegisterDeviceJSONRequestBody, reqEditors ...RequestEditorFn) (*RegisterDeviceResponse, error)
-
-	// ForgetDeviceWithResponse Forget a device
-	//
-	// Returns a wrapper object for the known response body format(s).
-	//
-	// Corresponds with DELETE /v1/devices/{handle} (the `ForgetDevice` operationId).
-	ForgetDeviceWithResponse(ctx context.Context, handle Handle, reqEditors ...RequestEditorFn) (*ForgetDeviceResponse, error)
-
 	// SendPushWithBodyWithResponse Send a push
 	//
-	// Sends a push to a device and answers once Apple or Google accepted it. A retry with the same `id` within a day isn't sent again.
+	// Sends a push to a phone and answers once Apple or Google accepted it. A retry with the same `id` within a day isn't sent again.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -534,108 +340,12 @@ type ClientWithResponsesInterface interface {
 
 	// SendPushWithResponse Send a push
 	//
-	// Sends a push to a device and answers once Apple or Google accepted it. A retry with the same `id` within a day isn't sent again.
+	// Sends a push to a phone and answers once Apple or Google accepted it. A retry with the same `id` within a day isn't sent again.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /v1/pushes (the `SendPush` operationId).
 	SendPushWithResponse(ctx context.Context, body SendPushJSONRequestBody, reqEditors ...RequestEditorFn) (*SendPushResponse, error)
-}
-
-type RegisterDeviceResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *Device
-	// JSON201 the response for an HTTP 201 `application/json` response
-	JSON201 *Device
-	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
-	ApplicationproblemJSON400 *Problem
-}
-
-// GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r RegisterDeviceResponse) GetJSON200() *Device {
-	return r.JSON200
-}
-
-// GetJSON201 returns the response for an HTTP 201 `application/json` response
-func (r RegisterDeviceResponse) GetJSON201() *Device {
-	return r.JSON201
-}
-
-// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
-func (r RegisterDeviceResponse) GetApplicationproblemJSON400() *Problem {
-	return r.ApplicationproblemJSON400
-}
-
-// GetBody returns the raw response body bytes
-func (r RegisterDeviceResponse) GetBody() []byte {
-	return r.Body
-}
-
-// Status returns HTTPResponse.Status
-func (r RegisterDeviceResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r RegisterDeviceResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r RegisterDeviceResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-type ForgetDeviceResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
-	ApplicationproblemJSON404 *Problem
-}
-
-// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
-func (r ForgetDeviceResponse) GetApplicationproblemJSON404() *Problem {
-	return r.ApplicationproblemJSON404
-}
-
-// GetBody returns the raw response body bytes
-func (r ForgetDeviceResponse) GetBody() []byte {
-	return r.Body
-}
-
-// Status returns HTTPResponse.Status
-func (r ForgetDeviceResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r ForgetDeviceResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r ForgetDeviceResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
 }
 
 type SendPushResponse struct {
@@ -645,8 +355,6 @@ type SendPushResponse struct {
 	JSON200 *Push
 	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
 	ApplicationproblemJSON400 *Problem
-	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
-	ApplicationproblemJSON404 *Problem
 	// ApplicationproblemJSON410 the response for an HTTP 410 `application/problem+json` response
 	ApplicationproblemJSON410 *Problem
 	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
@@ -663,11 +371,6 @@ func (r SendPushResponse) GetJSON200() *Push {
 // GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
 func (r SendPushResponse) GetApplicationproblemJSON400() *Problem {
 	return r.ApplicationproblemJSON400
-}
-
-// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
-func (r SendPushResponse) GetApplicationproblemJSON404() *Problem {
-	return r.ApplicationproblemJSON404
 }
 
 // GetApplicationproblemJSON410 returns the response for an HTTP 410 `application/problem+json` response
@@ -714,52 +417,9 @@ func (r SendPushResponse) ContentType() string {
 	return ""
 }
 
-// RegisterDeviceWithBodyWithResponse Register a device
-//
-// Registers a phone's push token for this install and returns the handle to push to. Registering the same token again returns the same handle. Only the install that registered a device can push to it.
-//
-// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with POST /v1/devices (the `RegisterDevice` operationId).
-func (c *ClientWithResponses) RegisterDeviceWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*RegisterDeviceResponse, error) {
-	rsp, err := c.RegisterDeviceWithBody(ctx, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseRegisterDeviceResponse(rsp)
-}
-
-// RegisterDeviceWithResponse Register a device
-//
-// Registers a phone's push token for this install and returns the handle to push to. Registering the same token again returns the same handle. Only the install that registered a device can push to it.
-//
-// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with POST /v1/devices (the `RegisterDevice` operationId).
-func (c *ClientWithResponses) RegisterDeviceWithResponse(ctx context.Context, body RegisterDeviceJSONRequestBody, reqEditors ...RequestEditorFn) (*RegisterDeviceResponse, error) {
-	rsp, err := c.RegisterDevice(ctx, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseRegisterDeviceResponse(rsp)
-}
-
-// ForgetDeviceWithResponse Forget a device
-//
-// Returns a wrapper object for the known response body format(s).
-//
-// Corresponds with DELETE /v1/devices/{handle} (the `ForgetDevice` operationId).
-func (c *ClientWithResponses) ForgetDeviceWithResponse(ctx context.Context, handle Handle, reqEditors ...RequestEditorFn) (*ForgetDeviceResponse, error) {
-	rsp, err := c.ForgetDevice(ctx, handle, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseForgetDeviceResponse(rsp)
-}
-
 // SendPushWithBodyWithResponse Send a push
 //
-// Sends a push to a device and answers once Apple or Google accepted it. A retry with the same `id` within a day isn't sent again.
+// Sends a push to a phone and answers once Apple or Google accepted it. A retry with the same `id` within a day isn't sent again.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -774,7 +434,7 @@ func (c *ClientWithResponses) SendPushWithBodyWithResponse(ctx context.Context, 
 
 // SendPushWithResponse Send a push
 //
-// Sends a push to a device and answers once Apple or Google accepted it. A retry with the same `id` within a day isn't sent again.
+// Sends a push to a phone and answers once Apple or Google accepted it. A retry with the same `id` within a day isn't sent again.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -785,75 +445,6 @@ func (c *ClientWithResponses) SendPushWithResponse(ctx context.Context, body Sen
 		return nil, err
 	}
 	return ParseSendPushResponse(rsp)
-}
-
-// ParseRegisterDeviceResponse parses an HTTP response from a RegisterDeviceWithResponse call
-func ParseRegisterDeviceResponse(rsp *http.Response) (*RegisterDeviceResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &RegisterDeviceResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest Device
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
-		var dest Device
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON201 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest Problem
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON400 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseForgetDeviceResponse parses an HTTP response from a ForgetDeviceWithResponse call
-func ParseForgetDeviceResponse(rsp *http.Response) (*ForgetDeviceResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &ForgetDeviceResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case rsp.StatusCode == 204:
-		break // No content-type
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest Problem
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON404 = &dest
-
-	}
-
-	return response, nil
 }
 
 // ParseSendPushResponse parses an HTTP response from a SendPushWithResponse call
@@ -883,13 +474,6 @@ func ParseSendPushResponse(rsp *http.Response) (*SendPushResponse, error) {
 			return nil, err
 		}
 		response.ApplicationproblemJSON400 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest Problem
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON404 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 410:
 		var dest Problem

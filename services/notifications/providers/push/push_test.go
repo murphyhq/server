@@ -41,7 +41,7 @@ func pushesThrough(t *testing.T, answer *relayAnswer) *push.Pushes {
 func notification(reason murphy.NotificationReason) *murphy.Notification {
 	return &murphy.Notification{
 		Id: "notification-1", Reason: reason, Incident: &murphy.Incident{Id: "incident-1", Title: "Disk full on db-1"},
-		ContactMethod: &murphy.ContactMethod{Type: murphy.ContactMethodType_CONTACT_METHOD_TYPE_PUSH, Address: "mdh_phone"},
+		ContactMethod: &murphy.ContactMethod{Type: murphy.ContactMethodType_CONTACT_METHOD_TYPE_PUSH, Address: "apns-token", PushPlatform: murphy.PushPlatform_PUSH_PLATFORM_IOS},
 		Deadline:      timestamppb.New(time.Now().Add(time.Minute)),
 	}
 }
@@ -53,7 +53,7 @@ func TestAPushCarriesTheEventTheServerAndTheIncidentOnly(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, map[string]string{
-		"id": "notification-1", "handle": "mdh_phone", "event": "paged", "server": "https://murphy.example.com",
+		"id": "notification-1", "platform": "ios", "token": "apns-token", "event": "paged", "server": "https://murphy.example.com",
 		"incident_id": "incident-1", "authorization": "Bearer mik_install-key",
 	}, answer.received, "no incident title or other incident data")
 }

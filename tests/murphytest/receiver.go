@@ -100,13 +100,14 @@ func (r *Receiver) stub(path, state string, status int, next string) {
 }
 
 type Phone struct {
-	Handle   string
+	Token    string
 	receiver *Receiver
 }
 
 type ReceivedPush struct {
 	ID         string `json:"id"`
-	Handle     string `json:"handle"`
+	Platform   string `json:"platform"`
+	Token      string `json:"token"`
 	Event      string `json:"event"`
 	Server     string `json:"server"`
 	IncidentID string `json:"incident_id"`
@@ -114,7 +115,7 @@ type ReceivedPush struct {
 
 func (p *Phone) pushes() *wiremock.Request {
 	return wiremock.NewRequest(http.MethodPost, wiremock.URLPathEqualTo("/relay/v1/pushes")).
-		WithBodyPattern(wiremock.MatchingJsonPath("$[?(@.handle == '" + p.Handle + "')]"))
+		WithBodyPattern(wiremock.MatchingJsonPath("$[?(@.token == '" + p.Token + "')]"))
 }
 
 func (p *Phone) WaitForPushes(count int) []ReceivedPush {

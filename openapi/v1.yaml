@@ -1632,7 +1632,7 @@ components:
           $ref: "#/components/schemas/ContactMethodType"
         address:
           type: string
-          description: An email address, an E.164 phone number, a webhook URL, or for push, the handle the push relay gave the device.
+          description: An email address, an E.164 phone number, a webhook URL, or the push token iOS or Android gave the app.
         platform:
           $ref: "#/components/schemas/PushPlatform"
         created_at:
@@ -1649,13 +1649,13 @@ components:
           $ref: "#/components/schemas/ContactMethodType"
         address:
           type: string
-          description: An email address, an E.164 phone number, a webhook URL, or for push, the push token iOS or Android gave the app. A push token is registered with the push relay, and the contact method keeps the relay's handle instead.
+          description: An email address, an E.164 phone number, a webhook URL, or the push token iOS or Android gave the app. When the app's token changes, update the contact method.
         platform:
           $ref: "#/components/schemas/PushPlatform"
     PushPlatform:
       type: string
       enum: [ios, android]
-      description: Push only. Push contact methods can't be changed; add a new one and delete the old one.
+      description: Push only. The phone's platform, which decides whether the push relay sends through Apple or Google.
     ContactMethodList:
       type: object
       required: [items]

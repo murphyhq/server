@@ -45,7 +45,6 @@ flowchart LR
   providers_in --> ingest
   clients --> api
   api --> idp
-  api --> relay
   notifier --> providers_out
   notifier --> relay
 
@@ -85,7 +84,7 @@ The public entry point for webhooks. Monitoring tools send it alerts, and notifi
 
 The management API, described by an OpenAPI spec and used by people and automation. It reads and writes the database directly, and changes that belong together happen in one transaction, together with the messages they cause.
 
-People sign in through the install's identity provider over OpenID Connect, or with a password where the install allows passwords, and `api` keeps their sessions in the database, so a session can be ended at once. Every request needs a session, except the health checks and the public signing keys. On an install without an admin, `api` logs a one-time link that lets the first person to sign in become the admin.
+People sign in through the install's identity provider over OpenID Connect, or with a password where the install allows passwords, and `api` keeps their sessions in the database, so a session can be ended at once. Every request needs a session, except the health checks and the public signing keys.
 
 ### Engine
 
@@ -111,7 +110,7 @@ The message broker keeps every message until it is processed, delivers it at lea
 
 An OpenID Connect identity provider, such as Google, Okta or Microsoft Entra ID, tells `api` who someone is. Locally, the provider is Dex. An install without one can allow passwords instead, which `api` keeps only as hashes.
 
-The push relay is a service Murphy hosts for every install, because only it holds the credentials Apple and Google require to push to the official app. `api` registers a phone with it when someone adds one as a contact method, and `notifier` sends pushes through it. Pushes carry no incident data, only what the app needs to fetch the incident from the install itself. An install reaches the relay with an install key, and without one, it sends no pushes.
+The push relay is a service Murphy hosts for every install, because only it holds the credentials Apple and Google require to push to the official app. `notifier` sends pushes through it. Pushes carry no incident data, only what the app needs to fetch the incident from the install itself. An install reaches the relay with an install key, and without one, it sends no pushes.
 
 A key-value store keeps the `Idempotency-Key` of every request that creates something, with its response, for 24 hours, so `api` answers a retry without doing the work twice. The implementation is Redis.
 
