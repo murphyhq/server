@@ -17,6 +17,7 @@ var (
 
 	ErrUnauthenticated = errors.New("unauthenticated")
 	ErrForbidden       = errors.New("forbidden")
+	ErrTooManyAttempts = errors.New("too many attempts")
 )
 
 type FieldError struct {

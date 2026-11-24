@@ -52,7 +52,7 @@ func newAccounts(t *testing.T) *accounts {
 	t.Helper()
 	repo, provider := NewMockAuthRepository(t), NewMockProvider(t)
 	a := &accounts{
-		auth:       people.NewAuth(repo, provider, settings()),
+		auth:       people.NewAuth(repo, provider, NewMockLimiter(t), settings()),
 		repo:       repo,
 		provider:   provider,
 		claims:     &people.Claims{Issuer: issuer, Subject: "bo-at-the-provider", Email: "bo@example.com", EmailVerified: true, Name: "Bo", Nonce: nonce},
@@ -146,7 +146,7 @@ func settings() people.AuthSettings {
 func (a *accounts) allowingOnly(domains ...string) {
 	allowed := settings()
 	allowed.AllowedEmailDomains = domains
-	a.auth = people.NewAuth(a.repo, a.provider, allowed)
+	a.auth = people.NewAuth(a.repo, a.provider, nil, allowed)
 }
 
 func (a *accounts) known(email, subject string) *murphy.User {

@@ -548,6 +548,63 @@ func (_c *MockAuthRepository_CreateSession_Call) RunAndReturn(run func(ctx conte
 	return _c
 }
 
+// CreateUser provides a mock function for the type MockAuthRepository
+func (_mock *MockAuthRepository) CreateUser(ctx context.Context, user *murphy.User) error {
+	ret := _mock.Called(ctx, user)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateUser")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *murphy.User) error); ok {
+		r0 = returnFunc(ctx, user)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockAuthRepository_CreateUser_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateUser'
+type MockAuthRepository_CreateUser_Call struct {
+	*mock.Call
+}
+
+// CreateUser is a helper method to define mock.On call
+//   - ctx context.Context
+//   - user *murphy.User
+func (_e *MockAuthRepository_Expecter) CreateUser(ctx any, user any) *MockAuthRepository_CreateUser_Call {
+	return &MockAuthRepository_CreateUser_Call{Call: _e.mock.On("CreateUser", ctx, user)}
+}
+
+func (_c *MockAuthRepository_CreateUser_Call) Run(run func(ctx context.Context, user *murphy.User)) *MockAuthRepository_CreateUser_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *murphy.User
+		if args[1] != nil {
+			arg1 = args[1].(*murphy.User)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockAuthRepository_CreateUser_Call) Return(err error) *MockAuthRepository_CreateUser_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockAuthRepository_CreateUser_Call) RunAndReturn(run func(ctx context.Context, user *murphy.User) error) *MockAuthRepository_CreateUser_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CreateUserWithIdentity provides a mock function for the type MockAuthRepository
 func (_mock *MockAuthRepository) CreateUserWithIdentity(ctx context.Context, user *murphy.User, identity *murphy.Identity) error {
 	ret := _mock.Called(ctx, user, identity)
@@ -824,6 +881,140 @@ func (_c *MockAuthRepository_GetIdentity_Call) Return(identity *murphy.Identity,
 }
 
 func (_c *MockAuthRepository_GetIdentity_Call) RunAndReturn(run func(ctx context.Context, issuer string, subject string) (*murphy.Identity, error)) *MockAuthRepository_GetIdentity_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetPasswordHash provides a mock function for the type MockAuthRepository
+func (_mock *MockAuthRepository) GetPasswordHash(ctx context.Context, userID string) (string, error) {
+	ret := _mock.Called(ctx, userID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetPasswordHash")
+	}
+
+	var r0 string
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (string, error)); ok {
+		return returnFunc(ctx, userID)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) string); ok {
+		r0 = returnFunc(ctx, userID)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = returnFunc(ctx, userID)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockAuthRepository_GetPasswordHash_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetPasswordHash'
+type MockAuthRepository_GetPasswordHash_Call struct {
+	*mock.Call
+}
+
+// GetPasswordHash is a helper method to define mock.On call
+//   - ctx context.Context
+//   - userID string
+func (_e *MockAuthRepository_Expecter) GetPasswordHash(ctx any, userID any) *MockAuthRepository_GetPasswordHash_Call {
+	return &MockAuthRepository_GetPasswordHash_Call{Call: _e.mock.On("GetPasswordHash", ctx, userID)}
+}
+
+func (_c *MockAuthRepository_GetPasswordHash_Call) Run(run func(ctx context.Context, userID string)) *MockAuthRepository_GetPasswordHash_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockAuthRepository_GetPasswordHash_Call) Return(s string, err error) *MockAuthRepository_GetPasswordHash_Call {
+	_c.Call.Return(s, err)
+	return _c
+}
+
+func (_c *MockAuthRepository_GetPasswordHash_Call) RunAndReturn(run func(ctx context.Context, userID string) (string, error)) *MockAuthRepository_GetPasswordHash_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetUser provides a mock function for the type MockAuthRepository
+func (_mock *MockAuthRepository) GetUser(ctx context.Context, id string) (*murphy.User, error) {
+	ret := _mock.Called(ctx, id)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetUser")
+	}
+
+	var r0 *murphy.User
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (*murphy.User, error)); ok {
+		return returnFunc(ctx, id)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) *murphy.User); ok {
+		r0 = returnFunc(ctx, id)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*murphy.User)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = returnFunc(ctx, id)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockAuthRepository_GetUser_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetUser'
+type MockAuthRepository_GetUser_Call struct {
+	*mock.Call
+}
+
+// GetUser is a helper method to define mock.On call
+//   - ctx context.Context
+//   - id string
+func (_e *MockAuthRepository_Expecter) GetUser(ctx any, id any) *MockAuthRepository_GetUser_Call {
+	return &MockAuthRepository_GetUser_Call{Call: _e.mock.On("GetUser", ctx, id)}
+}
+
+func (_c *MockAuthRepository_GetUser_Call) Run(run func(ctx context.Context, id string)) *MockAuthRepository_GetUser_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockAuthRepository_GetUser_Call) Return(user *murphy.User, err error) *MockAuthRepository_GetUser_Call {
+	_c.Call.Return(user, err)
+	return _c
+}
+
+func (_c *MockAuthRepository_GetUser_Call) RunAndReturn(run func(ctx context.Context, id string) (*murphy.User, error)) *MockAuthRepository_GetUser_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1114,6 +1305,75 @@ func (_c *MockAuthRepository_RevokeSessionOfUser_Call) RunAndReturn(run func(ctx
 	return _c
 }
 
+// SetPassword provides a mock function for the type MockAuthRepository
+func (_mock *MockAuthRepository) SetPassword(ctx context.Context, userID string, hash string, at time.Time) error {
+	ret := _mock.Called(ctx, userID, hash, at)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetPassword")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, time.Time) error); ok {
+		r0 = returnFunc(ctx, userID, hash, at)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockAuthRepository_SetPassword_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SetPassword'
+type MockAuthRepository_SetPassword_Call struct {
+	*mock.Call
+}
+
+// SetPassword is a helper method to define mock.On call
+//   - ctx context.Context
+//   - userID string
+//   - hash string
+//   - at time.Time
+func (_e *MockAuthRepository_Expecter) SetPassword(ctx any, userID any, hash any, at any) *MockAuthRepository_SetPassword_Call {
+	return &MockAuthRepository_SetPassword_Call{Call: _e.mock.On("SetPassword", ctx, userID, hash, at)}
+}
+
+func (_c *MockAuthRepository_SetPassword_Call) Run(run func(ctx context.Context, userID string, hash string, at time.Time)) *MockAuthRepository_SetPassword_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 time.Time
+		if args[3] != nil {
+			arg3 = args[3].(time.Time)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *MockAuthRepository_SetPassword_Call) Return(err error) *MockAuthRepository_SetPassword_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockAuthRepository_SetPassword_Call) RunAndReturn(run func(ctx context.Context, userID string, hash string, at time.Time) error) *MockAuthRepository_SetPassword_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // StartSignIn provides a mock function for the type MockAuthRepository
 func (_mock *MockAuthRepository) StartSignIn(ctx context.Context, signIn *murphy.SignIn, now time.Time) error {
 	ret := _mock.Called(ctx, signIn, now)
@@ -1321,6 +1581,237 @@ func (_c *MockAuthRepository_TakeSignIn_Call) Return(signIn *murphy.SignIn, err 
 }
 
 func (_c *MockAuthRepository_TakeSignIn_Call) RunAndReturn(run func(ctx context.Context, stateHash []byte, now time.Time) (*murphy.SignIn, error)) *MockAuthRepository_TakeSignIn_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// NewMockLimiter creates a new instance of MockLimiter. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
+// The first argument is typically a *testing.T value.
+func NewMockLimiter(t interface {
+	mock.TestingT
+	Cleanup(func())
+}) *MockLimiter {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
+	mock := &MockLimiter{}
+	mock.Mock.Test(t)
+
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
+
+	return mock
+}
+
+// MockLimiter is an autogenerated mock type for the Limiter type
+type MockLimiter struct {
+	mock.Mock
+}
+
+type MockLimiter_Expecter struct {
+	mock *mock.Mock
+}
+
+func (_m *MockLimiter) EXPECT() *MockLimiter_Expecter {
+	return &MockLimiter_Expecter{mock: &_m.Mock}
+}
+
+// Count provides a mock function for the type MockLimiter
+func (_mock *MockLimiter) Count(ctx context.Context, key string) (int64, error) {
+	ret := _mock.Called(ctx, key)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Count")
+	}
+
+	var r0 int64
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (int64, error)); ok {
+		return returnFunc(ctx, key)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) int64); ok {
+		r0 = returnFunc(ctx, key)
+	} else {
+		r0 = ret.Get(0).(int64)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = returnFunc(ctx, key)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockLimiter_Count_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Count'
+type MockLimiter_Count_Call struct {
+	*mock.Call
+}
+
+// Count is a helper method to define mock.On call
+//   - ctx context.Context
+//   - key string
+func (_e *MockLimiter_Expecter) Count(ctx any, key any) *MockLimiter_Count_Call {
+	return &MockLimiter_Count_Call{Call: _e.mock.On("Count", ctx, key)}
+}
+
+func (_c *MockLimiter_Count_Call) Run(run func(ctx context.Context, key string)) *MockLimiter_Count_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockLimiter_Count_Call) Return(n int64, err error) *MockLimiter_Count_Call {
+	_c.Call.Return(n, err)
+	return _c
+}
+
+func (_c *MockLimiter_Count_Call) RunAndReturn(run func(ctx context.Context, key string) (int64, error)) *MockLimiter_Count_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// Hit provides a mock function for the type MockLimiter
+func (_mock *MockLimiter) Hit(ctx context.Context, key string, window time.Duration) (int64, error) {
+	ret := _mock.Called(ctx, key, window)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Hit")
+	}
+
+	var r0 int64
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, time.Duration) (int64, error)); ok {
+		return returnFunc(ctx, key, window)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, time.Duration) int64); ok {
+		r0 = returnFunc(ctx, key, window)
+	} else {
+		r0 = ret.Get(0).(int64)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, time.Duration) error); ok {
+		r1 = returnFunc(ctx, key, window)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockLimiter_Hit_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Hit'
+type MockLimiter_Hit_Call struct {
+	*mock.Call
+}
+
+// Hit is a helper method to define mock.On call
+//   - ctx context.Context
+//   - key string
+//   - window time.Duration
+func (_e *MockLimiter_Expecter) Hit(ctx any, key any, window any) *MockLimiter_Hit_Call {
+	return &MockLimiter_Hit_Call{Call: _e.mock.On("Hit", ctx, key, window)}
+}
+
+func (_c *MockLimiter_Hit_Call) Run(run func(ctx context.Context, key string, window time.Duration)) *MockLimiter_Hit_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 time.Duration
+		if args[2] != nil {
+			arg2 = args[2].(time.Duration)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockLimiter_Hit_Call) Return(n int64, err error) *MockLimiter_Hit_Call {
+	_c.Call.Return(n, err)
+	return _c
+}
+
+func (_c *MockLimiter_Hit_Call) RunAndReturn(run func(ctx context.Context, key string, window time.Duration) (int64, error)) *MockLimiter_Hit_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// Reset provides a mock function for the type MockLimiter
+func (_mock *MockLimiter) Reset(ctx context.Context, key string) error {
+	ret := _mock.Called(ctx, key)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Reset")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) error); ok {
+		r0 = returnFunc(ctx, key)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockLimiter_Reset_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Reset'
+type MockLimiter_Reset_Call struct {
+	*mock.Call
+}
+
+// Reset is a helper method to define mock.On call
+//   - ctx context.Context
+//   - key string
+func (_e *MockLimiter_Expecter) Reset(ctx any, key any) *MockLimiter_Reset_Call {
+	return &MockLimiter_Reset_Call{Call: _e.mock.On("Reset", ctx, key)}
+}
+
+func (_c *MockLimiter_Reset_Call) Run(run func(ctx context.Context, key string)) *MockLimiter_Reset_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockLimiter_Reset_Call) Return(err error) *MockLimiter_Reset_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockLimiter_Reset_Call) RunAndReturn(run func(ctx context.Context, key string) error) *MockLimiter_Reset_Call {
 	_c.Call.Return(run)
 	return _c
 }

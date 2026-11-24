@@ -23,15 +23,20 @@ import (
 )
 
 const (
-	signInDuration     = 10 * time.Minute
-	appSignInDuration  = 2 * time.Minute
-	connectDuration    = 45 * time.Second
-	sessionPrefix      = "mss_"
-	appSignInPrefix    = "mas_"
-	connectCodePrefix  = "mcc_"
-	appSignedInPath    = "://signed-in"
-	appConnectPath     = "://connect"
-	codeChallengeChars = 43
+	signInDuration       = 10 * time.Minute
+	appSignInDuration    = 2 * time.Minute
+	connectDuration      = 45 * time.Second
+	sessionPrefix        = "mss_"
+	appSignInPrefix      = "mas_"
+	connectCodePrefix    = "mcc_"
+	passwordLinkPrefix   = "mpl_"
+	passwordLinkDuration = 24 * time.Hour
+	failureWindow        = 15 * time.Minute
+	maxPersonFailures    = 5
+	maxAddressFailures   = 50
+	appSignedInPath      = "://signed-in"
+	appConnectPath       = "://connect"
+	codeChallengeChars   = 43
 )
 
 type Claims struct {
@@ -65,6 +70,16 @@ type AuthRepository interface {
 	ListActiveSessions(ctx context.Context, userID, before string, limit int, now time.Time) ([]*murphy.Session, error)
 	RevokeSessionOfUser(ctx context.Context, userID, id string, at time.Time) error
 	EndSessionsOfUser(ctx context.Context, userID string, at time.Time) error
+	SetPassword(ctx context.Context, userID, hash string, at time.Time) error
+	GetPasswordHash(ctx context.Context, userID string) (string, error)
+	GetUser(ctx context.Context, id string) (*murphy.User, error)
+	CreateUser(ctx context.Context, user *murphy.User) error
+}
+
+type Limiter interface {
+	Hit(ctx context.Context, key string, window time.Duration) (int64, error)
+	Count(ctx context.Context, key string) (int64, error)
+	Reset(ctx context.Context, key string) error
 }
 
 type AuthSettings struct {
@@ -74,21 +89,28 @@ type AuthSettings struct {
 	PublicURL           string
 	AppScheme           string
 	AllowedEmailDomains []string
+	PasswordsAllowed    bool
 }
 
 type Auth struct {
 	repo          AuthRepository
 	provider      Provider
+	limiter       Limiter
 	settings      AuthSettings
 	returnOrigins map[string]bool
 }
 
-func NewAuth(repo AuthRepository, provider Provider, settings AuthSettings) *Auth {
+var (
+	errNoProvider = &murphy.ForbiddenError{Reason: "this install has no identity provider; sign in with a password"}
+	errNoPassword = &murphy.ForbiddenError{Reason: "this install signs in through its identity provider, not with passwords"}
+)
+
+func NewAuth(repo AuthRepository, provider Provider, limiter Limiter, settings AuthSettings) *Auth {
 	origins := make(map[string]bool, len(settings.ReturnOrigins))
 	for _, origin := range settings.ReturnOrigins {
 		origins[strings.ToLower(strings.TrimSuffix(origin, "/"))] = true
 	}
-	return &Auth{repo: repo, provider: provider, settings: settings, returnOrigins: origins}
+	return &Auth{repo: repo, provider: provider, limiter: limiter, settings: settings, returnOrigins: origins}
 }
 
 type StartedSignIn struct {
@@ -112,6 +134,9 @@ func (a *Auth) StartSignIn(ctx context.Context, returnTo, codeChallenge string) 
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
+	if a.provider == nil {
+		return nil, errNoProvider
+	}
 	if err := a.checkReturnTo(returnTo, codeChallenge); err != nil {
 		return nil, err
 	}
@@ -142,6 +167,9 @@ func (a *Auth) FinishSignIn(ctx context.Context, state, browserState, code strin
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
+	if a.provider == nil {
+		return nil, errNoProvider
+	}
 	if subtle.ConstantTimeCompare([]byte(state), []byte(browserState)) != 1 {
 		return nil, fmt.Errorf("%w: the sign-in was started in another browser", murphy.ErrUnauthenticated)
 	}
@@ -179,6 +207,9 @@ func (a *Auth) SignInWithIDToken(ctx context.Context, idToken string) (_ *Signed
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
+	if a.provider == nil {
+		return nil, errNoProvider
+	}
 	claims, err := a.provider.Verify(ctx, idToken)
 	if err != nil {
 		return nil, err
@@ -202,6 +233,9 @@ func (a *Auth) SignInWithCode(ctx context.Context, code, codeVerifier string) (_
 	}
 	if err != nil {
 		return nil, fmt.Errorf("take one-time code: %w", err)
+	}
+	if taken.GetPurpose() == murphy.OneTimeCodePurpose_ONE_TIME_CODE_PURPOSE_SET_PASSWORD {
+		return nil, fmt.Errorf("%w: a set-password link doesn't sign anyone in", murphy.ErrUnauthenticated)
 	}
 	if taken.GetCodeChallenge() != "" && subtle.ConstantTimeCompare([]byte(challengeOf(codeVerifier)), []byte(taken.GetCodeChallenge())) != 1 {
 		return nil, fmt.Errorf("%w: the code verifier doesn't match the sign-in", murphy.ErrUnauthenticated)
@@ -456,4 +490,171 @@ func secret() string {
 func hash(value string) []byte {
 	sum := sha256.Sum256([]byte(value))
 	return sum[:]
+}
+
+type PasswordLink struct {
+	Link      string
+	ExpiresAt time.Time
+}
+
+func (a *Auth) SignInWithPassword(ctx context.Context, email, password, address string) (_ *SignedIn, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	if !a.settings.PasswordsAllowed {
+		return nil, errNoPassword
+	}
+	person, place := "sign-in:person:"+strings.ToLower(email), "sign-in:address:"+address
+	if err := a.withinLimits(ctx, person, place); err != nil {
+		return nil, err
+	}
+	user, stored, err := a.passwordOf(ctx, email)
+	if err != nil {
+		return nil, err
+	}
+	if !passwordMatches(password, stored) || user == nil {
+		if _, err := a.limiter.Hit(ctx, person, failureWindow); err != nil {
+			return nil, fmt.Errorf("count a failed sign-in: %w", err)
+		}
+		if _, err := a.limiter.Hit(ctx, place, failureWindow); err != nil {
+			return nil, fmt.Errorf("count a failed sign-in: %w", err)
+		}
+		return nil, fmt.Errorf("%w: wrong email or password", murphy.ErrUnauthenticated)
+	}
+	if err := a.limiter.Reset(ctx, person); err != nil {
+		return nil, fmt.Errorf("forget failed sign-ins: %w", err)
+	}
+	ctx = span.Set(ctx, telemetry.WithField("user.id", user.GetId()))
+	return a.startSession(ctx, user.GetId(), murphy.SessionClient_SESSION_CLIENT_TOKEN, time.Now().UTC())
+}
+
+func (a *Auth) withinLimits(ctx context.Context, person, place string) error {
+	personFailures, err := a.limiter.Count(ctx, person)
+	if err != nil {
+		return fmt.Errorf("count failed sign-ins: %w", err)
+	}
+	placeFailures, err := a.limiter.Count(ctx, place)
+	if err != nil {
+		return fmt.Errorf("count failed sign-ins: %w", err)
+	}
+	if personFailures >= maxPersonFailures || placeFailures >= maxAddressFailures {
+		return murphy.ErrTooManyAttempts
+	}
+	return nil
+}
+
+func (a *Auth) passwordOf(ctx context.Context, email string) (*murphy.User, string, error) {
+	user, err := a.repo.GetUserByEmail(ctx, email)
+	if errors.Is(err, murphy.ErrNotFound) {
+		return nil, unusable, nil
+	}
+	if err != nil {
+		return nil, "", fmt.Errorf("find user by email: %w", err)
+	}
+	stored, err := a.repo.GetPasswordHash(ctx, user.GetId())
+	if errors.Is(err, murphy.ErrNotFound) {
+		return nil, unusable, nil
+	}
+	if err != nil {
+		return nil, "", fmt.Errorf("get password: %w", err)
+	}
+	if user.GetStatus() != murphy.UserStatus_USER_STATUS_ACTIVE {
+		return nil, stored, nil
+	}
+	return user, stored, nil
+}
+
+func (a *Auth) CreatePasswordLink(ctx context.Context, userID string) (_ *PasswordLink, err error) {
+	ctx, span := tracer.Span(ctx)
+	ctx = span.Set(ctx, telemetry.WithField("user.id", userID))
+	defer span.End(&err)
+
+	if !a.settings.PasswordsAllowed {
+		return nil, errNoPassword
+	}
+	if err := murphy.LookupID("user", userID); err != nil {
+		return nil, err
+	}
+	if _, err := a.repo.GetUser(ctx, userID); err != nil {
+		return nil, err
+	}
+	return a.passwordLink(ctx, userID, time.Now().UTC())
+}
+
+func (a *Auth) passwordLink(ctx context.Context, userID string, now time.Time) (*PasswordLink, error) {
+	expiresAt := now.Add(passwordLinkDuration)
+	code, err := a.createCode(ctx, passwordLinkPrefix, murphy.OneTimeCodePurpose_ONE_TIME_CODE_PURPOSE_SET_PASSWORD, userID, "", expiresAt, now)
+	if err != nil {
+		return nil, err
+	}
+	// The web UI will show this screen. Until it exists, nothing answers at this address, and the code works only through POST /v1/auth/password.
+	return &PasswordLink{Link: a.settings.PublicURL + "/set-password?" + url.Values{"code": {code}}.Encode(), ExpiresAt: expiresAt}, nil
+}
+
+func (a *Auth) SetPassword(ctx context.Context, code, password string) (err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	if !a.settings.PasswordsAllowed {
+		return errNoPassword
+	}
+	if err := checkPassword(password); err != nil {
+		return err
+	}
+	now := time.Now().UTC()
+	taken, err := a.repo.TakeOneTimeCode(ctx, hash(code), now)
+	if errors.Is(err, murphy.ErrNotFound) || (err == nil && taken.GetPurpose() != murphy.OneTimeCodePurpose_ONE_TIME_CODE_PURPOSE_SET_PASSWORD) {
+		return fmt.Errorf("%w: the link expired or was already used", murphy.ErrUnauthenticated)
+	}
+	if err != nil {
+		return fmt.Errorf("take one-time code: %w", err)
+	}
+	ctx = span.Set(ctx, telemetry.WithField("user.id", taken.GetUserId()))
+	hashed, err := hashPassword(password)
+	if err != nil {
+		return err
+	}
+	if err := a.repo.SetPassword(ctx, taken.GetUserId(), hashed, now); err != nil {
+		return fmt.Errorf("set password: %w", err)
+	}
+	if err := a.repo.EndSessionsOfUser(ctx, taken.GetUserId(), now); err != nil {
+		return fmt.Errorf("end the person's other sessions: %w", err)
+	}
+	return nil
+}
+
+func (a *Auth) RecoveryLink(ctx context.Context) (_ *PasswordLink, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	if !a.settings.PasswordsAllowed {
+		return nil, errNoPassword
+	}
+	if a.settings.InitialAdminEmail == "" {
+		return nil, &murphy.FieldError{Field: "MURPHY_INITIAL_ADMIN_EMAIL", Reason: "must name the admin to recover"}
+	}
+	now := time.Now().UTC()
+	user, err := a.repo.GetUserByEmail(ctx, a.settings.InitialAdminEmail)
+	if errors.Is(err, murphy.ErrNotFound) {
+		user = &murphy.User{
+			Id: murphy.NewID(), Name: a.settings.InitialAdminEmail, Email: a.settings.InitialAdminEmail, TimeZone: "UTC",
+			Status: murphy.UserStatus_USER_STATUS_ACTIVE, Role: murphy.UserRole_USER_ROLE_MEMBER,
+			CreatedAt: timestamppb.New(now), UpdatedAt: timestamppb.New(now),
+		}
+		err = a.repo.CreateUser(ctx, user)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("find or create the initial admin: %w", err)
+	}
+	if _, err := a.repo.ClaimFirstAdmin(ctx, user.GetId(), now); err != nil {
+		return nil, fmt.Errorf("claim the first admin: %w", err)
+	}
+	current, err := a.repo.GetUser(ctx, user.GetId())
+	if err != nil {
+		return nil, fmt.Errorf("get the initial admin: %w", err)
+	}
+	if current.GetRole() != murphy.UserRole_USER_ROLE_ADMIN {
+		return nil, &murphy.ForbiddenError{Reason: "the initial admin's email belongs to someone who isn't an admin"}
+	}
+	return a.passwordLink(ctx, user.GetId(), now)
 }

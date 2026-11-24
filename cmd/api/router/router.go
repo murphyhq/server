@@ -4,6 +4,7 @@ import (
 	"crypto/ed25519"
 	"fmt"
 	"net/http"
+	"net/netip"
 	"time"
 
 	"github.com/murphyhq/server/internal/httpserver"
@@ -27,14 +28,15 @@ type Server struct {
 }
 
 type Services struct {
-	Catalog       *catalog.Service
-	Incidents     *incidents.Service
-	People        *people.Service
-	OnCall        *oncall.Service
-	Escalation    *escalation.Service
-	PublicKeys    []ed25519.PublicKey
-	Auth          *people.Auth
-	SecureCookies bool
+	Catalog        *catalog.Service
+	Incidents      *incidents.Service
+	People         *people.Service
+	OnCall         *oncall.Service
+	Escalation     *escalation.Service
+	PublicKeys     []ed25519.PublicKey
+	Auth           *people.Auth
+	SecureCookies  bool
+	TrustedProxies []netip.Prefix
 }
 
 func New(services Services, keys idempotency.Store) (http.Handler, error) {
@@ -56,6 +58,7 @@ func New(services Services, keys idempotency.Store) (http.Handler, error) {
 			httpserver.RejectUnknownParameters(spec),
 			requireAccess(rules),
 			RequireSession(services.Auth),
+			httpserver.WithClientAddress(services.TrustedProxies),
 		},
 		ErrorHandlerFunc: httpserver.BadRequest,
 	}), nil

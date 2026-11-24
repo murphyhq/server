@@ -399,3 +399,32 @@ func TestAPersonsTeamsAreListedWithTheirRoles(t *testing.T) {
 	assert.Equal(t, cy.Reference(), got.JSON200.Items[0].User)
 	assert.Equal(t, client.Responder, got.JSON200.Items[0].Role)
 }
+
+func TestALinkFromAnAdminLetsSomeoneSetAPasswordOnceAndSignInWithIt(t *testing.T) {
+	m := murphytest.New(t)
+	cy := m.User()
+	link := m.PasswordLinkFor(cy)
+
+	set := m.SetPasswordThrough(link, "a long and good password")
+	again := m.SetPasswordThrough(link, "another long password")
+	signedIn := m.SignInWithPassword(cy.Email, "a long and good password")
+
+	assert.Equal(t, http.StatusNoContent, set)
+	assert.Equal(t, http.StatusUnauthorized, again, "a link works once")
+	assert.Equal(t, http.StatusCreated, signedIn)
+}
+
+func TestRepeatedWrongPasswordsSlowDown(t *testing.T) {
+	m := murphytest.New(t)
+	cy := m.User()
+	m.SetPasswordThrough(m.PasswordLinkFor(cy), "a long and good password")
+	wrong := make([]int, 5)
+	for i := range wrong {
+		wrong[i] = m.SignInWithPassword(cy.Email, "a wrong password, again")
+	}
+
+	refused := m.SignInWithPassword(cy.Email, "a long and good password")
+
+	assert.Equal(t, []int{http.StatusUnauthorized, http.StatusUnauthorized, http.StatusUnauthorized, http.StatusUnauthorized, http.StatusUnauthorized}, wrong)
+	assert.Equal(t, http.StatusTooManyRequests, refused, "even the right password waits")
+}

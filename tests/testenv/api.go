@@ -47,6 +47,8 @@ func APIWith(t *testing.T, databases migrateapp.Settings) string {
 		OIDCClientSecret:      "murphy-local-secret",
 		SessionDuration:       time.Hour,
 		InitialAdminEmail:     "ana@murphy.test",
+		AllowPasswords:        true,
+		RateLimitStoreURL:     RedisURL(),
 	})
 	require.NoError(t, err)
 	t.Cleanup(a.Close)

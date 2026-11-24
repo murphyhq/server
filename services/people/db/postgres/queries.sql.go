@@ -495,6 +495,19 @@ func (q *Queries) GetOneTimeCode(ctx context.Context, codeHash []byte) (OneTimeC
 	return i, err
 }
 
+const getPasswordHash = `-- name: GetPasswordHash :one
+SELECT hash
+FROM passwords
+WHERE user_id = $1
+`
+
+func (q *Queries) GetPasswordHash(ctx context.Context, userID string) (string, error) {
+	row := q.db.QueryRow(ctx, getPasswordHash, userID)
+	var hash string
+	err := row.Scan(&hash)
+	return hash, err
+}
+
 const getSignIn = `-- name: GetSignIn :one
 SELECT id, state_hash, nonce, verifier, return_to, code_challenge, expires_at, used_at, created_at, updated_at
 FROM sign_ins
@@ -942,6 +955,29 @@ func (q *Queries) SetMembership(ctx context.Context, arg SetMembershipParams) er
 		arg.Role,
 		arg.CreatedAt,
 		arg.UpdatedAt,
+	)
+	return err
+}
+
+const setPassword = `-- name: SetPassword :exec
+INSERT INTO passwords (id, user_id, hash, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $4)
+ON CONFLICT (user_id) DO UPDATE SET hash = EXCLUDED.hash, updated_at = EXCLUDED.updated_at
+`
+
+type SetPasswordParams struct {
+	ID     string
+	UserID string
+	Hash   string
+	At     time.Time
+}
+
+func (q *Queries) SetPassword(ctx context.Context, arg SetPasswordParams) error {
+	_, err := q.db.Exec(ctx, setPassword,
+		arg.ID,
+		arg.UserID,
+		arg.Hash,
+		arg.At,
 	)
 	return err
 }

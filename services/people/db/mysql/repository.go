@@ -545,3 +545,21 @@ func toSession(row Session) *murphy.Session {
 		CreatedAt: timestamppb.New(row.CreatedAt), UpdatedAt: timestamppb.New(row.UpdatedAt),
 	}
 }
+
+func (r *Repository) SetPassword(ctx context.Context, userID, hash string, at time.Time) (err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	return murphymysql.Error("password", r.queries.SetPassword(ctx, SetPasswordParams{ID: murphy.NewID(), UserID: userID, Hash: hash, CreatedAt: at, UpdatedAt: at}))
+}
+
+func (r *Repository) GetPasswordHash(ctx context.Context, userID string) (_ string, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	hash, err := r.queries.GetPasswordHash(ctx, userID)
+	if err != nil {
+		return "", murphymysql.Error("password", err)
+	}
+	return hash, nil
+}

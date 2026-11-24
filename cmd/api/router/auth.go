@@ -132,13 +132,21 @@ func (s *Server) CreateSession(ctx context.Context, request CreateSessionRequest
 }
 
 func (s *Server) signInWith(ctx context.Context, body *CreateSessionJSONRequestBody) (*people.SignedIn, error) {
+	ways := 0
+	for _, sent := range []bool{body.IdToken != nil, body.Code != nil, body.Email != nil || body.Password != nil} {
+		if sent {
+			ways++
+		}
+	}
 	switch {
-	case body.IdToken != nil && body.Code == nil:
+	case ways != 1:
+		return nil, &murphy.FieldError{Field: "id_token", Reason: "code, or email and password must be sent, and only one of them"}
+	case body.IdToken != nil:
 		return s.auth.SignInWithIDToken(ctx, *body.IdToken)
-	case body.Code != nil && body.IdToken == nil:
+	case body.Code != nil:
 		return s.auth.SignInWithCode(ctx, *body.Code, *murphy.Or(body.CodeVerifier, new(string)))
 	default:
-		return nil, &murphy.FieldError{Field: "id_token", Reason: "or code must be sent, and not both"}
+		return s.auth.SignInWithPassword(ctx, *murphy.Or(body.Email, new(string)), *murphy.Or(body.Password, new(string)), httpserver.ClientAddress(ctx))
 	}
 }
 
@@ -243,4 +251,25 @@ func (s *Server) cookie(token string, expires time.Time) string {
 		HttpOnly: true, Secure: s.secureCookies, SameSite: http.SameSiteLaxMode,
 	}
 	return cookie.String()
+}
+
+func (s *Server) CreatePasswordLink(ctx context.Context, request CreatePasswordLinkRequestObject) (_ CreatePasswordLinkResponseObject, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	link, err := s.auth.CreatePasswordLink(ctx, request.Id)
+	if err != nil {
+		return nil, err
+	}
+	return CreatePasswordLink201JSONResponse{Link: link.Link, ExpiresAt: link.ExpiresAt}, nil
+}
+
+func (s *Server) SetPassword(ctx context.Context, request SetPasswordRequestObject) (_ SetPasswordResponseObject, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	if err := s.auth.SetPassword(ctx, request.Body.Code, request.Body.Password); err != nil {
+		return nil, err
+	}
+	return SetPassword204Response{}, nil
 }

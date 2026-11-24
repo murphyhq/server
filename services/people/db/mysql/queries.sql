@@ -214,3 +214,13 @@ SELECT id, team_id, user_id, role, created_at, updated_at
 FROM team_memberships
 WHERE user_id = sqlc.arg(user_id)
 ORDER BY team_id;
+
+-- name: SetPassword :exec
+INSERT INTO passwords (id, user_id, hash, created_at, updated_at)
+VALUES (sqlc.arg(id), sqlc.arg(user_id), sqlc.arg(hash), sqlc.arg(created_at), sqlc.arg(updated_at))
+ON DUPLICATE KEY UPDATE hash = VALUES(hash), updated_at = VALUES(updated_at);
+
+-- name: GetPasswordHash :one
+SELECT hash
+FROM passwords
+WHERE user_id = sqlc.arg(user_id);

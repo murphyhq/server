@@ -347,3 +347,26 @@ func (m *Murphy) created(got response, err error, doing string) {
 	m.t.Helper()
 	m.expect(got, err, http.StatusCreated, doing)
 }
+
+func (m *Murphy) PasswordLinkFor(user *User) string {
+	m.t.Helper()
+	link, err := m.API.CreatePasswordLinkWithResponse(m.t.Context(), user.ID)
+	m.created(link, err, "create a set-password link")
+	return link.JSON201.Link
+}
+
+func (m *Murphy) SetPasswordThrough(link, password string) int {
+	m.t.Helper()
+	parsed, err := url.Parse(link)
+	require.NoError(m.t, err)
+	set, err := m.Anonymous().SetPasswordWithResponse(m.t.Context(), client.PasswordInput{Code: parsed.Query().Get("code"), Password: password})
+	require.NoError(m.t, err)
+	return set.StatusCode()
+}
+
+func (m *Murphy) SignInWithPassword(email, password string) int {
+	m.t.Helper()
+	signedIn, err := m.Anonymous().CreateSessionWithResponse(m.t.Context(), client.SessionInput{Email: &email, Password: &password})
+	require.NoError(m.t, err)
+	return signedIn.StatusCode()
+}

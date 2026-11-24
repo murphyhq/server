@@ -41,6 +41,14 @@ type OneTimeCode struct {
 	UpdatedAt     time.Time
 }
 
+type Password struct {
+	ID        string
+	UserID    string
+	Hash      string
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
 type Session struct {
 	ID        string
 	UserID    string

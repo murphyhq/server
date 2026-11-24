@@ -334,9 +334,10 @@ func (SessionClient) EnumDescriptor() ([]byte, []int) {
 type OneTimeCodePurpose int32
 
 const (
-	OneTimeCodePurpose_ONE_TIME_CODE_PURPOSE_UNSPECIFIED OneTimeCodePurpose = 0
-	OneTimeCodePurpose_ONE_TIME_CODE_PURPOSE_APP_SIGN_IN OneTimeCodePurpose = 1
-	OneTimeCodePurpose_ONE_TIME_CODE_PURPOSE_CONNECT     OneTimeCodePurpose = 2
+	OneTimeCodePurpose_ONE_TIME_CODE_PURPOSE_UNSPECIFIED  OneTimeCodePurpose = 0
+	OneTimeCodePurpose_ONE_TIME_CODE_PURPOSE_APP_SIGN_IN  OneTimeCodePurpose = 1
+	OneTimeCodePurpose_ONE_TIME_CODE_PURPOSE_CONNECT      OneTimeCodePurpose = 2
+	OneTimeCodePurpose_ONE_TIME_CODE_PURPOSE_SET_PASSWORD OneTimeCodePurpose = 3
 )
 
 // Enum value maps for OneTimeCodePurpose.
@@ -345,11 +346,13 @@ var (
 		0: "ONE_TIME_CODE_PURPOSE_UNSPECIFIED",
 		1: "ONE_TIME_CODE_PURPOSE_APP_SIGN_IN",
 		2: "ONE_TIME_CODE_PURPOSE_CONNECT",
+		3: "ONE_TIME_CODE_PURPOSE_SET_PASSWORD",
 	}
 	OneTimeCodePurpose_value = map[string]int32{
-		"ONE_TIME_CODE_PURPOSE_UNSPECIFIED": 0,
-		"ONE_TIME_CODE_PURPOSE_APP_SIGN_IN": 1,
-		"ONE_TIME_CODE_PURPOSE_CONNECT":     2,
+		"ONE_TIME_CODE_PURPOSE_UNSPECIFIED":  0,
+		"ONE_TIME_CODE_PURPOSE_APP_SIGN_IN":  1,
+		"ONE_TIME_CODE_PURPOSE_CONNECT":      2,
+		"ONE_TIME_CODE_PURPOSE_SET_PASSWORD": 3,
 	}
 )
 
@@ -1264,11 +1267,12 @@ const file_murphy_v1_people_proto_rawDesc = "" +
 	"\x1aSESSION_CLIENT_UNSPECIFIED\x10\x00\x12\x1a\n" +
 	"\x16SESSION_CLIENT_BROWSER\x10\x01\x12\x16\n" +
 	"\x12SESSION_CLIENT_APP\x10\x02\x12\x18\n" +
-	"\x14SESSION_CLIENT_TOKEN\x10\x03*\x85\x01\n" +
+	"\x14SESSION_CLIENT_TOKEN\x10\x03*\xad\x01\n" +
 	"\x12OneTimeCodePurpose\x12%\n" +
 	"!ONE_TIME_CODE_PURPOSE_UNSPECIFIED\x10\x00\x12%\n" +
 	"!ONE_TIME_CODE_PURPOSE_APP_SIGN_IN\x10\x01\x12!\n" +
-	"\x1dONE_TIME_CODE_PURPOSE_CONNECT\x10\x02B#Z!github.com/murphyhq/server;murphyb\x06proto3"
+	"\x1dONE_TIME_CODE_PURPOSE_CONNECT\x10\x02\x12&\n" +
+	"\"ONE_TIME_CODE_PURPOSE_SET_PASSWORD\x10\x03B#Z!github.com/murphyhq/server;murphyb\x06proto3"
 
 var (
 	file_murphy_v1_people_proto_rawDescOnce sync.Once

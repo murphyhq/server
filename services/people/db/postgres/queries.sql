@@ -215,3 +215,13 @@ SELECT id, team_id, user_id, role, created_at, updated_at
 FROM team_memberships
 WHERE user_id = @user_id
 ORDER BY team_id;
+
+-- name: SetPassword :exec
+INSERT INTO passwords (id, user_id, hash, created_at, updated_at)
+VALUES (@id, @user_id, @hash, @at, @at)
+ON CONFLICT (user_id) DO UPDATE SET hash = EXCLUDED.hash, updated_at = EXCLUDED.updated_at;
+
+-- name: GetPasswordHash :one
+SELECT hash
+FROM passwords
+WHERE user_id = @user_id;

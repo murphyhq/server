@@ -206,6 +206,22 @@ services:
         - action: restart
           path: ./services/escalation/db/mysql/migrations
 
+  recover:
+    image: golang:1.27.4
+    profiles: [tools]
+    working_dir: /src
+    volumes:
+      - .:/src
+      - go-mod:/go/pkg/mod
+      - go-build:/root/.cache/go-build
+    command: ["sh", "-c", "go build -o /tmp/recover ./cmd/recover && exec /tmp/recover"]
+    environment:
+      <<: *component-environment
+      MURPHY_PEOPLE_DATABASE_URL: postgres://murphy:murphy@postgres:5432/people?sslmode=disable
+      MURPHY_PUBLIC_URL: http://localhost:8080
+      MURPHY_INITIAL_ADMIN_EMAIL: ana@murphy.test
+      MURPHY_ALLOW_PASSWORDS: "true"
+
   seed:
     <<: *component
     command: ["sh", "-c", "go build -o /tmp/seed ./tests/seed && exec /tmp/seed"]
@@ -256,6 +272,8 @@ services:
       MURPHY_OIDC_CLIENT_ID: murphy
       MURPHY_OIDC_CLIENT_SECRET: murphy-local-secret
       MURPHY_INITIAL_ADMIN_EMAIL: ana@murphy.test
+      MURPHY_ALLOW_PASSWORDS: "true"
+      MURPHY_RATE_LIMIT_STORE_URL: redis://redis:6379/0
     ports:
       - "8080:8080"
     depends_on:
