@@ -98,4 +98,23 @@ message SignIn {
   google.protobuf.Timestamp created_at = 6;
   google.protobuf.Timestamp updated_at = 7;
   string return_to = 8;
+  string code_challenge = 9;
+}
+
+message OneTimeCode {
+  string id = 1;
+  bytes code_hash = 2;
+  string user_id = 3;
+  OneTimeCodePurpose purpose = 4;
+  string code_challenge = 5;
+  google.protobuf.Timestamp expires_at = 6;
+  google.protobuf.Timestamp used_at = 7;
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp updated_at = 9;
+}
+
+enum OneTimeCodePurpose {
+  ONE_TIME_CODE_PURPOSE_UNSPECIFIED = 0;
+  ONE_TIME_CODE_PURPOSE_APP_SIGN_IN = 1;
+  ONE_TIME_CODE_PURPOSE_CONNECT = 2;
 }

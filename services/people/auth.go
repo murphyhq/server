@@ -21,8 +21,15 @@ import (
 )
 
 const (
-	signInDuration = 10 * time.Minute
-	sessionPrefix  = "mss_"
+	signInDuration     = 10 * time.Minute
+	appSignInDuration  = 2 * time.Minute
+	connectDuration    = 5 * time.Minute
+	sessionPrefix      = "mss_"
+	appSignInPrefix    = "mas_"
+	connectCodePrefix  = "mcc_"
+	appSignedInPath    = "://signed-in"
+	appConnectPath     = "://connect"
+	codeChallengeChars = 43
 )
 
 type Claims struct {
@@ -51,12 +58,16 @@ type AuthRepository interface {
 	GetActiveSession(ctx context.Context, tokenHash []byte, now time.Time) (*murphy.Session, error)
 	RevokeSession(ctx context.Context, tokenHash []byte, at time.Time) error
 	ClaimFirstAdmin(ctx context.Context, userID string, now time.Time) (bool, error)
+	CreateOneTimeCode(ctx context.Context, code *murphy.OneTimeCode) error
+	TakeOneTimeCode(ctx context.Context, codeHash []byte, now time.Time) (*murphy.OneTimeCode, error)
 }
 
 type AuthSettings struct {
 	SessionDuration   time.Duration
 	InitialAdminEmail string
 	ReturnOrigins     []string
+	PublicURL         string
+	AppScheme         string
 }
 
 type Auth struct {
@@ -79,30 +90,37 @@ type StartedSignIn struct {
 	State string
 }
 
+type ConnectCode struct {
+	Code      string
+	Link      string
+	ExpiresAt time.Time
+}
+
 type SignedIn struct {
 	Token    string
 	Session  *murphy.Session
 	ReturnTo string
 }
 
-func (a *Auth) StartSignIn(ctx context.Context, returnTo string) (_ *StartedSignIn, err error) {
+func (a *Auth) StartSignIn(ctx context.Context, returnTo, codeChallenge string) (_ *StartedSignIn, err error) {
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
-	if err := a.checkReturnTo(returnTo); err != nil {
+	if err := a.checkReturnTo(returnTo, codeChallenge); err != nil {
 		return nil, err
 	}
 	state, nonce, verifier := secret(), secret(), secret()
 	now := time.Now().UTC()
 	signIn := &murphy.SignIn{
-		Id:        murphy.NewID(),
-		StateHash: hash(state),
-		Nonce:     nonce,
-		Verifier:  verifier,
-		ReturnTo:  returnTo,
-		ExpiresAt: timestamppb.New(now.Add(signInDuration)),
-		CreatedAt: timestamppb.New(now),
-		UpdatedAt: timestamppb.New(now),
+		Id:            murphy.NewID(),
+		StateHash:     hash(state),
+		Nonce:         nonce,
+		Verifier:      verifier,
+		ReturnTo:      returnTo,
+		CodeChallenge: codeChallenge,
+		ExpiresAt:     timestamppb.New(now.Add(signInDuration)),
+		CreatedAt:     timestamppb.New(now),
+		UpdatedAt:     timestamppb.New(now),
 	}
 	if err := a.repo.StartSignIn(ctx, signIn, now); err != nil {
 		return nil, fmt.Errorf("start sign-in: %w", err)
@@ -140,6 +158,9 @@ func (a *Auth) FinishSignIn(ctx context.Context, state, browserState, code strin
 	if err != nil {
 		return nil, err
 	}
+	if signIn.GetCodeChallenge() != "" {
+		return a.handToApp(ctx, signIn, userID, now)
+	}
 	signedIn, err := a.startSession(ctx, userID, now)
 	if err != nil {
 		return nil, err
@@ -162,6 +183,39 @@ func (a *Auth) SignInWithIDToken(ctx context.Context, idToken string) (_ *Signed
 		return nil, err
 	}
 	return a.startSession(ctx, userID, now)
+}
+
+func (a *Auth) SignInWithCode(ctx context.Context, code, codeVerifier string) (_ *SignedIn, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	now := time.Now().UTC()
+	taken, err := a.repo.TakeOneTimeCode(ctx, hash(code), now)
+	if errors.Is(err, murphy.ErrNotFound) {
+		return nil, fmt.Errorf("%w: the code expired or was already used", murphy.ErrUnauthenticated)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("take one-time code: %w", err)
+	}
+	if taken.GetCodeChallenge() != "" && subtle.ConstantTimeCompare([]byte(challengeOf(codeVerifier)), []byte(taken.GetCodeChallenge())) != 1 {
+		return nil, fmt.Errorf("%w: the code verifier doesn't match the sign-in", murphy.ErrUnauthenticated)
+	}
+	ctx = span.Set(ctx, telemetry.WithField("user.id", taken.GetUserId()))
+	return a.startSession(ctx, taken.GetUserId(), now)
+}
+
+func (a *Auth) CreateConnectCode(ctx context.Context, userID string) (_ *ConnectCode, err error) {
+	ctx, span := tracer.Span(ctx)
+	ctx = span.Set(ctx, telemetry.WithField("user.id", userID))
+	defer span.End(&err)
+
+	now := time.Now().UTC()
+	code, err := a.createCode(ctx, connectCodePrefix, murphy.OneTimeCodePurpose_ONE_TIME_CODE_PURPOSE_CONNECT, userID, "", now.Add(connectDuration), now)
+	if err != nil {
+		return nil, err
+	}
+	link := a.settings.AppScheme + appConnectPath + "?" + url.Values{"server": {a.settings.PublicURL}, "code": {code}}.Encode()
+	return &ConnectCode{Code: code, Link: link, ExpiresAt: now.Add(connectDuration)}, nil
 }
 
 func (a *Auth) Authenticate(ctx context.Context, token string) (_ *murphy.Session, err error) {
@@ -276,8 +330,42 @@ func (a *Auth) startSession(ctx context.Context, userID string, now time.Time) (
 	return &SignedIn{Token: token, Session: session}, nil
 }
 
-func (a *Auth) checkReturnTo(returnTo string) error {
-	if returnTo == "" {
+func (a *Auth) handToApp(ctx context.Context, signIn *murphy.SignIn, userID string, now time.Time) (*SignedIn, error) {
+	code, err := a.createCode(ctx, appSignInPrefix, murphy.OneTimeCodePurpose_ONE_TIME_CODE_PURPOSE_APP_SIGN_IN, userID, signIn.GetCodeChallenge(), now.Add(appSignInDuration), now)
+	if err != nil {
+		return nil, err
+	}
+	return &SignedIn{ReturnTo: signIn.GetReturnTo() + "?" + url.Values{"code": {code}}.Encode()}, nil
+}
+
+func (a *Auth) createCode(ctx context.Context, prefix string, purpose murphy.OneTimeCodePurpose, userID, codeChallenge string, expiresAt, now time.Time) (string, error) {
+	code := prefix + secret()
+	err := a.repo.CreateOneTimeCode(ctx, &murphy.OneTimeCode{
+		Id:            murphy.NewID(),
+		CodeHash:      hash(code),
+		UserId:        userID,
+		Purpose:       purpose,
+		CodeChallenge: codeChallenge,
+		ExpiresAt:     timestamppb.New(expiresAt),
+		CreatedAt:     timestamppb.New(now),
+		UpdatedAt:     timestamppb.New(now),
+	})
+	if err != nil {
+		return "", fmt.Errorf("create one-time code: %w", err)
+	}
+	return code, nil
+}
+
+func (a *Auth) checkReturnTo(returnTo, codeChallenge string) error {
+	toApp := a.settings.AppScheme != "" && returnTo == a.settings.AppScheme+appSignedInPath
+	switch {
+	case toApp && !validChallenge(codeChallenge):
+		return &murphy.FieldError{Field: "code_challenge", Reason: "must be an S256 PKCE challenge when signing in to the app"}
+	case toApp:
+		return nil
+	case codeChallenge != "":
+		return &murphy.FieldError{Field: "code_challenge", Reason: "is only for signing in to the app"}
+	case returnTo == "":
 		return nil
 	}
 	u, err := url.Parse(returnTo)
@@ -285,6 +373,16 @@ func (a *Auth) checkReturnTo(returnTo string) error {
 		return &murphy.FieldError{Field: "return_to", Reason: "must be on an origin this install allows"}
 	}
 	return nil
+}
+
+func validChallenge(challenge string) bool {
+	decoded, err := base64.RawURLEncoding.DecodeString(challenge)
+	return err == nil && len(challenge) == codeChallengeChars && len(decoded) == sha256.Size
+}
+
+func challengeOf(verifier string) string {
+	sum := sha256.Sum256([]byte(verifier))
+	return base64.RawURLEncoding.EncodeToString(sum[:])
 }
 
 func secret() string {

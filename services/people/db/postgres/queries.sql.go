@@ -99,6 +99,36 @@ func (q *Queries) CreateIdentity(ctx context.Context, arg CreateIdentityParams) 
 	return err
 }
 
+const createOneTimeCode = `-- name: CreateOneTimeCode :exec
+INSERT INTO one_time_codes (id, code_hash, user_id, purpose, code_challenge, expires_at, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+`
+
+type CreateOneTimeCodeParams struct {
+	ID            string
+	CodeHash      []byte
+	UserID        string
+	Purpose       string
+	CodeChallenge *string
+	ExpiresAt     time.Time
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+}
+
+func (q *Queries) CreateOneTimeCode(ctx context.Context, arg CreateOneTimeCodeParams) error {
+	_, err := q.db.Exec(ctx, createOneTimeCode,
+		arg.ID,
+		arg.CodeHash,
+		arg.UserID,
+		arg.Purpose,
+		arg.CodeChallenge,
+		arg.ExpiresAt,
+		arg.CreatedAt,
+		arg.UpdatedAt,
+	)
+	return err
+}
+
 const createSession = `-- name: CreateSession :exec
 INSERT INTO sessions (id, user_id, token_hash, expires_at, created_at, updated_at)
 VALUES ($1, $2, $3, $4, $5, $6)
@@ -126,19 +156,20 @@ func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) er
 }
 
 const createSignIn = `-- name: CreateSignIn :exec
-INSERT INTO sign_ins (id, state_hash, nonce, verifier, return_to, expires_at, created_at, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+INSERT INTO sign_ins (id, state_hash, nonce, verifier, return_to, code_challenge, expires_at, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 `
 
 type CreateSignInParams struct {
-	ID        string
-	StateHash []byte
-	Nonce     string
-	Verifier  string
-	ReturnTo  *string
-	ExpiresAt time.Time
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID            string
+	StateHash     []byte
+	Nonce         string
+	Verifier      string
+	ReturnTo      *string
+	CodeChallenge *string
+	ExpiresAt     time.Time
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
 }
 
 func (q *Queries) CreateSignIn(ctx context.Context, arg CreateSignInParams) error {
@@ -148,6 +179,7 @@ func (q *Queries) CreateSignIn(ctx context.Context, arg CreateSignInParams) erro
 		arg.Nonce,
 		arg.Verifier,
 		arg.ReturnTo,
+		arg.CodeChallenge,
 		arg.ExpiresAt,
 		arg.CreatedAt,
 		arg.UpdatedAt,
@@ -426,8 +458,31 @@ func (q *Queries) GetMembership(ctx context.Context, arg GetMembershipParams) (T
 	return i, err
 }
 
+const getOneTimeCode = `-- name: GetOneTimeCode :one
+SELECT id, code_hash, user_id, purpose, code_challenge, expires_at, used_at, created_at, updated_at
+FROM one_time_codes
+WHERE code_hash = $1
+`
+
+func (q *Queries) GetOneTimeCode(ctx context.Context, codeHash []byte) (OneTimeCode, error) {
+	row := q.db.QueryRow(ctx, getOneTimeCode, codeHash)
+	var i OneTimeCode
+	err := row.Scan(
+		&i.ID,
+		&i.CodeHash,
+		&i.UserID,
+		&i.Purpose,
+		&i.CodeChallenge,
+		&i.ExpiresAt,
+		&i.UsedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getSignIn = `-- name: GetSignIn :one
-SELECT id, state_hash, nonce, verifier, return_to, expires_at, used_at, created_at, updated_at
+SELECT id, state_hash, nonce, verifier, return_to, code_challenge, expires_at, used_at, created_at, updated_at
 FROM sign_ins
 WHERE state_hash = $1
 `
@@ -441,6 +496,7 @@ func (q *Queries) GetSignIn(ctx context.Context, stateHash []byte) (SignIn, erro
 		&i.Nonce,
 		&i.Verifier,
 		&i.ReturnTo,
+		&i.CodeChallenge,
 		&i.ExpiresAt,
 		&i.UsedAt,
 		&i.CreatedAt,
@@ -830,6 +886,32 @@ func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (int64, 
 		arg.Status,
 		arg.UpdatedAt,
 		arg.ID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const useOneTimeCode = `-- name: UseOneTimeCode :execrows
+UPDATE one_time_codes
+SET used_at = $1, updated_at = $2
+WHERE code_hash = $3 AND used_at IS NULL AND expires_at > $4
+`
+
+type UseOneTimeCodeParams struct {
+	UsedAt    *time.Time
+	UpdatedAt time.Time
+	CodeHash  []byte
+	Now       time.Time
+}
+
+func (q *Queries) UseOneTimeCode(ctx context.Context, arg UseOneTimeCodeParams) (int64, error) {
+	result, err := q.db.Exec(ctx, useOneTimeCode,
+		arg.UsedAt,
+		arg.UpdatedAt,
+		arg.CodeHash,
+		arg.Now,
 	)
 	if err != nil {
 		return 0, err

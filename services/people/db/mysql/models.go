@@ -26,6 +26,18 @@ type Identity struct {
 	UpdatedAt time.Time
 }
 
+type OneTimeCode struct {
+	ID            string
+	CodeHash      []byte
+	UserID        string
+	Purpose       string
+	CodeChallenge *string
+	ExpiresAt     time.Time
+	UsedAt        *time.Time
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+}
+
 type Session struct {
 	ID        string
 	UserID    string
@@ -37,15 +49,16 @@ type Session struct {
 }
 
 type SignIn struct {
-	ID        string
-	StateHash []byte
-	Nonce     string
-	Verifier  string
-	ReturnTo  *string
-	ExpiresAt time.Time
-	UsedAt    *time.Time
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID            string
+	StateHash     []byte
+	Nonce         string
+	Verifier      string
+	ReturnTo      *string
+	CodeChallenge *string
+	ExpiresAt     time.Time
+	UsedAt        *time.Time
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
 }
 
 type Team struct {

@@ -104,7 +104,7 @@ func SignIn(ctx context.Context, apiURL, identityProviderURL, email string) (str
 	if err != nil {
 		return "", err
 	}
-	got, err := api.CreateSessionWithResponse(ctx, client.CreateSessionJSONRequestBody{IdToken: idToken})
+	got, err := api.CreateSessionWithResponse(ctx, client.CreateSessionJSONRequestBody{IdToken: &idToken})
 	if err != nil {
 		return "", fmt.Errorf("create a session: %w", err)
 	}
@@ -206,6 +206,28 @@ func (m *Murphy) CallbackFor(email string) string {
 	callback, err := redirect.Location()
 	require.NoError(m.t, err, "the identity provider sends the browser back to api")
 	return callback.String()
+}
+
+func (m *Murphy) SignInToTheApp(email, codeChallenge string) string {
+	m.t.Helper()
+	browser := m.browser()
+	browser.CheckRedirect = func(request *http.Request, _ []*http.Request) error {
+		if request.URL.Scheme != "http" && request.URL.Scheme != "https" {
+			return http.ErrUseLastResponse
+		}
+		return nil
+	}
+	start := m.apiURL + "/v1/auth/sign-in?" + url.Values{"return_to": {"murphy://signed-in"}, "code_challenge": {codeChallenge}}.Encode()
+	redirect := m.loginThroughProvider(browser, start, email)
+	toApp, err := redirect.Location()
+	require.NoError(m.t, err, "api sends the browser back to the app")
+	require.Equal(m.t, "murphy://signed-in", toApp.Scheme+"://"+toApp.Host)
+	return toApp.Query().Get("code")
+}
+
+func (m *Murphy) SessionFromCode(code, codeVerifier string) (*client.CreateSessionResponse, error) {
+	m.t.Helper()
+	return m.Anonymous().CreateSessionWithResponse(m.t.Context(), client.CreateSessionJSONRequestBody{Code: &code, CodeVerifier: &codeVerifier})
 }
 
 func (m *Murphy) OpenInAnotherBrowser(url string) *http.Response {

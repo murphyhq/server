@@ -66,7 +66,7 @@ func (s *Server) SignIn(ctx context.Context, request SignInRequestObject) (_ Sig
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
-	started, err := s.auth.StartSignIn(ctx, *murphy.Or(request.Params.ReturnTo, new(string)))
+	started, err := s.auth.StartSignIn(ctx, *murphy.Or(request.Params.ReturnTo, new(string)), *murphy.Or(request.Params.CodeChallenge, new(string)))
 	if err != nil {
 		return nil, err
 	}
@@ -88,6 +88,9 @@ func (s *Server) FinishSignIn(ctx context.Context, request FinishSignInRequestOb
 	if err != nil {
 		return nil, err
 	}
+	if signedIn.Session == nil {
+		return FinishSignIn303Response{Headers: FinishSignIn303ResponseHeaders{Location: &signedIn.ReturnTo}}, nil
+	}
 	cookie := s.cookie(signedIn.Token, signedIn.Session.GetExpiresAt().AsTime())
 	if signedIn.ReturnTo != "" {
 		return FinishSignIn303Response{Headers: FinishSignIn303ResponseHeaders{Location: &signedIn.ReturnTo, SetCookie: &cookie}}, nil
@@ -103,7 +106,7 @@ func (s *Server) CreateSession(ctx context.Context, request CreateSessionRequest
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
-	signedIn, err := s.auth.SignInWithIDToken(ctx, request.Body.IdToken)
+	signedIn, err := s.signInWith(ctx, request.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -112,6 +115,28 @@ func (s *Server) CreateSession(ctx context.Context, request CreateSessionRequest
 		return nil, err
 	}
 	return CreateSession201JSONResponse{Token: signedIn.Token, Session: session}, nil
+}
+
+func (s *Server) signInWith(ctx context.Context, body *CreateSessionJSONRequestBody) (*people.SignedIn, error) {
+	switch {
+	case body.IdToken != nil && body.Code == nil:
+		return s.auth.SignInWithIDToken(ctx, *body.IdToken)
+	case body.Code != nil && body.IdToken == nil:
+		return s.auth.SignInWithCode(ctx, *body.Code, *murphy.Or(body.CodeVerifier, new(string)))
+	default:
+		return nil, &murphy.FieldError{Field: "id_token", Reason: "or code must be sent, and not both"}
+	}
+}
+
+func (s *Server) CreateConnectCode(ctx context.Context, _ CreateConnectCodeRequestObject) (_ CreateConnectCodeResponseObject, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	connect, err := s.auth.CreateConnectCode(ctx, sessionFrom(ctx).session.GetUserId())
+	if err != nil {
+		return nil, err
+	}
+	return CreateConnectCode201JSONResponse{Code: connect.Code, Link: connect.Link, ExpiresAt: connect.ExpiresAt}, nil
 }
 
 func (s *Server) GetSession(ctx context.Context, _ GetSessionRequestObject) (_ GetSessionResponseObject, err error) {
