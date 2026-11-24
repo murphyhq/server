@@ -61,6 +61,16 @@ func TestSigningInThroughTheBrowserSetsASessionCookie(t *testing.T) {
 	assert.Equal(t, murphytest.Bo, session.JSON200.User.Email)
 }
 
+func TestASignInOnlyFinishesInTheBrowserThatStartedIt(t *testing.T) {
+	m := murphytest.New(t)
+	callback := m.CallbackFor(murphytest.Bo)
+
+	got := m.OpenInAnotherBrowser(callback)
+
+	assert.Equal(t, http.StatusUnauthorized, got.StatusCode)
+	assert.Empty(t, got.Cookies(), "no session is handed to the other browser")
+}
+
 func TestTheInitialAdminIsAnAdminAndEveryoneElseAMember(t *testing.T) {
 	m := murphytest.New(t)
 

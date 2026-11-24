@@ -20,9 +20,12 @@ paths:
       security: []
       responses:
         "302":
-          description: Go to the identity provider.
+          description: Go to the identity provider. The `murphy_sign_in` cookie ties the sign-in to this browser.
           headers:
             Location:
+              schema:
+                type: string
+            Set-Cookie:
               schema:
                 type: string
   /v1/auth/callback:
@@ -47,6 +50,11 @@ paths:
             type: string
         - name: error_description
           in: query
+          schema:
+            type: string
+        - name: murphy_sign_in
+          in: cookie
+          description: Set when the sign-in started, so only the browser that started it can finish it.
           schema:
             type: string
       responses:

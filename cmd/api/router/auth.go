@@ -12,7 +12,10 @@ import (
 	"github.com/murphyhq/server/services/people"
 )
 
-const sessionCookie = "murphy_session"
+const (
+	sessionCookie = "murphy_session"
+	signInCookie  = "murphy_sign_in"
+)
 
 type sessionContext struct{}
 
@@ -63,21 +66,25 @@ func (s *Server) SignIn(ctx context.Context, _ SignInRequestObject) (_ SignInRes
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
-	location, err := s.auth.StartSignIn(ctx)
+	started, err := s.auth.StartSignIn(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return SignIn302Response{Headers: SignIn302ResponseHeaders{Location: &location}}, nil
+	cookie := (&http.Cookie{
+		Name: signInCookie, Value: started.State, Path: "/v1/auth/callback", MaxAge: 600,
+		HttpOnly: true, Secure: s.secureCookies, SameSite: http.SameSiteLaxMode,
+	}).String()
+	return SignIn302Response{Headers: SignIn302ResponseHeaders{Location: &started.URL, SetCookie: &cookie}}, nil
 }
 
 func (s *Server) FinishSignIn(ctx context.Context, request FinishSignInRequestObject) (_ FinishSignInResponseObject, err error) {
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
-	if request.Params.Error != nil || request.Params.Code == nil || request.Params.State == nil {
+	if request.Params.Error != nil || request.Params.Code == nil || request.Params.State == nil || request.Params.MurphySignIn == nil {
 		return nil, murphy.ErrUnauthenticated
 	}
-	signedIn, err := s.auth.FinishSignIn(ctx, *request.Params.State, *request.Params.Code)
+	signedIn, err := s.auth.FinishSignIn(ctx, *request.Params.State, *request.Params.MurphySignIn, *request.Params.Code)
 	if err != nil {
 		return nil, err
 	}

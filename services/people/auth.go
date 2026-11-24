@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -62,12 +63,17 @@ func NewAuth(repo AuthRepository, provider Provider, sessionDuration time.Durati
 	return &Auth{repo: repo, provider: provider, sessionDuration: sessionDuration, initialAdmin: initialAdmin}
 }
 
+type StartedSignIn struct {
+	URL   string
+	State string
+}
+
 type SignedIn struct {
 	Token   string
 	Session *murphy.Session
 }
 
-func (a *Auth) StartSignIn(ctx context.Context) (_ string, err error) {
+func (a *Auth) StartSignIn(ctx context.Context) (_ *StartedSignIn, err error) {
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
@@ -83,15 +89,22 @@ func (a *Auth) StartSignIn(ctx context.Context) (_ string, err error) {
 		UpdatedAt: timestamppb.New(now),
 	}
 	if err := a.repo.StartSignIn(ctx, signIn, now); err != nil {
-		return "", fmt.Errorf("start sign-in: %w", err)
+		return nil, fmt.Errorf("start sign-in: %w", err)
 	}
-	return a.provider.SignInURL(ctx, state, nonce, verifier)
+	url, err := a.provider.SignInURL(ctx, state, nonce, verifier)
+	if err != nil {
+		return nil, err
+	}
+	return &StartedSignIn{URL: url, State: state}, nil
 }
 
-func (a *Auth) FinishSignIn(ctx context.Context, state, code string) (_ *SignedIn, err error) {
+func (a *Auth) FinishSignIn(ctx context.Context, state, browserState, code string) (_ *SignedIn, err error) {
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
+	if subtle.ConstantTimeCompare([]byte(state), []byte(browserState)) != 1 {
+		return nil, fmt.Errorf("%w: the sign-in was started in another browser", murphy.ErrUnauthenticated)
+	}
 	now := time.Now().UTC()
 	signIn, err := a.repo.TakeSignIn(ctx, hash(state), now)
 	if errors.Is(err, murphy.ErrNotFound) {

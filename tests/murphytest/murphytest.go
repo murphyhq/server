@@ -176,9 +176,45 @@ func (m *Murphy) Anonymous() *client.ClientWithResponses {
 
 func (m *Murphy) SignInThroughBrowser(email string) (*client.ClientWithResponses, *http.Response) {
 	m.t.Helper()
+	browser := m.browser()
+	signedIn := m.loginThroughProvider(browser, email)
+	api, err := client.NewClientWithResponses(m.apiURL, client.WithHTTPClient(browser))
+	require.NoError(m.t, err)
+	return api, signedIn
+}
+
+func (m *Murphy) CallbackFor(email string) string {
+	m.t.Helper()
+	browser := m.browser()
+	browser.CheckRedirect = func(request *http.Request, _ []*http.Request) error {
+		if request.URL.Path == "/v1/auth/callback" {
+			return http.ErrUseLastResponse
+		}
+		return nil
+	}
+	redirect := m.loginThroughProvider(browser, email)
+	callback, err := redirect.Location()
+	require.NoError(m.t, err, "the identity provider sends the browser back to api")
+	return callback.String()
+}
+
+func (m *Murphy) OpenInAnotherBrowser(url string) *http.Response {
+	m.t.Helper()
+	response, err := m.browser().Get(url)
+	require.NoError(m.t, err)
+	require.NoError(m.t, response.Body.Close())
+	return response
+}
+
+func (m *Murphy) browser() *http.Client {
+	m.t.Helper()
 	jar, err := cookiejar.New(nil)
 	require.NoError(m.t, err)
-	browser := &http.Client{Jar: jar, Timeout: 10 * time.Second}
+	return &http.Client{Jar: jar, Timeout: 10 * time.Second}
+}
+
+func (m *Murphy) loginThroughProvider(browser *http.Client, email string) *http.Response {
+	m.t.Helper()
 	loginPage, err := browser.Get(m.apiURL + "/v1/auth/sign-in")
 	require.NoError(m.t, err, "open the sign-in page")
 	page, err := io.ReadAll(loginPage.Body)
@@ -191,9 +227,7 @@ func (m *Murphy) SignInThroughBrowser(email string) (*client.ClientWithResponses
 	signedIn, err := browser.PostForm(submit.String(), url.Values{"login": {email}, "password": {testPassword}})
 	require.NoError(m.t, err, "submit the login form")
 	_ = signedIn.Body.Close()
-	api, err := client.NewClientWithResponses(m.apiURL, client.WithHTTPClient(browser))
-	require.NoError(m.t, err)
-	return api, signedIn
+	return signedIn
 }
 
 var loginForm = regexp.MustCompile(`<form[^>]*action="([^"]+)"`)

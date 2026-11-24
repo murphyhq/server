@@ -823,6 +823,9 @@ type FinishSignInParams struct {
 	State            *string `form:"state,omitempty" json:"state,omitempty"`
 	Error            *string `form:"error,omitempty" json:"error,omitempty"`
 	ErrorDescription *string `form:"error_description,omitempty" json:"error_description,omitempty"`
+
+	// MurphySignIn Set when the sign-in started, so only the browser that started it can finish it.
+	MurphySignIn *string `form:"murphy_sign_in,omitempty" json:"murphy_sign_in,omitempty"`
 }
 
 // ListEscalationPoliciesParams defines parameters for ListEscalationPolicies.
@@ -2787,6 +2790,23 @@ func NewFinishSignInRequest(server string, params *FinishSignInParams) (*http.Re
 		return nil, err
 	}
 
+	if params != nil {
+
+		if params.MurphySignIn != nil {
+			var cookieParam0 string
+
+			cookieParam0, err = runtime.StyleParamWithOptions("simple", true, "murphy_sign_in", *params.MurphySignIn, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationCookie, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			cookie0 := &http.Cookie{
+				Name:  "murphy_sign_in",
+				Value: cookieParam0,
+			}
+			req.AddCookie(cookie0)
+		}
+	}
 	return req, nil
 }
 
@@ -6018,7 +6038,8 @@ func (r CreateSessionResponse) ContentType() string {
 
 // SignInResponse302Headers the declared response headers of an HTTP 302 response for SignIn
 type SignInResponse302Headers struct {
-	Location *string
+	Location  *string
+	SetCookie *string
 }
 
 type SignInResponse struct {
@@ -9711,6 +9732,13 @@ func ParseSignInResponse(rsp *http.Response) (*SignInResponse, error) {
 				return nil, err
 			}
 			headers.Location = &value
+		}
+		if values := rsp.Header.Values("Set-Cookie"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Set-Cookie", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.SetCookie = &value
 		}
 		response.Headers302 = &headers
 	}

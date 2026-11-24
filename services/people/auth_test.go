@@ -132,10 +132,11 @@ func (a *accounts) unlinked(email string) *murphy.User {
 func TestStartingASignInKeepsOnlyTheStateHash(t *testing.T) {
 	a := newAccounts(t)
 
-	_, err := a.auth.StartSignIn(t.Context())
+	started, err := a.auth.StartSignIn(t.Context())
 
 	require.NoError(t, err)
 	require.Len(t, a.signInURL, 3)
+	assert.Equal(t, a.signInURL[0], started.State, "the browser keeps the state the provider sends back")
 	assert.Equal(t, hashOf(a.signInURL[0]), a.started.GetStateHash())
 	assert.Equal(t, a.signInURL[1], a.started.GetNonce())
 	assert.Equal(t, a.signInURL[2], a.started.GetVerifier())
@@ -145,7 +146,7 @@ func TestStartingASignInKeepsOnlyTheStateHash(t *testing.T) {
 func TestSomeoneNewBecomesAMember(t *testing.T) {
 	a := newAccounts(t)
 
-	signedIn, err := a.auth.FinishSignIn(t.Context(), state, code)
+	signedIn, err := a.auth.FinishSignIn(t.Context(), state, state, code)
 
 	require.NoError(t, err)
 	require.Len(t, a.created, 1)
@@ -160,7 +161,7 @@ func TestAReturningPersonSignsInAsThemselves(t *testing.T) {
 	a := newAccounts(t)
 	bo := a.known("bo@example.com", "bo-at-the-provider")
 
-	signedIn, err := a.auth.FinishSignIn(t.Context(), state, code)
+	signedIn, err := a.auth.FinishSignIn(t.Context(), state, state, code)
 
 	require.NoError(t, err)
 	assert.Equal(t, bo.GetId(), signedIn.Session.GetUserId())
@@ -172,7 +173,7 @@ func TestAVerifiedEmailSignsInToTheUserWithThatEmail(t *testing.T) {
 	a := newAccounts(t)
 	bo := a.unlinked("bo@example.com")
 
-	signedIn, err := a.auth.FinishSignIn(t.Context(), state, code)
+	signedIn, err := a.auth.FinishSignIn(t.Context(), state, state, code)
 
 	require.NoError(t, err)
 	assert.Equal(t, bo.GetId(), signedIn.Session.GetUserId())
@@ -186,18 +187,27 @@ func TestAnUnverifiedEmailNeverSignsInToSomeoneElse(t *testing.T) {
 	bo := a.unlinked("bo@example.com")
 	a.claims.EmailVerified = false
 
-	signedIn, err := a.auth.FinishSignIn(t.Context(), state, code)
+	signedIn, err := a.auth.FinishSignIn(t.Context(), state, state, code)
 
 	require.NoError(t, err)
 	assert.NotEqual(t, bo.GetId(), signedIn.Session.GetUserId())
 	assert.Len(t, a.created, 1)
 }
 
+func TestASignInOnlyFinishesInTheBrowserThatStartedIt(t *testing.T) {
+	a := newAccounts(t)
+
+	_, err := a.auth.FinishSignIn(t.Context(), state, "state-of-the-victims-own-sign-in", code)
+
+	require.ErrorIs(t, err, murphy.ErrUnauthenticated)
+	assert.Nil(t, a.session)
+}
+
 func TestTheProvidersAnswerMustBelongToTheSignIn(t *testing.T) {
 	a := newAccounts(t)
 	a.claims.Nonce = "nonce-of-another-sign-in"
 
-	_, err := a.auth.FinishSignIn(t.Context(), state, code)
+	_, err := a.auth.FinishSignIn(t.Context(), state, state, code)
 
 	require.ErrorIs(t, err, murphy.ErrUnauthenticated)
 	assert.Nil(t, a.session)
@@ -206,7 +216,7 @@ func TestTheProvidersAnswerMustBelongToTheSignIn(t *testing.T) {
 func TestAnExpiredOrUsedSignInIsRefused(t *testing.T) {
 	a := newAccounts(t)
 
-	_, err := a.auth.FinishSignIn(t.Context(), "state-of-a-sign-in-already-taken", code)
+	_, err := a.auth.FinishSignIn(t.Context(), "state-of-a-sign-in-already-taken", "state-of-a-sign-in-already-taken", code)
 
 	require.ErrorIs(t, err, murphy.ErrUnauthenticated)
 	assert.Nil(t, a.session)
