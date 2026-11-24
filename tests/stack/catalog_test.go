@@ -18,7 +18,8 @@ import (
 func TestServicesAndTheirIntegrations(t *testing.T) {
 	m := murphytest.New(t)
 	ctx := t.Context()
-	input := client.ServiceInput{Name: m.Name("checkout-api"), EscalationPolicy: client.Reference{Id: m.Policy().ID}}
+	policy := m.Policy()
+	input := client.ServiceInput{Name: m.Name("checkout-api"), EscalationPolicy: client.Reference{Id: policy.ID}}
 
 	created, err := m.API.CreateServiceWithResponse(ctx, nil, input)
 	require.NoError(t, err)
@@ -30,7 +31,9 @@ func TestServicesAndTheirIntegrations(t *testing.T) {
 	fetched, err := m.API.GetServiceWithResponse(ctx, service.Id)
 	require.NoError(t, err)
 	require.Equal(t, http.StatusOK, fetched.StatusCode())
-	assert.Equal(t, service, fetched.JSON200)
+	read := *service
+	read.EscalationPolicy.Name = &policy.Name
+	assert.Equal(t, &read, fetched.JSON200, "a read names the policy")
 
 	integration, err := m.API.CreateIntegrationWithResponse(ctx, service.Id, nil, client.IntegrationCreate{Name: "alertmanager", Type: client.Alertmanager})
 	require.NoError(t, err)
