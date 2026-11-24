@@ -355,6 +355,64 @@ func Run(t *testing.T, open func(t *testing.T) Storage) {
 		assert.ElementsMatch(t, []string{anaHook.GetId(), anaEmail.GetId(), boHook.GetId()}, ids)
 	})
 
+	t.Run("keeps a disabled contact method with why, but never hands it out for paging", func(t *testing.T) {
+		repo := open(t)
+		ana := newUser("ana@example.com")
+		require.NoError(t, repo.CreateUser(t.Context(), ana))
+		dead, working := newContactMethod(ana, murphy.ContactMethodType_CONTACT_METHOD_TYPE_WEBHOOK), newContactMethod(ana, murphy.ContactMethodType_CONTACT_METHOD_TYPE_WEBHOOK)
+		require.NoError(t, repo.CreateContactMethod(t.Context(), dead))
+		require.NoError(t, repo.CreateContactMethod(t.Context(), working))
+		at := time.Now().UTC().Truncate(time.Millisecond)
+
+		require.NoError(t, repo.DisableContactMethod(t.Context(), &murphy.ContactMethod{Id: dead.GetId(), Address: dead.GetAddress(), DisabledAt: timestamppb.New(at), DisabledReason: "gone"}))
+
+		got, err := repo.GetContactMethod(t.Context(), dead.GetId())
+		require.NoError(t, err)
+		assert.WithinDuration(t, at, got.GetDisabledAt().AsTime(), time.Millisecond)
+		assert.Equal(t, "gone", got.GetDisabledReason())
+		listed, err := repo.ListContactMethods(t.Context(), ana.GetId())
+		require.NoError(t, err)
+		assert.Len(t, listed, 2, "the person still sees it")
+		paging, err := repo.ListContactMethodsOfUsers(t.Context(), []string{ana.GetId()})
+		require.NoError(t, err)
+		require.Len(t, paging, 1)
+		assert.Equal(t, working.GetId(), paging[0].GetId())
+	})
+
+	t.Run("disabling leaves a contact method alone once its address has changed", func(t *testing.T) {
+		repo := open(t)
+		ana := newUser("ana@example.com")
+		require.NoError(t, repo.CreateUser(t.Context(), ana))
+		method := newContactMethod(ana, murphy.ContactMethodType_CONTACT_METHOD_TYPE_WEBHOOK)
+		require.NoError(t, repo.CreateContactMethod(t.Context(), method))
+		dead := method.GetAddress()
+		method.Address, method.UpdatedAt = "https://example.com/new", murphy.Now()
+		require.NoError(t, repo.UpdateContactMethod(t.Context(), method))
+
+		require.NoError(t, repo.DisableContactMethod(t.Context(), &murphy.ContactMethod{Id: method.GetId(), Address: dead, DisabledAt: murphy.Now(), DisabledReason: "gone"}))
+
+		got, err := repo.GetContactMethod(t.Context(), method.GetId())
+		require.NoError(t, err)
+		assert.Nil(t, got.GetDisabledAt())
+	})
+
+	t.Run("an update enables a disabled contact method again", func(t *testing.T) {
+		repo := open(t)
+		ana := newUser("ana@example.com")
+		require.NoError(t, repo.CreateUser(t.Context(), ana))
+		method := newContactMethod(ana, murphy.ContactMethodType_CONTACT_METHOD_TYPE_WEBHOOK)
+		require.NoError(t, repo.CreateContactMethod(t.Context(), method))
+		require.NoError(t, repo.DisableContactMethod(t.Context(), &murphy.ContactMethod{Id: method.GetId(), Address: method.GetAddress(), DisabledAt: murphy.Now(), DisabledReason: "gone"}))
+
+		method.Address, method.UpdatedAt = "https://example.com/new", murphy.Now()
+		require.NoError(t, repo.UpdateContactMethod(t.Context(), method))
+
+		got, err := repo.GetContactMethod(t.Context(), method.GetId())
+		require.NoError(t, err)
+		assert.Nil(t, got.GetDisabledAt())
+		assert.Empty(t, got.GetDisabledReason())
+	})
+
 	t.Run("reports missing users, teams and memberships", func(t *testing.T) {
 		repo := open(t)
 		_, err := repo.GetUser(t.Context(), murphy.NewID())

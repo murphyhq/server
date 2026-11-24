@@ -333,22 +333,23 @@ func (x *PageEvent) GetCurrent() *Page {
 }
 
 type Notification struct {
-	state           protoimpl.MessageState `protogen:"open.v1"`
-	Id              string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Reason          NotificationReason     `protobuf:"varint,2,opt,name=reason,proto3,enum=murphy.v1.NotificationReason" json:"reason,omitempty"`
-	Incident        *Incident              `protobuf:"bytes,3,opt,name=incident,proto3" json:"incident,omitempty"`
-	UserId          string                 `protobuf:"bytes,4,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	ContactMethod   *ContactMethod         `protobuf:"bytes,5,opt,name=contact_method,json=contactMethod,proto3" json:"contact_method,omitempty"`
-	EscalationLevel int32                  `protobuf:"varint,6,opt,name=escalation_level,json=escalationLevel,proto3" json:"escalation_level,omitempty"`
-	EscalationRound int32                  `protobuf:"varint,7,opt,name=escalation_round,json=escalationRound,proto3" json:"escalation_round,omitempty"`
-	Via             *EscalationTarget      `protobuf:"bytes,8,opt,name=via,proto3" json:"via,omitempty"`
-	CreatedAt       *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
-	SentAt          *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=sent_at,json=sentAt,proto3" json:"sent_at,omitempty"`
-	Failure         string                 `protobuf:"bytes,11,opt,name=failure,proto3" json:"failure,omitempty"`
-	PageId          string                 `protobuf:"bytes,12,opt,name=page_id,json=pageId,proto3" json:"page_id,omitempty"`
-	Deadline        *timestamppb.Timestamp `protobuf:"bytes,13,opt,name=deadline,proto3" json:"deadline,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	Id                string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Reason            NotificationReason     `protobuf:"varint,2,opt,name=reason,proto3,enum=murphy.v1.NotificationReason" json:"reason,omitempty"`
+	Incident          *Incident              `protobuf:"bytes,3,opt,name=incident,proto3" json:"incident,omitempty"`
+	UserId            string                 `protobuf:"bytes,4,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	ContactMethod     *ContactMethod         `protobuf:"bytes,5,opt,name=contact_method,json=contactMethod,proto3" json:"contact_method,omitempty"`
+	EscalationLevel   int32                  `protobuf:"varint,6,opt,name=escalation_level,json=escalationLevel,proto3" json:"escalation_level,omitempty"`
+	EscalationRound   int32                  `protobuf:"varint,7,opt,name=escalation_round,json=escalationRound,proto3" json:"escalation_round,omitempty"`
+	Via               *EscalationTarget      `protobuf:"bytes,8,opt,name=via,proto3" json:"via,omitempty"`
+	CreatedAt         *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	SentAt            *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=sent_at,json=sentAt,proto3" json:"sent_at,omitempty"`
+	Failure           string                 `protobuf:"bytes,11,opt,name=failure,proto3" json:"failure,omitempty"`
+	PageId            string                 `protobuf:"bytes,12,opt,name=page_id,json=pageId,proto3" json:"page_id,omitempty"`
+	Deadline          *timestamppb.Timestamp `protobuf:"bytes,13,opt,name=deadline,proto3" json:"deadline,omitempty"`
+	ContactMethodGone bool                   `protobuf:"varint,14,opt,name=contact_method_gone,json=contactMethodGone,proto3" json:"contact_method_gone,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *Notification) Reset() {
@@ -472,6 +473,13 @@ func (x *Notification) GetDeadline() *timestamppb.Timestamp {
 	return nil
 }
 
+func (x *Notification) GetContactMethodGone() bool {
+	if x != nil {
+		return x.ContactMethodGone
+	}
+	return false
+}
+
 type NotificationEvent struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Verb          NotificationVerb       `protobuf:"varint,1,opt,name=verb,proto3,enum=murphy.v1.NotificationVerb" json:"verb,omitempty"`
@@ -553,7 +561,7 @@ const file_murphy_v1_notifications_proto_rawDesc = "" +
 	"\tPageEvent\x12'\n" +
 	"\x04verb\x18\x01 \x01(\x0e2\x13.murphy.v1.PageVerbR\x04verb\x12+\n" +
 	"\bprevious\x18\x02 \x01(\v2\x0f.murphy.v1.PageR\bprevious\x12)\n" +
-	"\acurrent\x18\x03 \x01(\v2\x0f.murphy.v1.PageR\acurrent\"\xc0\x04\n" +
+	"\acurrent\x18\x03 \x01(\v2\x0f.murphy.v1.PageR\acurrent\"\xf0\x04\n" +
 	"\fNotification\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x125\n" +
 	"\x06reason\x18\x02 \x01(\x0e2\x1d.murphy.v1.NotificationReasonR\x06reason\x12/\n" +
@@ -569,7 +577,8 @@ const file_murphy_v1_notifications_proto_rawDesc = "" +
 	" \x01(\v2\x1a.google.protobuf.TimestampR\x06sentAt\x12\x18\n" +
 	"\afailure\x18\v \x01(\tR\afailure\x12\x17\n" +
 	"\apage_id\x18\f \x01(\tR\x06pageId\x126\n" +
-	"\bdeadline\x18\r \x01(\v2\x1a.google.protobuf.TimestampR\bdeadline\"\xac\x01\n" +
+	"\bdeadline\x18\r \x01(\v2\x1a.google.protobuf.TimestampR\bdeadline\x12.\n" +
+	"\x13contact_method_gone\x18\x0e \x01(\bR\x11contactMethodGone\"\xac\x01\n" +
 	"\x11NotificationEvent\x12/\n" +
 	"\x04verb\x18\x01 \x01(\x0e2\x1b.murphy.v1.NotificationVerbR\x04verb\x123\n" +
 	"\bprevious\x18\x02 \x01(\v2\x17.murphy.v1.NotificationR\bprevious\x121\n" +

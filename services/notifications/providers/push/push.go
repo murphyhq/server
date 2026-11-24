@@ -44,7 +44,7 @@ func (p *Pushes) Send(ctx context.Context, notification *murphy.Notification) (e
 	case http.StatusOK:
 		return nil
 	case http.StatusGone, http.StatusNotFound:
-		return &notifications.RefusedError{Reason: "the phone is no longer registered for pushes"}
+		return &notifications.RefusedError{Reason: "the phone is no longer registered for pushes, so it's disabled until the app registers again", Gone: true}
 	case http.StatusUnauthorized:
 		return &notifications.RefusedError{Reason: "the push relay doesn't accept this install's key"}
 	case http.StatusBadRequest:

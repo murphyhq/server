@@ -22,6 +22,7 @@ type Publisher interface {
 
 type RefusedError struct {
 	Reason string
+	Gone   bool
 }
 
 func (e *RefusedError) Error() string {
@@ -57,7 +58,9 @@ func (s *Sender) Send(ctx context.Context, messageID string, notification *murph
 	case sendErr == nil:
 		return s.outcome(ctx, messageID, notification, murphy.NotificationVerb_NOTIFICATION_VERB_SENT, "")
 	case errors.As(sendErr, &refused):
-		return s.outcome(ctx, messageID, notification, murphy.NotificationVerb_NOTIFICATION_VERB_FAILED, refused.Reason)
+		failed := proto.CloneOf(notification)
+		failed.ContactMethodGone = refused.Gone
+		return s.outcome(ctx, messageID, failed, murphy.NotificationVerb_NOTIFICATION_VERB_FAILED, refused.Reason)
 	case !time.Now().Before(notification.GetDeadline().AsTime()):
 		tried := notification.GetDeadline().AsTime().Sub(notification.GetCreatedAt().AsTime()).Round(time.Second)
 		return s.outcome(ctx, messageID, notification, murphy.NotificationVerb_NOTIFICATION_VERB_FAILED, fmt.Sprintf("still failing after %s: %s", tried, sendErr))

@@ -963,3 +963,72 @@ func (_c *MockPeople_ContactMethodsOfUsers_Call) RunAndReturn(run func(ctx conte
 	_c.Call.Return(run)
 	return _c
 }
+
+// DisableContactMethod provides a mock function for the type MockPeople
+func (_mock *MockPeople) DisableContactMethod(ctx context.Context, method *murphy.ContactMethod, reason string, at time.Time) error {
+	ret := _mock.Called(ctx, method, reason, at)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DisableContactMethod")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *murphy.ContactMethod, string, time.Time) error); ok {
+		r0 = returnFunc(ctx, method, reason, at)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockPeople_DisableContactMethod_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DisableContactMethod'
+type MockPeople_DisableContactMethod_Call struct {
+	*mock.Call
+}
+
+// DisableContactMethod is a helper method to define mock.On call
+//   - ctx context.Context
+//   - method *murphy.ContactMethod
+//   - reason string
+//   - at time.Time
+func (_e *MockPeople_Expecter) DisableContactMethod(ctx any, method any, reason any, at any) *MockPeople_DisableContactMethod_Call {
+	return &MockPeople_DisableContactMethod_Call{Call: _e.mock.On("DisableContactMethod", ctx, method, reason, at)}
+}
+
+func (_c *MockPeople_DisableContactMethod_Call) Run(run func(ctx context.Context, method *murphy.ContactMethod, reason string, at time.Time)) *MockPeople_DisableContactMethod_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *murphy.ContactMethod
+		if args[1] != nil {
+			arg1 = args[1].(*murphy.ContactMethod)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 time.Time
+		if args[3] != nil {
+			arg3 = args[3].(time.Time)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *MockPeople_DisableContactMethod_Call) Return(err error) *MockPeople_DisableContactMethod_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockPeople_DisableContactMethod_Call) RunAndReturn(run func(ctx context.Context, method *murphy.ContactMethod, reason string, at time.Time) error) *MockPeople_DisableContactMethod_Call {
+	_c.Call.Return(run)
+	return _c
+}

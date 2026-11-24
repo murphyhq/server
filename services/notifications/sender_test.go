@@ -85,6 +85,19 @@ func TestARefusedNotificationFailsAtOnce(t *testing.T) {
 	assert.Equal(t, "the receiver answered 410", event.GetCurrent().GetFailure())
 }
 
+func TestAnAddressThatIsGoneIsMarkedOnTheOutcome(t *testing.T) {
+	f := setup(t)
+	f.provider.EXPECT().Send(mock.Anything, mock.Anything).Return(&notifications.RefusedError{Reason: "the phone is no longer registered", Gone: true})
+	sent := notification(murphy.ContactMethodType_CONTACT_METHOD_TYPE_WEBHOOK, 0)
+
+	require.NoError(t, f.sender.Send(t.Context(), "message-1", sent))
+
+	require.Len(t, f.published, 1)
+	event := f.published[0].GetNotification()
+	assert.True(t, event.GetCurrent().GetContactMethodGone())
+	assert.False(t, sent.GetContactMethodGone(), "the notification handed in is left as it was")
+}
+
 func TestAFailureThatMayPassIsRetriedByTheBroker(t *testing.T) {
 	f := setup(t)
 	f.provider.EXPECT().Send(mock.Anything, mock.Anything).Return(errors.New("the receiver answered 503"))

@@ -28,26 +28,31 @@ INSERT INTO contact_methods (id, user_id, type, address, push_platform, created_
 VALUES (@id, @user_id, @type, @address, sqlc.narg(push_platform), @created_at, @updated_at);
 
 -- name: GetContactMethod :one
-SELECT id, user_id, type, address, push_platform, created_at, updated_at
+SELECT id, user_id, type, address, push_platform, created_at, updated_at, disabled_at, disabled_reason
 FROM contact_methods
 WHERE id = @id;
 
 -- name: ListContactMethods :many
-SELECT id, user_id, type, address, push_platform, created_at, updated_at
+SELECT id, user_id, type, address, push_platform, created_at, updated_at, disabled_at, disabled_reason
 FROM contact_methods
 WHERE user_id = @user_id
 ORDER BY id;
 
 -- name: ListContactMethodsOfUsers :many
-SELECT id, user_id, type, address, push_platform, created_at, updated_at
+SELECT id, user_id, type, address, push_platform, created_at, updated_at, disabled_at, disabled_reason
 FROM contact_methods
-WHERE user_id = ANY(@user_ids::uuid[])
+WHERE user_id = ANY(@user_ids::uuid[]) AND disabled_at IS NULL
 ORDER BY user_id, id;
 
 -- name: UpdateContactMethod :execrows
 UPDATE contact_methods
-SET type = @type, address = @address, updated_at = @updated_at
+SET type = @type, address = @address, updated_at = @updated_at, disabled_at = sqlc.narg(disabled_at), disabled_reason = sqlc.narg(disabled_reason)
 WHERE id = @id;
+
+-- name: DisableContactMethod :exec
+UPDATE contact_methods
+SET disabled_at = @disabled_at, disabled_reason = @disabled_reason, updated_at = @updated_at
+WHERE id = @id AND address = @address AND disabled_at IS NULL;
 
 -- name: DeleteContactMethod :execrows
 DELETE FROM contact_methods

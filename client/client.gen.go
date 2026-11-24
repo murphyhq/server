@@ -337,7 +337,13 @@ type ContactMethod struct {
 	// Address An email address, an E.164 phone number, a webhook URL, or the push token iOS or Android gave the app.
 	Address   string    `json:"address"`
 	CreatedAt time.Time `json:"created_at"`
-	Id        string    `json:"id"`
+
+	// DisabledAt When Murphy stopped using this contact method because its address no longer works, such as a push token the phone no longer has. A disabled contact method is never used to reach anyone; updating it with a new address enables it again.
+	DisabledAt *time.Time `json:"disabled_at,omitempty"`
+
+	// DisabledReason Why it was disabled.
+	DisabledReason *string `json:"disabled_reason,omitempty"`
+	Id             string  `json:"id"`
 
 	// Platform Push only. The phone's platform, which decides whether the push relay sends through Apple or Google.
 	Platform  *PushPlatform     `json:"platform,omitempty"`

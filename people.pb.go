@@ -481,16 +481,18 @@ func (x *User) GetRole() UserRole {
 }
 
 type ContactMethod struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	UserId        string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	Type          ContactMethodType      `protobuf:"varint,3,opt,name=type,proto3,enum=murphy.v1.ContactMethodType" json:"type,omitempty"`
-	Address       string                 `protobuf:"bytes,4,opt,name=address,proto3" json:"address,omitempty"`
-	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
-	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
-	PushPlatform  PushPlatform           `protobuf:"varint,7,opt,name=push_platform,json=pushPlatform,proto3,enum=murphy.v1.PushPlatform" json:"push_platform,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Id             string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	UserId         string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	Type           ContactMethodType      `protobuf:"varint,3,opt,name=type,proto3,enum=murphy.v1.ContactMethodType" json:"type,omitempty"`
+	Address        string                 `protobuf:"bytes,4,opt,name=address,proto3" json:"address,omitempty"`
+	CreatedAt      *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt      *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	PushPlatform   PushPlatform           `protobuf:"varint,7,opt,name=push_platform,json=pushPlatform,proto3,enum=murphy.v1.PushPlatform" json:"push_platform,omitempty"`
+	DisabledAt     *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=disabled_at,json=disabledAt,proto3" json:"disabled_at,omitempty"`
+	DisabledReason string                 `protobuf:"bytes,9,opt,name=disabled_reason,json=disabledReason,proto3" json:"disabled_reason,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *ContactMethod) Reset() {
@@ -570,6 +572,20 @@ func (x *ContactMethod) GetPushPlatform() PushPlatform {
 		return x.PushPlatform
 	}
 	return PushPlatform_PUSH_PLATFORM_UNSPECIFIED
+}
+
+func (x *ContactMethod) GetDisabledAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.DisabledAt
+	}
+	return nil
+}
+
+func (x *ContactMethod) GetDisabledReason() string {
+	if x != nil {
+		return x.DisabledReason
+	}
+	return ""
 }
 
 type Team struct {
@@ -1139,7 +1155,7 @@ const file_murphy_v1_people_proto_rawDesc = "" +
 	"created_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
 	"updated_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12'\n" +
-	"\x04role\x18\b \x01(\x0e2\x13.murphy.v1.UserRoleR\x04role\"\xb8\x02\n" +
+	"\x04role\x18\b \x01(\x0e2\x13.murphy.v1.UserRoleR\x04role\"\x9e\x03\n" +
 	"\rContactMethod\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x120\n" +
@@ -1149,7 +1165,10 @@ const file_murphy_v1_people_proto_rawDesc = "" +
 	"created_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
 	"updated_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12<\n" +
-	"\rpush_platform\x18\a \x01(\x0e2\x17.murphy.v1.PushPlatformR\fpushPlatform\"\xa0\x01\n" +
+	"\rpush_platform\x18\a \x01(\x0e2\x17.murphy.v1.PushPlatformR\fpushPlatform\x12;\n" +
+	"\vdisabled_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"disabledAt\x12'\n" +
+	"\x0fdisabled_reason\x18\t \x01(\tR\x0edisabledReason\"\xa0\x01\n" +
 	"\x04Team\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x129\n" +
@@ -1292,31 +1311,32 @@ var file_murphy_v1_people_proto_depIdxs = []int32{
 	15, // 5: murphy.v1.ContactMethod.created_at:type_name -> google.protobuf.Timestamp
 	15, // 6: murphy.v1.ContactMethod.updated_at:type_name -> google.protobuf.Timestamp
 	2,  // 7: murphy.v1.ContactMethod.push_platform:type_name -> murphy.v1.PushPlatform
-	15, // 8: murphy.v1.Team.created_at:type_name -> google.protobuf.Timestamp
-	15, // 9: murphy.v1.Team.updated_at:type_name -> google.protobuf.Timestamp
-	4,  // 10: murphy.v1.TeamMembership.role:type_name -> murphy.v1.TeamRole
-	15, // 11: murphy.v1.TeamMembership.created_at:type_name -> google.protobuf.Timestamp
-	15, // 12: murphy.v1.TeamMembership.updated_at:type_name -> google.protobuf.Timestamp
-	15, // 13: murphy.v1.Identity.created_at:type_name -> google.protobuf.Timestamp
-	15, // 14: murphy.v1.Identity.updated_at:type_name -> google.protobuf.Timestamp
-	15, // 15: murphy.v1.Session.expires_at:type_name -> google.protobuf.Timestamp
-	15, // 16: murphy.v1.Session.revoked_at:type_name -> google.protobuf.Timestamp
-	15, // 17: murphy.v1.Session.created_at:type_name -> google.protobuf.Timestamp
-	15, // 18: murphy.v1.Session.updated_at:type_name -> google.protobuf.Timestamp
-	5,  // 19: murphy.v1.Session.client:type_name -> murphy.v1.SessionClient
-	15, // 20: murphy.v1.SignIn.expires_at:type_name -> google.protobuf.Timestamp
-	15, // 21: murphy.v1.SignIn.created_at:type_name -> google.protobuf.Timestamp
-	15, // 22: murphy.v1.SignIn.updated_at:type_name -> google.protobuf.Timestamp
-	6,  // 23: murphy.v1.OneTimeCode.purpose:type_name -> murphy.v1.OneTimeCodePurpose
-	15, // 24: murphy.v1.OneTimeCode.expires_at:type_name -> google.protobuf.Timestamp
-	15, // 25: murphy.v1.OneTimeCode.used_at:type_name -> google.protobuf.Timestamp
-	15, // 26: murphy.v1.OneTimeCode.created_at:type_name -> google.protobuf.Timestamp
-	15, // 27: murphy.v1.OneTimeCode.updated_at:type_name -> google.protobuf.Timestamp
-	28, // [28:28] is the sub-list for method output_type
-	28, // [28:28] is the sub-list for method input_type
-	28, // [28:28] is the sub-list for extension type_name
-	28, // [28:28] is the sub-list for extension extendee
-	0,  // [0:28] is the sub-list for field type_name
+	15, // 8: murphy.v1.ContactMethod.disabled_at:type_name -> google.protobuf.Timestamp
+	15, // 9: murphy.v1.Team.created_at:type_name -> google.protobuf.Timestamp
+	15, // 10: murphy.v1.Team.updated_at:type_name -> google.protobuf.Timestamp
+	4,  // 11: murphy.v1.TeamMembership.role:type_name -> murphy.v1.TeamRole
+	15, // 12: murphy.v1.TeamMembership.created_at:type_name -> google.protobuf.Timestamp
+	15, // 13: murphy.v1.TeamMembership.updated_at:type_name -> google.protobuf.Timestamp
+	15, // 14: murphy.v1.Identity.created_at:type_name -> google.protobuf.Timestamp
+	15, // 15: murphy.v1.Identity.updated_at:type_name -> google.protobuf.Timestamp
+	15, // 16: murphy.v1.Session.expires_at:type_name -> google.protobuf.Timestamp
+	15, // 17: murphy.v1.Session.revoked_at:type_name -> google.protobuf.Timestamp
+	15, // 18: murphy.v1.Session.created_at:type_name -> google.protobuf.Timestamp
+	15, // 19: murphy.v1.Session.updated_at:type_name -> google.protobuf.Timestamp
+	5,  // 20: murphy.v1.Session.client:type_name -> murphy.v1.SessionClient
+	15, // 21: murphy.v1.SignIn.expires_at:type_name -> google.protobuf.Timestamp
+	15, // 22: murphy.v1.SignIn.created_at:type_name -> google.protobuf.Timestamp
+	15, // 23: murphy.v1.SignIn.updated_at:type_name -> google.protobuf.Timestamp
+	6,  // 24: murphy.v1.OneTimeCode.purpose:type_name -> murphy.v1.OneTimeCodePurpose
+	15, // 25: murphy.v1.OneTimeCode.expires_at:type_name -> google.protobuf.Timestamp
+	15, // 26: murphy.v1.OneTimeCode.used_at:type_name -> google.protobuf.Timestamp
+	15, // 27: murphy.v1.OneTimeCode.created_at:type_name -> google.protobuf.Timestamp
+	15, // 28: murphy.v1.OneTimeCode.updated_at:type_name -> google.protobuf.Timestamp
+	29, // [29:29] is the sub-list for method output_type
+	29, // [29:29] is the sub-list for method input_type
+	29, // [29:29] is the sub-list for extension type_name
+	29, // [29:29] is the sub-list for extension extendee
+	0,  // [0:29] is the sub-list for field type_name
 }
 
 func init() { file_murphy_v1_people_proto_init() }

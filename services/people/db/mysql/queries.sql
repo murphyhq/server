@@ -28,26 +28,31 @@ INSERT INTO contact_methods (id, user_id, type, address, push_platform, created_
 VALUES (sqlc.arg(id), sqlc.arg(user_id), sqlc.arg(type), sqlc.arg(address), sqlc.narg(push_platform), sqlc.arg(created_at), sqlc.arg(updated_at));
 
 -- name: GetContactMethod :one
-SELECT id, user_id, type, address, push_platform, created_at, updated_at
+SELECT id, user_id, type, address, push_platform, created_at, updated_at, disabled_at, disabled_reason
 FROM contact_methods
 WHERE id = sqlc.arg(id);
 
 -- name: ListContactMethods :many
-SELECT id, user_id, type, address, push_platform, created_at, updated_at
+SELECT id, user_id, type, address, push_platform, created_at, updated_at, disabled_at, disabled_reason
 FROM contact_methods
 WHERE user_id = sqlc.arg(user_id)
 ORDER BY id;
 
 -- name: ListContactMethodsOfUsers :many
-SELECT id, user_id, type, address, push_platform, created_at, updated_at
+SELECT id, user_id, type, address, push_platform, created_at, updated_at, disabled_at, disabled_reason
 FROM contact_methods
-WHERE user_id IN (sqlc.slice(user_ids))
+WHERE user_id IN (sqlc.slice(user_ids)) AND disabled_at IS NULL
 ORDER BY user_id, id;
 
 -- name: UpdateContactMethod :execrows
 UPDATE contact_methods
-SET type = sqlc.arg(type), address = sqlc.arg(address), updated_at = sqlc.arg(updated_at)
+SET type = sqlc.arg(type), address = sqlc.arg(address), updated_at = sqlc.arg(updated_at), disabled_at = sqlc.narg(disabled_at), disabled_reason = sqlc.narg(disabled_reason)
 WHERE id = sqlc.arg(id);
+
+-- name: DisableContactMethod :exec
+UPDATE contact_methods
+SET disabled_at = sqlc.arg(disabled_at), disabled_reason = sqlc.arg(disabled_reason), updated_at = sqlc.arg(updated_at)
+WHERE id = sqlc.arg(id) AND address = sqlc.arg(address) AND disabled_at IS NULL;
 
 -- name: DeleteContactMethod :execrows
 DELETE FROM contact_methods

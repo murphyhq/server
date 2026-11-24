@@ -3,6 +3,9 @@ package people
 import (
 	"context"
 	"fmt"
+	"time"
+
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/murphyhq/server"
 	"github.com/murphyhq/server/internal/pagination"
@@ -22,6 +25,7 @@ type Repository interface {
 	ListContactMethodsOfUsers(ctx context.Context, userIDs []string) ([]*murphy.ContactMethod, error)
 	UpdateContactMethod(ctx context.Context, method *murphy.ContactMethod) error
 	DeleteContactMethod(ctx context.Context, id string) error
+	DisableContactMethod(ctx context.Context, method *murphy.ContactMethod) error
 	CreateTeam(ctx context.Context, team *murphy.Team) error
 	GetTeam(ctx context.Context, id string) (*murphy.Team, error)
 	ListTeams(ctx context.Context, before string, limit int) ([]*murphy.Team, error)
@@ -219,6 +223,9 @@ func (s *Service) UpdateContactMethod(ctx context.Context, in *murphy.ContactMet
 		CreatedAt:    current.GetCreatedAt(),
 		UpdatedAt:    murphy.Now(),
 	}
+	if method.GetAddress() == current.GetAddress() {
+		method.DisabledAt, method.DisabledReason = current.GetDisabledAt(), current.GetDisabledReason()
+	}
 	if err := method.Validate(); err != nil {
 		return nil, err
 	}
@@ -226,6 +233,18 @@ func (s *Service) UpdateContactMethod(ctx context.Context, in *murphy.ContactMet
 		return nil, fmt.Errorf("update contact method: %w", err)
 	}
 	return method, nil
+}
+
+func (s *Service) DisableContactMethod(ctx context.Context, method *murphy.ContactMethod, reason string, at time.Time) (err error) {
+	ctx, span := tracer.Span(ctx)
+	ctx = span.Set(ctx, telemetry.WithField("contact_method.id", method.GetId()))
+	defer span.End(&err)
+
+	disabled := &murphy.ContactMethod{Id: method.GetId(), Address: method.GetAddress(), DisabledAt: timestamppb.New(at), DisabledReason: reason}
+	if err := s.repo.DisableContactMethod(ctx, disabled); err != nil {
+		return fmt.Errorf("disable contact method: %w", err)
+	}
+	return nil
 }
 
 func (s *Service) DeleteContactMethod(ctx context.Context, id string) (err error) {

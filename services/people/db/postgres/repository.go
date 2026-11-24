@@ -165,8 +165,19 @@ func (r *Repository) UpdateContactMethod(ctx context.Context, method *murphy.Con
 
 	rows, err := r.queries.UpdateContactMethod(ctx, UpdateContactMethodParams{
 		ID: method.GetId(), Type: method.GetType().Text(), Address: method.GetAddress(), UpdatedAt: method.GetUpdatedAt().AsTime(),
+		DisabledAt: database.Time(method.GetDisabledAt()), DisabledReason: database.Text(method.GetDisabledReason()),
 	})
 	return murphypostgres.Changed("contact method", rows, err)
+}
+
+func (r *Repository) DisableContactMethod(ctx context.Context, method *murphy.ContactMethod) (err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	return murphypostgres.Error("contact method", r.queries.DisableContactMethod(ctx, DisableContactMethodParams{
+		ID: method.GetId(), Address: method.GetAddress(), UpdatedAt: method.GetDisabledAt().AsTime(),
+		DisabledAt: database.Time(method.GetDisabledAt()), DisabledReason: database.Text(method.GetDisabledReason()),
+	}))
 }
 
 func (r *Repository) DeleteContactMethod(ctx context.Context, id string) (err error) {
@@ -189,6 +200,7 @@ func toContactMethod(row ContactMethod) *murphy.ContactMethod {
 		Id: row.ID, UserId: row.UserID, Type: murphy.ContactMethodTypeFromText(row.Type), Address: row.Address,
 		PushPlatform: murphy.PushPlatformFromText(database.TextValue(row.PushPlatform)),
 		CreatedAt:    timestamppb.New(row.CreatedAt), UpdatedAt: timestamppb.New(row.UpdatedAt),
+		DisabledAt: database.Timestamp(row.DisabledAt), DisabledReason: database.TextValue(row.DisabledReason),
 	}
 }
 
