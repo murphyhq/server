@@ -32,10 +32,10 @@ jobs:
           go tool buf generate
           go tool sqlc generate
           go tool mockery
-          go tool oapi-codegen -config oapi-codegen/server.yaml openapi/v1.yaml
-          go tool oapi-codegen -config oapi-codegen/client.yaml openapi/v1.yaml
-          go tool oapi-codegen -config oapi-codegen/ingest.yaml openapi/ingest/v1.yaml
-          go tool oapi-codegen -config oapi-codegen/webhooks.yaml openapi/webhooks/v1.yaml
+          go tool oapi-codegen -config openapi/codegen/server.yaml openapi/v1.yaml
+          go tool oapi-codegen -config openapi/codegen/client.yaml openapi/v1.yaml
+          go tool oapi-codegen -config openapi/codegen/ingest.yaml openapi/ingest/v1.yaml
+          go tool oapi-codegen -config openapi/codegen/webhooks.yaml openapi/webhooks/v1.yaml
           git diff --exit-code
           test -z "$(git status --porcelain)"
 
