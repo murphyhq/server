@@ -61,10 +61,6 @@ func seedPeople(ctx context.Context, api *client.ClientWithResponses) (teams, us
 				return nil, nil, err
 			}
 			users[user.email] = created.JSON201.Id
-			method, err := api.CreateContactMethodWithResponse(ctx, created.JSON201.Id, nil, client.ContactMethodInput{Type: client.Email, Address: user.email})
-			if err := expect(method, err, http.StatusCreated, "create contact method for "+user.email); err != nil {
-				return nil, nil, err
-			}
 		}
 		for team, role := range user.teams {
 			member, err := api.SetTeamMemberWithResponse(ctx, teams[team], users[user.email], client.TeamMemberInput{Role: role})

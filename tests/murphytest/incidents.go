@@ -364,3 +364,15 @@ func (u *User) WaitForDisabledPhone() client.ContactMethod {
 	}, u.m.patience, tick)
 	return disabled
 }
+
+func Summaries(kind client.TimelineEntryType, want ...string) Expectation {
+	return func(c *assert.CollectT, incident *client.IncidentWithTimeline) {
+		var got []string
+		for _, entry := range incident.Timeline {
+			if entry.Type == kind {
+				got = append(got, entry.Summary)
+			}
+		}
+		assert.Equal(c, want, got, "what the timeline says")
+	}
+}

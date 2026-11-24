@@ -233,3 +233,45 @@ func TestANotificationOutcomeGoesOnTheTimeline(t *testing.T) {
 	assert.Equal(t, "Page by webhook failed: the receiver answered 410", entry.GetSummary())
 	assert.Equal(t, notification.GetContactMethod().GetId(), entry.GetNotification().GetContactMethodId())
 }
+
+func named(userID string) string {
+	return map[string]string{"ana": "Ana", "bo": "Bo", "cy": "Cy"}[userID]
+}
+
+func notifiedEntry(kind murphy.TimelineEntryType, reason murphy.NotificationReason, channel murphy.ContactMethodType, failure string) *murphy.TimelineEntry {
+	return &murphy.TimelineEntry{Type: kind, Summary: "stored", Notification: &murphy.TimelineNotification{Reason: reason, UserId: "ana", Channel: channel, Failure: failure}}
+}
+
+func TestANotificationSaysWhoWasReachedAndHow(t *testing.T) {
+	paged := notifiedEntry(murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_NOTIFIED, murphy.NotificationReason_NOTIFICATION_REASON_PAGED, murphy.ContactMethodType_CONTACT_METHOD_TYPE_WEBHOOK, "")
+	told := notifiedEntry(murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_NOTIFIED, murphy.NotificationReason_NOTIFICATION_REASON_ACKNOWLEDGED, murphy.ContactMethodType_CONTACT_METHOD_TYPE_PUSH, "")
+	failed := notifiedEntry(murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_NOTIFICATION_FAILED, murphy.NotificationReason_NOTIFICATION_REASON_PAGED, murphy.ContactMethodType_CONTACT_METHOD_TYPE_PUSH, "the phone is no longer registered for pushes")
+	unreachable := notifiedEntry(murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_NOTIFICATION_FAILED, murphy.NotificationReason_NOTIFICATION_REASON_PAGED, murphy.ContactMethodType_CONTACT_METHOD_TYPE_UNSPECIFIED, "the user has no working contact methods")
+
+	assert.Equal(t, "Paged Ana by webhook", incidents.Summary(paged, named))
+	assert.Equal(t, "Told Ana by push that it was acknowledged", incidents.Summary(told, named))
+	assert.Equal(t, "Couldn't page Ana by push: the phone is no longer registered for pushes", incidents.Summary(failed, named))
+	assert.Equal(t, "Couldn't page Ana: the user has no working contact methods", incidents.Summary(unreachable, named))
+}
+
+func TestALevelNamesEveryoneItPagedOnce(t *testing.T) {
+	escalated := &murphy.TimelineEntry{Type: murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_ESCALATED, Escalation: &murphy.TimelineEscalation{
+		Level: 2, Round: 2, Paged: []*murphy.TimelinePage{{UserId: "ana"}, {UserId: "bo"}, {UserId: "ana"}, {UserId: "cy"}},
+	}}
+
+	assert.Equal(t, "Level 2 paged Ana, Bo and Cy, round 2", incidents.Summary(escalated, named))
+}
+
+func TestWhoActedAndSomeoneDeletedAreNamed(t *testing.T) {
+	acknowledged := &murphy.TimelineEntry{Type: murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_ACKNOWLEDGED, ActorUserId: "bo"}
+	resolved := &murphy.TimelineEntry{Type: murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_RESOLVED, ActorUserId: "someone-deleted"}
+
+	assert.Equal(t, "Acknowledged by Bo", incidents.Summary(acknowledged, named))
+	assert.Equal(t, "Resolved by someone since deleted", incidents.Summary(resolved, named))
+}
+
+func TestEntriesWithoutPeopleKeepTheirStoredSummary(t *testing.T) {
+	exhausted := &murphy.TimelineEntry{Type: murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_ESCALATION_EXHAUSTED, Summary: "Escalation is exhausted: every level and repeat was paged"}
+
+	assert.Equal(t, "Escalation is exhausted: every level and repeat was paged", incidents.Summary(exhausted, named))
+}

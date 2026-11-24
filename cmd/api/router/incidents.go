@@ -99,6 +99,13 @@ func (s *Server) GetIncident(ctx context.Context, request GetIncidentRequestObje
 			entries[i].Notification = out
 		}
 	}
+	if err := s.name(ctx, n); err != nil {
+		return nil, err
+	}
+	nameOf := func(userID string) string { return *n.user(userID).Name }
+	for i, entry := range timeline {
+		entries[i].Summary = incidents.Summary(entry, nameOf)
+	}
 	return GetIncident200JSONResponse{
 		Id:         out.Id,
 		Number:     out.Number,
@@ -114,7 +121,7 @@ func (s *Server) GetIncident(ctx context.Context, request GetIncidentRequestObje
 
 		AcknowledgedAt: out.AcknowledgedAt,
 		Escalation:     out.Escalation,
-	}, s.name(ctx, n)
+	}, nil
 }
 
 func toIncident(incident *murphy.Incident, n *names) Incident {

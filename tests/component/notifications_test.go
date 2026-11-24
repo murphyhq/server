@@ -75,7 +75,7 @@ func TestARedeliveredEscalationPagesOnce(t *testing.T) {
 	testenv.EachDatabase(t, func(t *testing.T, engine testenv.DatabaseEngine) {
 		databases := testenv.Databases(t, engine)
 		m := murphyOn(t, databases)
-		ana := m.User(murphytest.Email())
+		ana := m.User(murphytest.WithPhone())
 		policy := m.Policy(murphytest.Pages(ana.Target()))
 		notifications, storage := notificationsOn(t, databases)
 		incident := &murphy.Incident{

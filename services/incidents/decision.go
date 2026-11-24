@@ -2,6 +2,8 @@ package incidents
 
 import (
 	"fmt"
+	"slices"
+	"strings"
 
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -255,4 +257,60 @@ func (d *Decision) GetNextTimer() *murphy.Timer {
 
 func (d *Decision) GetCancelTimers() bool {
 	return d != nil && d.CancelTimers
+}
+
+func Summary(entry *murphy.TimelineEntry, nameOf func(userID string) string) string {
+	person := func(userID string) string { return murphy.Or(nameOf(userID), "someone since deleted") }
+	switch {
+	case entry.GetNotification() != nil:
+		return notificationSummary(entry, person(entry.GetNotification().GetUserId()))
+	case entry.GetType() == murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_ESCALATED && len(entry.GetEscalation().GetPaged()) > 0:
+		return escalationSummary(entry.GetEscalation(), person)
+	case entry.GetActorUserId() != "" && entry.GetType() == murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_ACKNOWLEDGED:
+		return "Acknowledged by " + person(entry.GetActorUserId())
+	case entry.GetActorUserId() != "" && entry.GetType() == murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_RESOLVED:
+		return "Resolved by " + person(entry.GetActorUserId())
+	default:
+		return entry.GetSummary()
+	}
+}
+
+func notificationSummary(entry *murphy.TimelineEntry, person string) string {
+	notification := entry.GetNotification()
+	channel := ""
+	if notification.GetChannel() != murphy.ContactMethodType_CONTACT_METHOD_TYPE_UNSPECIFIED {
+		channel = " by " + notification.GetChannel().Text()
+	}
+	verb, failed, about := "Paged ", "Couldn't page ", ""
+	switch notification.GetReason() {
+	case murphy.NotificationReason_NOTIFICATION_REASON_ACKNOWLEDGED:
+		verb, failed, about = "Told ", "Couldn't tell ", " that it was acknowledged"
+	case murphy.NotificationReason_NOTIFICATION_REASON_RESOLVED:
+		verb, failed, about = "Told ", "Couldn't tell ", " that it was resolved"
+	}
+	if entry.GetType() == murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_NOTIFIED {
+		return verb + person + channel + about
+	}
+	return failed + person + channel + about + ": " + notification.GetFailure()
+}
+
+func escalationSummary(escalation *murphy.TimelineEscalation, person func(string) string) string {
+	var people []string
+	for _, page := range escalation.GetPaged() {
+		if name := person(page.GetUserId()); !slices.Contains(people, name) {
+			people = append(people, name)
+		}
+	}
+	summary := fmt.Sprintf("Level %d paged %s", escalation.GetLevel(), listOf(people))
+	if escalation.GetRound() > 1 {
+		summary += fmt.Sprintf(", round %d", escalation.GetRound())
+	}
+	return summary
+}
+
+func listOf(names []string) string {
+	if len(names) < 2 {
+		return strings.Join(names, "")
+	}
+	return strings.Join(names[:len(names)-1], ", ") + " and " + names[len(names)-1]
 }

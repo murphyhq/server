@@ -17,7 +17,7 @@ import (
 
 func TestAPageReachesEveryContactMethodOfEveryonePaged(t *testing.T) {
 	m := murphytest.New(t)
-	ana := m.User(murphytest.WithWebhook(), murphytest.Email())
+	ana := m.User(murphytest.WithWebhook(), murphytest.WithPhone())
 	service := m.Service(murphytest.Pages(ana.Target()))
 
 	incident := service.Fire("disk-full")
@@ -25,7 +25,7 @@ func TestAPageReachesEveryContactMethodOfEveryonePaged(t *testing.T) {
 	incident.WaitFor(
 		murphytest.Paged(ana),
 		murphytest.Notified(ana, client.Webhook),
-		murphytest.NotificationFailed(ana, client.Email),
+		murphytest.Notified(ana, client.Push),
 	)
 	page := ana.Webhook().WaitForWebhooks(1)[0]
 	assert.True(t, page.Verified, "signed with a key the API publishes")
@@ -212,4 +212,27 @@ func TestWebhooksCarryASignatureFromEveryKeyDuringARotation(t *testing.T) {
 	assert.Equal(t, 2, page.Signatures())
 	assert.True(t, page.VerifiesWith(keys[0]), "a receiver still on the old key accepts it")
 	assert.True(t, page.VerifiesWith(keys[1]), "a receiver already on the new key accepts it")
+}
+
+func TestTheTimelineSaysWhoWasPagedAndHow(t *testing.T) {
+	m := murphytest.New(t)
+	ana := m.User(murphytest.WithWebhook())
+	service := m.Service(murphytest.Pages(ana.Target()))
+
+	incident := service.Fire("disk-full")
+
+	incident.WaitFor(
+		murphytest.Summaries(client.TimelineEntryTypeEscalated, "Level 1 paged "+ana.Name),
+		murphytest.Summaries(client.TimelineEntryTypeNotified, "Paged "+ana.Name+" by webhook"),
+	)
+}
+
+func TestAContactMethodMurphyCantSendToYetIsRefused(t *testing.T) {
+	m := murphytest.New(t)
+	ana := m.User()
+
+	created, err := m.API.CreateContactMethodWithResponse(t.Context(), ana.ID, nil, client.ContactMethodInput{Type: client.Email, Address: ana.Email})
+
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusBadRequest, created.StatusCode())
 }
