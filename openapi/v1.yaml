@@ -1747,6 +1747,7 @@ components:
           description: The person who did it; absent for what Murphy did on its own.
         summary:
           type: string
+          description: What happened, in a sentence that names the people involved as they're called now.
         at:
           type: string
           format: date-time
@@ -1913,6 +1914,7 @@ components:
     ContactMethodType:
       type: string
       enum: [email, sms, voice, webhook, push]
+      description: Murphy sends by webhook and push for now; contact methods of the other types are refused until it can send by them.
     ContactMethod:
       type: object
       required: [id, user, type, address, created_at, updated_at]

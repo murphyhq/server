@@ -346,7 +346,9 @@ type ContactMethod struct {
 	Id             string  `json:"id"`
 
 	// Platform Push only. The phone's platform, which decides whether the push relay sends through Apple or Google.
-	Platform  *PushPlatform     `json:"platform,omitempty"`
+	Platform *PushPlatform `json:"platform,omitempty"`
+
+	// Type Murphy sends by webhook and push for now; contact methods of the other types are refused until it can send by them.
 	Type      ContactMethodType `json:"type"`
 	UpdatedAt time.Time         `json:"updated_at"`
 
@@ -360,8 +362,10 @@ type ContactMethodInput struct {
 	Address string `json:"address"`
 
 	// Platform Push only. The phone's platform, which decides whether the push relay sends through Apple or Google.
-	Platform *PushPlatform     `json:"platform,omitempty"`
-	Type     ContactMethodType `json:"type"`
+	Platform *PushPlatform `json:"platform,omitempty"`
+
+	// Type Murphy sends by webhook and push for now; contact methods of the other types are refused until it can send by them.
+	Type ContactMethodType `json:"type"`
 }
 
 // ContactMethodList defines model for ContactMethodList.
@@ -369,7 +373,7 @@ type ContactMethodList struct {
 	Items []ContactMethod `json:"items"`
 }
 
-// ContactMethodType defines model for ContactMethodType.
+// ContactMethodType Murphy sends by webhook and push for now; contact methods of the other types are refused until it can send by them.
 type ContactMethodType string
 
 // EscalationLevel defines model for EscalationLevel.
@@ -869,8 +873,10 @@ type TimelineEntry struct {
 
 	// Notification A notification Murphy sent or failed to send. `notification_failed` without a contact method means the person had none.
 	Notification *TimelineNotification `json:"notification,omitempty"`
-	Summary      string                `json:"summary"`
-	Type         TimelineEntryType     `json:"type"`
+
+	// Summary What happened, in a sentence that names the people involved as they're called now.
+	Summary string            `json:"summary"`
+	Type    TimelineEntryType `json:"type"`
 }
 
 // TimelineEntryType defines model for TimelineEntry.Type.
@@ -890,6 +896,7 @@ type TimelineEscalation struct {
 
 // TimelineNotification A notification Murphy sent or failed to send. `notification_failed` without a contact method means the person had none.
 type TimelineNotification struct {
+	// Channel Murphy sends by webhook and push for now; contact methods of the other types are refused until it can send by them.
 	Channel *ContactMethodType `json:"channel,omitempty"`
 
 	// ContactMethod Points at another resource.
