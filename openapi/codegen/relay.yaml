@@ -1,0 +1,5 @@
+package: relay
+output: internal/relay/client.gen.go
+generate:
+  client: true
+  models: true

@@ -149,12 +149,13 @@ func (s *Service) CreateContactMethod(ctx context.Context, in *murphy.ContactMet
 
 	now := murphy.Now()
 	method := &murphy.ContactMethod{
-		Id:        murphy.NewID(),
-		UserId:    in.GetUserId(),
-		Type:      in.GetType(),
-		Address:   in.GetAddress(),
-		CreatedAt: now,
-		UpdatedAt: now,
+		Id:           murphy.NewID(),
+		UserId:       in.GetUserId(),
+		Type:         in.GetType(),
+		Address:      in.GetAddress(),
+		PushPlatform: in.GetPushPlatform(),
+		CreatedAt:    now,
+		UpdatedAt:    now,
 	}
 	if err := method.Validate(); err != nil {
 		return nil, err
@@ -208,12 +209,13 @@ func (s *Service) UpdateContactMethod(ctx context.Context, in *murphy.ContactMet
 		return nil, err
 	}
 	method := &murphy.ContactMethod{
-		Id:        current.GetId(),
-		UserId:    current.GetUserId(),
-		Type:      murphy.Or(in.GetType(), current.GetType()),
-		Address:   in.GetAddress(),
-		CreatedAt: current.GetCreatedAt(),
-		UpdatedAt: murphy.Now(),
+		Id:           current.GetId(),
+		UserId:       current.GetUserId(),
+		Type:         murphy.Or(in.GetType(), current.GetType()),
+		Address:      in.GetAddress(),
+		PushPlatform: murphy.Or(in.GetPushPlatform(), current.GetPushPlatform()),
+		CreatedAt:    current.GetCreatedAt(),
+		UpdatedAt:    murphy.Now(),
 	}
 	if err := method.Validate(); err != nil {
 		return nil, err

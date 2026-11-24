@@ -37,6 +37,31 @@ func TestAPageReachesEveryContactMethodOfEveryonePaged(t *testing.T) {
 	assert.Equal(t, int32(1), page.Body.Data.Escalation.Level)
 }
 
+func TestAPageReachesAPhoneThroughTheRelay(t *testing.T) {
+	m := murphytest.New(t)
+	ana := m.User(murphytest.WithPhone())
+	service := m.Service(murphytest.Pages(ana.Target()))
+
+	incident := service.Fire("disk-full")
+
+	incident.WaitFor(murphytest.Paged(ana), murphytest.Notified(ana, client.Push))
+	push := ana.Phone().WaitForPushes(1)[0]
+	assert.Equal(t, "ios", push.Platform)
+	assert.Equal(t, "paged", push.Event)
+	assert.Equal(t, incident.ID, push.IncidentID)
+	assert.Equal(t, m.APIURL(), push.Server)
+}
+
+func TestAPhoneWhoseTokenIsGoneFailsTheNotification(t *testing.T) {
+	m := murphytest.New(t)
+	ana := m.User(murphytest.WithGonePhone())
+	service := m.Service(murphytest.Pages(ana.Target()))
+
+	incident := service.Fire("disk-full")
+
+	incident.WaitFor(murphytest.NotificationFailedBecause(ana, client.Push, "the phone is no longer registered for pushes"))
+}
+
 func TestSomeoneOnCallIsPagedThroughTheirSchedule(t *testing.T) {
 	m := murphytest.New(t)
 	team := m.Team()

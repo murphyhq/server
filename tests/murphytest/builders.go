@@ -2,6 +2,7 @@ package murphytest
 
 import (
 	"time"
+	"uuid"
 
 	"github.com/murphyhq/server/client"
 )
@@ -21,6 +22,7 @@ type User struct {
 	ID       string
 	Email    string
 	webhooks []*Webhook
+	phones   []*Phone
 	m        *Murphy
 }
 
@@ -30,6 +32,7 @@ type userSpec struct {
 	input    client.UserInput
 	methods  []client.ContactMethodInput
 	webhooks [][]WebhookOption
+	phones   []string
 }
 
 func Deactivated() UserOption {
@@ -47,6 +50,14 @@ func Email() UserOption {
 
 func WithWebhook(options ...WebhookOption) UserOption {
 	return func(s *userSpec) { s.webhooks = append(s.webhooks, options) }
+}
+
+func WithPhone() UserOption {
+	return func(s *userSpec) { s.phones = append(s.phones, "device-"+uuid.NewV4().String()) }
+}
+
+func WithGonePhone() UserOption {
+	return func(s *userSpec) { s.phones = append(s.phones, "gone-"+uuid.NewV4().String()) }
 }
 
 func (m *Murphy) User(options ...UserOption) *User {
@@ -73,7 +84,22 @@ func (m *Murphy) User(options ...UserOption) *User {
 			}
 		}
 	}
+	for _, token := range spec.phones {
+		ios := client.Ios
+		added, err := m.API.CreateContactMethodWithResponse(m.t.Context(), user.ID, nil, client.ContactMethodInput{Type: client.Push, Address: token, Platform: &ios})
+		m.created(added, err, "add a phone")
+		user.phones = append(user.phones, &Phone{Token: added.JSON201.Address, receiver: m.Receiver()})
+	}
 	return user
+}
+
+func (u *User) Phone() *Phone {
+	u.m.t.Helper()
+	if len(u.phones) == 0 {
+		u.m.t.Errorf("%s has no phone", u.Email)
+		u.m.t.FailNow()
+	}
+	return u.phones[0]
 }
 
 func (u *User) Webhook() *Webhook {

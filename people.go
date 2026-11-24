@@ -43,10 +43,16 @@ func (c *ContactMethod) Validate() error {
 		}
 	case ContactMethodType_CONTACT_METHOD_TYPE_PUSH:
 		if address == "" {
-			errs = append(errs, invalid("address", "must be the device's relay handle"))
+			errs = append(errs, invalid("address", "must be the device's push token"))
+		}
+		if c.GetPushPlatform() != PushPlatform_PUSH_PLATFORM_IOS && c.GetPushPlatform() != PushPlatform_PUSH_PLATFORM_ANDROID {
+			errs = append(errs, invalid("platform", "must be ios or android"))
 		}
 	default:
 		errs = append(errs, invalid("type", "must be email, sms, voice, webhook or push"))
+	}
+	if c.GetType() != ContactMethodType_CONTACT_METHOD_TYPE_PUSH && c.GetPushPlatform() != PushPlatform_PUSH_PLATFORM_UNSPECIFIED {
+		errs = append(errs, invalid("platform", "is only for push contact methods"))
 	}
 	return errors.Join(errs...)
 }
@@ -127,4 +133,12 @@ func (c SessionClient) Text() string {
 
 func SessionClientFromText(text string) SessionClient {
 	return enumFromText[SessionClient](SessionClient_value, "SESSION_CLIENT_", text)
+}
+
+func (p PushPlatform) Text() string {
+	return enumText(p, "PUSH_PLATFORM_")
+}
+
+func PushPlatformFromText(text string) PushPlatform {
+	return enumFromText[PushPlatform](PushPlatform_value, "PUSH_PLATFORM_", text)
 }

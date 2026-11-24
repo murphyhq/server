@@ -9,48 +9,11 @@ servers:
 security:
   - installKey: []
 paths:
-  /v1/devices:
-    post:
-      operationId: registerDevice
-      summary: Register a device
-      description: Registers a phone's push token for this install and returns the handle to push to. Registering the same token again returns the same handle. Only the install that registered a device can push to it.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/DeviceInput"
-      responses:
-        "201":
-          description: Registered.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Device"
-        "200":
-          description: Already registered by this install.
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Device"
-        "400":
-          $ref: "#/components/responses/Problem"
-  /v1/devices/{handle}:
-    delete:
-      operationId: forgetDevice
-      summary: Forget a device
-      parameters:
-        - $ref: "#/components/parameters/Handle"
-      responses:
-        "204":
-          description: Forgotten.
-        "404":
-          $ref: "#/components/responses/Problem"
   /v1/pushes:
     post:
       operationId: sendPush
       summary: Send a push
-      description: Sends a push to a device and answers once Apple or Google accepted it. A retry with the same `id` within a day isn't sent again.
+      description: Sends a push to a phone and answers once Apple or Google accepted it. A retry with the same `id` within a day isn't sent again.
       requestBody:
         required: true
         content:
@@ -66,10 +29,8 @@ paths:
                 $ref: "#/components/schemas/Push"
         "400":
           $ref: "#/components/responses/Problem"
-        "404":
-          $ref: "#/components/responses/Problem"
         "410":
-          description: The device is gone, and the relay has forgotten it. Stop sending to this handle.
+          description: Apple or Google say the token is no longer valid, for example because the app was uninstalled. Stop sending to it.
           content:
             application/problem+json:
               schema:
@@ -88,13 +49,6 @@ components:
       type: http
       scheme: bearer
       description: The install's key. Requests without a valid key get 401.
-  parameters:
-    Handle:
-      name: handle
-      in: path
-      required: true
-      schema:
-        type: string
   responses:
     Problem:
       description: The request failed.
@@ -103,37 +57,22 @@ components:
           schema:
             $ref: "#/components/schemas/Problem"
   schemas:
-    DeviceInput:
-      type: object
-      additionalProperties: false
-      required: [platform, token]
-      properties:
-        platform:
-          $ref: "#/components/schemas/Platform"
-        token:
-          type: string
-          description: The push token iOS or Android gave the app.
-    Device:
-      type: object
-      required: [handle, platform]
-      properties:
-        handle:
-          type: string
-        platform:
-          $ref: "#/components/schemas/Platform"
     Platform:
       type: string
       enum: [ios, android]
     PushInput:
       type: object
       additionalProperties: false
-      required: [id, handle, event, server, incident_id]
+      required: [id, platform, token, event, server, incident_id]
       properties:
         id:
           type: string
           description: The ID of the notification this push delivers. Retries use the same ID.
-        handle:
+        platform:
+          $ref: "#/components/schemas/Platform"
+        token:
           type: string
+          description: The push token iOS or Android gave the app.
         event:
           type: string
           enum: [paged, acknowledged, resolved]

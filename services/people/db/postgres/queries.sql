@@ -24,22 +24,22 @@ DELETE FROM users
 WHERE id = @id;
 
 -- name: CreateContactMethod :exec
-INSERT INTO contact_methods (id, user_id, type, address, created_at, updated_at)
-VALUES (@id, @user_id, @type, @address, @created_at, @updated_at);
+INSERT INTO contact_methods (id, user_id, type, address, push_platform, created_at, updated_at)
+VALUES (@id, @user_id, @type, @address, sqlc.narg(push_platform), @created_at, @updated_at);
 
 -- name: GetContactMethod :one
-SELECT id, user_id, type, address, created_at, updated_at
+SELECT id, user_id, type, address, push_platform, created_at, updated_at
 FROM contact_methods
 WHERE id = @id;
 
 -- name: ListContactMethods :many
-SELECT id, user_id, type, address, created_at, updated_at
+SELECT id, user_id, type, address, push_platform, created_at, updated_at
 FROM contact_methods
 WHERE user_id = @user_id
 ORDER BY id;
 
 -- name: ListContactMethodsOfUsers :many
-SELECT id, user_id, type, address, created_at, updated_at
+SELECT id, user_id, type, address, push_platform, created_at, updated_at
 FROM contact_methods
 WHERE user_id = ANY(@user_ids::uuid[])
 ORDER BY user_id, id;

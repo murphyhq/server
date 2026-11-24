@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -10,10 +11,12 @@ import (
 	"github.com/murphyhq/server/internal/lifecycle"
 	"github.com/murphyhq/server/internal/messaging"
 	"github.com/murphyhq/server/internal/messaging/broker"
+	"github.com/murphyhq/server/internal/relay"
 	"github.com/murphyhq/server/services/escalation"
 	escalationdb "github.com/murphyhq/server/services/escalation/db"
 	"github.com/murphyhq/server/services/notifications"
 	notificationsdb "github.com/murphyhq/server/services/notifications/db"
+	"github.com/murphyhq/server/services/notifications/providers/push"
 	"github.com/murphyhq/server/services/notifications/providers/webhook"
 	"github.com/murphyhq/server/services/oncall"
 	oncalldb "github.com/murphyhq/server/services/oncall/db"
@@ -31,6 +34,9 @@ type Settings struct {
 	OnCallDatabaseURL        string `env:"ONCALL_DATABASE_URL" required:"true"`
 	EscalationDatabaseURL    string `env:"ESCALATION_DATABASE_URL" required:"true"`
 	WebhookSigningKeys       string `env:"WEBHOOK_SIGNING_KEYS" required:"true"`
+	RelayURL                 string `env:"RELAY_URL" validate:"http-url"`
+	RelayKey                 string `env:"RELAY_KEY"`
+	PublicURL                string `env:"PUBLIC_URL" validate:"base-url"`
 }
 
 type App struct {
@@ -90,13 +96,40 @@ func New(ctx context.Context, s Settings) (_ *App, err error) {
 	}
 	a.resources.Add(func() { _ = a.subscription.Close() }, a.subscription.Ping)
 
+	providers := map[murphy.ContactMethodType]notifications.Provider{
+		murphy.ContactMethodType_CONTACT_METHOD_TYPE_WEBHOOK: webhook.New(keys),
+	}
+	if s.RelayURL != "" {
+		pushes, err := pushProvider(s)
+		if err != nil {
+			return nil, err
+		}
+		providers[murphy.ContactMethodType_CONTACT_METHOD_TYPE_PUSH] = pushes
+	}
+
 	peopleService := people.New(peopleStorage)
 	a.notifications = notifications.New(notificationsStorage, escalation.New(escalationStorage, nil, nil, nil, 0), oncall.New(oncallStorage, peopleService), peopleService)
-	a.sender = notifications.NewSender(messaging.NewPublisher(topic), map[murphy.ContactMethodType]notifications.Provider{
-		murphy.ContactMethodType_CONTACT_METHOD_TYPE_WEBHOOK: webhook.New(keys),
-	})
+	a.sender = notifications.NewSender(messaging.NewPublisher(topic), providers)
 	a.Ready = a.resources.Checks()
 	return a, nil
+}
+
+func pushProvider(s Settings) (*push.Pushes, error) {
+	var missing []error
+	if s.RelayKey == "" {
+		missing = append(missing, errors.New("MURPHY_RELAY_KEY is required when MURPHY_RELAY_URL is set"))
+	}
+	if s.PublicURL == "" {
+		missing = append(missing, errors.New("MURPHY_PUBLIC_URL is required when MURPHY_RELAY_URL is set"))
+	}
+	if len(missing) > 0 {
+		return nil, errors.Join(missing...)
+	}
+	client, err := relay.New(s.RelayURL, s.RelayKey)
+	if err != nil {
+		return nil, fmt.Errorf("MURPHY_RELAY_URL: %w", err)
+	}
+	return push.New(client, s.PublicURL), nil
 }
 
 func (a *App) Run(ctx context.Context) error {
