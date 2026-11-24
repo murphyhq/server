@@ -37,12 +37,10 @@ func TestEveryIncidentPagesItsFirstLevel(t *testing.T) {
 	}
 	attack(t, p, "escalation intake", targeter, Thresholds{Success: 1, P99: 500 * time.Millisecond}, nil)
 
-	var delays []time.Duration
-	require.Eventually(t, func() bool {
-		var unpaged int
-		delays, unpaged = pageDelays(t, m.API, service.ID)
-		return unpaged == 0 && len(delays) > 0
-	}, p.Settle, time.Second, "every incident's first level gets its webhook")
+	watch := newPageWatch(m.API, service.ID)
+	watch.awaitAll(t, p.Settle)
+	delays := watch.delays
+	require.NotEmpty(t, delays, "incidents were opened and paged")
 
 	slices.Sort(delays)
 	p50, p90, p99 := percentile(delays, 0.5), percentile(delays, 0.9), percentile(delays, 0.99)
