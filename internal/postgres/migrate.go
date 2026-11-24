@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
 	"github.com/pressly/goose/v3/database"
+	"github.com/pressly/goose/v3/lock"
 
 	"github.com/murphyhq/server/internal/logger"
 	"github.com/murphyhq/server/internal/telemetry"
@@ -45,7 +46,11 @@ func migrate(ctx context.Context, db *sql.DB, set Migrations) (err error) {
 	if err != nil {
 		return fmt.Errorf("create migration store for %s: %w", set.Service, err)
 	}
-	provider, err := goose.NewProvider(database.DialectCustom, db, set.Files, goose.WithStore(store))
+	locker, err := lock.NewPostgresSessionLocker()
+	if err != nil {
+		return fmt.Errorf("create migration lock for %s: %w", set.Service, err)
+	}
+	provider, err := goose.NewProvider(database.DialectCustom, db, set.Files, goose.WithStore(store), goose.WithSessionLocker(locker))
 	if err != nil {
 		return fmt.Errorf("load migrations for %s: %w", set.Service, err)
 	}
