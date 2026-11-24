@@ -91,3 +91,8 @@ SELECT id, schedule_id, user_id, starts_at, ends_at, created_at, updated_at
 FROM overrides
 WHERE schedule_id = ANY(@schedule_ids::uuid[]) AND starts_at <= @at AND ends_at > @after
 ORDER BY schedule_id, starts_at, id;
+
+-- name: GetOverride :one
+SELECT id, schedule_id, user_id, starts_at, ends_at, created_at, updated_at
+FROM overrides
+WHERE id = @id;

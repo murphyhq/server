@@ -241,6 +241,16 @@ func (m *Murphy) SessionFromCode(code, codeVerifier string) (*client.CreateSessi
 	return m.Anonymous().CreateSessionWithResponse(m.t.Context(), client.CreateSessionJSONRequestBody{Code: &code, CodeVerifier: &codeVerifier})
 }
 
+func (m *Murphy) PostThroughBrowser(email, path, contentType, body string) *http.Response {
+	m.t.Helper()
+	browser := m.browser()
+	m.loginThroughProvider(browser, m.apiURL+"/v1/auth/sign-in", email)
+	response, err := browser.Post(m.apiURL+path, contentType, strings.NewReader(body))
+	require.NoError(m.t, err)
+	require.NoError(m.t, response.Body.Close())
+	return response
+}
+
 func (m *Murphy) OpenInAnotherBrowser(url string) *http.Response {
 	m.t.Helper()
 	response, err := m.browser().Get(url)

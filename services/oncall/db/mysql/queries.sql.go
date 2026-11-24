@@ -148,6 +148,27 @@ func (q *Queries) ExistingSchedules(ctx context.Context, ids []string) ([]string
 	return items, nil
 }
 
+const getOverride = `-- name: GetOverride :one
+SELECT id, schedule_id, user_id, starts_at, ends_at, created_at, updated_at
+FROM overrides
+WHERE id = ?
+`
+
+func (q *Queries) GetOverride(ctx context.Context, id string) (Override, error) {
+	row := q.db.QueryRowContext(ctx, getOverride, id)
+	var i Override
+	err := row.Scan(
+		&i.ID,
+		&i.ScheduleID,
+		&i.UserID,
+		&i.StartsAt,
+		&i.EndsAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getSchedule = `-- name: GetSchedule :one
 SELECT id, name, time_zone, created_at, updated_at
 FROM schedules

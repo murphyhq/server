@@ -1,0 +1,329 @@
+package router
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"slices"
+	"strings"
+
+	"github.com/getkin/kin-openapi/openapi3"
+
+	"github.com/murphyhq/server"
+	"github.com/murphyhq/server/internal/httpserver"
+)
+
+type TeamRoles interface {
+	TeamRolesOf(ctx context.Context, userID string) (map[string]murphy.TeamRole, error)
+	GetContactMethod(ctx context.Context, id string) (*murphy.ContactMethod, error)
+}
+
+type PolicyOwners interface {
+	GetPolicy(ctx context.Context, id string) (*murphy.EscalationPolicy, error)
+}
+
+type ServiceOwners interface {
+	GetService(ctx context.Context, id string) (*murphy.Service, error)
+	GetIntegration(ctx context.Context, id string) (*murphy.Integration, error)
+}
+
+type ScheduleOwners interface {
+	GetSchedule(ctx context.Context, id string) (*murphy.Schedule, error)
+	GetOverride(ctx context.Context, id string) (*murphy.Override, error)
+}
+
+type IncidentResponders interface {
+	GetIncident(ctx context.Context, id string) (*murphy.Incident, []*murphy.TimelineEntry, error)
+}
+
+type rule struct {
+	adminOnly bool
+	anyone    bool
+	check     func(a *access, ctx context.Context, userID, id string) error
+	owner     func(a *access, ctx context.Context, id string) ([]string, error)
+}
+
+var rules = map[string]rule{
+	"sessions:own":        {anyone: true},
+	"install:manage":      {adminOnly: true},
+	"users:self":          {check: (*access).isSelf},
+	"contact-methods:own": {check: (*access).ownsContactMethod},
+	"incidents:respond":   {check: (*access).respondsTo},
+	"teams:manage":        {owner: (*access).theTeam},
+	"policies:manage":     {owner: (*access).teamOfPolicy},
+	"services:manage":     {owner: (*access).teamOfService},
+	"integrations:manage": {owner: (*access).teamOfIntegration},
+	"schedules:manage":    {owner: (*access).teamsOfSchedule},
+	"overrides:manage":    {owner: (*access).teamsOfOverride},
+}
+
+type grant struct {
+	scope    string
+	resource resource
+}
+
+type access struct {
+	grants    map[string][]grant
+	people    TeamRoles
+	policies  PolicyOwners
+	services  ServiceOwners
+	schedules ScheduleOwners
+	incidents IncidentResponders
+}
+
+func requireAccess(a *access) MiddlewareFunc {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			current := sessionFrom(r.Context())
+			grants := a.grants[r.Pattern]
+			if current == nil || len(grants) == 0 || current.role == murphy.UserRole_USER_ROLE_ADMIN {
+				next.ServeHTTP(w, r)
+				return
+			}
+			body, err := jsonBody(r)
+			if err != nil {
+				httpserver.WriteProblem(w, r, http.StatusBadRequest, "the request body is not valid JSON")
+				return
+			}
+			for _, g := range grants {
+				ids, applies := g.resource.in(r, body)
+				if !applies {
+					continue
+				}
+				if err := a.allows(r.Context(), current.session.GetUserId(), g.scope, ids); err != nil {
+					httpserver.WriteError(w, r, err)
+					return
+				}
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+func (a *access) allows(ctx context.Context, userID, scope string, ids []string) error {
+	rule := rules[scope]
+	switch {
+	case rule.anyone:
+		return nil
+	case rule.adminOnly:
+		return &murphy.ForbiddenError{Reason: "only admins can do this"}
+	case rule.check != nil:
+		return rule.check(a, ctx, userID, ids[0])
+	}
+	var teams []string
+	for _, id := range ids {
+		owners, err := rule.owner(a, ctx, id)
+		if err != nil {
+			return err
+		}
+		teams = append(teams, owners...)
+	}
+	return a.hasRoleIn(ctx, userID, teams, "only the team's managers can do this", murphy.TeamRole_TEAM_ROLE_MANAGER)
+}
+
+func (a *access) isSelf(_ context.Context, userID, id string) error {
+	if id == userID {
+		return nil
+	}
+	return &murphy.ForbiddenError{Reason: "only admins can do this for someone else"}
+}
+
+func (a *access) ownsContactMethod(ctx context.Context, userID, id string) error {
+	method, err := a.people.GetContactMethod(ctx, id)
+	if err != nil {
+		return err
+	}
+	return a.isSelf(ctx, userID, method.GetUserId())
+}
+
+func (a *access) respondsTo(ctx context.Context, userID, id string) error {
+	incident, timeline, err := a.incidents.GetIncident(ctx, id)
+	if err != nil {
+		return err
+	}
+	if wasPaged(timeline, userID) {
+		return nil
+	}
+	teams, err := a.teamOfPolicy(ctx, incident.GetEscalationPolicyId())
+	if err != nil {
+		return err
+	}
+	return a.hasRoleIn(ctx, userID, teams, "only the owning team's responders and managers, and people paged for it, can respond to this incident",
+		murphy.TeamRole_TEAM_ROLE_RESPONDER, murphy.TeamRole_TEAM_ROLE_MANAGER)
+}
+
+func (a *access) hasRoleIn(ctx context.Context, userID string, teams []string, refusal string, allowed ...murphy.TeamRole) error {
+	roles, err := a.people.TeamRolesOf(ctx, userID)
+	if err != nil {
+		return fmt.Errorf("check team roles: %w", err)
+	}
+	if slices.ContainsFunc(teams, func(team string) bool { return slices.Contains(allowed, roles[team]) }) {
+		return nil
+	}
+	return &murphy.ForbiddenError{Reason: refusal}
+}
+
+func wasPaged(timeline []*murphy.TimelineEntry, userID string) bool {
+	for _, entry := range timeline {
+		for _, page := range entry.GetEscalation().GetPaged() {
+			if page.GetUserId() == userID {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (a *access) theTeam(_ context.Context, id string) ([]string, error) {
+	return []string{id}, nil
+}
+
+func (a *access) teamOfPolicy(ctx context.Context, id string) ([]string, error) {
+	policy, err := a.policies.GetPolicy(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return []string{policy.GetTeamId()}, nil
+}
+
+func (a *access) teamOfService(ctx context.Context, id string) ([]string, error) {
+	service, err := a.services.GetService(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return a.teamOfPolicy(ctx, service.GetEscalationPolicyId())
+}
+
+func (a *access) teamOfIntegration(ctx context.Context, id string) ([]string, error) {
+	integration, err := a.services.GetIntegration(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return a.teamOfService(ctx, integration.GetServiceId())
+}
+
+func (a *access) teamsOfSchedule(ctx context.Context, id string) ([]string, error) {
+	schedule, err := a.schedules.GetSchedule(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return schedule.GetTeamIds(), nil
+}
+
+func (a *access) teamsOfOverride(ctx context.Context, id string) ([]string, error) {
+	override, err := a.schedules.GetOverride(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return a.teamsOfSchedule(ctx, override.GetScheduleId())
+}
+
+type resource struct {
+	inPath   string
+	inBody   []string
+	optional bool
+}
+
+func (where resource) in(r *http.Request, body any) ([]string, bool) {
+	switch {
+	case where.inPath != "":
+		return []string{r.PathValue(where.inPath)}, true
+	case where.inBody != nil:
+		ids := lookup(body, where.inBody)
+		return ids, len(ids) > 0 || !where.optional
+	default:
+		return nil, true
+	}
+}
+
+func lookup(value any, fields []string) []string {
+	if items, ok := value.([]any); ok {
+		var found []string
+		for _, item := range items {
+			found = append(found, lookup(item, fields)...)
+		}
+		return found
+	}
+	if len(fields) == 0 {
+		text, ok := value.(string)
+		if !ok {
+			return nil
+		}
+		return []string{text}
+	}
+	object, _ := value.(map[string]any)
+	next, ok := object[fields[0]]
+	if !ok {
+		return nil
+	}
+	return lookup(next, fields[1:])
+}
+
+func jsonBody(r *http.Request) (any, error) {
+	raw, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+	if err != nil || len(raw) == 0 {
+		return nil, err
+	}
+	r.Body = io.NopCloser(bytes.NewReader(raw))
+	var body any
+	return body, json.Unmarshal(raw, &body)
+}
+
+func newAccess(spec *openapi3.T, people TeamRoles, policies PolicyOwners, services ServiceOwners, schedules ScheduleOwners, incidents IncidentResponders) (*access, error) {
+	a := &access{grants: map[string][]grant{}, people: people, policies: policies, services: services, schedules: schedules, incidents: incidents}
+	for path, item := range spec.Paths.Map() {
+		for method, operation := range item.Operations() {
+			grants, err := grantsOf(spec, path, method, operation)
+			if err != nil {
+				return nil, fmt.Errorf("%s %s: %w", method, path, err)
+			}
+			a.grants[method+" "+path] = grants
+		}
+	}
+	return a, nil
+}
+
+func grantsOf(spec *openapi3.T, path, method string, operation *openapi3.Operation) ([]grant, error) {
+	requirements := spec.Security
+	if operation.Security != nil {
+		requirements = *operation.Security
+	}
+	if len(requirements) == 0 {
+		return nil, nil
+	}
+	scopes := requirements[0]["session"]
+	if method != http.MethodGet && len(scopes) == 0 {
+		return nil, fmt.Errorf("a change must declare a scope")
+	}
+	declared, _ := operation.Extensions["x-murphy-resources"].(map[string]any)
+	grants := make([]grant, len(scopes))
+	for i, scope := range scopes {
+		rule, known := rules[scope]
+		if !known {
+			return nil, fmt.Errorf("unknown scope %q", scope)
+		}
+		where, err := resourceOf(path, rule, declared[scope])
+		if err != nil {
+			return nil, fmt.Errorf("scope %q: %w", scope, err)
+		}
+		grants[i] = grant{scope: scope, resource: where}
+	}
+	return grants, nil
+}
+
+func resourceOf(path string, rule rule, declared any) (resource, error) {
+	if text, ok := declared.(string); ok {
+		field, optional := strings.CutSuffix(strings.TrimPrefix(text, "body."), "?")
+		return resource{inBody: strings.Split(field, "."), optional: optional}, nil
+	}
+	if rule.anyone || rule.adminOnly {
+		return resource{}, nil
+	}
+	if !strings.Contains(path, "{id}") {
+		return resource{}, fmt.Errorf("needs a resource: an {id} in the path, or where to find it in x-murphy-resources")
+	}
+	return resource{inPath: "id"}, nil
+}

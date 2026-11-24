@@ -120,12 +120,13 @@ func Run(t *testing.T, open func(t *testing.T) Storage) {
 		require.NoError(t, repo.CreateUser(t.Context(), user))
 		require.NoError(t, repo.CreateSession(t.Context(), newSession(user, "token", now.Add(time.Hour))))
 
-		active, err := repo.GetActiveSession(t.Context(), []byte("token"), now)
+		active, role, err := repo.GetActiveSession(t.Context(), []byte("token"), now)
 		require.NoError(t, err)
 		require.NoError(t, repo.RevokeSession(t.Context(), []byte("token"), now))
-		_, revoked := repo.GetActiveSession(t.Context(), []byte("token"), now)
+		_, _, revoked := repo.GetActiveSession(t.Context(), []byte("token"), now)
 
 		assert.Equal(t, user.GetId(), active.GetUserId())
+		assert.Equal(t, murphy.UserRole_USER_ROLE_MEMBER, role, "the session says what the user may do")
 		assert.ErrorIs(t, revoked, murphy.ErrNotFound)
 	})
 
@@ -136,7 +137,7 @@ func Run(t *testing.T, open func(t *testing.T) Storage) {
 		require.NoError(t, repo.CreateUser(t.Context(), user))
 		require.NoError(t, repo.CreateSession(t.Context(), newSession(user, "token", now.Add(time.Hour))))
 
-		_, err := repo.GetActiveSession(t.Context(), []byte("token"), now.Add(2*time.Hour))
+		_, _, err := repo.GetActiveSession(t.Context(), []byte("token"), now.Add(2*time.Hour))
 
 		assert.ErrorIs(t, err, murphy.ErrNotFound)
 	})
@@ -150,7 +151,7 @@ func Run(t *testing.T, open func(t *testing.T) Storage) {
 		user.Status = murphy.UserStatus_USER_STATUS_DEACTIVATED
 		require.NoError(t, repo.UpdateUser(t.Context(), user))
 
-		_, err := repo.GetActiveSession(t.Context(), []byte("token"), now)
+		_, _, err := repo.GetActiveSession(t.Context(), []byte("token"), now)
 
 		assert.ErrorIs(t, err, murphy.ErrNotFound)
 	})
@@ -185,9 +186,9 @@ func Run(t *testing.T, open func(t *testing.T) Storage) {
 		require.NoError(t, repo.CreateSession(t.Context(), anas))
 
 		byBo := repo.RevokeSessionOfUser(t.Context(), bo.GetId(), anas.GetId(), now)
-		_, stillActive := repo.GetActiveSession(t.Context(), []byte("anas"), now)
+		_, _, stillActive := repo.GetActiveSession(t.Context(), []byte("anas"), now)
 		byAna := repo.RevokeSessionOfUser(t.Context(), ana.GetId(), anas.GetId(), now)
-		_, ended := repo.GetActiveSession(t.Context(), []byte("anas"), now)
+		_, _, ended := repo.GetActiveSession(t.Context(), []byte("anas"), now)
 
 		assert.ErrorIs(t, byBo, murphy.ErrNotFound)
 		assert.NoError(t, stillActive)
@@ -210,7 +211,7 @@ func Run(t *testing.T, open func(t *testing.T) Storage) {
 		anas, err := repo.ListActiveSessions(t.Context(), ana.GetId(), maxID, 10, now)
 		require.NoError(t, err)
 		_, code := repo.TakeOneTimeCode(t.Context(), []byte("connect"), now)
-		_, bos := repo.GetActiveSession(t.Context(), []byte("bos"), now)
+		_, _, bos := repo.GetActiveSession(t.Context(), []byte("bos"), now)
 
 		assert.Empty(t, anas)
 		assert.ErrorIs(t, code, murphy.ErrNotFound)

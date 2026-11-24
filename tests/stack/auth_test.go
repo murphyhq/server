@@ -252,3 +252,133 @@ func TestAMemberCannotEndSomeoneElsesSessions(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusForbidden, got.StatusCode())
 }
+
+func TestAMemberReadsEverything(t *testing.T) {
+	m := murphytest.New(t)
+	m.Service()
+	bo := m.Member(murphytest.Bo)
+
+	got, err := bo.API.ListServicesWithResponse(t.Context(), nil)
+
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, got.StatusCode())
+}
+
+func TestOnlyAdminsAddPeople(t *testing.T) {
+	m := murphytest.New(t)
+	bo := m.Member(murphytest.Bo)
+
+	got, err := bo.API.CreateUserWithResponse(t.Context(), nil, client.UserInput{Name: "Eve", Email: m.Name("eve") + "@example.com"})
+
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusForbidden, got.StatusCode())
+}
+
+func TestATeamsManagerManagesItsServices(t *testing.T) {
+	m := murphytest.New(t)
+	team := m.Team()
+	bo := m.Member(murphytest.Bo)
+	team.Add(bo, client.Manager)
+	service := m.Service(murphytest.OwnedBy(team))
+
+	got, err := bo.API.DeleteServiceWithResponse(t.Context(), service.ID)
+
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusNoContent, got.StatusCode())
+}
+
+func TestSomeoneOutsideTheTeamCannotChangeItsServices(t *testing.T) {
+	m := murphytest.New(t)
+	team := m.Team()
+	team.Add(m.Member(murphytest.Bo), client.Manager)
+	service := m.Service(murphytest.OwnedBy(team))
+	cy := m.Member(murphytest.Cy)
+
+	got, err := cy.API.DeleteServiceWithResponse(t.Context(), service.ID)
+
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusForbidden, got.StatusCode())
+}
+
+func TestTheOwningTeamsResponderAcknowledges(t *testing.T) {
+	m := murphytest.New(t)
+	team := m.Team()
+	bo := m.Member(murphytest.Bo)
+	team.Add(bo, client.Responder)
+	incident := m.Service(murphytest.OwnedBy(team), murphytest.Pages(m.User().Target())).Fire("disk-full")
+
+	got, err := bo.API.AcknowledgeIncidentWithResponse(t.Context(), incident.ID, nil)
+
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, got.StatusCode())
+}
+
+func TestAnObserverCannotAcknowledge(t *testing.T) {
+	m := murphytest.New(t)
+	team := m.Team()
+	bo := m.Member(murphytest.Bo)
+	team.Add(bo, client.Observer)
+	incident := m.Service(murphytest.OwnedBy(team), murphytest.Pages(m.User().Target())).Fire("disk-full")
+
+	got, err := bo.API.AcknowledgeIncidentWithResponse(t.Context(), incident.ID, nil)
+
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusForbidden, got.StatusCode())
+}
+
+func TestSomeonePagedDirectlyAcknowledgesFromOutsideTheTeam(t *testing.T) {
+	m := murphytest.New(t)
+	cy := m.Member(murphytest.Cy)
+	incident := m.Service(murphytest.OwnedBy(m.Team()), murphytest.Pages(cy.Target())).Fire("disk-full")
+	incident.WaitFor(murphytest.Paged(cy.User))
+
+	got, err := cy.API.AcknowledgeIncidentWithResponse(t.Context(), incident.ID, nil)
+
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, got.StatusCode())
+}
+
+func TestNobodyChangesSomeoneElsesContactMethods(t *testing.T) {
+	m := murphytest.New(t)
+	bo := m.Member(murphytest.Bo)
+	cy := m.Member(murphytest.Cy)
+
+	got, err := bo.API.CreateContactMethodWithResponse(t.Context(), cy.ID, nil, client.ContactMethodInput{Type: client.Webhook, Address: "https://example.com/hook"})
+
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusForbidden, got.StatusCode())
+}
+
+func TestWritesSignedInWithTheCookieMustSendJSON(t *testing.T) {
+	m := murphytest.New(t)
+
+	got := m.PostThroughBrowser(murphytest.Bo, "/v1/auth/connect-codes", "text/plain", "{}")
+
+	assert.Equal(t, http.StatusUnsupportedMediaType, got.StatusCode)
+}
+
+func TestAMemberCannotChangeTheirOwnStatus(t *testing.T) {
+	m := murphytest.New(t)
+	bo := m.Member(murphytest.Bo)
+	deactivated := client.UserStatusDeactivated
+
+	got, err := bo.API.UpdateUserWithResponse(t.Context(), bo.ID, client.UserInput{Name: "Bo", Email: murphytest.Bo, Status: &deactivated})
+
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusForbidden, got.StatusCode())
+}
+
+func TestAPolicyCannotBeCreatedForATeamYouDontManage(t *testing.T) {
+	m := murphytest.New(t)
+	theirs := m.Team()
+	bo := m.Member(murphytest.Bo)
+	m.Team().Add(bo, client.Manager)
+
+	got, err := bo.API.CreateEscalationPolicyWithResponse(t.Context(), nil, client.EscalationPolicyInput{
+		Name: m.Name("policy"), Team: client.Reference{Id: theirs.ID},
+		Levels: []client.EscalationLevel{{DelaySeconds: 300, Targets: []client.EscalationTarget{bo.Target()}}},
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusForbidden, got.StatusCode())
+}

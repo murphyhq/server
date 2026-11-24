@@ -42,6 +42,10 @@ func New(services Services, keys idempotency.Store) (http.Handler, error) {
 	if err != nil {
 		return nil, fmt.Errorf("load OpenAPI spec: %w", err)
 	}
+	rules, err := newAccess(spec, services.People, services.Escalation, services.Catalog, services.OnCall, services.Incidents)
+	if err != nil {
+		return nil, fmt.Errorf("read access rules from the OpenAPI spec: %w", err)
+	}
 	strict := NewStrictHandlerWithOptions(&Server{catalog: services.Catalog, incidents: services.Incidents, people: services.People, oncall: services.OnCall, escalation: services.Escalation, publicKeys: services.PublicKeys, auth: services.Auth, secureCookies: services.SecureCookies}, nil, StrictHTTPServerOptions{
 		RequestErrorHandlerFunc:  httpserver.BadRequest,
 		ResponseErrorHandlerFunc: httpserver.WriteError,
@@ -50,6 +54,7 @@ func New(services Services, keys idempotency.Store) (http.Handler, error) {
 		Middlewares: []MiddlewareFunc{
 			idempotency.Middleware(keys, 24*time.Hour),
 			httpserver.RejectUnknownParameters(spec),
+			requireAccess(rules),
 			RequireSession(services.Auth),
 		},
 		ErrorHandlerFunc: httpserver.BadRequest,

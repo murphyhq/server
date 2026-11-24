@@ -34,6 +34,7 @@ type Repository interface {
 	ExistingUsers(ctx context.Context, ids []string) ([]string, error)
 	ExistingTeams(ctx context.Context, ids []string) ([]string, error)
 	ActiveUsers(ctx context.Context, ids []string) ([]string, error)
+	ListMembershipsOfUser(ctx context.Context, userID string) ([]*murphy.TeamMembership, error)
 }
 
 type Service struct {
@@ -432,4 +433,20 @@ func (s *Service) ContactMethodsOfUsers(ctx context.Context, userIDs []string) (
 		byUser[method.GetUserId()] = append(byUser[method.GetUserId()], method)
 	}
 	return byUser, nil
+}
+
+func (s *Service) TeamRolesOf(ctx context.Context, userID string) (_ map[string]murphy.TeamRole, err error) {
+	ctx, span := tracer.Span(ctx)
+	ctx = span.Set(ctx, telemetry.WithField("user.id", userID))
+	defer span.End(&err)
+
+	memberships, err := s.repo.ListMembershipsOfUser(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("list the user's team roles: %w", err)
+	}
+	roles := make(map[string]murphy.TeamRole, len(memberships))
+	for _, membership := range memberships {
+		roles[membership.GetTeamId()] = membership.GetRole()
+	}
+	return roles, nil
 }

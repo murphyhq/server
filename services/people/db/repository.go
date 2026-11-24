@@ -25,7 +25,7 @@ type Engine[T Tx] interface {
 	GetIdentity(ctx context.Context, issuer, subject string) (*murphy.Identity, error)
 	CreateIdentity(ctx context.Context, identity *murphy.Identity) error
 	CreateSession(ctx context.Context, session *murphy.Session) error
-	GetActiveSession(ctx context.Context, tokenHash []byte, now time.Time) (*murphy.Session, error)
+	GetActiveSession(ctx context.Context, tokenHash []byte, now time.Time) (*murphy.Session, murphy.UserRole, error)
 	RevokeSession(ctx context.Context, tokenHash []byte, at time.Time) error
 	ListActiveSessions(ctx context.Context, userID, before string, limit int, now time.Time) ([]*murphy.Session, error)
 	RevokeSessionOfUser(ctx context.Context, userID, id string, at time.Time) error

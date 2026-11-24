@@ -45,6 +45,7 @@ type Settings struct {
 	SessionDuration        time.Duration `env:"SESSION_DURATION" default:"720h"`
 	InitialAdminEmail      string        `env:"INITIAL_ADMIN_EMAIL"`
 	AppScheme              string        `env:"APP_SCHEME" default:"murphy"`
+	AllowedEmailDomains    []string      `env:"ALLOWED_EMAIL_DOMAINS"`
 }
 
 type App struct {
@@ -116,17 +117,19 @@ func New(ctx context.Context, s Settings) (_ *App, err error) {
 		ClientSecret:   s.OIDCClientSecret,
 		RedirectURL:    s.PublicURL + "/v1/auth/callback",
 	}), people.AuthSettings{
-		SessionDuration:   s.SessionDuration,
-		InitialAdminEmail: s.InitialAdminEmail,
-		ReturnOrigins:     append([]string{s.PublicURL}, s.CORSOrigins...),
-		PublicURL:         s.PublicURL,
-		AppScheme:         s.AppScheme,
+		SessionDuration:     s.SessionDuration,
+		InitialAdminEmail:   s.InitialAdminEmail,
+		ReturnOrigins:       append([]string{s.PublicURL}, s.CORSOrigins...),
+		PublicURL:           s.PublicURL,
+		AppScheme:           s.AppScheme,
+		AllowedEmailDomains: s.AllowedEmailDomains,
 	})
 	oncallService := oncall.New(oncallStorage, peopleService)
 	escalationService := escalation.New(escalationStorage, peopleService, oncallService, catalogService, s.EscalationMinimumDelay)
+	incidentsService := incidents.New(incidentsStorage, catalogService, escalationService)
 	a.Handler, err = router.New(router.Services{
 		Catalog:       catalogService,
-		Incidents:     incidents.New(incidentsStorage, catalogService, escalationService),
+		Incidents:     incidentsService,
 		People:        peopleService,
 		OnCall:        oncallService,
 		Escalation:    escalationService,

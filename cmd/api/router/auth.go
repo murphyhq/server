@@ -2,6 +2,7 @@ package router
 
 import (
 	"context"
+	"mime"
 	"net/http"
 	"strings"
 	"time"
@@ -22,6 +23,7 @@ type sessionContext struct{}
 type currentSession struct {
 	token   string
 	session *murphy.Session
+	role    murphy.UserRole
 }
 
 func RequireSession(auth *people.Auth) func(http.Handler) http.Handler {
@@ -31,30 +33,42 @@ func RequireSession(auth *people.Auth) func(http.Handler) http.Handler {
 				next.ServeHTTP(w, r)
 				return
 			}
-			token := sessionToken(r)
+			token, fromCookie := sessionToken(r)
 			if token == "" {
 				httpserver.WriteError(w, r, murphy.ErrUnauthenticated)
 				return
 			}
-			session, err := auth.Authenticate(r.Context(), token)
+			if fromCookie && !jsonOrEmpty(r) {
+				httpserver.WriteProblem(w, r, http.StatusUnsupportedMediaType, "requests signed in with the session cookie must send JSON")
+				return
+			}
+			session, role, err := auth.Authenticate(r.Context(), token)
 			if err != nil {
 				httpserver.WriteError(w, r, err)
 				return
 			}
-			ctx := context.WithValue(r.Context(), sessionContext{}, &currentSession{token: token, session: session})
+			ctx := context.WithValue(r.Context(), sessionContext{}, &currentSession{token: token, session: session, role: role})
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
 }
 
-func sessionToken(r *http.Request) string {
+func sessionToken(r *http.Request) (string, bool) {
 	if token, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer "); ok {
-		return token
+		return token, false
 	}
 	if cookie, err := r.Cookie(sessionCookie); err == nil {
-		return cookie.Value
+		return cookie.Value, true
 	}
-	return ""
+	return "", false
+}
+
+func jsonOrEmpty(r *http.Request) bool {
+	if r.ContentLength == 0 || r.Method == http.MethodGet || r.Method == http.MethodHead {
+		return true
+	}
+	mediaType, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
+	return err == nil && mediaType == "application/json"
 }
 
 func sessionFrom(ctx context.Context) *currentSession {
@@ -183,9 +197,6 @@ func (s *Server) EndUserSessions(ctx context.Context, request EndUserSessionsReq
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
-	if err := s.requireAdmin(ctx); err != nil {
-		return nil, err
-	}
 	user, err := s.people.GetUser(ctx, request.Id)
 	if err != nil {
 		return nil, err
@@ -194,17 +205,6 @@ func (s *Server) EndUserSessions(ctx context.Context, request EndUserSessionsReq
 		return nil, err
 	}
 	return EndUserSessions204Response{}, nil
-}
-
-func (s *Server) requireAdmin(ctx context.Context) error {
-	caller, err := s.people.GetUser(ctx, sessionFrom(ctx).session.GetUserId())
-	if err != nil {
-		return err
-	}
-	if caller.GetRole() != murphy.UserRole_USER_ROLE_ADMIN {
-		return murphy.ErrForbidden
-	}
-	return nil
 }
 
 func (s *Server) GetSession(ctx context.Context, _ GetSessionRequestObject) (_ GetSessionResponseObject, err error) {
