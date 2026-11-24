@@ -48,17 +48,18 @@ func (q *Queries) AdminExists(ctx context.Context) (bool, error) {
 }
 
 const createContactMethod = `-- name: CreateContactMethod :exec
-INSERT INTO contact_methods (id, user_id, type, address, created_at, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6)
+INSERT INTO contact_methods (id, user_id, type, address, push_platform, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
 `
 
 type CreateContactMethodParams struct {
-	ID        string
-	UserID    string
-	Type      string
-	Address   string
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID           string
+	UserID       string
+	Type         string
+	Address      string
+	PushPlatform *string
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
 }
 
 func (q *Queries) CreateContactMethod(ctx context.Context, arg CreateContactMethodParams) error {
@@ -67,6 +68,7 @@ func (q *Queries) CreateContactMethod(ctx context.Context, arg CreateContactMeth
 		arg.UserID,
 		arg.Type,
 		arg.Address,
+		arg.PushPlatform,
 		arg.CreatedAt,
 		arg.UpdatedAt,
 	)
@@ -412,7 +414,7 @@ func (q *Queries) GetActiveSession(ctx context.Context, arg GetActiveSessionPara
 }
 
 const getContactMethod = `-- name: GetContactMethod :one
-SELECT id, user_id, type, address, created_at, updated_at
+SELECT id, user_id, type, address, push_platform, created_at, updated_at
 FROM contact_methods
 WHERE id = $1
 `
@@ -425,6 +427,7 @@ func (q *Queries) GetContactMethod(ctx context.Context, id string) (ContactMetho
 		&i.UserID,
 		&i.Type,
 		&i.Address,
+		&i.PushPlatform,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -640,7 +643,7 @@ func (q *Queries) ListActiveSessions(ctx context.Context, arg ListActiveSessions
 }
 
 const listContactMethods = `-- name: ListContactMethods :many
-SELECT id, user_id, type, address, created_at, updated_at
+SELECT id, user_id, type, address, push_platform, created_at, updated_at
 FROM contact_methods
 WHERE user_id = $1
 ORDER BY id
@@ -660,6 +663,7 @@ func (q *Queries) ListContactMethods(ctx context.Context, userID string) ([]Cont
 			&i.UserID,
 			&i.Type,
 			&i.Address,
+			&i.PushPlatform,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -674,7 +678,7 @@ func (q *Queries) ListContactMethods(ctx context.Context, userID string) ([]Cont
 }
 
 const listContactMethodsOfUsers = `-- name: ListContactMethodsOfUsers :many
-SELECT id, user_id, type, address, created_at, updated_at
+SELECT id, user_id, type, address, push_platform, created_at, updated_at
 FROM contact_methods
 WHERE user_id = ANY($1::uuid[])
 ORDER BY user_id, id
@@ -694,6 +698,7 @@ func (q *Queries) ListContactMethodsOfUsers(ctx context.Context, userIds []strin
 			&i.UserID,
 			&i.Type,
 			&i.Address,
+			&i.PushPlatform,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {

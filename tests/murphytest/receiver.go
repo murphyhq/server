@@ -99,6 +99,40 @@ func (r *Receiver) stub(path, state string, status int, next string) {
 	require.NoError(r.t, r.client.StubFor(rule), "set up the webhook receiver")
 }
 
+type Phone struct {
+	Handle   string
+	receiver *Receiver
+}
+
+type ReceivedPush struct {
+	ID         string `json:"id"`
+	Handle     string `json:"handle"`
+	Event      string `json:"event"`
+	Server     string `json:"server"`
+	IncidentID string `json:"incident_id"`
+}
+
+func (p *Phone) pushes() *wiremock.Request {
+	return wiremock.NewRequest(http.MethodPost, wiremock.URLPathEqualTo("/relay/v1/pushes")).
+		WithBodyPattern(wiremock.MatchingJsonPath("$[?(@.handle == '" + p.Handle + "')]"))
+}
+
+func (p *Phone) WaitForPushes(count int) []ReceivedPush {
+	p.receiver.t.Helper()
+	require.EventuallyWithT(p.receiver.t, func(c *assert.CollectT) {
+		got, err := p.receiver.client.GetCountRequests(p.pushes())
+		assert.NoError(c, err)
+		assert.Equal(c, int64(count), got)
+	}, Settle, tick)
+	found, err := p.receiver.client.FindRequestsByCriteria(p.pushes())
+	require.NoError(p.receiver.t, err, "read what the relay received")
+	received := make([]ReceivedPush, len(found.Requests))
+	for i, request := range found.Requests {
+		require.NoError(p.receiver.t, json.Unmarshal([]byte(request.Body), &received[i]))
+	}
+	return received
+}
+
 func (w *Webhook) Received() []ReceivedWebhook {
 	w.receiver.t.Helper()
 	found, err := w.receiver.client.FindRequestsByCriteria(wiremock.NewRequest(http.MethodPost, wiremock.URLPathEqualTo(w.path)))

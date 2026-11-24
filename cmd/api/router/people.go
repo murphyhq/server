@@ -87,9 +87,10 @@ func (s *Server) CreateContactMethod(ctx context.Context, request CreateContactM
 	defer span.End(&err)
 
 	method, err := s.people.CreateContactMethod(ctx, &murphy.ContactMethod{
-		UserId:  request.Id,
-		Type:    murphy.ContactMethodTypeFromText(string(request.Body.Type)),
-		Address: request.Body.Address,
+		UserId:       request.Id,
+		Type:         murphy.ContactMethodTypeFromText(string(request.Body.Type)),
+		Address:      request.Body.Address,
+		PushPlatform: murphy.PushPlatformFromText(string(*murphy.Or(request.Body.Platform, new(PushPlatform)))),
 	})
 	if err != nil {
 		return nil, err
@@ -161,7 +162,16 @@ func toContactMethod(method *murphy.ContactMethod) ContactMethod {
 		User:      ref(method.GetUserId()),
 		Type:      ContactMethodType(method.GetType().Text()),
 		Address:   method.GetAddress(),
+		Platform:  pushPlatform(method.GetPushPlatform()),
 		CreatedAt: method.GetCreatedAt().AsTime(),
 		UpdatedAt: method.GetUpdatedAt().AsTime(),
 	}
+}
+
+func pushPlatform(platform murphy.PushPlatform) *PushPlatform {
+	if platform == murphy.PushPlatform_PUSH_PLATFORM_UNSPECIFIED {
+		return nil
+	}
+	text := PushPlatform(platform.Text())
+	return &text
 }

@@ -24,22 +24,22 @@ DELETE FROM users
 WHERE id = sqlc.arg(id);
 
 -- name: CreateContactMethod :exec
-INSERT INTO contact_methods (id, user_id, type, address, created_at, updated_at)
-VALUES (sqlc.arg(id), sqlc.arg(user_id), sqlc.arg(type), sqlc.arg(address), sqlc.arg(created_at), sqlc.arg(updated_at));
+INSERT INTO contact_methods (id, user_id, type, address, push_platform, created_at, updated_at)
+VALUES (sqlc.arg(id), sqlc.arg(user_id), sqlc.arg(type), sqlc.arg(address), sqlc.narg(push_platform), sqlc.arg(created_at), sqlc.arg(updated_at));
 
 -- name: GetContactMethod :one
-SELECT id, user_id, type, address, created_at, updated_at
+SELECT id, user_id, type, address, push_platform, created_at, updated_at
 FROM contact_methods
 WHERE id = sqlc.arg(id);
 
 -- name: ListContactMethods :many
-SELECT id, user_id, type, address, created_at, updated_at
+SELECT id, user_id, type, address, push_platform, created_at, updated_at
 FROM contact_methods
 WHERE user_id = sqlc.arg(user_id)
 ORDER BY id;
 
 -- name: ListContactMethodsOfUsers :many
-SELECT id, user_id, type, address, created_at, updated_at
+SELECT id, user_id, type, address, push_platform, created_at, updated_at
 FROM contact_methods
 WHERE user_id IN (sqlc.slice(user_ids))
 ORDER BY user_id, id;

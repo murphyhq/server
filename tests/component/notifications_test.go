@@ -42,7 +42,7 @@ func notificationsOn(t *testing.T, databases migrateapp.Settings) (*notification
 	escalationStorage, err := escalationdb.Open(t.Context(), databases.EscalationDatabaseURL)
 	require.NoError(t, err)
 	t.Cleanup(escalationStorage.Close)
-	peopleService := people.New(peopleStorage)
+	peopleService := people.New(peopleStorage, nil)
 	return notifications.New(storage, escalation.New(escalationStorage, nil, nil, nil, 0), oncall.New(oncallStorage, peopleService), peopleService), storage
 }
 

@@ -19,11 +19,13 @@ CREATE TABLE contact_methods (
   user_id CHAR(36) NOT NULL,
   type VARCHAR(16) NOT NULL,
   address VARCHAR(2048) NOT NULL,
+  push_platform VARCHAR(16),
   created_at DATETIME(6) NOT NULL,
   updated_at DATETIME(6) NOT NULL,
   CONSTRAINT contact_methods_pkey PRIMARY KEY (id),
   CONSTRAINT contact_methods_user_id_fkey FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
-  CONSTRAINT contact_methods_type_check CHECK (type IN ('email', 'sms', 'voice', 'webhook', 'push'))
+  CONSTRAINT contact_methods_type_check CHECK (type IN ('email', 'sms', 'voice', 'webhook', 'push')),
+  CONSTRAINT contact_methods_push_platform_check CHECK ((type = 'push' AND COALESCE(push_platform, '') IN ('ios', 'android')) OR (type <> 'push' AND push_platform IS NULL))
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
 
 CREATE INDEX contact_methods_user_id_id_idx ON contact_methods (user_id, id);

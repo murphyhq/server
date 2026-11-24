@@ -131,6 +131,24 @@ func (e IntegrationType) Valid() bool {
 	}
 }
 
+// Defines values for PushPlatform.
+const (
+	Android PushPlatform = "android"
+	Ios     PushPlatform = "ios"
+)
+
+// Valid indicates whether the value is a known member of the PushPlatform enum.
+func (e PushPlatform) Valid() bool {
+	switch e {
+	case Android:
+		return true
+	case Ios:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ServiceStatus.
 const (
 	ServiceStatusActive   ServiceStatus = "active"
@@ -316,10 +334,13 @@ type ConnectCode struct {
 
 // ContactMethod defines model for ContactMethod.
 type ContactMethod struct {
-	// Address An email address, an E.164 phone number, a webhook URL, or a push device's relay handle.
-	Address   string            `json:"address"`
-	CreatedAt time.Time         `json:"created_at"`
-	Id        string            `json:"id"`
+	// Address An email address, an E.164 phone number, a webhook URL, or for push, the handle the push relay gave the device.
+	Address   string    `json:"address"`
+	CreatedAt time.Time `json:"created_at"`
+	Id        string    `json:"id"`
+
+	// Platform Push only. Push contact methods can't be changed; add a new one and delete the old one.
+	Platform  *PushPlatform     `json:"platform,omitempty"`
 	Type      ContactMethodType `json:"type"`
 	UpdatedAt time.Time         `json:"updated_at"`
 
@@ -329,8 +350,12 @@ type ContactMethod struct {
 
 // ContactMethodInput defines model for ContactMethodInput.
 type ContactMethodInput struct {
-	Address string            `json:"address"`
-	Type    ContactMethodType `json:"type"`
+	// Address An email address, an E.164 phone number, a webhook URL, or for push, the push token iOS or Android gave the app. A push token is registered with the push relay, and the contact method keeps the relay's handle instead.
+	Address string `json:"address"`
+
+	// Platform Push only. Push contact methods can't be changed; add a new one and delete the old one.
+	Platform *PushPlatform     `json:"platform,omitempty"`
+	Type     ContactMethodType `json:"type"`
 }
 
 // ContactMethodList defines model for ContactMethodList.
@@ -592,6 +617,9 @@ type Problem struct {
 	// TraceId The trace of this request, to find it in your tracing backend.
 	TraceId *string `json:"trace_id,omitempty"`
 }
+
+// PushPlatform Push only. Push contact methods can't be changed; add a new one and delete the old one.
+type PushPlatform string
 
 // Reference Points at another resource.
 type Reference struct {

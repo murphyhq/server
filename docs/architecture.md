@@ -39,12 +39,15 @@ flowchart LR
 
   providers_out[Notification providers]
   idp[Identity provider]
+  relay[Push relay]
 
   mon --> ingest
   providers_in --> ingest
   clients --> api
   api --> idp
+  api --> relay
   notifier --> providers_out
+  notifier --> relay
 
   ingest --> broker
   scheduler --> broker
@@ -60,7 +63,7 @@ flowchart LR
   classDef outside fill:#f3f4f6,stroke:#9ca3af,color:#1f2937
   classDef component fill:#e0ecff,stroke:#3b6fb6,color:#13294b
   classDef infra fill:#fdf0d5,stroke:#b7791f,color:#3d2a06
-  class mon,providers_in,clients,providers_out,idp outside
+  class mon,providers_in,clients,providers_out,idp,relay outside
   class ingest,api,scheduler,engine,notifier component
   class broker,db,kv infra
 
@@ -94,7 +97,7 @@ Publishes stored messages. Every message that decides whether someone is paged i
 
 ### Notifier
 
-Reaches people outside Murphy. It decides whom to notify and how, and sends through providers: webhooks, email, chat, SMS and voice. Its work waits on receivers that can be slow or down, so it runs apart from `engine`, and a failing receiver delays notifications without delaying incidents. Sending doesn't use the database, so notifications already handed to the broker still go out when the database is unavailable. Webhooks are signed with a private key that only `notifier` holds, and receivers check them with the public key `api` serves.
+Reaches people outside Murphy. It decides whom to notify and how, and sends through providers: webhooks, email, chat, SMS and voice. Its work waits on receivers that can be slow or down, so it runs apart from `engine`, and a failing receiver delays notifications without delaying incidents. Sending doesn't use the database, so notifications already handed to the broker still go out when the database is unavailable. Webhooks are signed with a private key that only `notifier` holds, and receivers check them with the public key `api` serves. Pushes to the official app go through the push relay.
 
 ### Migrate
 
@@ -107,6 +110,8 @@ Murphy depends on what it needs from a message broker, a database and a key-valu
 The message broker keeps every message until it is processed, delivers it at least once, and hands each message to every component subscribed to its event type. It promises no order, and never has to delay a message, because timers live in the database. Its topics and subscriptions are created outside Murphy, like the databases, and labelled with a topology version; a component refuses to start on a topology older than its release needs. The implementations are SNS with SQS, and NATS JetStream.
 
 An OpenID Connect identity provider, such as Google, Okta or Microsoft Entra ID, tells `api` who someone is. Locally, the provider is Dex. An install without one can allow passwords instead, which `api` keeps only as hashes.
+
+The push relay is a service Murphy hosts for every install, because only it holds the credentials Apple and Google require to push to the official app. `api` registers a phone with it when someone adds one as a contact method, and `notifier` sends pushes through it. Pushes carry no incident data, only what the app needs to fetch the incident from the install itself. An install reaches the relay with an install key, and without one, it sends no pushes.
 
 A key-value store keeps the `Idempotency-Key` of every request that creates something, with its response, for 24 hours, so `api` answers a retry without doing the work twice. The implementation is Redis.
 

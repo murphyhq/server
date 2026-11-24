@@ -36,6 +36,13 @@ message ContactMethod {
   string address = 4;
   google.protobuf.Timestamp created_at = 5;
   google.protobuf.Timestamp updated_at = 6;
+  PushPlatform push_platform = 7;
+}
+
+enum PushPlatform {
+  PUSH_PLATFORM_UNSPECIFIED = 0;
+  PUSH_PLATFORM_IOS = 1;
+  PUSH_PLATFORM_ANDROID = 2;
 }
 
 enum ContactMethodType {

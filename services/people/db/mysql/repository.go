@@ -113,7 +113,7 @@ func (r *Repository) CreateContactMethod(ctx context.Context, method *murphy.Con
 
 	return murphymysql.Error("contact method", r.queries.CreateContactMethod(ctx, CreateContactMethodParams{
 		ID: method.GetId(), UserID: method.GetUserId(), Type: method.GetType().Text(), Address: method.GetAddress(),
-		CreatedAt: method.GetCreatedAt().AsTime(), UpdatedAt: method.GetUpdatedAt().AsTime(),
+		PushPlatform: pushPlatform(method), CreatedAt: method.GetCreatedAt().AsTime(), UpdatedAt: method.GetUpdatedAt().AsTime(),
 	}))
 }
 
@@ -186,8 +186,16 @@ func toUser(row User) *murphy.User {
 func toContactMethod(row ContactMethod) *murphy.ContactMethod {
 	return &murphy.ContactMethod{
 		Id: row.ID, UserId: row.UserID, Type: murphy.ContactMethodTypeFromText(row.Type), Address: row.Address,
-		CreatedAt: timestamppb.New(row.CreatedAt), UpdatedAt: timestamppb.New(row.UpdatedAt),
+		PushPlatform: murphy.PushPlatformFromText(database.TextValue(row.PushPlatform)),
+		CreatedAt:    timestamppb.New(row.CreatedAt), UpdatedAt: timestamppb.New(row.UpdatedAt),
 	}
+}
+
+func pushPlatform(method *murphy.ContactMethod) *string {
+	if method.GetPushPlatform() == murphy.PushPlatform_PUSH_PLATFORM_UNSPECIFIED {
+		return nil
+	}
+	return database.Text(method.GetPushPlatform().Text())
 }
 
 func (r *Repository) CreateTeam(ctx context.Context, team *murphy.Team) (err error) {

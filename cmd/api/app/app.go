@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -11,6 +12,7 @@ import (
 	"github.com/murphyhq/server/internal/httpserver"
 	idempotencystore "github.com/murphyhq/server/internal/idempotency/store"
 	"github.com/murphyhq/server/internal/lifecycle"
+	"github.com/murphyhq/server/internal/relay"
 	"github.com/murphyhq/server/services/catalog"
 	catalogdb "github.com/murphyhq/server/services/catalog/db"
 	"github.com/murphyhq/server/services/escalation"
@@ -23,6 +25,7 @@ import (
 	"github.com/murphyhq/server/services/people"
 	peopledb "github.com/murphyhq/server/services/people/db"
 	"github.com/murphyhq/server/services/people/providers/oidc"
+	relaydevices "github.com/murphyhq/server/services/people/providers/relay"
 )
 
 type Settings struct {
@@ -45,6 +48,8 @@ type Settings struct {
 	SessionDuration        time.Duration `env:"SESSION_DURATION" default:"720h"`
 	InitialAdminEmail      string        `env:"INITIAL_ADMIN_EMAIL"`
 	AppScheme              string        `env:"APP_SCHEME" default:"murphy"`
+	RelayURL               string        `env:"RELAY_URL" validate:"http-url"`
+	RelayKey               string        `env:"RELAY_KEY"`
 }
 
 type App struct {
@@ -108,7 +113,11 @@ func New(ctx context.Context, s Settings) (_ *App, err error) {
 	}
 
 	catalogService := catalog.New(catalogStorage, keyring)
-	peopleService := people.New(peopleStorage)
+	devices, err := relayDevices(s)
+	if err != nil {
+		return nil, err
+	}
+	peopleService := people.New(peopleStorage, devices)
 	auth := people.NewAuth(peopleStorage, oidc.New(oidc.Config{
 		Issuer:         s.OIDCIssuer,
 		BackchannelURL: s.OIDCBackchannelURL,
@@ -139,6 +148,20 @@ func New(ctx context.Context, s Settings) (_ *App, err error) {
 	}
 	a.Ready = a.resources.Checks()
 	return a, nil
+}
+
+func relayDevices(s Settings) (people.Devices, error) {
+	if s.RelayURL == "" {
+		return nil, nil
+	}
+	if s.RelayKey == "" {
+		return nil, errors.New("MURPHY_RELAY_KEY is required when MURPHY_RELAY_URL is set")
+	}
+	client, err := relay.New(s.RelayURL, s.RelayKey)
+	if err != nil {
+		return nil, fmt.Errorf("MURPHY_RELAY_URL: %w", err)
+	}
+	return relaydevices.New(client), nil
 }
 
 func (a *App) Close() {

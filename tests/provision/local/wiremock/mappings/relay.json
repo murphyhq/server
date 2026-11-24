@@ -1,0 +1,50 @@
+{
+  "mappings": [
+    {
+      "priority": 1,
+      "request": {
+        "method": "POST",
+        "urlPath": "/relay/v1/devices",
+        "headers": { "Authorization": { "equalTo": "Bearer mik_local-development-key" } }
+      },
+      "response": {
+        "status": 201,
+        "headers": { "Content-Type": "application/json" },
+        "body": "{\"handle\": \"mdh_{{jsonPath request.body '$.token'}}\", \"platform\": \"{{jsonPath request.body '$.platform'}}\"}",
+        "transformers": ["response-template"]
+      }
+    },
+    {
+      "priority": 1,
+      "request": { "method": "DELETE", "urlPathPattern": "/relay/v1/devices/.+" },
+      "response": { "status": 204 }
+    },
+    {
+      "priority": 1,
+      "request": {
+        "method": "POST",
+        "urlPath": "/relay/v1/pushes",
+        "bodyPatterns": [{ "matchesJsonPath": "$[?(@.handle =~ /mdh_gone-.+/)]" }]
+      },
+      "response": {
+        "status": 410,
+        "headers": { "Content-Type": "application/problem+json" },
+        "jsonBody": { "title": "Gone", "status": 410, "detail": "the device is gone; stop sending to this handle" }
+      }
+    },
+    {
+      "priority": 2,
+      "request": {
+        "method": "POST",
+        "urlPath": "/relay/v1/pushes",
+        "headers": { "Authorization": { "equalTo": "Bearer mik_local-development-key" } }
+      },
+      "response": {
+        "status": 200,
+        "headers": { "Content-Type": "application/json" },
+        "body": "{\"id\": \"{{jsonPath request.body '$.id'}}\", \"status\": \"sent\"}",
+        "transformers": ["response-template"]
+      }
+    }
+  ]
+}

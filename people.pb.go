@@ -120,6 +120,55 @@ func (UserStatus) EnumDescriptor() ([]byte, []int) {
 	return file_murphy_v1_people_proto_rawDescGZIP(), []int{1}
 }
 
+type PushPlatform int32
+
+const (
+	PushPlatform_PUSH_PLATFORM_UNSPECIFIED PushPlatform = 0
+	PushPlatform_PUSH_PLATFORM_IOS         PushPlatform = 1
+	PushPlatform_PUSH_PLATFORM_ANDROID     PushPlatform = 2
+)
+
+// Enum value maps for PushPlatform.
+var (
+	PushPlatform_name = map[int32]string{
+		0: "PUSH_PLATFORM_UNSPECIFIED",
+		1: "PUSH_PLATFORM_IOS",
+		2: "PUSH_PLATFORM_ANDROID",
+	}
+	PushPlatform_value = map[string]int32{
+		"PUSH_PLATFORM_UNSPECIFIED": 0,
+		"PUSH_PLATFORM_IOS":         1,
+		"PUSH_PLATFORM_ANDROID":     2,
+	}
+)
+
+func (x PushPlatform) Enum() *PushPlatform {
+	p := new(PushPlatform)
+	*p = x
+	return p
+}
+
+func (x PushPlatform) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (PushPlatform) Descriptor() protoreflect.EnumDescriptor {
+	return file_murphy_v1_people_proto_enumTypes[2].Descriptor()
+}
+
+func (PushPlatform) Type() protoreflect.EnumType {
+	return &file_murphy_v1_people_proto_enumTypes[2]
+}
+
+func (x PushPlatform) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use PushPlatform.Descriptor instead.
+func (PushPlatform) EnumDescriptor() ([]byte, []int) {
+	return file_murphy_v1_people_proto_rawDescGZIP(), []int{2}
+}
+
 type ContactMethodType int32
 
 const (
@@ -162,11 +211,11 @@ func (x ContactMethodType) String() string {
 }
 
 func (ContactMethodType) Descriptor() protoreflect.EnumDescriptor {
-	return file_murphy_v1_people_proto_enumTypes[2].Descriptor()
+	return file_murphy_v1_people_proto_enumTypes[3].Descriptor()
 }
 
 func (ContactMethodType) Type() protoreflect.EnumType {
-	return &file_murphy_v1_people_proto_enumTypes[2]
+	return &file_murphy_v1_people_proto_enumTypes[3]
 }
 
 func (x ContactMethodType) Number() protoreflect.EnumNumber {
@@ -175,7 +224,7 @@ func (x ContactMethodType) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ContactMethodType.Descriptor instead.
 func (ContactMethodType) EnumDescriptor() ([]byte, []int) {
-	return file_murphy_v1_people_proto_rawDescGZIP(), []int{2}
+	return file_murphy_v1_people_proto_rawDescGZIP(), []int{3}
 }
 
 type TeamRole int32
@@ -214,11 +263,11 @@ func (x TeamRole) String() string {
 }
 
 func (TeamRole) Descriptor() protoreflect.EnumDescriptor {
-	return file_murphy_v1_people_proto_enumTypes[3].Descriptor()
+	return file_murphy_v1_people_proto_enumTypes[4].Descriptor()
 }
 
 func (TeamRole) Type() protoreflect.EnumType {
-	return &file_murphy_v1_people_proto_enumTypes[3]
+	return &file_murphy_v1_people_proto_enumTypes[4]
 }
 
 func (x TeamRole) Number() protoreflect.EnumNumber {
@@ -227,7 +276,7 @@ func (x TeamRole) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use TeamRole.Descriptor instead.
 func (TeamRole) EnumDescriptor() ([]byte, []int) {
-	return file_murphy_v1_people_proto_rawDescGZIP(), []int{3}
+	return file_murphy_v1_people_proto_rawDescGZIP(), []int{4}
 }
 
 type SessionClient int32
@@ -266,11 +315,11 @@ func (x SessionClient) String() string {
 }
 
 func (SessionClient) Descriptor() protoreflect.EnumDescriptor {
-	return file_murphy_v1_people_proto_enumTypes[4].Descriptor()
+	return file_murphy_v1_people_proto_enumTypes[5].Descriptor()
 }
 
 func (SessionClient) Type() protoreflect.EnumType {
-	return &file_murphy_v1_people_proto_enumTypes[4]
+	return &file_murphy_v1_people_proto_enumTypes[5]
 }
 
 func (x SessionClient) Number() protoreflect.EnumNumber {
@@ -279,7 +328,7 @@ func (x SessionClient) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use SessionClient.Descriptor instead.
 func (SessionClient) EnumDescriptor() ([]byte, []int) {
-	return file_murphy_v1_people_proto_rawDescGZIP(), []int{4}
+	return file_murphy_v1_people_proto_rawDescGZIP(), []int{5}
 }
 
 type OneTimeCodePurpose int32
@@ -315,11 +364,11 @@ func (x OneTimeCodePurpose) String() string {
 }
 
 func (OneTimeCodePurpose) Descriptor() protoreflect.EnumDescriptor {
-	return file_murphy_v1_people_proto_enumTypes[5].Descriptor()
+	return file_murphy_v1_people_proto_enumTypes[6].Descriptor()
 }
 
 func (OneTimeCodePurpose) Type() protoreflect.EnumType {
-	return &file_murphy_v1_people_proto_enumTypes[5]
+	return &file_murphy_v1_people_proto_enumTypes[6]
 }
 
 func (x OneTimeCodePurpose) Number() protoreflect.EnumNumber {
@@ -328,7 +377,7 @@ func (x OneTimeCodePurpose) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use OneTimeCodePurpose.Descriptor instead.
 func (OneTimeCodePurpose) EnumDescriptor() ([]byte, []int) {
-	return file_murphy_v1_people_proto_rawDescGZIP(), []int{5}
+	return file_murphy_v1_people_proto_rawDescGZIP(), []int{6}
 }
 
 type User struct {
@@ -439,6 +488,7 @@ type ContactMethod struct {
 	Address       string                 `protobuf:"bytes,4,opt,name=address,proto3" json:"address,omitempty"`
 	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	PushPlatform  PushPlatform           `protobuf:"varint,7,opt,name=push_platform,json=pushPlatform,proto3,enum=murphy.v1.PushPlatform" json:"push_platform,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -513,6 +563,13 @@ func (x *ContactMethod) GetUpdatedAt() *timestamppb.Timestamp {
 		return x.UpdatedAt
 	}
 	return nil
+}
+
+func (x *ContactMethod) GetPushPlatform() PushPlatform {
+	if x != nil {
+		return x.PushPlatform
+	}
+	return PushPlatform_PUSH_PLATFORM_UNSPECIFIED
 }
 
 type Team struct {
@@ -1082,7 +1139,7 @@ const file_murphy_v1_people_proto_rawDesc = "" +
 	"created_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
 	"updated_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12'\n" +
-	"\x04role\x18\b \x01(\x0e2\x13.murphy.v1.UserRoleR\x04role\"\xfa\x01\n" +
+	"\x04role\x18\b \x01(\x0e2\x13.murphy.v1.UserRoleR\x04role\"\xb8\x02\n" +
 	"\rContactMethod\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x120\n" +
@@ -1091,7 +1148,8 @@ const file_murphy_v1_people_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"\xa0\x01\n" +
+	"updated_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12<\n" +
+	"\rpush_platform\x18\a \x01(\x0e2\x17.murphy.v1.PushPlatformR\fpushPlatform\"\xa0\x01\n" +
 	"\x04Team\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x129\n" +
@@ -1166,7 +1224,11 @@ const file_murphy_v1_people_proto_rawDesc = "" +
 	"UserStatus\x12\x1b\n" +
 	"\x17USER_STATUS_UNSPECIFIED\x10\x00\x12\x16\n" +
 	"\x12USER_STATUS_ACTIVE\x10\x01\x12\x1b\n" +
-	"\x17USER_STATUS_DEACTIVATED\x10\x02*\xd2\x01\n" +
+	"\x17USER_STATUS_DEACTIVATED\x10\x02*_\n" +
+	"\fPushPlatform\x12\x1d\n" +
+	"\x19PUSH_PLATFORM_UNSPECIFIED\x10\x00\x12\x15\n" +
+	"\x11PUSH_PLATFORM_IOS\x10\x01\x12\x19\n" +
+	"\x15PUSH_PLATFORM_ANDROID\x10\x02*\xd2\x01\n" +
 	"\x11ContactMethodType\x12#\n" +
 	"\x1fCONTACT_METHOD_TYPE_UNSPECIFIED\x10\x00\x12\x1d\n" +
 	"\x19CONTACT_METHOD_TYPE_EMAIL\x10\x01\x12\x1b\n" +
@@ -1201,58 +1263,60 @@ func file_murphy_v1_people_proto_rawDescGZIP() []byte {
 	return file_murphy_v1_people_proto_rawDescData
 }
 
-var file_murphy_v1_people_proto_enumTypes = make([]protoimpl.EnumInfo, 6)
+var file_murphy_v1_people_proto_enumTypes = make([]protoimpl.EnumInfo, 7)
 var file_murphy_v1_people_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_murphy_v1_people_proto_goTypes = []any{
 	(UserRole)(0),                 // 0: murphy.v1.UserRole
 	(UserStatus)(0),               // 1: murphy.v1.UserStatus
-	(ContactMethodType)(0),        // 2: murphy.v1.ContactMethodType
-	(TeamRole)(0),                 // 3: murphy.v1.TeamRole
-	(SessionClient)(0),            // 4: murphy.v1.SessionClient
-	(OneTimeCodePurpose)(0),       // 5: murphy.v1.OneTimeCodePurpose
-	(*User)(nil),                  // 6: murphy.v1.User
-	(*ContactMethod)(nil),         // 7: murphy.v1.ContactMethod
-	(*Team)(nil),                  // 8: murphy.v1.Team
-	(*TeamMembership)(nil),        // 9: murphy.v1.TeamMembership
-	(*Identity)(nil),              // 10: murphy.v1.Identity
-	(*Session)(nil),               // 11: murphy.v1.Session
-	(*SignIn)(nil),                // 12: murphy.v1.SignIn
-	(*OneTimeCode)(nil),           // 13: murphy.v1.OneTimeCode
-	(*timestamppb.Timestamp)(nil), // 14: google.protobuf.Timestamp
+	(PushPlatform)(0),             // 2: murphy.v1.PushPlatform
+	(ContactMethodType)(0),        // 3: murphy.v1.ContactMethodType
+	(TeamRole)(0),                 // 4: murphy.v1.TeamRole
+	(SessionClient)(0),            // 5: murphy.v1.SessionClient
+	(OneTimeCodePurpose)(0),       // 6: murphy.v1.OneTimeCodePurpose
+	(*User)(nil),                  // 7: murphy.v1.User
+	(*ContactMethod)(nil),         // 8: murphy.v1.ContactMethod
+	(*Team)(nil),                  // 9: murphy.v1.Team
+	(*TeamMembership)(nil),        // 10: murphy.v1.TeamMembership
+	(*Identity)(nil),              // 11: murphy.v1.Identity
+	(*Session)(nil),               // 12: murphy.v1.Session
+	(*SignIn)(nil),                // 13: murphy.v1.SignIn
+	(*OneTimeCode)(nil),           // 14: murphy.v1.OneTimeCode
+	(*timestamppb.Timestamp)(nil), // 15: google.protobuf.Timestamp
 }
 var file_murphy_v1_people_proto_depIdxs = []int32{
 	1,  // 0: murphy.v1.User.status:type_name -> murphy.v1.UserStatus
-	14, // 1: murphy.v1.User.created_at:type_name -> google.protobuf.Timestamp
-	14, // 2: murphy.v1.User.updated_at:type_name -> google.protobuf.Timestamp
+	15, // 1: murphy.v1.User.created_at:type_name -> google.protobuf.Timestamp
+	15, // 2: murphy.v1.User.updated_at:type_name -> google.protobuf.Timestamp
 	0,  // 3: murphy.v1.User.role:type_name -> murphy.v1.UserRole
-	2,  // 4: murphy.v1.ContactMethod.type:type_name -> murphy.v1.ContactMethodType
-	14, // 5: murphy.v1.ContactMethod.created_at:type_name -> google.protobuf.Timestamp
-	14, // 6: murphy.v1.ContactMethod.updated_at:type_name -> google.protobuf.Timestamp
-	14, // 7: murphy.v1.Team.created_at:type_name -> google.protobuf.Timestamp
-	14, // 8: murphy.v1.Team.updated_at:type_name -> google.protobuf.Timestamp
-	3,  // 9: murphy.v1.TeamMembership.role:type_name -> murphy.v1.TeamRole
-	14, // 10: murphy.v1.TeamMembership.created_at:type_name -> google.protobuf.Timestamp
-	14, // 11: murphy.v1.TeamMembership.updated_at:type_name -> google.protobuf.Timestamp
-	14, // 12: murphy.v1.Identity.created_at:type_name -> google.protobuf.Timestamp
-	14, // 13: murphy.v1.Identity.updated_at:type_name -> google.protobuf.Timestamp
-	14, // 14: murphy.v1.Session.expires_at:type_name -> google.protobuf.Timestamp
-	14, // 15: murphy.v1.Session.revoked_at:type_name -> google.protobuf.Timestamp
-	14, // 16: murphy.v1.Session.created_at:type_name -> google.protobuf.Timestamp
-	14, // 17: murphy.v1.Session.updated_at:type_name -> google.protobuf.Timestamp
-	4,  // 18: murphy.v1.Session.client:type_name -> murphy.v1.SessionClient
-	14, // 19: murphy.v1.SignIn.expires_at:type_name -> google.protobuf.Timestamp
-	14, // 20: murphy.v1.SignIn.created_at:type_name -> google.protobuf.Timestamp
-	14, // 21: murphy.v1.SignIn.updated_at:type_name -> google.protobuf.Timestamp
-	5,  // 22: murphy.v1.OneTimeCode.purpose:type_name -> murphy.v1.OneTimeCodePurpose
-	14, // 23: murphy.v1.OneTimeCode.expires_at:type_name -> google.protobuf.Timestamp
-	14, // 24: murphy.v1.OneTimeCode.used_at:type_name -> google.protobuf.Timestamp
-	14, // 25: murphy.v1.OneTimeCode.created_at:type_name -> google.protobuf.Timestamp
-	14, // 26: murphy.v1.OneTimeCode.updated_at:type_name -> google.protobuf.Timestamp
-	27, // [27:27] is the sub-list for method output_type
-	27, // [27:27] is the sub-list for method input_type
-	27, // [27:27] is the sub-list for extension type_name
-	27, // [27:27] is the sub-list for extension extendee
-	0,  // [0:27] is the sub-list for field type_name
+	3,  // 4: murphy.v1.ContactMethod.type:type_name -> murphy.v1.ContactMethodType
+	15, // 5: murphy.v1.ContactMethod.created_at:type_name -> google.protobuf.Timestamp
+	15, // 6: murphy.v1.ContactMethod.updated_at:type_name -> google.protobuf.Timestamp
+	2,  // 7: murphy.v1.ContactMethod.push_platform:type_name -> murphy.v1.PushPlatform
+	15, // 8: murphy.v1.Team.created_at:type_name -> google.protobuf.Timestamp
+	15, // 9: murphy.v1.Team.updated_at:type_name -> google.protobuf.Timestamp
+	4,  // 10: murphy.v1.TeamMembership.role:type_name -> murphy.v1.TeamRole
+	15, // 11: murphy.v1.TeamMembership.created_at:type_name -> google.protobuf.Timestamp
+	15, // 12: murphy.v1.TeamMembership.updated_at:type_name -> google.protobuf.Timestamp
+	15, // 13: murphy.v1.Identity.created_at:type_name -> google.protobuf.Timestamp
+	15, // 14: murphy.v1.Identity.updated_at:type_name -> google.protobuf.Timestamp
+	15, // 15: murphy.v1.Session.expires_at:type_name -> google.protobuf.Timestamp
+	15, // 16: murphy.v1.Session.revoked_at:type_name -> google.protobuf.Timestamp
+	15, // 17: murphy.v1.Session.created_at:type_name -> google.protobuf.Timestamp
+	15, // 18: murphy.v1.Session.updated_at:type_name -> google.protobuf.Timestamp
+	5,  // 19: murphy.v1.Session.client:type_name -> murphy.v1.SessionClient
+	15, // 20: murphy.v1.SignIn.expires_at:type_name -> google.protobuf.Timestamp
+	15, // 21: murphy.v1.SignIn.created_at:type_name -> google.protobuf.Timestamp
+	15, // 22: murphy.v1.SignIn.updated_at:type_name -> google.protobuf.Timestamp
+	6,  // 23: murphy.v1.OneTimeCode.purpose:type_name -> murphy.v1.OneTimeCodePurpose
+	15, // 24: murphy.v1.OneTimeCode.expires_at:type_name -> google.protobuf.Timestamp
+	15, // 25: murphy.v1.OneTimeCode.used_at:type_name -> google.protobuf.Timestamp
+	15, // 26: murphy.v1.OneTimeCode.created_at:type_name -> google.protobuf.Timestamp
+	15, // 27: murphy.v1.OneTimeCode.updated_at:type_name -> google.protobuf.Timestamp
+	28, // [28:28] is the sub-list for method output_type
+	28, // [28:28] is the sub-list for method input_type
+	28, // [28:28] is the sub-list for extension type_name
+	28, // [28:28] is the sub-list for extension extendee
+	0,  // [0:28] is the sub-list for field type_name
 }
 
 func init() { file_murphy_v1_people_proto_init() }
@@ -1265,7 +1329,7 @@ func file_murphy_v1_people_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_murphy_v1_people_proto_rawDesc), len(file_murphy_v1_people_proto_rawDesc)),
-			NumEnums:      6,
+			NumEnums:      7,
 			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   0,

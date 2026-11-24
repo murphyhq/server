@@ -36,6 +36,7 @@ jobs:
           go tool oapi-codegen -config openapi/codegen/client.yaml openapi/v1.yaml
           go tool oapi-codegen -config openapi/codegen/ingest.yaml openapi/ingest/v1.yaml
           go tool oapi-codegen -config openapi/codegen/webhooks.yaml openapi/webhooks/v1.yaml
+          go tool oapi-codegen -config openapi/codegen/relay.yaml openapi/relay/v1.yaml
           git diff --exit-code
           test -z "$(git status --porcelain)"
 
