@@ -240,6 +240,118 @@ func (q *Queries) RecipientsOf(ctx context.Context, incidentID string) ([]string
 	return items, nil
 }
 
+const recordOutcome = `-- name: RecordOutcome :one
+WITH handled AS (
+  INSERT INTO handled_messages (id, created_at)
+  VALUES ($1, $2)
+  ON CONFLICT (id) DO NOTHING
+  RETURNING id
+), updated AS (
+  UPDATE notifications
+  SET status = $3, failure = $4, sent_at = $5, updated_at = $2
+  WHERE notifications.id = $6 AND EXISTS (SELECT 1 FROM handled)
+  RETURNING notifications.id
+)
+SELECT count(*) FROM handled
+`
+
+type RecordOutcomeParams struct {
+	MessageID string
+	At        time.Time
+	Status    string
+	Failure   *string
+	SentAt    *time.Time
+	ID        string
+}
+
+func (q *Queries) RecordOutcome(ctx context.Context, arg RecordOutcomeParams) (int64, error) {
+	row := q.db.QueryRow(ctx, recordOutcome,
+		arg.MessageID,
+		arg.At,
+		arg.Status,
+		arg.Failure,
+		arg.SentAt,
+		arg.ID,
+	)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const recordPage = `-- name: RecordPage :one
+WITH handled AS (
+  INSERT INTO handled_messages (id, created_at)
+  VALUES ($1, $2)
+  ON CONFLICT (id) DO NOTHING
+  RETURNING id
+), page AS (
+  INSERT INTO pages (id, incident_id, escalation_level, escalation_round, created_at)
+  SELECT $3::uuid, $4::uuid, $5::integer, $6::integer, $7::timestamptz
+  FROM handled
+  RETURNING id
+), recipients AS (
+  INSERT INTO page_recipients (id, page_id, incident_id, user_id, via_type, via_id, created_at)
+  SELECT unnest($8::uuid[]), page.id, $4::uuid, unnest($9::uuid[]), unnest($10::text[]), unnest($11::uuid[]), $7::timestamptz
+  FROM page
+), created AS (
+  INSERT INTO notifications (id, incident_id, page_id, user_id, contact_method_id, channel, reason, status, created_at, updated_at)
+  SELECT unnest($12::uuid[]), $4::uuid, page.id, unnest($13::uuid[]), unnest($14::uuid[]), unnest($15::text[]), 'paged', 'created', $7::timestamptz, $7::timestamptz
+  FROM page
+), scheduled AS (
+  INSERT INTO scheduled_messages (id, due_at, envelope, created_at)
+  SELECT unnest($16::uuid[]), unnest($17::timestamptz[]), unnest($18::bytea[]), $2::timestamptz
+  FROM handled
+)
+SELECT count(*) FROM handled
+`
+
+type RecordPageParams struct {
+	MessageID           string
+	At                  time.Time
+	PageID              string
+	IncidentID          string
+	EscalationLevel     int32
+	EscalationRound     int32
+	CreatedAt           time.Time
+	RecipientIds        []string
+	RecipientUserIds    []string
+	RecipientViaTypes   []string
+	RecipientViaIds     []string
+	NotificationIds     []string
+	NotificationUserIds []string
+	ContactMethodIds    []string
+	Channels            []string
+	MessageIds          []string
+	DueAts              []time.Time
+	Envelopes           [][]byte
+}
+
+func (q *Queries) RecordPage(ctx context.Context, arg RecordPageParams) (int64, error) {
+	row := q.db.QueryRow(ctx, recordPage,
+		arg.MessageID,
+		arg.At,
+		arg.PageID,
+		arg.IncidentID,
+		arg.EscalationLevel,
+		arg.EscalationRound,
+		arg.CreatedAt,
+		arg.RecipientIds,
+		arg.RecipientUserIds,
+		arg.RecipientViaTypes,
+		arg.RecipientViaIds,
+		arg.NotificationIds,
+		arg.NotificationUserIds,
+		arg.ContactMethodIds,
+		arg.Channels,
+		arg.MessageIds,
+		arg.DueAts,
+		arg.Envelopes,
+	)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const updateNotificationOutcome = `-- name: UpdateNotificationOutcome :exec
 UPDATE notifications
 SET status = $1, failure = $2, sent_at = $3, updated_at = $4

@@ -39,8 +39,14 @@ type Histogram struct {
 	histogram metric.Float64Histogram
 }
 
+var secondsBuckets = []float64{0, 0.0005, 0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30, 60}
+
 func NewHistogram(name, description, unit string) (*Histogram, error) {
-	histogram, err := otel.Meter(telemetry.CallerOf(1).Package).Float64Histogram(prefixed(name), metric.WithDescription(description), metric.WithUnit(unit))
+	options := []metric.Float64HistogramOption{metric.WithDescription(description), metric.WithUnit(unit)}
+	if unit == "s" {
+		options = append(options, metric.WithExplicitBucketBoundaries(secondsBuckets...))
+	}
+	histogram, err := otel.Meter(telemetry.CallerOf(1).Package).Float64Histogram(prefixed(name), options...)
 	if err != nil {
 		return nil, fmt.Errorf("create histogram %s: %w", name, err)
 	}

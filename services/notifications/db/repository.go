@@ -35,11 +35,27 @@ type Repository[T Tx] struct {
 
 var _ notifications.Repository = (*Repository[Tx])(nil)
 
+type outcomeRecorder interface {
+	RecordOutcome(ctx context.Context, messageID string, notification *murphy.Notification, at time.Time) (bool, error)
+}
+
+type pageRecorder interface {
+	RecordPage(ctx context.Context, change *notifications.Change, at time.Time) (bool, error)
+}
+
 func (r *Repository[T]) Record(ctx context.Context, change *notifications.Change) (recorded bool, err error) {
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
 	now := time.Now().UTC()
+	onlyOutcome := change.MessageID != "" && change.Outcome != nil && change.Page == nil && len(change.Notifications) == 0 && len(change.Messages) == 0
+	if recorder, ok := any(r.Engine).(outcomeRecorder); ok && onlyOutcome {
+		return recorder.RecordOutcome(ctx, change.MessageID, change.Outcome, now)
+	}
+	onlyPage := change.MessageID != "" && change.Page != nil && change.Outcome == nil
+	if recorder, ok := any(r.Engine).(pageRecorder); ok && onlyPage {
+		return recorder.RecordPage(ctx, change, now)
+	}
 	err = r.Transaction(ctx, func(tx T) error {
 		if change.MessageID != "" {
 			first, err := tx.MarkHandled(ctx, change.MessageID, now)
