@@ -83,13 +83,14 @@ type Limiter interface {
 }
 
 type AuthSettings struct {
-	SessionDuration     time.Duration
-	InitialAdminEmail   string
-	ReturnOrigins       []string
-	PublicURL           string
-	AppScheme           string
-	AllowedEmailDomains []string
-	PasswordsAllowed    bool
+	SessionDuration      time.Duration
+	InitialAdminEmail    string
+	ReturnOrigins        []string
+	PublicURL            string
+	AppScheme            string
+	AllowedEmailDomains  []string
+	PasswordsAllowed     bool
+	InitialAdminPassword string
 }
 
 type Auth struct {
@@ -512,6 +513,13 @@ func (a *Auth) SignInWithPassword(ctx context.Context, email, password, address 
 	if err != nil {
 		return nil, err
 	}
+	if user == nil && a.isInitialAdmin(email, password) {
+		user, err = a.claimWithPassword(ctx, email, password)
+		if err != nil {
+			return nil, err
+		}
+		stored = mustHashPassword(password)
+	}
 	if !passwordMatches(password, stored) || user == nil {
 		if _, err := a.limiter.Hit(ctx, person, failureWindow); err != nil {
 			return nil, fmt.Errorf("count a failed sign-in: %w", err)
@@ -623,21 +631,18 @@ func (a *Auth) SetPassword(ctx context.Context, code, password string) (err erro
 	return nil
 }
 
-func (a *Auth) RecoveryLink(ctx context.Context) (_ *PasswordLink, err error) {
-	ctx, span := tracer.Span(ctx)
-	defer span.End(&err)
+func (a *Auth) isInitialAdmin(email, password string) bool {
+	return a.settings.InitialAdminEmail != "" && a.settings.InitialAdminPassword != "" &&
+		strings.EqualFold(email, a.settings.InitialAdminEmail) &&
+		subtle.ConstantTimeCompare([]byte(password), []byte(a.settings.InitialAdminPassword)) == 1
+}
 
-	if !a.settings.PasswordsAllowed {
-		return nil, errNoPassword
-	}
-	if a.settings.InitialAdminEmail == "" {
-		return nil, &murphy.FieldError{Field: "MURPHY_INITIAL_ADMIN_EMAIL", Reason: "must name the admin to recover"}
-	}
+func (a *Auth) claimWithPassword(ctx context.Context, email, password string) (*murphy.User, error) {
 	now := time.Now().UTC()
-	user, err := a.repo.GetUserByEmail(ctx, a.settings.InitialAdminEmail)
+	user, err := a.repo.GetUserByEmail(ctx, email)
 	if errors.Is(err, murphy.ErrNotFound) {
 		user = &murphy.User{
-			Id: murphy.NewID(), Name: a.settings.InitialAdminEmail, Email: a.settings.InitialAdminEmail, TimeZone: "UTC",
+			Id: murphy.NewID(), Name: email, Email: email, TimeZone: "UTC",
 			Status: murphy.UserStatus_USER_STATUS_ACTIVE, Role: murphy.UserRole_USER_ROLE_MEMBER,
 			CreatedAt: timestamppb.New(now), UpdatedAt: timestamppb.New(now),
 		}
@@ -646,15 +651,20 @@ func (a *Auth) RecoveryLink(ctx context.Context) (_ *PasswordLink, err error) {
 	if err != nil {
 		return nil, fmt.Errorf("find or create the initial admin: %w", err)
 	}
-	if _, err := a.repo.ClaimFirstAdmin(ctx, user.GetId(), now); err != nil {
+	claimed, err := a.repo.ClaimFirstAdmin(ctx, user.GetId(), now)
+	if err != nil {
 		return nil, fmt.Errorf("claim the first admin: %w", err)
 	}
-	current, err := a.repo.GetUser(ctx, user.GetId())
+	if !claimed {
+		return nil, nil
+	}
+	hashed, err := hashPassword(password)
 	if err != nil {
-		return nil, fmt.Errorf("get the initial admin: %w", err)
+		return nil, err
 	}
-	if current.GetRole() != murphy.UserRole_USER_ROLE_ADMIN {
-		return nil, &murphy.ForbiddenError{Reason: "the initial admin's email belongs to someone who isn't an admin"}
+	if err := a.repo.SetPassword(ctx, user.GetId(), hashed, now); err != nil {
+		return nil, fmt.Errorf("set the first admin's password: %w", err)
 	}
-	return a.passwordLink(ctx, user.GetId(), now)
+	logger.Info(ctx, "the initial admin signed in with the configured password and became the first admin")
+	return user, nil
 }

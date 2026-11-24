@@ -41,6 +41,7 @@ func withPasswords(t *testing.T) *passwords {
 	repo, limiter := NewMockAuthRepository(t), NewMockLimiter(t)
 	allowed := settings()
 	allowed.PasswordsAllowed = true
+	allowed.InitialAdminPassword = "the configured admin password"
 	p := &passwords{
 		auth: people.NewAuth(repo, nil, limiter, allowed), repo: repo, limiter: limiter,
 		bo:    &murphy.User{Id: murphy.NewID(), Email: "bo@example.com", Status: murphy.UserStatus_USER_STATUS_ACTIVE},
@@ -248,28 +249,6 @@ func TestALinkForSomeoneMissingIsNotFound(t *testing.T) {
 	assert.ErrorIs(t, err, murphy.ErrNotFound)
 }
 
-func TestRecoveryMakesTheInitialAdminAndALinkForThem(t *testing.T) {
-	p := withPasswords(t)
-
-	link, err := p.auth.RecoveryLink(t.Context())
-
-	require.NoError(t, err)
-	require.Len(t, p.created, 1)
-	assert.Equal(t, initialAdmin, p.created[0].GetEmail())
-	assert.Equal(t, murphy.UserRole_USER_ROLE_ADMIN, p.created[0].GetRole())
-	assert.True(t, strings.HasPrefix(link.Link, "https://murphy.example.com/set-password?code=mpl_"))
-}
-
-func TestRecoveryRefusesAnInitialAdminEmailThatIsntAnAdmin(t *testing.T) {
-	p := withPasswords(t)
-	p.admin = murphy.NewID()
-	p.users[initialAdmin] = &murphy.User{Id: murphy.NewID(), Email: initialAdmin, Role: murphy.UserRole_USER_ROLE_MEMBER}
-
-	_, err := p.auth.RecoveryLink(t.Context())
-
-	assert.ErrorIs(t, err, murphy.ErrForbidden)
-}
-
 func TestAnInstallThatDoesntAllowPasswordsRefusesThem(t *testing.T) {
 	repo := NewMockAuthRepository(t)
 	auth := people.NewAuth(repo, NewMockProvider(t), nil, settings())
@@ -277,12 +256,10 @@ func TestAnInstallThatDoesntAllowPasswordsRefusesThem(t *testing.T) {
 	_, signIn := auth.SignInWithPassword(t.Context(), "bo@example.com", goodPassword, address)
 	_, link := auth.CreatePasswordLink(t.Context(), murphy.NewID())
 	set := auth.SetPassword(t.Context(), "mpl_anything", goodPassword)
-	_, recovery := auth.RecoveryLink(t.Context())
 
 	assert.ErrorIs(t, signIn, murphy.ErrForbidden)
 	assert.ErrorIs(t, link, murphy.ErrForbidden)
 	assert.ErrorIs(t, set, murphy.ErrForbidden)
-	assert.ErrorIs(t, recovery, murphy.ErrForbidden)
 }
 
 func TestAnInstallWithoutAProviderOnlySignsInWithPasswords(t *testing.T) {
@@ -295,4 +272,35 @@ func TestAnInstallWithoutAProviderOnlySignsInWithPasswords(t *testing.T) {
 	assert.ErrorIs(t, started, murphy.ErrForbidden)
 	assert.ErrorIs(t, verified, murphy.ErrForbidden)
 	assert.ErrorIs(t, finished, murphy.ErrForbidden)
+}
+
+func TestTheConfiguredPasswordMakesTheInitialAdminTheFirstAdmin(t *testing.T) {
+	p := withPasswords(t)
+
+	signedIn, err := p.auth.SignInWithPassword(t.Context(), initialAdmin, "the configured admin password", address)
+
+	require.NoError(t, err)
+	require.Len(t, p.created, 1)
+	assert.Equal(t, p.created[0].GetId(), signedIn.Session.GetUserId())
+	assert.Equal(t, murphy.UserRole_USER_ROLE_ADMIN, p.created[0].GetRole())
+	assert.True(t, strings.HasPrefix(p.hashes[p.created[0].GetId()], "$argon2id$"), "only a hash is kept")
+}
+
+func TestTheConfiguredPasswordDoesNothingOnceThereIsAnAdmin(t *testing.T) {
+	p := withPasswords(t)
+	p.admin = murphy.NewID()
+
+	_, err := p.auth.SignInWithPassword(t.Context(), initialAdmin, "the configured admin password", address)
+
+	assert.ErrorIs(t, err, murphy.ErrUnauthenticated)
+	assert.Empty(t, p.hashes)
+}
+
+func TestTheInitialAdminEmailNeedsTheConfiguredPassword(t *testing.T) {
+	p := withPasswords(t)
+
+	_, err := p.auth.SignInWithPassword(t.Context(), initialAdmin, "a guess at the admin password", address)
+
+	assert.ErrorIs(t, err, murphy.ErrUnauthenticated)
+	assert.Empty(t, p.created)
 }

@@ -102,21 +102,17 @@ Reaches people outside Murphy. It decides whom to notify and how, and sends thro
 
 Applies database schema changes. It runs once before the other components start, so several copies of a component never race to change the schema.
 
-### Recover
-
-Prints a one-time link that lets the initial admin set a password, making them the first admin if there is none. It's run by hand, where Murphy runs, when nobody can sign in, and only ever writes the link to its own output.
-
 ## Infrastructure
 
 Murphy depends on what it needs from a message broker, a database and a key-value store, never on a specific product. Each product is an implementation chosen by configuration, and every implementation passes the same test suite against the real service. Supporting another product means adding an implementation that passes it, without touching the components.
 
 The message broker keeps every message until it is processed, delivers it at least once, and hands each message to every component subscribed to its event type. It promises no order, and never has to delay a message, because timers live in the database. Its topics and subscriptions are created outside Murphy, like the databases, and labelled with a topology version; a component refuses to start on a topology older than its release needs. The implementations are SNS with SQS, and NATS JetStream.
 
-An OpenID Connect identity provider, such as Google, Okta or Microsoft Entra ID, tells `api` who someone is. Locally, the provider is Dex. An install without one signs people in with passwords, and an install with one can allow them too. `api` keeps passwords only as hashes.
+An OpenID Connect identity provider, such as Google, Okta or Microsoft Entra ID, tells `api` who someone is. Locally, the provider is Dex. An install without one can allow passwords instead, which `api` keeps only as hashes.
 
 The push relay is a service Murphy hosts for every install, because only it holds the credentials Apple and Google require to push to the official app. `notifier` sends pushes through it. Pushes carry no incident data, only what the app needs to fetch the incident from the install itself. An install reaches the relay with an install key, and without one, it sends no pushes.
 
-A key-value store keeps the `Idempotency-Key` of every request that creates something, with its response, for 24 hours, so `api` answers a retry without doing the work twice. It also counts failed sign-ins per person and per address, shared by every `api` instance, so repeated guessing is refused for a while. The implementation is Redis.
+A key-value store keeps the `Idempotency-Key` of every request that creates something, with its response, for 24 hours, so `api` answers a retry without doing the work twice. The implementation is Redis.
 
 The database provides transactions, so changes that belong together are applied together, and row locking, so two `scheduler` instances never publish the same message. The implementations are PostgreSQL and MySQL.
 

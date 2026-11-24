@@ -51,6 +51,7 @@ type Settings struct {
 	TrustedProxies         []string      `env:"TRUSTED_PROXIES" validate:"cidr"`
 	SessionDuration        time.Duration `env:"SESSION_DURATION" default:"720h"`
 	InitialAdminEmail      string        `env:"INITIAL_ADMIN_EMAIL"`
+	InitialAdminPassword   string        `env:"INITIAL_ADMIN_PASSWORD"`
 	AppScheme              string        `env:"APP_SCHEME" default:"murphy"`
 	AllowedEmailDomains    []string      `env:"ALLOWED_EMAIL_DOMAINS"`
 }
@@ -140,13 +141,14 @@ func New(ctx context.Context, s Settings) (_ *App, err error) {
 	catalogService := catalog.New(catalogStorage, keyring)
 	peopleService := people.New(peopleStorage)
 	auth := people.NewAuth(peopleStorage, provider, limiter, people.AuthSettings{
-		SessionDuration:     s.SessionDuration,
-		InitialAdminEmail:   s.InitialAdminEmail,
-		ReturnOrigins:       append([]string{s.PublicURL}, s.CORSOrigins...),
-		PublicURL:           s.PublicURL,
-		AppScheme:           s.AppScheme,
-		AllowedEmailDomains: s.AllowedEmailDomains,
-		PasswordsAllowed:    passwords,
+		SessionDuration:      s.SessionDuration,
+		InitialAdminEmail:    s.InitialAdminEmail,
+		ReturnOrigins:        append([]string{s.PublicURL}, s.CORSOrigins...),
+		PublicURL:            s.PublicURL,
+		AppScheme:            s.AppScheme,
+		AllowedEmailDomains:  s.AllowedEmailDomains,
+		PasswordsAllowed:     passwords,
+		InitialAdminPassword: s.InitialAdminPassword,
 	})
 	oncallService := oncall.New(oncallStorage, peopleService)
 	escalationService := escalation.New(escalationStorage, peopleService, oncallService, catalogService, s.EscalationMinimumDelay)

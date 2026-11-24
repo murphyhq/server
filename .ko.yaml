@@ -17,5 +17,3 @@ builds:
     main: ./cmd/notifier
   - id: migrate
     main: ./cmd/migrate
-  - id: recover
-    main: ./cmd/recover
