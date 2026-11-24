@@ -25,7 +25,7 @@ type Delivery struct {
 
 type Topic interface {
 	System() string
-	Publish(ctx context.Context, topic, id string, data []byte) error
+	Publish(ctx context.Context, eventType, id string, data []byte) error
 	Ping(ctx context.Context) error
 	Close() error
 }
@@ -79,22 +79,6 @@ func On(verb protoreflect.Enum, handle Handler) Registration {
 
 var event = (&murphy.Envelope{}).ProtoReflect().Descriptor().Oneofs().ByName("event")
 
-func TopicOf(envelope *murphy.Envelope) string {
-	field := envelope.ProtoReflect().WhichOneof(event)
-	if field == nil {
-		return ""
-	}
-	return topicOf(field)
-}
-
-func Topics() []string {
-	topics := make([]string, event.Fields().Len())
-	for i := range topics {
-		topics[i] = topicOf(event.Fields().Get(i))
-	}
-	return topics
-}
-
 func topicOf(field protoreflect.FieldDescriptor) string {
 	return string(field.ParentFile().Package()) + "." + string(field.Name())
 }
@@ -145,14 +129,14 @@ func NewPublisher(topic Topic) *Publisher {
 }
 
 func (p *Publisher) Publish(ctx context.Context, envelope *murphy.Envelope) (err error) {
-	topic := TopicOf(envelope)
-	if topic == "" || envelope.GetId() == "" {
+	eventType := EventTypeOf(envelope)
+	if eventType == "" || envelope.GetId() == "" {
 		return errors.New("publish message: it needs an ID and an event")
 	}
 
 	ctx, span := tracer.Span(ctx, tracer.Producer())
 	defer span.End(&err)
-	ctx = span.Set(ctx, attributes(p.topic.System(), topic, envelope.GetId())...)
+	ctx = span.Set(ctx, attributes(p.topic.System(), eventType, envelope.GetId())...)
 
 	message := proto.CloneOf(envelope)
 	message.TraceContext = tracer.Inject(ctx)
@@ -160,10 +144,10 @@ func (p *Publisher) Publish(ctx context.Context, envelope *murphy.Envelope) (err
 	if err != nil {
 		return fmt.Errorf("encode message: %w", err)
 	}
-	if err := p.topic.Publish(ctx, topic, envelope.GetId(), data); err != nil {
+	if err := p.topic.Publish(ctx, eventType, envelope.GetId(), data); err != nil {
 		return fmt.Errorf("publish message: %w", err)
 	}
-	published.Add(ctx, 1, metrics.Dimension{Name: "topic", Value: topic})
+	published.Add(ctx, 1, metrics.Dimension{Name: "event.type", Value: eventType})
 	return nil
 }
 
@@ -214,11 +198,11 @@ func process(ctx context.Context, system, group string, handlers map[string]Hand
 		logger.Error(ctx, "message rejected", telemetry.WithField("consumer.group", group), telemetry.WithError(err))
 		return Reject(fmt.Errorf("decode message: %w", err))
 	}
-	topic, eventType := TopicOf(envelope), EventTypeOf(envelope)
+	eventType := EventTypeOf(envelope)
 
 	ctx, span := tracer.Span(ctx, tracer.Consumer(), tracer.ContinuedFrom(envelope.GetTraceContext()))
 	defer span.End(&err)
-	ctx = span.Set(ctx, append(attributes(system, topic, envelope.GetId()),
+	ctx = span.Set(ctx, append(attributes(system, eventType, envelope.GetId()),
 		telemetry.Standard("messaging.consumer.group.name", group),
 		telemetry.WithField("event.type", eventType),
 		telemetry.WithField("message.attempt", delivery.Attempt),
@@ -258,10 +242,10 @@ func process(ctx context.Context, system, group string, handlers map[string]Hand
 	return err
 }
 
-func attributes(system, topic, id string) []telemetry.Field {
+func attributes(system, eventType, id string) []telemetry.Field {
 	return []telemetry.Field{
 		telemetry.Standard("messaging.system", system),
-		telemetry.Standard("messaging.destination.name", topic),
+		telemetry.Standard("messaging.destination.name", eventType),
 		telemetry.Standard("messaging.message.id", id),
 	}
 }

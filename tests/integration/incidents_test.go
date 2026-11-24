@@ -20,7 +20,6 @@ import (
 	migrateapp "github.com/murphyhq/server/cmd/migrate/app"
 	"github.com/murphyhq/server/internal/messaging"
 	brokerpkg "github.com/murphyhq/server/internal/messaging/broker"
-	"github.com/murphyhq/server/internal/messaging/brokertest"
 	"github.com/murphyhq/server/services/catalog"
 	catalogdb "github.com/murphyhq/server/services/catalog/db"
 	"github.com/murphyhq/server/services/escalation"
@@ -396,7 +395,7 @@ func TestAMessagePublishedBeforeACrashIsPublishedAgain(t *testing.T) {
 				api, _ := testenv.APIWith(t, databases)
 				serviceID, integrationID, _ := integrationKey(t, api)
 				service, storage := incidentsFor(t, databases)
-				endpoints := broker(t).Provision(t, brokertest.Topology{"engine": {"murphy.v1.timer"}}, messaging.TopologyVersion)
+				endpoints := broker(t).Provision(t, messaging.Topology{"engine": {"murphy.v1.timer": {"expired"}}}, messaging.TopologyVersion)
 				topic, err := brokerpkg.OpenTopic(ctx, endpoints.Topic)
 				require.NoError(t, err)
 				t.Cleanup(func() { _ = topic.Close() })

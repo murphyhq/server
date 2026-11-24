@@ -27,9 +27,9 @@ type Stack struct {
 func Murphy(t *testing.T, broker brokertest.Environment, engine DatabaseEngine) Stack {
 	t.Helper()
 	databases := Databases(t, engine)
-	endpoints := broker.Provision(t, brokertest.Topology{
-		"engine":   {"murphy.v1.alert", "murphy.v1.timer"},
-		"notifier": {"murphy.v1.incident"},
+	endpoints := broker.Provision(t, messaging.Topology{
+		"engine":   {"murphy.v1.alert": {"received"}, "murphy.v1.timer": {"expired"}, "murphy.v1.notification": {"sent", "failed"}},
+		"notifier": {"murphy.v1.notification": {"created"}},
 	}, messaging.TopologyVersion)
 
 	api, _ := APIWith(t, databases)

@@ -25,9 +25,9 @@ import (
 )
 
 const (
-	topicAttribute = "topic"
-	maxInFlight    = 64
-	maxBatch       = 10
+	typeAttribute = "type"
+	maxInFlight   = 64
+	maxBatch      = 10
 )
 
 type Topic struct {
@@ -66,7 +66,7 @@ func (t *Topic) System() string {
 	return "aws_sns"
 }
 
-func (t *Topic) Publish(ctx context.Context, topic, _ string, data []byte) (err error) {
+func (t *Topic) Publish(ctx context.Context, eventType, _ string, data []byte) (err error) {
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
@@ -74,11 +74,11 @@ func (t *Topic) Publish(ctx context.Context, topic, _ string, data []byte) (err 
 		TopicArn: &t.arn,
 		Message:  sdkaws.String(base64.StdEncoding.EncodeToString(data)),
 		MessageAttributes: map[string]snstypes.MessageAttributeValue{
-			topicAttribute: {DataType: sdkaws.String("String"), StringValue: &topic},
+			typeAttribute: {DataType: sdkaws.String("String"), StringValue: &eventType},
 		},
 	})
 	if err != nil {
-		return fmt.Errorf("publish to %s: %w", topic, err)
+		return fmt.Errorf("publish %s: %w", eventType, err)
 	}
 	return nil
 }

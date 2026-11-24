@@ -15,5 +15,7 @@ func New(incidents *incidents.Service) messaging.Handlers {
 	return messaging.Handlers{
 		messaging.On(murphy.AlertVerb_ALERT_VERB_RECEIVED, h.AlertReceived),
 		messaging.On(murphy.TimerVerb_TIMER_VERB_EXPIRED, h.TimerExpired),
+		messaging.On(murphy.NotificationVerb_NOTIFICATION_VERB_SENT, h.NotificationSent),
+		messaging.On(murphy.NotificationVerb_NOTIFICATION_VERB_FAILED, h.NotificationFailed),
 	}
 }
