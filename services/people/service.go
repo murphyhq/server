@@ -55,6 +55,7 @@ func (s *Service) CreateUser(ctx context.Context, in *murphy.User) (_ *murphy.Us
 		Email:     in.GetEmail(),
 		TimeZone:  murphy.Or(in.GetTimeZone(), "UTC"),
 		Status:    murphy.Or(in.GetStatus(), murphy.UserStatus_USER_STATUS_ACTIVE),
+		Role:      murphy.Or(in.GetRole(), murphy.UserRole_USER_ROLE_MEMBER),
 		CreatedAt: now,
 		UpdatedAt: now,
 	}
@@ -114,6 +115,7 @@ func (s *Service) UpdateUser(ctx context.Context, in *murphy.User) (_ *murphy.Us
 		Email:     in.GetEmail(),
 		TimeZone:  murphy.Or(in.GetTimeZone(), current.GetTimeZone()),
 		Status:    murphy.Or(in.GetStatus(), current.GetStatus()),
+		Role:      current.GetRole(),
 		CreatedAt: current.GetCreatedAt(),
 		UpdatedAt: murphy.Now(),
 	}

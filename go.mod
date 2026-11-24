@@ -21,6 +21,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/credentials v1.21.3
 	github.com/aws/aws-sdk-go-v2/service/sns v1.48.0
 	github.com/aws/aws-sdk-go-v2/service/sqs v1.53.0
+	github.com/coreos/go-oidc/v3 v3.21.0
 	github.com/exaring/otelpgx v0.13.0
 	github.com/getkin/kin-openapi v0.153.0
 	github.com/go-sql-driver/mysql v1.10.2
@@ -32,6 +33,7 @@ require (
 	github.com/redis/go-redis/v9 v9.23.0
 	github.com/stretchr/testify v1.12.1
 	github.com/tsenart/vegeta/v12 v12.13.0
+	github.com/wiremock/go-wiremock v1.16.0
 	go.opentelemetry.io/contrib/bridges/otelslog v0.21.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.72.0
 	go.opentelemetry.io/contrib/instrumentation/runtime v0.72.0
@@ -44,6 +46,7 @@ require (
 	go.opentelemetry.io/otel/sdk/log v1.47.0
 	go.opentelemetry.io/otel/sdk/metric v1.47.0
 	go.opentelemetry.io/otel/trace v1.47.0
+	golang.org/x/oauth2 v0.38.0
 	google.golang.org/protobuf v1.36.13-0.20261016172727-e9ee2a76ab8e
 )
 
@@ -118,6 +121,7 @@ require (
 	github.com/fsnotify/fsnotify v1.10.1 // indirect
 	github.com/go-faster/city v1.0.1 // indirect
 	github.com/go-faster/errors v0.8.0 // indirect
+	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
 	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-openapi/jsonpointer v1.0.0 // indirect
@@ -216,7 +220,6 @@ require (
 	github.com/vmware-labs/yaml-jsonpath v0.3.2 // indirect
 	github.com/wasilibs/go-pgquery v0.0.0-20250409022910-10ac41983c07 // indirect
 	github.com/wasilibs/wazero-helpers v0.0.0-20240620070341-3dff1577cd52 // indirect
-	github.com/wiremock/go-wiremock v1.16.0 // indirect
 	github.com/xeipuuv/gojsonpointer v0.0.0-20190905194746-02993c407bfb // indirect
 	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect
 	github.com/xeipuuv/gojsonschema v1.2.0 // indirect

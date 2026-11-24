@@ -149,6 +149,7 @@ func toUser(user *murphy.User) User {
 		Email:     user.GetEmail(),
 		TimeZone:  user.GetTimeZone(),
 		Status:    UserStatus(user.GetStatus().Text()),
+		Role:      UserRole(user.GetRole().Text()),
 		CreatedAt: user.GetCreatedAt().AsTime(),
 		UpdatedAt: user.GetUpdatedAt().AsTime(),
 	}

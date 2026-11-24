@@ -10,3 +10,10 @@ func RedisURL() string {
 	}
 	return "redis://localhost:6379/0"
 }
+
+func IdentityProviderURL() string {
+	if url := os.Getenv("MURPHY_TEST_IDENTITY_PROVIDER_URL"); url != "" {
+		return url
+	}
+	return "http://localhost:5556/dex"
+}

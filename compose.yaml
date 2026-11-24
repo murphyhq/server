@@ -213,6 +213,7 @@ services:
       <<: *component-environment
       MURPHY_SEED_API_URL: http://api:8080
       MURPHY_SEED_WEBHOOK_URL: http://webhook-receiver:8080
+      MURPHY_SEED_IDENTITY_PROVIDER_URL: http://dex:5556/dex
       MURPHY_SEED_GRAFANA_URL: http://lgtm:3000
     healthcheck:
       disable: true
@@ -249,9 +250,17 @@ services:
       MURPHY_WEBHOOK_PUBLIC_KEYS: *webhook-public-keys
       MURPHY_ESCALATION_MINIMUM_DELAY: 1s
       MURPHY_CORS_ORIGINS: http://localhost:8090
+      MURPHY_PUBLIC_URL: http://localhost:8080
+      MURPHY_OIDC_ISSUER: http://localhost:5556/dex
+      MURPHY_OIDC_BACKCHANNEL_URL: http://dex:5556/dex
+      MURPHY_OIDC_CLIENT_ID: murphy
+      MURPHY_OIDC_CLIENT_SECRET: murphy-local-secret
+      MURPHY_INITIAL_ADMIN_EMAIL: ana@murphy.test
     ports:
       - "8080:8080"
     depends_on:
+      dex:
+        condition: service_healthy
       lgtm:
         condition: service_started
       migrate:
@@ -292,6 +301,18 @@ services:
       MURPHY_ONCALL_DATABASE_URL: postgres://murphy:murphy@postgres:5432/oncall?sslmode=disable
       MURPHY_ESCALATION_DATABASE_URL: postgres://murphy:murphy@postgres:5432/escalation?sslmode=disable
       MURPHY_WEBHOOK_SIGNING_KEYS: *webhook-signing-keys
+
+  dex:
+    image: ghcr.io/dexidp/dex:v2.46.1
+    command: ["dex", "serve", "/etc/dex/config.yaml"]
+    ports:
+      - "5556:5556"
+    volumes:
+      - ./tests/provision/local/dex:/etc/dex:ro
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:5558/healthz"]
+      interval: 5s
+      retries: 10
 
   webhook-receiver:
     image: wiremock/wiremock:3.9.1

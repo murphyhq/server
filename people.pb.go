@@ -22,6 +22,55 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type UserRole int32
+
+const (
+	UserRole_USER_ROLE_UNSPECIFIED UserRole = 0
+	UserRole_USER_ROLE_ADMIN       UserRole = 1
+	UserRole_USER_ROLE_MEMBER      UserRole = 2
+)
+
+// Enum value maps for UserRole.
+var (
+	UserRole_name = map[int32]string{
+		0: "USER_ROLE_UNSPECIFIED",
+		1: "USER_ROLE_ADMIN",
+		2: "USER_ROLE_MEMBER",
+	}
+	UserRole_value = map[string]int32{
+		"USER_ROLE_UNSPECIFIED": 0,
+		"USER_ROLE_ADMIN":       1,
+		"USER_ROLE_MEMBER":      2,
+	}
+)
+
+func (x UserRole) Enum() *UserRole {
+	p := new(UserRole)
+	*p = x
+	return p
+}
+
+func (x UserRole) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (UserRole) Descriptor() protoreflect.EnumDescriptor {
+	return file_murphy_v1_people_proto_enumTypes[0].Descriptor()
+}
+
+func (UserRole) Type() protoreflect.EnumType {
+	return &file_murphy_v1_people_proto_enumTypes[0]
+}
+
+func (x UserRole) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use UserRole.Descriptor instead.
+func (UserRole) EnumDescriptor() ([]byte, []int) {
+	return file_murphy_v1_people_proto_rawDescGZIP(), []int{0}
+}
+
 type UserStatus int32
 
 const (
@@ -55,11 +104,11 @@ func (x UserStatus) String() string {
 }
 
 func (UserStatus) Descriptor() protoreflect.EnumDescriptor {
-	return file_murphy_v1_people_proto_enumTypes[0].Descriptor()
+	return file_murphy_v1_people_proto_enumTypes[1].Descriptor()
 }
 
 func (UserStatus) Type() protoreflect.EnumType {
-	return &file_murphy_v1_people_proto_enumTypes[0]
+	return &file_murphy_v1_people_proto_enumTypes[1]
 }
 
 func (x UserStatus) Number() protoreflect.EnumNumber {
@@ -68,7 +117,7 @@ func (x UserStatus) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use UserStatus.Descriptor instead.
 func (UserStatus) EnumDescriptor() ([]byte, []int) {
-	return file_murphy_v1_people_proto_rawDescGZIP(), []int{0}
+	return file_murphy_v1_people_proto_rawDescGZIP(), []int{1}
 }
 
 type ContactMethodType int32
@@ -113,11 +162,11 @@ func (x ContactMethodType) String() string {
 }
 
 func (ContactMethodType) Descriptor() protoreflect.EnumDescriptor {
-	return file_murphy_v1_people_proto_enumTypes[1].Descriptor()
+	return file_murphy_v1_people_proto_enumTypes[2].Descriptor()
 }
 
 func (ContactMethodType) Type() protoreflect.EnumType {
-	return &file_murphy_v1_people_proto_enumTypes[1]
+	return &file_murphy_v1_people_proto_enumTypes[2]
 }
 
 func (x ContactMethodType) Number() protoreflect.EnumNumber {
@@ -126,7 +175,7 @@ func (x ContactMethodType) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use ContactMethodType.Descriptor instead.
 func (ContactMethodType) EnumDescriptor() ([]byte, []int) {
-	return file_murphy_v1_people_proto_rawDescGZIP(), []int{1}
+	return file_murphy_v1_people_proto_rawDescGZIP(), []int{2}
 }
 
 type TeamRole int32
@@ -165,11 +214,11 @@ func (x TeamRole) String() string {
 }
 
 func (TeamRole) Descriptor() protoreflect.EnumDescriptor {
-	return file_murphy_v1_people_proto_enumTypes[2].Descriptor()
+	return file_murphy_v1_people_proto_enumTypes[3].Descriptor()
 }
 
 func (TeamRole) Type() protoreflect.EnumType {
-	return &file_murphy_v1_people_proto_enumTypes[2]
+	return &file_murphy_v1_people_proto_enumTypes[3]
 }
 
 func (x TeamRole) Number() protoreflect.EnumNumber {
@@ -178,7 +227,7 @@ func (x TeamRole) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use TeamRole.Descriptor instead.
 func (TeamRole) EnumDescriptor() ([]byte, []int) {
-	return file_murphy_v1_people_proto_rawDescGZIP(), []int{2}
+	return file_murphy_v1_people_proto_rawDescGZIP(), []int{3}
 }
 
 type User struct {
@@ -190,6 +239,7 @@ type User struct {
 	Status        UserStatus             `protobuf:"varint,5,opt,name=status,proto3,enum=murphy.v1.UserStatus" json:"status,omitempty"`
 	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	Role          UserRole               `protobuf:"varint,8,opt,name=role,proto3,enum=murphy.v1.UserRole" json:"role,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -271,6 +321,13 @@ func (x *User) GetUpdatedAt() *timestamppb.Timestamp {
 		return x.UpdatedAt
 	}
 	return nil
+}
+
+func (x *User) GetRole() UserRole {
+	if x != nil {
+		return x.Role
+	}
+	return UserRole_USER_ROLE_UNSPECIFIED
 }
 
 type ContactMethod struct {
@@ -509,11 +566,279 @@ func (x *TeamMembership) GetUpdatedAt() *timestamppb.Timestamp {
 	return nil
 }
 
+type Identity struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	UserId        string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	Issuer        string                 `protobuf:"bytes,3,opt,name=issuer,proto3" json:"issuer,omitempty"`
+	Subject       string                 `protobuf:"bytes,4,opt,name=subject,proto3" json:"subject,omitempty"`
+	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Identity) Reset() {
+	*x = Identity{}
+	mi := &file_murphy_v1_people_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Identity) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Identity) ProtoMessage() {}
+
+func (x *Identity) ProtoReflect() protoreflect.Message {
+	mi := &file_murphy_v1_people_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Identity.ProtoReflect.Descriptor instead.
+func (*Identity) Descriptor() ([]byte, []int) {
+	return file_murphy_v1_people_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *Identity) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *Identity) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *Identity) GetIssuer() string {
+	if x != nil {
+		return x.Issuer
+	}
+	return ""
+}
+
+func (x *Identity) GetSubject() string {
+	if x != nil {
+		return x.Subject
+	}
+	return ""
+}
+
+func (x *Identity) GetCreatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
+func (x *Identity) GetUpdatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return nil
+}
+
+type Session struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	UserId        string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	TokenHash     []byte                 `protobuf:"bytes,3,opt,name=token_hash,json=tokenHash,proto3" json:"token_hash,omitempty"`
+	ExpiresAt     *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
+	RevokedAt     *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=revoked_at,json=revokedAt,proto3" json:"revoked_at,omitempty"`
+	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Session) Reset() {
+	*x = Session{}
+	mi := &file_murphy_v1_people_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Session) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Session) ProtoMessage() {}
+
+func (x *Session) ProtoReflect() protoreflect.Message {
+	mi := &file_murphy_v1_people_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Session.ProtoReflect.Descriptor instead.
+func (*Session) Descriptor() ([]byte, []int) {
+	return file_murphy_v1_people_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *Session) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *Session) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *Session) GetTokenHash() []byte {
+	if x != nil {
+		return x.TokenHash
+	}
+	return nil
+}
+
+func (x *Session) GetExpiresAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ExpiresAt
+	}
+	return nil
+}
+
+func (x *Session) GetRevokedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.RevokedAt
+	}
+	return nil
+}
+
+func (x *Session) GetCreatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
+func (x *Session) GetUpdatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return nil
+}
+
+type SignIn struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	StateHash     []byte                 `protobuf:"bytes,2,opt,name=state_hash,json=stateHash,proto3" json:"state_hash,omitempty"`
+	Nonce         string                 `protobuf:"bytes,3,opt,name=nonce,proto3" json:"nonce,omitempty"`
+	Verifier      string                 `protobuf:"bytes,4,opt,name=verifier,proto3" json:"verifier,omitempty"`
+	ExpiresAt     *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
+	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SignIn) Reset() {
+	*x = SignIn{}
+	mi := &file_murphy_v1_people_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SignIn) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SignIn) ProtoMessage() {}
+
+func (x *SignIn) ProtoReflect() protoreflect.Message {
+	mi := &file_murphy_v1_people_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SignIn.ProtoReflect.Descriptor instead.
+func (*SignIn) Descriptor() ([]byte, []int) {
+	return file_murphy_v1_people_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *SignIn) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *SignIn) GetStateHash() []byte {
+	if x != nil {
+		return x.StateHash
+	}
+	return nil
+}
+
+func (x *SignIn) GetNonce() string {
+	if x != nil {
+		return x.Nonce
+	}
+	return ""
+}
+
+func (x *SignIn) GetVerifier() string {
+	if x != nil {
+		return x.Verifier
+	}
+	return ""
+}
+
+func (x *SignIn) GetExpiresAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ExpiresAt
+	}
+	return nil
+}
+
+func (x *SignIn) GetCreatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
+func (x *SignIn) GetUpdatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return nil
+}
+
 var File_murphy_v1_people_proto protoreflect.FileDescriptor
 
 const file_murphy_v1_people_proto_rawDesc = "" +
 	"\n" +
-	"\x16murphy/v1/people.proto\x12\tmurphy.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\x82\x02\n" +
+	"\x16murphy/v1/people.proto\x12\tmurphy.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xab\x02\n" +
 	"\x04User\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x14\n" +
@@ -523,7 +848,8 @@ const file_murphy_v1_people_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"\xfa\x01\n" +
+	"updated_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12'\n" +
+	"\x04role\x18\b \x01(\x0e2\x13.murphy.v1.UserRoleR\x04role\"\xfa\x01\n" +
 	"\rContactMethod\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x120\n" +
@@ -548,7 +874,45 @@ const file_murphy_v1_people_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt*^\n" +
+	"updated_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"\xdb\x01\n" +
+	"\bIdentity\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x17\n" +
+	"\auser_id\x18\x02 \x01(\tR\x06userId\x12\x16\n" +
+	"\x06issuer\x18\x03 \x01(\tR\x06issuer\x12\x18\n" +
+	"\asubject\x18\x04 \x01(\tR\asubject\x129\n" +
+	"\n" +
+	"created_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
+	"\n" +
+	"updated_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"\xbd\x02\n" +
+	"\aSession\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x17\n" +
+	"\auser_id\x18\x02 \x01(\tR\x06userId\x12\x1d\n" +
+	"\n" +
+	"token_hash\x18\x03 \x01(\fR\ttokenHash\x129\n" +
+	"\n" +
+	"expires_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\x129\n" +
+	"\n" +
+	"revoked_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\trevokedAt\x129\n" +
+	"\n" +
+	"created_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
+	"\n" +
+	"updated_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"\x9a\x02\n" +
+	"\x06SignIn\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
+	"\n" +
+	"state_hash\x18\x02 \x01(\fR\tstateHash\x12\x14\n" +
+	"\x05nonce\x18\x03 \x01(\tR\x05nonce\x12\x1a\n" +
+	"\bverifier\x18\x04 \x01(\tR\bverifier\x129\n" +
+	"\n" +
+	"expires_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\x129\n" +
+	"\n" +
+	"created_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
+	"\n" +
+	"updated_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt*P\n" +
+	"\bUserRole\x12\x19\n" +
+	"\x15USER_ROLE_UNSPECIFIED\x10\x00\x12\x13\n" +
+	"\x0fUSER_ROLE_ADMIN\x10\x01\x12\x14\n" +
+	"\x10USER_ROLE_MEMBER\x10\x02*^\n" +
 	"\n" +
 	"UserStatus\x12\x1b\n" +
 	"\x17USER_STATUS_UNSPECIFIED\x10\x00\x12\x16\n" +
@@ -579,35 +943,49 @@ func file_murphy_v1_people_proto_rawDescGZIP() []byte {
 	return file_murphy_v1_people_proto_rawDescData
 }
 
-var file_murphy_v1_people_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_murphy_v1_people_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_murphy_v1_people_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
+var file_murphy_v1_people_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
 var file_murphy_v1_people_proto_goTypes = []any{
-	(UserStatus)(0),               // 0: murphy.v1.UserStatus
-	(ContactMethodType)(0),        // 1: murphy.v1.ContactMethodType
-	(TeamRole)(0),                 // 2: murphy.v1.TeamRole
-	(*User)(nil),                  // 3: murphy.v1.User
-	(*ContactMethod)(nil),         // 4: murphy.v1.ContactMethod
-	(*Team)(nil),                  // 5: murphy.v1.Team
-	(*TeamMembership)(nil),        // 6: murphy.v1.TeamMembership
-	(*timestamppb.Timestamp)(nil), // 7: google.protobuf.Timestamp
+	(UserRole)(0),                 // 0: murphy.v1.UserRole
+	(UserStatus)(0),               // 1: murphy.v1.UserStatus
+	(ContactMethodType)(0),        // 2: murphy.v1.ContactMethodType
+	(TeamRole)(0),                 // 3: murphy.v1.TeamRole
+	(*User)(nil),                  // 4: murphy.v1.User
+	(*ContactMethod)(nil),         // 5: murphy.v1.ContactMethod
+	(*Team)(nil),                  // 6: murphy.v1.Team
+	(*TeamMembership)(nil),        // 7: murphy.v1.TeamMembership
+	(*Identity)(nil),              // 8: murphy.v1.Identity
+	(*Session)(nil),               // 9: murphy.v1.Session
+	(*SignIn)(nil),                // 10: murphy.v1.SignIn
+	(*timestamppb.Timestamp)(nil), // 11: google.protobuf.Timestamp
 }
 var file_murphy_v1_people_proto_depIdxs = []int32{
-	0,  // 0: murphy.v1.User.status:type_name -> murphy.v1.UserStatus
-	7,  // 1: murphy.v1.User.created_at:type_name -> google.protobuf.Timestamp
-	7,  // 2: murphy.v1.User.updated_at:type_name -> google.protobuf.Timestamp
-	1,  // 3: murphy.v1.ContactMethod.type:type_name -> murphy.v1.ContactMethodType
-	7,  // 4: murphy.v1.ContactMethod.created_at:type_name -> google.protobuf.Timestamp
-	7,  // 5: murphy.v1.ContactMethod.updated_at:type_name -> google.protobuf.Timestamp
-	7,  // 6: murphy.v1.Team.created_at:type_name -> google.protobuf.Timestamp
-	7,  // 7: murphy.v1.Team.updated_at:type_name -> google.protobuf.Timestamp
-	2,  // 8: murphy.v1.TeamMembership.role:type_name -> murphy.v1.TeamRole
-	7,  // 9: murphy.v1.TeamMembership.created_at:type_name -> google.protobuf.Timestamp
-	7,  // 10: murphy.v1.TeamMembership.updated_at:type_name -> google.protobuf.Timestamp
-	11, // [11:11] is the sub-list for method output_type
-	11, // [11:11] is the sub-list for method input_type
-	11, // [11:11] is the sub-list for extension type_name
-	11, // [11:11] is the sub-list for extension extendee
-	0,  // [0:11] is the sub-list for field type_name
+	1,  // 0: murphy.v1.User.status:type_name -> murphy.v1.UserStatus
+	11, // 1: murphy.v1.User.created_at:type_name -> google.protobuf.Timestamp
+	11, // 2: murphy.v1.User.updated_at:type_name -> google.protobuf.Timestamp
+	0,  // 3: murphy.v1.User.role:type_name -> murphy.v1.UserRole
+	2,  // 4: murphy.v1.ContactMethod.type:type_name -> murphy.v1.ContactMethodType
+	11, // 5: murphy.v1.ContactMethod.created_at:type_name -> google.protobuf.Timestamp
+	11, // 6: murphy.v1.ContactMethod.updated_at:type_name -> google.protobuf.Timestamp
+	11, // 7: murphy.v1.Team.created_at:type_name -> google.protobuf.Timestamp
+	11, // 8: murphy.v1.Team.updated_at:type_name -> google.protobuf.Timestamp
+	3,  // 9: murphy.v1.TeamMembership.role:type_name -> murphy.v1.TeamRole
+	11, // 10: murphy.v1.TeamMembership.created_at:type_name -> google.protobuf.Timestamp
+	11, // 11: murphy.v1.TeamMembership.updated_at:type_name -> google.protobuf.Timestamp
+	11, // 12: murphy.v1.Identity.created_at:type_name -> google.protobuf.Timestamp
+	11, // 13: murphy.v1.Identity.updated_at:type_name -> google.protobuf.Timestamp
+	11, // 14: murphy.v1.Session.expires_at:type_name -> google.protobuf.Timestamp
+	11, // 15: murphy.v1.Session.revoked_at:type_name -> google.protobuf.Timestamp
+	11, // 16: murphy.v1.Session.created_at:type_name -> google.protobuf.Timestamp
+	11, // 17: murphy.v1.Session.updated_at:type_name -> google.protobuf.Timestamp
+	11, // 18: murphy.v1.SignIn.expires_at:type_name -> google.protobuf.Timestamp
+	11, // 19: murphy.v1.SignIn.created_at:type_name -> google.protobuf.Timestamp
+	11, // 20: murphy.v1.SignIn.updated_at:type_name -> google.protobuf.Timestamp
+	21, // [21:21] is the sub-list for method output_type
+	21, // [21:21] is the sub-list for method input_type
+	21, // [21:21] is the sub-list for extension type_name
+	21, // [21:21] is the sub-list for extension extendee
+	0,  // [0:21] is the sub-list for field type_name
 }
 
 func init() { file_murphy_v1_people_proto_init() }
@@ -620,8 +998,8 @@ func file_murphy_v1_people_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_murphy_v1_people_proto_rawDesc), len(file_murphy_v1_people_proto_rawDesc)),
-			NumEnums:      3,
-			NumMessages:   4,
+			NumEnums:      4,
+			NumMessages:   7,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

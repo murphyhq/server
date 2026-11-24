@@ -5,16 +5,17 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/murphyhq/server/client"
 	"github.com/murphyhq/server/internal/config"
 	"github.com/murphyhq/server/internal/logger"
 	"github.com/murphyhq/server/internal/telemetry"
+	"github.com/murphyhq/server/tests/murphytest"
 )
 
 type settings struct {
-	APIURL     string `env:"SEED_API_URL" default:"http://localhost:8080"`
-	WebhookURL string `env:"SEED_WEBHOOK_URL" default:"http://localhost:8092"`
-	Dogfood    dogfoodSettings
+	APIURL              string `env:"SEED_API_URL" default:"http://localhost:8080"`
+	WebhookURL          string `env:"SEED_WEBHOOK_URL" default:"http://localhost:8092"`
+	IdentityProviderURL string `env:"SEED_IDENTITY_PROVIDER_URL" default:"http://localhost:5556/dex"`
+	Dogfood             dogfoodSettings
 }
 
 func main() {
@@ -31,7 +32,11 @@ func run(ctx context.Context) error {
 	if err := config.Load(&s); err != nil {
 		return err
 	}
-	api, err := client.NewClientWithResponses(s.APIURL)
+	session, err := murphytest.SignIn(ctx, s.APIURL, s.IdentityProviderURL, murphytest.Ana)
+	if err != nil {
+		return fmt.Errorf("sign in: %w", err)
+	}
+	api, err := murphytest.Authenticated(s.APIURL, session)
 	if err != nil {
 		return fmt.Errorf("create API client: %w", err)
 	}

@@ -7,7 +7,117 @@ info:
 servers:
   - url: http://localhost:8080
     description: Local development
+security:
+  - session: []
+  - sessionCookie: []
 paths:
+  /v1/auth/sign-in:
+    get:
+      operationId: signIn
+      summary: Sign in through the identity provider
+      description: Sends the browser to the install's identity provider. Once the person has signed in there, the provider sends them back to `/v1/auth/callback`.
+      tags: [auth]
+      security: []
+      responses:
+        "302":
+          description: Go to the identity provider. The `murphy_sign_in` cookie ties the sign-in to this browser.
+          headers:
+            Location:
+              schema:
+                type: string
+            Set-Cookie:
+              schema:
+                type: string
+  /v1/auth/callback:
+    get:
+      operationId: finishSignIn
+      summary: Finish signing in
+      description: Where the identity provider sends the browser back. Signs the person in and sets the session cookie.
+      tags: [auth]
+      security: []
+      parameters:
+        - name: code
+          in: query
+          schema:
+            type: string
+        - name: state
+          in: query
+          schema:
+            type: string
+        - name: error
+          in: query
+          schema:
+            type: string
+        - name: error_description
+          in: query
+          schema:
+            type: string
+        - name: murphy_sign_in
+          in: cookie
+          description: Set when the sign-in started, so only the browser that started it can finish it.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Signed in. The session is in the `murphy_session` cookie.
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+        "401":
+          $ref: "#/components/responses/Problem"
+  /v1/auth/sessions:
+    post:
+      operationId: createSession
+      summary: Sign in with an identity token
+      description: Signs in with an ID token the install's identity provider issued to Murphy's client, for apps and automation that sign in with the provider themselves.
+      tags: [auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SessionInput"
+      responses:
+        "201":
+          description: Signed in.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionToken"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "401":
+          $ref: "#/components/responses/Problem"
+  /v1/auth/session:
+    get:
+      operationId: getSession
+      summary: Get the current session
+      tags: [auth]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+    delete:
+      operationId: signOut
+      summary: Sign out
+      description: Ends the current session at once.
+      tags: [auth]
+      responses:
+        "204":
+          description: Signed out.
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
   /v1/services:
     get:
       operationId: listServices
@@ -935,6 +1045,7 @@ paths:
   /v1/signing-keys:
     get:
       operationId: getSigningKeys
+      security: []
       summary: Get the public keys that sign webhooks
       description: Webhooks Murphy sends are signed with Ed25519 (Standard Webhooks `v1a`). Check a webhook's signature with any of these keys; while a key is being replaced, both the old and the new one are listed.
       tags: [notifications]
@@ -974,6 +1085,16 @@ components:
       description: The next_cursor of the previous page.
       schema:
         type: string
+  securitySchemes:
+    session:
+      type: http
+      scheme: bearer
+      description: A session token from `POST /v1/auth/sessions`. Requests without a valid session get 401.
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: murphy_session
+      description: The session cookie set when signing in through the browser.
   responses:
     Problem:
       description: The request failed.
@@ -982,6 +1103,32 @@ components:
           schema:
             $ref: "#/components/schemas/Problem"
   schemas:
+    SessionInput:
+      type: object
+      additionalProperties: false
+      required: [id_token]
+      properties:
+        id_token:
+          type: string
+          description: An ID token from the install's identity provider.
+    Session:
+      type: object
+      required: [user, expires_at]
+      properties:
+        user:
+          $ref: "#/components/schemas/User"
+        expires_at:
+          type: string
+          format: date-time
+    SessionToken:
+      type: object
+      required: [token, session]
+      properties:
+        token:
+          type: string
+          description: Send it as a bearer token. It is shown only once.
+        session:
+          $ref: "#/components/schemas/Session"
     Urgency:
       type: string
       enum: [high, low]
@@ -1282,7 +1429,7 @@ components:
       enum: [active, deactivated]
     User:
       type: object
-      required: [id, name, email, time_zone, status, created_at, updated_at]
+      required: [id, name, email, time_zone, status, role, created_at, updated_at]
       properties:
         id:
           type: string
@@ -1295,6 +1442,10 @@ components:
           description: IANA time zone, as in Europe/Malta.
         status:
           $ref: "#/components/schemas/UserStatus"
+        role:
+          type: string
+          enum: [admin, member]
+          description: Admins manage the whole install. The first admin is whoever signs in with the install's initial admin email.
         created_at:
           type: string
           format: date-time

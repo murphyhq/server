@@ -109,9 +109,7 @@ func TestInvalidServiceRequestsAreRefused(t *testing.T) {
 	for _, field := range []string{"name", "escalation_policy_id", "urgency"} {
 		assert.Contains(t, *invalid.ApplicationproblemJSON400.Detail, field)
 	}
-	resp, err := http.Get(m.APIURL() + "/v1/services?status=active")
-	require.NoError(t, err)
-	require.NoError(t, resp.Body.Close())
+	resp := m.Raw(http.MethodGet, "/v1/services?status=active")
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode, "unknown parameters are refused")
 }
 
@@ -132,11 +130,7 @@ func TestMissingResourcesAndRoutesAnswerWithProblems(t *testing.T) {
 		{http.MethodGet, "/v1/services//integrations", http.StatusNotFound},
 		{http.MethodDelete, "/v1/services", http.StatusMethodNotAllowed},
 	} {
-		req, err := http.NewRequestWithContext(ctx, request.method, m.APIURL()+request.path, nil)
-		require.NoError(t, err)
-		resp, err := http.DefaultClient.Do(req)
-		require.NoError(t, err)
-		require.NoError(t, resp.Body.Close())
+		resp := m.Raw(request.method, request.path)
 		assert.Equal(t, request.status, resp.StatusCode, request.path)
 		assert.Equal(t, "application/problem+json", resp.Header.Get("Content-Type"), request.path)
 	}

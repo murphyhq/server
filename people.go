@@ -69,6 +69,14 @@ func (s UserStatus) Text() string {
 	return enumText(s, "USER_STATUS_")
 }
 
+func (r UserRole) Text() string {
+	return enumText(r, "USER_ROLE_")
+}
+
+func UserRoleFromText(text string) UserRole {
+	return enumFromText[UserRole](UserRole_value, "USER_ROLE_", text)
+}
+
 func UserStatusFromText(text string) UserStatus {
 	return enumFromText[UserStatus](UserStatus_value, "USER_STATUS_", text)
 }

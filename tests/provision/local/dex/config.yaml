@@ -1,0 +1,27 @@
+issuer: http://localhost:5556/dex
+storage:
+  type: memory
+web:
+  http: 0.0.0.0:5556
+telemetry:
+  http: 0.0.0.0:5558
+oauth2:
+  skipApprovalScreen: true
+  passwordConnector: local
+  grantTypes: [authorization_code, password, refresh_token]
+enablePasswordDB: true
+staticClients:
+  - id: murphy
+    name: Murphy
+    secret: murphy-local-secret
+    redirectURIs:
+      - http://localhost:8080/v1/auth/callback
+staticPasswords:
+  - email: ana@murphy.test
+    username: ana
+    userID: 7d3c3f4e-5c1a-4e1e-9d1a-0a1b2c3d4e01
+    hash: "$2a$10$BuslZ90klud4bHQ.XkTUGet1imZh84OTvRSC3XpI5QnYGqWw674py"
+  - email: bo@murphy.test
+    username: bo
+    userID: 7d3c3f4e-5c1a-4e1e-9d1a-0a1b2c3d4e02
+    hash: "$2a$10$BuslZ90klud4bHQ.XkTUGet1imZh84OTvRSC3XpI5QnYGqWw674py"

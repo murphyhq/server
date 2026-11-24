@@ -3,6 +3,7 @@ package mysql
 import (
 	"context"
 	"embed"
+	"time"
 
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -15,16 +16,16 @@ import (
 var migrations embed.FS
 
 type Repository struct {
-	*murphymysql.Database[*Queries]
+	*murphymysql.Database[*Tx]
 	queries *Queries
 }
 
 func Open(ctx context.Context, url string) (*Repository, error) {
-	db, err := murphymysql.OpenDatabase(ctx, murphymysql.DatabaseConfig[*Queries]{
+	db, err := murphymysql.OpenDatabase(ctx, murphymysql.DatabaseConfig[*Tx]{
 		URL:        url,
 		Service:    "people",
 		Migrations: migrations,
-		Tx:         func(tx murphymysql.DBTX) *Queries { return New(tx) },
+		Tx:         func(tx murphymysql.DBTX) *Tx { return &Tx{queries: New(tx)} },
 	})
 	if err != nil {
 		return nil, err
@@ -38,7 +39,7 @@ func (r *Repository) CreateUser(ctx context.Context, user *murphy.User) (err err
 
 	return murphymysql.Error("user", r.queries.CreateUser(ctx, CreateUserParams{
 		ID: user.GetId(), Name: user.GetName(), Email: user.GetEmail(), TimeZone: user.GetTimeZone(),
-		Status: user.GetStatus().Text(), CreatedAt: user.GetCreatedAt().AsTime(), UpdatedAt: user.GetUpdatedAt().AsTime(),
+		Status: user.GetStatus().Text(), Role: user.GetRole().Text(), CreatedAt: user.GetCreatedAt().AsTime(), UpdatedAt: user.GetUpdatedAt().AsTime(),
 	}))
 }
 
@@ -66,6 +67,24 @@ func (r *Repository) ListUsers(ctx context.Context, before string, limit int) (_
 		users[i] = toUser(row)
 	}
 	return users, nil
+}
+
+func (r *Repository) GetUserByEmail(ctx context.Context, email string) (_ *murphy.User, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	row, err := r.queries.GetUserByEmail(ctx, email)
+	if err != nil {
+		return nil, murphymysql.Error("user", err)
+	}
+	return toUser(row), nil
+}
+
+func (r *Repository) AdminExists(ctx context.Context) (_ bool, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	return r.queries.AdminExists(ctx)
 }
 
 func (r *Repository) UpdateUser(ctx context.Context, user *murphy.User) (err error) {
@@ -159,7 +178,7 @@ func (r *Repository) DeleteContactMethod(ctx context.Context, id string) (err er
 func toUser(row User) *murphy.User {
 	return &murphy.User{
 		Id: row.ID, Name: row.Name, Email: row.Email, TimeZone: row.TimeZone, Status: murphy.UserStatusFromText(row.Status),
-		CreatedAt: timestamppb.New(row.CreatedAt), UpdatedAt: timestamppb.New(row.UpdatedAt),
+		Role: murphy.UserRoleFromText(row.Role), CreatedAt: timestamppb.New(row.CreatedAt), UpdatedAt: timestamppb.New(row.UpdatedAt),
 	}
 }
 
@@ -307,4 +326,108 @@ func (r *Repository) ActiveUsers(ctx context.Context, ids []string) (_ []string,
 		return nil, murphymysql.Error("user", err)
 	}
 	return active, nil
+}
+
+func (r *Repository) GetIdentity(ctx context.Context, issuer, subject string) (_ *murphy.Identity, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	row, err := r.queries.GetIdentity(ctx, GetIdentityParams{Issuer: issuer, Subject: subject})
+	if err != nil {
+		return nil, murphymysql.Error("identity", err)
+	}
+	return &murphy.Identity{
+		Id: row.ID, UserId: row.UserID, Issuer: row.Issuer, Subject: row.Subject,
+		CreatedAt: timestamppb.New(row.CreatedAt), UpdatedAt: timestamppb.New(row.UpdatedAt),
+	}, nil
+}
+
+func (r *Repository) CreateIdentity(ctx context.Context, identity *murphy.Identity) (err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	return insertIdentity(ctx, r.queries, identity)
+}
+
+func (r *Repository) CreateSession(ctx context.Context, session *murphy.Session) (err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	return murphymysql.Error("session", r.queries.CreateSession(ctx, CreateSessionParams{
+		ID: session.GetId(), UserID: session.GetUserId(), TokenHash: session.GetTokenHash(), ExpiresAt: session.GetExpiresAt().AsTime(),
+		CreatedAt: session.GetCreatedAt().AsTime(), UpdatedAt: session.GetUpdatedAt().AsTime(),
+	}))
+}
+
+func (r *Repository) GetActiveSession(ctx context.Context, tokenHash []byte, now time.Time) (_ *murphy.Session, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	row, err := r.queries.GetActiveSession(ctx, GetActiveSessionParams{TokenHash: tokenHash, Now: now})
+	if err != nil {
+		return nil, murphymysql.Error("session", err)
+	}
+	return &murphy.Session{
+		Id: row.ID, UserId: row.UserID, TokenHash: row.TokenHash, ExpiresAt: timestamppb.New(row.ExpiresAt),
+		CreatedAt: timestamppb.New(row.CreatedAt), UpdatedAt: timestamppb.New(row.UpdatedAt),
+	}, nil
+}
+
+func (r *Repository) RevokeSession(ctx context.Context, tokenHash []byte, at time.Time) (err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	rows, err := r.queries.RevokeSession(ctx, RevokeSessionParams{RevokedAt: &at, UpdatedAt: at, TokenHash: tokenHash})
+	return murphymysql.Changed("session", rows, err)
+}
+
+func (r *Repository) CreateSignIn(ctx context.Context, signIn *murphy.SignIn) (err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	return murphymysql.Error("sign-in", r.queries.CreateSignIn(ctx, CreateSignInParams{
+		ID: signIn.GetId(), StateHash: signIn.GetStateHash(), Nonce: signIn.GetNonce(), Verifier: signIn.GetVerifier(),
+		ExpiresAt: signIn.GetExpiresAt().AsTime(),
+		CreatedAt: signIn.GetCreatedAt().AsTime(), UpdatedAt: signIn.GetUpdatedAt().AsTime(),
+	}))
+}
+
+func (r *Repository) UseSignIn(ctx context.Context, stateHash []byte, now time.Time) (_ bool, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	rows, err := r.queries.UseSignIn(ctx, UseSignInParams{UsedAt: &now, UpdatedAt: now, StateHash: stateHash, Now: now})
+	if err != nil {
+		return false, murphymysql.Error("sign-in", err)
+	}
+	return rows == 1, nil
+}
+
+func (r *Repository) GetSignIn(ctx context.Context, stateHash []byte) (_ *murphy.SignIn, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	row, err := r.queries.GetSignIn(ctx, stateHash)
+	if err != nil {
+		return nil, murphymysql.Error("sign-in", err)
+	}
+	return &murphy.SignIn{
+		Id: row.ID, StateHash: row.StateHash, Nonce: row.Nonce, Verifier: row.Verifier,
+		ExpiresAt: timestamppb.New(row.ExpiresAt), CreatedAt: timestamppb.New(row.CreatedAt), UpdatedAt: timestamppb.New(row.UpdatedAt),
+	}, nil
+}
+
+func (r *Repository) DeleteExpiredSignIns(ctx context.Context, before time.Time) (err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	_, err = r.queries.DeleteExpiredSignIns(ctx, before)
+	return err
+}
+
+func insertIdentity(ctx context.Context, queries *Queries, identity *murphy.Identity) error {
+	return murphymysql.Error("identity", queries.CreateIdentity(ctx, CreateIdentityParams{
+		ID: identity.GetId(), UserID: identity.GetUserId(), Issuer: identity.GetIssuer(), Subject: identity.GetSubject(),
+		CreatedAt: identity.GetCreatedAt().AsTime(), UpdatedAt: identity.GetUpdatedAt().AsTime(),
+	}))
 }

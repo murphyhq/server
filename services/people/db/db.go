@@ -12,6 +12,7 @@ import (
 
 type Storage interface {
 	people.Repository
+	people.AuthRepository
 	Migrate(ctx context.Context) error
 	Ping(ctx context.Context) error
 	Close()
@@ -25,13 +26,13 @@ func Open(ctx context.Context, url string) (Storage, error) {
 		if err != nil {
 			return nil, err
 		}
-		return &Repository{Engine: engine}, nil
+		return &Repository[*postgres.Tx]{Engine: engine}, nil
 	case "mysql":
 		engine, err := mysql.Open(ctx, url)
 		if err != nil {
 			return nil, err
 		}
-		return &Repository{Engine: engine}, nil
+		return &Repository[*mysql.Tx]{Engine: engine}, nil
 	default:
 		return nil, errors.New("unsupported database")
 	}
