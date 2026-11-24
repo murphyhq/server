@@ -141,3 +141,22 @@ func TestMissingResourcesAndRoutesAnswerWithProblems(t *testing.T) {
 		assert.Equal(t, "application/problem+json", resp.Header.Get("Content-Type"), request.path)
 	}
 }
+
+func TestADisabledServiceRefusesAlerts(t *testing.T) {
+	m := murphytest.New(t)
+	service := m.Service()
+	service.Disable()
+
+	require.Equal(t, http.StatusAccepted, service.Send(murphytest.Generic("disk-full", "firing")))
+
+	service.StaysWithoutIncidents()
+}
+
+func TestAServicesUrgencyCarriesIntoItsIncidents(t *testing.T) {
+	m := murphytest.New(t)
+	service := m.Service(murphytest.Urgency(client.Low))
+
+	incident := service.Fire("disk-full")
+
+	assert.Equal(t, client.Low, incident.Get().Urgency)
+}

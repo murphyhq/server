@@ -156,7 +156,6 @@ Every kind of failure Murphy guards against is tested, without changing the code
 8. `tests/seed/` MUST give a fresh local stack realistic data, created only through the API and safe to run again. Every domain MUST add its data there in the PR that adds the domain.
 9. `go test ./...` MUST run the unit tests without Docker or network access. Tests under `tests/` MUST use the `integration` build tag, except stack tests, which use `stack`, and load tests, which use `load`.
 10. Every load test MUST state its thresholds and fail when a run breaks them. Load tests MUST run the same scenarios in every traffic profile, MUST keep their results as reports, and MUST run in CI after every merge to `main`.
-11. CI MUST run the stack tests on PostgreSQL and NATS for every pull request, and on every database and broker after every merge to `main`.
 
 ## Code
 

@@ -163,3 +163,15 @@ func TestAnUnknownAlertSourceIsNotFound(t *testing.T) {
 
 	assert.Equal(t, http.StatusNotFound, status)
 }
+
+func TestGrafanaPagesMurphyAndResolvesTheIncident(t *testing.T) {
+	m := murphytest.New(t, murphytest.Patience(3*time.Minute))
+	service := m.Service(murphytest.Receives(client.Grafana))
+	rule := m.GrafanaRuleFor(service)
+
+	rule.Fire()
+	incident := service.WaitForIncident()
+	rule.Recover()
+
+	incident.WaitFor(murphytest.Status(client.IncidentStatusResolved))
+}

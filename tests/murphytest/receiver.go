@@ -53,9 +53,21 @@ type Webhook struct {
 }
 
 type ReceivedWebhook struct {
-	ID       string
-	Verified bool
-	Body     webhook.Webhook
+	ID         string
+	Verified   bool
+	Body       webhook.Webhook
+	timestamp  string
+	signatures string
+	raw        []byte
+}
+
+func (r ReceivedWebhook) VerifiesWith(publicKey string) bool {
+	keys, err := webhook.ParsePublicKeys(publicKey)
+	return err == nil && webhook.Verify(keys, r.ID, r.timestamp, r.signatures, r.raw, time.Now(), 5*time.Minute) == nil
+}
+
+func (r ReceivedWebhook) Signatures() int {
+	return len(strings.Fields(r.signatures))
 }
 
 func (r *Receiver) Webhook(options ...WebhookOption) *Webhook {
@@ -99,10 +111,20 @@ func (w *Webhook) Received() []ReceivedWebhook {
 			headers[strings.ToLower(name)] = value
 		}
 		received[i].ID = headers[webhook.HeaderID]
+		received[i].timestamp, received[i].signatures, received[i].raw = headers[webhook.HeaderTimestamp], headers[webhook.HeaderSignature], []byte(request.Body)
 		received[i].Verified = webhook.Verify(keys, received[i].ID, headers[webhook.HeaderTimestamp], headers[webhook.HeaderSignature], []byte(request.Body), time.Now(), 5*time.Minute) == nil
 		_ = json.Unmarshal([]byte(request.Body), &received[i].Body)
 	}
 	return received
+}
+
+func (w *Webhook) ReceivesNothing() {
+	w.receiver.t.Helper()
+	request := wiremock.NewRequest(http.MethodPost, wiremock.URLPathEqualTo(w.path))
+	require.Never(w.receiver.t, func() bool {
+		got, err := w.receiver.client.GetCountRequests(request)
+		return err != nil || got > 0
+	}, 3*time.Second, tick, "the webhook receives nothing")
 }
 
 func (w *Webhook) WaitForWebhooks(count int) []ReceivedWebhook {

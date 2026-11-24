@@ -113,6 +113,12 @@ func (m *Murphy) Schedule(team *Team, participants ...*User) *Schedule {
 	return &Schedule{ID: created.JSON201.Id}
 }
 
+func (m *Murphy) Override(schedule *Schedule, user *User, from, to time.Time) {
+	m.t.Helper()
+	created, err := m.API.CreateOverrideWithResponse(m.t.Context(), schedule.ID, nil, client.OverrideInput{User: client.Reference{Id: user.ID}, StartsAt: from, EndsAt: to})
+	m.created(created, err, "create an override")
+}
+
 func (s *Schedule) Target() client.EscalationTarget {
 	return client.EscalationTarget{Type: client.EscalationTargetTypeSchedule, Id: s.ID}
 }
@@ -129,6 +135,7 @@ type serviceSpec struct {
 	levels      []Level
 	repeats     int32
 	integration client.IntegrationType
+	urgency     *client.Urgency
 }
 
 func Pages(targets ...client.EscalationTarget) ServiceOption {
@@ -147,6 +154,10 @@ func OwnedBy(team *Team) ServiceOption {
 	return func(s *serviceSpec) { s.team = team }
 }
 
+func Urgency(urgency client.Urgency) ServiceOption {
+	return func(s *serviceSpec) { s.urgency = &urgency }
+}
+
 func Receives(kind client.IntegrationType) ServiceOption {
 	return func(s *serviceSpec) { s.integration = kind }
 }
@@ -157,7 +168,25 @@ type Service struct {
 	PolicyVersion int32
 	IntegrationID string
 	key           string
+	name          string
 	m             *Murphy
+}
+
+func (s *Service) Disable() {
+	s.m.t.Helper()
+	disabled := client.ServiceStatusDisabled
+	updated, err := s.m.API.UpdateServiceWithResponse(s.m.t.Context(), s.ID, client.ServiceInput{Name: s.name, EscalationPolicy: client.Reference{Id: s.PolicyID}, Status: &disabled})
+	s.m.ok(updated, err, "disable the service")
+}
+
+func (s *Service) ChangePolicy(levels ...Level) {
+	s.m.t.Helper()
+	got, err := s.m.API.GetEscalationPolicyWithResponse(s.m.t.Context(), s.PolicyID)
+	s.m.ok(got, err, "get the service's policy")
+	updated, err := s.m.API.UpdateEscalationPolicyWithResponse(s.m.t.Context(), s.PolicyID, client.EscalationPolicyInput{
+		Name: got.JSON200.Name, Team: got.JSON200.Team, Levels: escalationLevels(levels), RepeatCount: &got.JSON200.RepeatCount,
+	})
+	s.m.ok(updated, err, "change the service's policy")
 }
 
 func (m *Murphy) Service(options ...ServiceOption) *Service {
@@ -167,13 +196,14 @@ func (m *Murphy) Service(options ...ServiceOption) *Service {
 		option(&spec)
 	}
 	policy := m.policy(spec)
-	service, err := m.API.CreateServiceWithResponse(m.t.Context(), nil, client.ServiceInput{Name: m.Name("service"), EscalationPolicy: client.Reference{Id: policy.ID}})
+	name := m.Name("service")
+	service, err := m.API.CreateServiceWithResponse(m.t.Context(), nil, client.ServiceInput{Name: name, EscalationPolicy: client.Reference{Id: policy.ID}, Urgency: spec.urgency})
 	m.created(service, err, "create a service")
 	integration, err := m.API.CreateIntegrationWithResponse(m.t.Context(), service.JSON201.Id, nil, client.IntegrationCreate{Name: string(spec.integration), Type: spec.integration})
 	m.created(integration, err, "create an integration")
 	return &Service{
 		ID: service.JSON201.Id, PolicyID: policy.ID, PolicyVersion: policy.Version,
-		IntegrationID: integration.JSON201.Id, key: integration.JSON201.Key, m: m,
+		IntegrationID: integration.JSON201.Id, key: integration.JSON201.Key, name: name, m: m,
 	}
 }
 
@@ -199,12 +229,8 @@ func (m *Murphy) policy(spec serviceSpec) *Policy {
 	if len(spec.levels) == 0 {
 		spec.levels = []Level{{Delay: time.Hour, Targets: []client.EscalationTarget{m.User().Target()}}}
 	}
-	levels := make([]client.EscalationLevel, len(spec.levels))
-	for i, level := range spec.levels {
-		levels[i] = client.EscalationLevel{DelaySeconds: int64(level.Delay / time.Second), Targets: level.Targets}
-	}
 	policy, err := m.API.CreateEscalationPolicyWithResponse(m.t.Context(), nil, client.EscalationPolicyInput{
-		Name: m.Name("policy"), Team: client.Reference{Id: spec.team.ID}, Levels: levels, RepeatCount: &spec.repeats,
+		Name: m.Name("policy"), Team: client.Reference{Id: spec.team.ID}, Levels: escalationLevels(spec.levels), RepeatCount: &spec.repeats,
 	})
 	m.created(policy, err, "create an escalation policy")
 	return &Policy{ID: policy.JSON201.Id, Version: policy.JSON201.Version}
@@ -212,4 +238,16 @@ func (m *Murphy) policy(spec serviceSpec) *Policy {
 
 func (s *Service) Key() string {
 	return s.key
+}
+
+func escalationLevels(levels []Level) []client.EscalationLevel {
+	out := make([]client.EscalationLevel, len(levels))
+	for i, level := range levels {
+		out[i] = client.EscalationLevel{DelaySeconds: int64(level.Delay / time.Second), Targets: level.Targets}
+	}
+	return out
+}
+
+func Within(delay time.Duration, targets ...client.EscalationTarget) Level {
+	return Level{Delay: delay, Targets: targets}
 }

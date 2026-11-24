@@ -51,7 +51,10 @@ type ScheduledMessage struct {
 	Envelope []byte
 }
 
-const HandledRetention = 7 * 24 * time.Hour
+const (
+	HandledRetention = 7 * 24 * time.Hour
+	FollowUpDeadline = 5 * time.Minute
+)
 
 type Service struct {
 	repo     Repository
@@ -86,6 +89,7 @@ func (s *Service) IncidentEscalated(ctx context.Context, messageID string, incid
 	page := &murphy.Page{
 		Id: murphy.NewID(), Incident: incident, EscalationLevel: level, EscalationRound: incident.GetEscalationRound(), CreatedAt: now,
 	}
+	nextLevelDue := timestamppb.New(now.AsTime().Add(policy.GetLevels()[level-1].GetDelay().AsDuration()))
 	if err := s.reach(ctx, page, policy.GetLevels()[level-1], now.AsTime()); err != nil {
 		return err
 	}
@@ -101,7 +105,7 @@ func (s *Service) IncidentEscalated(ctx context.Context, messageID string, incid
 	for _, recipient := range page.GetReached() {
 		recipient.ContactMethods = int32(len(methods[recipient.GetUserId()]))
 		for _, method := range methods[recipient.GetUserId()] {
-			notification := newNotification(incident, murphy.NotificationReason_NOTIFICATION_REASON_PAGED, method, now)
+			notification := newNotification(incident, murphy.NotificationReason_NOTIFICATION_REASON_PAGED, method, now, nextLevelDue)
 			notification.PageId, notification.Via = page.GetId(), recipient.GetVia()
 			created = append(created, notification)
 		}
@@ -178,10 +182,11 @@ func (s *Service) followUp(ctx context.Context, messageID string, incident *murp
 		return fmt.Errorf("find contact methods: %w", err)
 	}
 	now := murphy.Now()
+	deadline := timestamppb.New(now.AsTime().Add(FollowUpDeadline))
 	var created []*murphy.Notification
 	for _, user := range users {
 		for _, method := range methods[user] {
-			created = append(created, newNotification(incident, reason, method, now))
+			created = append(created, newNotification(incident, reason, method, now, deadline))
 		}
 	}
 	messages, err := notificationsCreated(ctx, created)
@@ -227,7 +232,7 @@ func (s *Service) policyVersion(ctx context.Context, id string, version int32) (
 	return policy, nil
 }
 
-func newNotification(incident *murphy.Incident, reason murphy.NotificationReason, method *murphy.ContactMethod, now *timestamppb.Timestamp) *murphy.Notification {
+func newNotification(incident *murphy.Incident, reason murphy.NotificationReason, method *murphy.ContactMethod, now, deadline *timestamppb.Timestamp) *murphy.Notification {
 	return &murphy.Notification{
 		Id:              murphy.NewID(),
 		Reason:          reason,
@@ -237,6 +242,7 @@ func newNotification(incident *murphy.Incident, reason murphy.NotificationReason
 		EscalationLevel: incident.GetEscalationLevel(),
 		EscalationRound: incident.GetEscalationRound(),
 		CreatedAt:       now,
+		Deadline:        deadline,
 	}
 }
 

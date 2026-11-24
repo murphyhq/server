@@ -20,8 +20,6 @@ type Publisher interface {
 	Publish(ctx context.Context, envelope *murphy.Envelope) error
 }
 
-const GiveUpAfter = 5 * time.Minute
-
 type RefusedError struct {
 	Reason string
 }
@@ -60,8 +58,9 @@ func (s *Sender) Send(ctx context.Context, messageID string, notification *murph
 		return s.outcome(ctx, messageID, notification, murphy.NotificationVerb_NOTIFICATION_VERB_SENT, "")
 	case errors.As(sendErr, &refused):
 		return s.outcome(ctx, messageID, notification, murphy.NotificationVerb_NOTIFICATION_VERB_FAILED, refused.Reason)
-	case time.Since(notification.GetCreatedAt().AsTime()) >= GiveUpAfter:
-		return s.outcome(ctx, messageID, notification, murphy.NotificationVerb_NOTIFICATION_VERB_FAILED, "still failing after 5 minutes: "+sendErr.Error())
+	case !time.Now().Before(notification.GetDeadline().AsTime()):
+		tried := notification.GetDeadline().AsTime().Sub(notification.GetCreatedAt().AsTime()).Round(time.Second)
+		return s.outcome(ctx, messageID, notification, murphy.NotificationVerb_NOTIFICATION_VERB_FAILED, fmt.Sprintf("still failing after %s: %s", tried, sendErr))
 	default:
 		return fmt.Errorf("send notification: %w", sendErr)
 	}

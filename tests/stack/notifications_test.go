@@ -130,3 +130,40 @@ func TestTheAPIServesThePublicSigningKeys(t *testing.T) {
 	_, err = webhook.ParsePublicKeys(got.JSON200.Keys[0].PublicKey)
 	assert.NoError(t, err)
 }
+
+func TestResolvingThroughTheAlertTellsEveryonePaged(t *testing.T) {
+	m := murphytest.New(t)
+	ana := m.User(murphytest.WithWebhook())
+	service := m.Service(murphytest.Pages(ana.Target()))
+	service.Fire("disk-full").WaitFor(murphytest.Notified(ana, client.Webhook))
+
+	service.Recover("disk-full")
+
+	received := ana.Webhook().WaitForWebhooks(2)
+	assert.Equal(t, []webhook.WebhookType{webhook.IncidentPaged, webhook.IncidentResolved}, []webhook.WebhookType{received[0].Body.Type, received[1].Body.Type})
+}
+
+func TestAPageGivesUpWhenTheNextLevelIsDue(t *testing.T) {
+	m := murphytest.New(t)
+	ana := m.User(murphytest.WithWebhook(murphytest.Refuses(http.StatusServiceUnavailable)))
+	service := m.Service(murphytest.Levels(murphytest.Within(2*time.Second, ana.Target())))
+
+	incident := service.Fire("disk-full")
+
+	incident.WaitFor(murphytest.NotificationFailedBecause(ana, client.Webhook, "still failing after 2s: the receiver answered 503"))
+}
+
+func TestWebhooksCarryASignatureFromEveryKeyDuringARotation(t *testing.T) {
+	m := murphytest.New(t)
+	keys := m.SigningKeys()
+	require.Len(t, keys, 2, "the local stack is always mid-rotation")
+	ana := m.User(murphytest.WithWebhook())
+	service := m.Service(murphytest.Pages(ana.Target()))
+
+	service.Fire("disk-full")
+
+	page := ana.Webhook().WaitForWebhooks(1)[0]
+	assert.Equal(t, 2, page.Signatures())
+	assert.True(t, page.VerifiesWith(keys[0]), "a receiver still on the old key accepts it")
+	assert.True(t, page.VerifiesWith(keys[1]), "a receiver already on the new key accepts it")
+}

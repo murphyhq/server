@@ -47,7 +47,7 @@ func incidentsOn(t *testing.T, databases migrateapp.Settings) (*incidents.Servic
 	storage, err := incidentsdb.Open(t.Context(), databases.IncidentsDatabaseURL)
 	require.NoError(t, err)
 	t.Cleanup(storage.Close)
-	return incidents.New(storage, catalog.New(catalogStorage, nil), escalation.New(escalationStorage, nil, nil, nil)), storage
+	return incidents.New(storage, catalog.New(catalogStorage, nil), escalation.New(escalationStorage, nil, nil, nil, 0)), storage
 }
 
 func firingAlert(service *murphytest.Service) *murphy.Alert {

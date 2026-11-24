@@ -94,6 +94,17 @@ func (m *Murphy) publicKeys() []ed25519.PublicKey {
 	return keys
 }
 
+func (m *Murphy) SigningKeys() []string {
+	m.t.Helper()
+	got, err := m.API.GetSigningKeysWithResponse(m.t.Context())
+	m.ok(got, err, "get the public signing keys")
+	keys := make([]string, len(got.JSON200.Keys))
+	for i, key := range got.JSON200.Keys {
+		keys[i] = key.PublicKey
+	}
+	return keys
+}
+
 func (m *Murphy) APIURL() string {
 	return m.apiURL
 }

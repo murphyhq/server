@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/murphyhq/server/cmd/api/router"
 	"github.com/murphyhq/server/internal/httpserver"
@@ -23,16 +24,17 @@ import (
 )
 
 type Settings struct {
-	HTTPAddr              string   `env:"HTTP_ADDR" default:":8080"`
-	CatalogDatabaseURL    string   `env:"CATALOG_DATABASE_URL" required:"true"`
-	IncidentsDatabaseURL  string   `env:"INCIDENTS_DATABASE_URL" required:"true"`
-	PeopleDatabaseURL     string   `env:"PEOPLE_DATABASE_URL" required:"true"`
-	OnCallDatabaseURL     string   `env:"ONCALL_DATABASE_URL" required:"true"`
-	EscalationDatabaseURL string   `env:"ESCALATION_DATABASE_URL" required:"true"`
-	IdempotencyStoreURL   string   `env:"IDEMPOTENCY_STORE_URL" required:"true"`
-	IntegrationKeySecrets string   `env:"INTEGRATION_KEY_SECRETS" required:"true"`
-	WebhookPublicKeys     string   `env:"WEBHOOK_PUBLIC_KEYS" required:"true"`
-	CORSOrigins           []string `env:"CORS_ORIGINS" validate:"base-url"`
+	HTTPAddr               string        `env:"HTTP_ADDR" default:":8080"`
+	CatalogDatabaseURL     string        `env:"CATALOG_DATABASE_URL" required:"true"`
+	IncidentsDatabaseURL   string        `env:"INCIDENTS_DATABASE_URL" required:"true"`
+	PeopleDatabaseURL      string        `env:"PEOPLE_DATABASE_URL" required:"true"`
+	OnCallDatabaseURL      string        `env:"ONCALL_DATABASE_URL" required:"true"`
+	EscalationDatabaseURL  string        `env:"ESCALATION_DATABASE_URL" required:"true"`
+	IdempotencyStoreURL    string        `env:"IDEMPOTENCY_STORE_URL" required:"true"`
+	IntegrationKeySecrets  string        `env:"INTEGRATION_KEY_SECRETS" required:"true"`
+	WebhookPublicKeys      string        `env:"WEBHOOK_PUBLIC_KEYS" required:"true"`
+	EscalationMinimumDelay time.Duration `env:"ESCALATION_MINIMUM_DELAY" default:"1m"`
+	CORSOrigins            []string      `env:"CORS_ORIGINS" validate:"base-url"`
 }
 
 type App struct {
@@ -98,7 +100,7 @@ func New(ctx context.Context, s Settings) (_ *App, err error) {
 	catalogService := catalog.New(catalogStorage, keyring)
 	peopleService := people.New(peopleStorage)
 	oncallService := oncall.New(oncallStorage, peopleService)
-	escalationService := escalation.New(escalationStorage, peopleService, oncallService, catalogService)
+	escalationService := escalation.New(escalationStorage, peopleService, oncallService, catalogService, s.EscalationMinimumDelay)
 	a.Handler, err = router.New(router.Services{
 		Catalog:    catalogService,
 		Incidents:  incidents.New(incidentsStorage, catalogService, escalationService),

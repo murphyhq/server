@@ -91,7 +91,7 @@ func New(ctx context.Context, s Settings) (_ *App, err error) {
 	a.resources.Add(func() { _ = a.subscription.Close() }, a.subscription.Ping)
 
 	peopleService := people.New(peopleStorage)
-	a.notifications = notifications.New(notificationsStorage, escalation.New(escalationStorage, nil, nil, nil), oncall.New(oncallStorage, peopleService), peopleService)
+	a.notifications = notifications.New(notificationsStorage, escalation.New(escalationStorage, nil, nil, nil, 0), oncall.New(oncallStorage, peopleService), peopleService)
 	a.sender = notifications.NewSender(messaging.NewPublisher(topic), map[murphy.ContactMethodType]notifications.Provider{
 		murphy.ContactMethodType_CONTACT_METHOD_TYPE_WEBHOOK: webhook.New(keys),
 	})

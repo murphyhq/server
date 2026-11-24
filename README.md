@@ -55,7 +55,7 @@ Integration tests, the shared suites and the component tests, run against the se
 go test -tags integration ./...
 ```
 
-Stack tests run against the whole stack from `docker compose --profile murphy up`. Set `COMPOSE_FILE=compose.yaml:compose.mysql.yaml` or `:compose.sqs.yaml` to run the stack on MySQL or on SNS with SQS:
+Stack tests run against the whole stack from `docker compose --profile murphy up`:
 
 ```
 go test -tags stack ./tests/stack/...

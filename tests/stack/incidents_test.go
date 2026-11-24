@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -95,4 +96,116 @@ func TestAnIncidentPagesItsFirstLevelUntilAcknowledged(t *testing.T) {
 	again := incident.Acknowledge()
 	assert.Equal(t, acknowledged.UpdatedAt, again.UpdatedAt, "acknowledging again changes nothing")
 	assert.Equal(t, client.IncidentStatusResolved, incident.Resolve().Status)
+}
+
+func TestTheNextLevelIsPagedWhenTheDelayEnds(t *testing.T) {
+	m := murphytest.New(t)
+	ana, bo := m.User(murphytest.WithWebhook()), m.User(murphytest.WithWebhook())
+	service := m.Service(murphytest.Levels(murphytest.Within(time.Second, ana.Target()), murphytest.Within(time.Hour, bo.Target())))
+
+	incident := service.Fire("disk-full")
+
+	incident.WaitFor(
+		murphytest.Entries(client.TimelineEntryTypeEscalated, client.TimelineEntryTypeEscalated),
+		murphytest.Paged(ana, bo),
+	)
+	bo.Webhook().WaitForWebhooks(1)
+}
+
+func TestAcknowledgingStopsEscalation(t *testing.T) {
+	m := murphytest.New(t)
+	ana, bo := m.User(murphytest.WithWebhook()), m.User(murphytest.WithWebhook())
+	service := m.Service(murphytest.Levels(murphytest.Within(2*time.Second, ana.Target()), murphytest.Within(time.Hour, bo.Target())))
+	incident := service.Fire("disk-full")
+	incident.WaitFor(murphytest.Paged(ana))
+
+	incident.Acknowledge()
+
+	bo.Webhook().ReceivesNothing()
+}
+
+func TestEscalationRepeatsThenIsExhausted(t *testing.T) {
+	m := murphytest.New(t)
+	ana := m.User(murphytest.WithWebhook())
+	service := m.Service(murphytest.Levels(murphytest.Within(time.Second, ana.Target())), murphytest.Repeats(1))
+
+	incident := service.Fire("disk-full")
+
+	incident.WaitFor(
+		murphytest.Entries(client.TimelineEntryTypeEscalated, client.TimelineEntryTypeEscalated, client.TimelineEntryTypeEscalationExhausted),
+		murphytest.Paged(ana, ana),
+	)
+	ana.Webhook().WaitForWebhooks(2)
+}
+
+func TestALevelPagesEachPersonItReachesOnce(t *testing.T) {
+	m := murphytest.New(t)
+	team := m.Team()
+	ana, bo := m.User(murphytest.WithWebhook()), m.User(murphytest.WithWebhook())
+	primary := m.Schedule(team, ana)
+	service := m.Service(murphytest.OwnedBy(team), murphytest.Pages(primary.Target(), bo.Target(), ana.Target()))
+
+	incident := service.Fire("disk-full")
+
+	incident.WaitFor(murphytest.Paged(ana, bo))
+	ana.Webhook().WaitForWebhooks(1)
+}
+
+func TestDeactivatedPeopleAreNotPaged(t *testing.T) {
+	m := murphytest.New(t)
+	cy, bo := m.User(murphytest.Deactivated(), murphytest.WithWebhook()), m.User(murphytest.WithWebhook())
+	service := m.Service(murphytest.Pages(cy.Target(), bo.Target()))
+
+	incident := service.Fire("disk-full")
+
+	incident.WaitFor(murphytest.Paged(bo), murphytest.Notified(bo, client.Webhook))
+	cy.Webhook().ReceivesNothing()
+}
+
+func TestAnOverridePagesWhoeverCoversTheSchedule(t *testing.T) {
+	m := murphytest.New(t)
+	team := m.Team()
+	ana, bo := m.User(murphytest.WithWebhook()), m.User(murphytest.WithWebhook())
+	primary := m.Schedule(team, ana)
+	m.Override(primary, bo, time.Now().Add(-time.Minute), time.Now().Add(time.Hour))
+	service := m.Service(murphytest.OwnedBy(team), murphytest.Pages(primary.Target()))
+
+	incident := service.Fire("disk-full")
+
+	incident.WaitFor(murphytest.PagedVia(bo, primary.Target()))
+	ana.Webhook().ReceivesNothing()
+}
+
+func TestAnIncidentFollowsThePolicyVersionItOpenedWith(t *testing.T) {
+	m := murphytest.New(t)
+	ana, bo, cy := m.User(murphytest.WithWebhook()), m.User(murphytest.WithWebhook()), m.User(murphytest.WithWebhook())
+	service := m.Service(murphytest.Levels(murphytest.Within(2*time.Second, ana.Target()), murphytest.Within(time.Hour, bo.Target())))
+	incident := service.Fire("disk-full")
+
+	service.ChangePolicy(murphytest.Within(2*time.Second, ana.Target()), murphytest.Within(time.Hour, cy.Target()))
+
+	incident.WaitFor(murphytest.Paged(ana, bo))
+	cy.Webhook().ReceivesNothing()
+}
+
+func TestIncidentsFilterByStatusAndServiceAndPaginate(t *testing.T) {
+	m := murphytest.New(t)
+	service, other := m.Service(), m.Service()
+	service.Fire("disk-full")
+	service.Fire("cpu-high")
+	service.Fire("memory-low").Resolve()
+	other.Fire("disk-full")
+	triggered := []client.IncidentStatus{client.IncidentStatusTriggered}
+	services := []string{service.ID}
+	limit := 1
+
+	first, err := m.API.ListIncidentsWithResponse(t.Context(), &client.ListIncidentsParams{Status: &triggered, ServiceId: &services, Limit: &limit})
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, first.StatusCode())
+	second, err := m.API.ListIncidentsWithResponse(t.Context(), &client.ListIncidentsParams{Status: &triggered, ServiceId: &services, Limit: &limit, Cursor: &first.JSON200.NextCursor})
+	require.NoError(t, err)
+
+	assert.Equal(t, "cpu-high", first.JSON200.Items[0].DedupKey, "newest first")
+	assert.Equal(t, "disk-full", second.JSON200.Items[0].DedupKey)
+	assert.Empty(t, second.JSON200.NextCursor)
 }

@@ -42,6 +42,7 @@ func notification(channel murphy.ContactMethodType, age time.Duration) *murphy.N
 		Incident:      &murphy.Incident{Id: murphy.NewID()},
 		ContactMethod: &murphy.ContactMethod{Id: murphy.NewID(), Type: channel, Address: "https://example.com/hook"},
 		CreatedAt:     timestamppb.New(time.Now().Add(-age)),
+		Deadline:      timestamppb.New(time.Now().Add(-age).Add(10 * time.Minute)),
 	}
 }
 
@@ -94,15 +95,15 @@ func TestAFailureThatMayPassIsRetriedByTheBroker(t *testing.T) {
 	assert.Empty(t, f.published)
 }
 
-func TestANotificationStillFailingAfterFiveMinutesFails(t *testing.T) {
+func TestANotificationStillFailingAtItsDeadlineFails(t *testing.T) {
 	f := setup(t)
 	f.provider.EXPECT().Send(mock.Anything, mock.Anything).Return(errors.New("the receiver answered 503"))
 
-	require.NoError(t, f.sender.Send(t.Context(), "message-1", notification(murphy.ContactMethodType_CONTACT_METHOD_TYPE_WEBHOOK, notifications.GiveUpAfter)))
+	require.NoError(t, f.sender.Send(t.Context(), "message-1", notification(murphy.ContactMethodType_CONTACT_METHOD_TYPE_WEBHOOK, 10*time.Minute)))
 
 	require.Len(t, f.published, 1)
 	assert.Equal(t, murphy.NotificationVerb_NOTIFICATION_VERB_FAILED, f.published[0].GetNotification().GetVerb())
-	assert.Equal(t, "still failing after 5 minutes: the receiver answered 503", f.published[0].GetNotification().GetCurrent().GetFailure())
+	assert.Equal(t, "still failing after 10m0s: the receiver answered 503", f.published[0].GetNotification().GetCurrent().GetFailure())
 }
 
 func TestAChannelWithoutAProviderFails(t *testing.T) {

@@ -130,3 +130,15 @@ func TestTeamsAndTheirMembers(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, members.JSON200.Items)
 }
+
+func TestPoliciesRefuseLevelsShorterThanTheMinimumDelay(t *testing.T) {
+	m := murphytest.New(t)
+	input := policyInput(m, m.Team().ID, m.User().Target())
+	input.Levels[0].DelaySeconds = 0
+
+	created, err := m.API.CreateEscalationPolicyWithResponse(t.Context(), nil, input)
+
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusBadRequest, created.StatusCode())
+	assert.Contains(t, *created.ApplicationproblemJSON400.Detail, "must be at least 1s")
+}

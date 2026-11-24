@@ -43,7 +43,7 @@ func notificationsOn(t *testing.T, databases migrateapp.Settings) (*notification
 	require.NoError(t, err)
 	t.Cleanup(escalationStorage.Close)
 	peopleService := people.New(peopleStorage)
-	return notifications.New(storage, escalation.New(escalationStorage, nil, nil, nil), oncall.New(oncallStorage, peopleService), peopleService), storage
+	return notifications.New(storage, escalation.New(escalationStorage, nil, nil, nil, 0), oncall.New(oncallStorage, peopleService), peopleService), storage
 }
 
 func webhookTo(address string) *murphy.ContactMethod {
