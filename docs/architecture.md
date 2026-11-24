@@ -38,10 +38,12 @@ flowchart LR
   end
 
   providers_out[Notification providers]
+  idp[Identity provider]
 
   mon --> ingest
   providers_in --> ingest
   clients --> api
+  api --> idp
   notifier --> providers_out
 
   ingest --> broker
@@ -58,7 +60,7 @@ flowchart LR
   classDef outside fill:#f3f4f6,stroke:#9ca3af,color:#1f2937
   classDef component fill:#e0ecff,stroke:#3b6fb6,color:#13294b
   classDef infra fill:#fdf0d5,stroke:#b7791f,color:#3d2a06
-  class mon,providers_in,clients,providers_out outside
+  class mon,providers_in,clients,providers_out,idp outside
   class ingest,api,scheduler,engine,notifier component
   class broker,db,kv infra
 
@@ -79,6 +81,8 @@ The public entry point for webhooks. Monitoring tools send it alerts, and notifi
 ### API
 
 The management API, described by an OpenAPI spec and used by people and automation. It reads and writes the database directly, and changes that belong together happen in one transaction, together with the messages they cause.
+
+People sign in through the install's identity provider over OpenID Connect, or with a password where the install allows passwords, and `api` keeps their sessions in the database, so a session can be ended at once. Every request needs a session, except the health checks and the public signing keys. On an install without an admin, `api` logs a one-time link that lets the first person to sign in become the admin.
 
 ### Engine
 
@@ -101,6 +105,8 @@ Applies database schema changes. It runs once before the other components start,
 Murphy depends on what it needs from a message broker, a database and a key-value store, never on a specific product. Each product is an implementation chosen by configuration, and every implementation passes the same test suite against the real service. Supporting another product means adding an implementation that passes it, without touching the components.
 
 The message broker keeps every message until it is processed, delivers it at least once, and hands each message to every component subscribed to its event type. It promises no order, and never has to delay a message, because timers live in the database. Its topics and subscriptions are created outside Murphy, like the databases, and labelled with a topology version; a component refuses to start on a topology older than its release needs. The implementations are SNS with SQS, and NATS JetStream.
+
+An OpenID Connect identity provider, such as Google, Okta or Microsoft Entra ID, tells `api` who someone is. Locally, the provider is Dex. An install without one can allow passwords instead, which `api` keeps only as hashes.
 
 A key-value store keeps the `Idempotency-Key` of every request that creates something, with its response, for 24 hours, so `api` answers a retry without doing the work twice. The implementation is Redis.
 
@@ -191,4 +197,22 @@ sequenceDiagram
   S->>D: claim due messages
   S-->>N: incident acknowledged
   N->>N: notify everyone already paged
+```
+
+### Signing in
+
+```mermaid
+sequenceDiagram
+  participant B as Browser or app
+  participant A as api
+  participant P as Identity provider
+  participant D as database
+  B->>A: sign in
+  A->>B: go to the provider (authorization code with PKCE)
+  B->>P: sign in there
+  P->>B: back to api with a code
+  B->>A: the code
+  A->>P: exchange the code for who they are
+  A->>D: find or create the person, store a session
+  A->>B: the session
 ```
