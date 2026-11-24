@@ -120,7 +120,7 @@ paths:
     post:
       operationId: createConnectCode
       summary: Connect the app
-      description: Creates a one-time code that signs the app in as you, valid for five minutes. Show its link as a QR code for the app to scan.
+      description: Creates a one-time code that signs the app in as you, valid for 45 seconds. Show its link as a QR code for the app to scan.
       tags: [auth]
       parameters:
         - $ref: "#/components/parameters/IdempotencyKey"

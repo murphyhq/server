@@ -23,7 +23,7 @@ import (
 const (
 	signInDuration     = 10 * time.Minute
 	appSignInDuration  = 2 * time.Minute
-	connectDuration    = 5 * time.Minute
+	connectDuration    = 45 * time.Second
 	sessionPrefix      = "mss_"
 	appSignInPrefix    = "mas_"
 	connectCodePrefix  = "mcc_"

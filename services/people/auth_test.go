@@ -402,7 +402,7 @@ func TestAConnectCodeSignsTheAppInAsWhoeverCreatedIt(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, bo, signedIn.Session.GetUserId())
 	assert.Equal(t, "murphy://connect?code="+url.QueryEscape(connect.Code)+"&server=https%3A%2F%2Fmurphy.example.com", connect.Link)
-	assert.WithinDuration(t, time.Now().Add(5*time.Minute), connect.ExpiresAt, time.Minute)
+	assert.WithinDuration(t, time.Now().Add(45*time.Second), connect.ExpiresAt, 5*time.Second)
 }
 
 func TestAOneTimeCodeWorksOnce(t *testing.T) {

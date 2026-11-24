@@ -1145,7 +1145,7 @@ type ClientInterface interface {
 
 	// CreateConnectCode Connect the app
 	//
-	// Creates a one-time code that signs the app in as you, valid for five minutes. Show its link as a QR code for the app to scan.
+	// Creates a one-time code that signs the app in as you, valid for 45 seconds. Show its link as a QR code for the app to scan.
 	//
 	// Corresponds with POST /v1/auth/connect-codes (the `CreateConnectCode` operationId).
 	CreateConnectCode(ctx context.Context, params *CreateConnectCodeParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -1606,7 +1606,7 @@ func (c *Client) FinishSignIn(ctx context.Context, params *FinishSignInParams, r
 
 // CreateConnectCode Connect the app
 //
-// Creates a one-time code that signs the app in as you, valid for five minutes. Show its link as a QR code for the app to scan.
+// Creates a one-time code that signs the app in as you, valid for 45 seconds. Show its link as a QR code for the app to scan.
 //
 // Corresponds with POST /v1/auth/connect-codes (the `CreateConnectCode` operationId).
 func (c *Client) CreateConnectCode(ctx context.Context, params *CreateConnectCodeParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -5472,7 +5472,7 @@ type ClientWithResponsesInterface interface {
 
 	// CreateConnectCodeWithResponse Connect the app
 	//
-	// Creates a one-time code that signs the app in as you, valid for five minutes. Show its link as a QR code for the app to scan.
+	// Creates a one-time code that signs the app in as you, valid for 45 seconds. Show its link as a QR code for the app to scan.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -8843,7 +8843,7 @@ func (c *ClientWithResponses) FinishSignInWithResponse(ctx context.Context, para
 
 // CreateConnectCodeWithResponse Connect the app
 //
-// Creates a one-time code that signs the app in as you, valid for five minutes. Show its link as a QR code for the app to scan.
+// Creates a one-time code that signs the app in as you, valid for 45 seconds. Show its link as a QR code for the app to scan.
 //
 // Returns a wrapper object for the known response body format(s).
 //
