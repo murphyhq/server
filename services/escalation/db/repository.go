@@ -26,6 +26,7 @@ type Engine[T Tx] interface {
 	DeletePolicy(ctx context.Context, id string, at time.Time) error
 	CurrentVersion(ctx context.Context, id string) (int32, error)
 	PolicyNames(ctx context.Context, ids []string) (map[string]string, error)
+	PoliciesOfTeams(ctx context.Context, teamIDs []string) ([]string, error)
 	Transaction(ctx context.Context, work func(tx T) error) error
 	Migrate(ctx context.Context) error
 	Ping(ctx context.Context) error

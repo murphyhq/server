@@ -209,3 +209,58 @@ func TestIncidentsFilterByStatusAndServiceAndPaginate(t *testing.T) {
 	assert.Equal(t, "disk-full", second.JSON200.Items[0].DedupKey)
 	assert.Empty(t, second.JSON200.NextCursor)
 }
+
+func TestAnIncidentNamesWhatItPointsAtAndWhoActed(t *testing.T) {
+	m := murphytest.New(t)
+	ana := m.Member(murphytest.Ana)
+	bo := m.User(murphytest.WithWebhook())
+	service := m.Service(murphytest.Pages(bo.Target()))
+	incident := service.Fire("disk-full")
+	incident.WaitFor(murphytest.PagedVia(bo, bo.Target()))
+
+	incident.Acknowledge()
+	incident.Resolve()
+
+	got := incident.WaitFor(
+		murphytest.ActedBy(client.TimelineEntryTypeAcknowledged, ana.User),
+		murphytest.ActedBy(client.TimelineEntryTypeResolved, ana.User),
+	)
+	assert.Equal(t, &service.Name, got.Service.Name)
+	require.NotNil(t, got.Escalation)
+	assert.Equal(t, &service.PolicyName, got.Escalation.Policy.Name)
+}
+
+func TestIncidentsFilterByTeamPersonPagedUrgencyAndTime(t *testing.T) {
+	m := murphytest.New(t)
+	team := m.Team()
+	bo := m.User(murphytest.WithWebhook())
+	owned := m.Service(murphytest.OwnedBy(team), murphytest.Pages(bo.Target()))
+	low := m.Service(murphytest.Urgency(client.Low))
+	mine := owned.Fire("disk-full")
+	mine.WaitFor(murphytest.Paged(bo))
+	quiet := low.Fire("disk-full")
+	both := []string{owned.ID, low.ID}
+	teams, paged, urgencies := []string{team.ID}, []string{bo.ID}, []client.Urgency{client.Low}
+	later := time.Now().Add(time.Hour)
+
+	byTeam := m.IncidentsMatching(client.ListIncidentsParams{TeamId: &teams})
+	byPerson := m.IncidentsMatching(client.ListIncidentsParams{PagedUserId: &paged})
+	byUrgency := m.IncidentsMatching(client.ListIncidentsParams{ServiceId: &both, Urgency: &urgencies})
+	afterNow := m.IncidentsMatching(client.ListIncidentsParams{ServiceId: &both, CreatedAfter: &later})
+	beforeNow := m.IncidentsMatching(client.ListIncidentsParams{ServiceId: &both, CreatedBefore: &later})
+
+	assert.Equal(t, []string{mine.ID}, byTeam)
+	assert.Equal(t, []string{mine.ID}, byPerson)
+	assert.Equal(t, []string{quiet.ID}, byUrgency)
+	assert.Empty(t, afterNow)
+	assert.Equal(t, []string{quiet.ID, mine.ID}, beforeNow, "newest first")
+}
+
+func TestATeamWithoutPoliciesOwnsNoIncidents(t *testing.T) {
+	m := murphytest.New(t)
+	teams := []string{m.Team().ID}
+
+	got := m.IncidentsMatching(client.ListIncidentsParams{TeamId: &teams})
+
+	assert.Empty(t, got)
+}

@@ -289,7 +289,7 @@ func TestAcknowledgingRetriesAfterAConcurrentChange(t *testing.T) {
 	repo.EXPECT().Record(mock.Anything, mock.Anything).Return(false, murphy.ErrConflict).Once()
 	repo.EXPECT().Record(mock.Anything, mock.Anything).Return(true, nil).Once()
 
-	acknowledged, err := f.service.Acknowledge(t.Context(), id)
+	acknowledged, err := f.service.Acknowledge(t.Context(), id, murphy.NewID())
 
 	require.NoError(t, err)
 	assert.Equal(t, murphy.IncidentStatus_INCIDENT_STATUS_ACKNOWLEDGED, acknowledged.GetStatus())

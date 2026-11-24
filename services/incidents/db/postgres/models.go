@@ -49,6 +49,13 @@ type Incident struct {
 	AcknowledgedAt          *time.Time
 }
 
+type IncidentPage struct {
+	ID         string
+	IncidentID string
+	UserID     string
+	CreatedAt  time.Time
+}
+
 type ScheduledMessage struct {
 	ID           string
 	IncidentID   string

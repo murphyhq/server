@@ -21,6 +21,7 @@ type Repository interface {
 	GetPolicyVersion(ctx context.Context, id string, version int32) (*murphy.EscalationPolicy, error)
 	CurrentVersion(ctx context.Context, id string) (int32, error)
 	PolicyNames(ctx context.Context, ids []string) (map[string]string, error)
+	PoliciesOfTeams(ctx context.Context, teamIDs []string) ([]string, error)
 }
 
 type People interface {
@@ -254,4 +255,16 @@ func (s *Service) PolicyNames(ctx context.Context, ids []string) (_ map[string]s
 		return map[string]string{}, nil
 	}
 	return s.repo.PolicyNames(ctx, ids)
+}
+
+func (s *Service) PoliciesOfTeams(ctx context.Context, teamIDs []string) (_ []string, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	for _, id := range teamIDs {
+		if err := murphy.LookupID("team", id); err != nil {
+			return nil, err
+		}
+	}
+	return s.repo.PoliciesOfTeams(ctx, teamIDs)
 }

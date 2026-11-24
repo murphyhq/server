@@ -58,3 +58,8 @@ WHERE id = sqlc.arg(id) AND deleted_at IS NULL;
 SELECT id, name
 FROM escalation_policies
 WHERE id IN (sqlc.slice(ids));
+
+-- name: PoliciesOfTeams :many
+SELECT id
+FROM escalation_policies
+WHERE team_id IN (sqlc.slice(team_ids));

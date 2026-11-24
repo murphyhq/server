@@ -60,6 +60,7 @@ message TimelineEntry {
   google.protobuf.Timestamp at = 6;
   TimelineEscalation escalation = 7;
   TimelineNotification notification = 8;
+  string actor_user_id = 9;
 }
 
 message TimelineEscalation {

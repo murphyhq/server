@@ -490,6 +490,7 @@ type TimelineEntry struct {
 	At            *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=at,proto3" json:"at,omitempty"`
 	Escalation    *TimelineEscalation    `protobuf:"bytes,7,opt,name=escalation,proto3" json:"escalation,omitempty"`
 	Notification  *TimelineNotification  `protobuf:"bytes,8,opt,name=notification,proto3" json:"notification,omitempty"`
+	ActorUserId   string                 `protobuf:"bytes,9,opt,name=actor_user_id,json=actorUserId,proto3" json:"actor_user_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -578,6 +579,13 @@ func (x *TimelineEntry) GetNotification() *TimelineNotification {
 		return x.Notification
 	}
 	return nil
+}
+
+func (x *TimelineEntry) GetActorUserId() string {
+	if x != nil {
+		return x.ActorUserId
+	}
+	return ""
 }
 
 type TimelineEscalation struct {
@@ -951,7 +959,7 @@ const file_murphy_v1_incident_proto_rawDesc = "" +
 	"\rIncidentEvent\x12+\n" +
 	"\x04verb\x18\x01 \x01(\x0e2\x17.murphy.v1.IncidentVerbR\x04verb\x12/\n" +
 	"\bprevious\x18\x02 \x01(\v2\x13.murphy.v1.IncidentR\bprevious\x12-\n" +
-	"\acurrent\x18\x03 \x01(\v2\x13.murphy.v1.IncidentR\acurrent\"\xd7\x02\n" +
+	"\acurrent\x18\x03 \x01(\v2\x13.murphy.v1.IncidentR\acurrent\"\xfb\x02\n" +
 	"\rTimelineEntry\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1f\n" +
 	"\vincident_id\x18\x02 \x01(\tR\n" +
@@ -963,7 +971,8 @@ const file_murphy_v1_incident_proto_rawDesc = "" +
 	"\n" +
 	"escalation\x18\a \x01(\v2\x1d.murphy.v1.TimelineEscalationR\n" +
 	"escalation\x12C\n" +
-	"\fnotification\x18\b \x01(\v2\x1f.murphy.v1.TimelineNotificationR\fnotification\"\xb3\x01\n" +
+	"\fnotification\x18\b \x01(\v2\x1f.murphy.v1.TimelineNotificationR\fnotification\x12\"\n" +
+	"\ractor_user_id\x18\t \x01(\tR\vactorUserId\"\xb3\x01\n" +
 	"\x12TimelineEscalation\x12\x14\n" +
 	"\x05level\x18\x01 \x01(\x05R\x05level\x12\x14\n" +
 	"\x05round\x18\x02 \x01(\x05R\x05round\x12-\n" +

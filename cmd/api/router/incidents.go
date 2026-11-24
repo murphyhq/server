@@ -13,14 +13,26 @@ func (s *Server) ListIncidents(ctx context.Context, request ListIncidentsRequest
 	defer span.End(&err)
 
 	n := newNames()
-	var filter incidents.Filter
-	if request.Params.Status != nil {
-		for _, status := range *request.Params.Status {
-			filter.Statuses = append(filter.Statuses, murphy.IncidentStatusFromText(string(status)))
-		}
+	filter := incidents.Filter{
+		ServiceIDs:    all(request.Params.ServiceId),
+		PagedUserIDs:  all(request.Params.PagedUserId),
+		CreatedAfter:  request.Params.CreatedAfter,
+		CreatedBefore: request.Params.CreatedBefore,
 	}
-	if request.Params.ServiceId != nil {
-		filter.ServiceIDs = *request.Params.ServiceId
+	for _, status := range all(request.Params.Status) {
+		filter.Statuses = append(filter.Statuses, murphy.IncidentStatusFromText(string(status)))
+	}
+	for _, urgency := range all(request.Params.Urgency) {
+		filter.Urgencies = append(filter.Urgencies, murphy.UrgencyFromText(string(urgency)))
+	}
+	if teams := all(request.Params.TeamId); len(teams) > 0 {
+		filter.PolicyIDs, err = s.escalation.PoliciesOfTeams(ctx, teams)
+		if err != nil {
+			return nil, err
+		}
+		if len(filter.PolicyIDs) == 0 {
+			return ListIncidents200JSONResponse{Items: []Incident{}}, nil
+		}
 	}
 	found, next, err := s.incidents.ListIncidents(ctx, filter, page(request.Params.Limit, request.Params.Cursor))
 	if err != nil {
@@ -50,6 +62,10 @@ func (s *Server) GetIncident(ctx context.Context, request GetIncidentRequestObje
 			Type:    TimelineEntryType(entry.GetType().Text()),
 			Summary: entry.GetSummary(),
 			At:      entry.GetAt().AsTime(),
+		}
+		if id := entry.GetActorUserId(); id != "" {
+			actor := n.user(id)
+			entries[i].Actor = &actor
 		}
 		if id := entry.GetAlertId(); id != "" {
 			alert := ref(id)
@@ -133,7 +149,7 @@ func (s *Server) AcknowledgeIncident(ctx context.Context, request AcknowledgeInc
 	defer span.End(&err)
 
 	n := newNames()
-	incident, err := s.incidents.Acknowledge(ctx, request.Id)
+	incident, err := s.incidents.Acknowledge(ctx, request.Id, sessionFrom(ctx).session.GetUserId())
 	if err != nil {
 		return nil, err
 	}
@@ -145,9 +161,16 @@ func (s *Server) ResolveIncident(ctx context.Context, request ResolveIncidentReq
 	defer span.End(&err)
 
 	n := newNames()
-	incident, err := s.incidents.Resolve(ctx, request.Id)
+	incident, err := s.incidents.Resolve(ctx, request.Id, sessionFrom(ctx).session.GetUserId())
 	if err != nil {
 		return nil, err
 	}
 	return ResolveIncident200JSONResponse(toIncident(incident, n)), s.name(ctx, n)
+}
+
+func all[T any](values *[]T) []T {
+	if values == nil {
+		return nil
+	}
+	return *values
 }

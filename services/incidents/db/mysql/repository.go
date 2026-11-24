@@ -65,17 +65,21 @@ func (r *Repository) ListIncidents(ctx context.Context, filter incidents.Filter,
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
-	texts := make([]string, len(filter.Statuses))
-	for i, status := range filter.Statuses {
-		texts[i] = status.Text()
-	}
 	rows, err := r.queries.ListIncidents(ctx, ListIncidentsParams{
-		Before:     before,
-		AnyStatus:  len(texts) == 0,
-		Statuses:   texts,
-		AnyService: len(filter.ServiceIDs) == 0,
-		ServiceIds: filter.ServiceIDs,
-		Limit:      int32(limit),
+		Before:              before,
+		AnyStatus:           len(filter.Statuses) == 0,
+		Statuses:            texts(filter.Statuses),
+		AnyService:          len(filter.ServiceIDs) == 0,
+		ServiceIds:          filter.ServiceIDs,
+		AnyPolicy:           len(filter.PolicyIDs) == 0,
+		EscalationPolicyIds: filter.PolicyIDs,
+		AnyUrgency:          len(filter.Urgencies) == 0,
+		Urgencies:           texts(filter.Urgencies),
+		AnyonePaged:         len(filter.PagedUserIDs) == 0,
+		PagedUserIds:        filter.PagedUserIDs,
+		CreatedAfter:        filter.CreatedAfter,
+		CreatedBefore:       filter.CreatedBefore,
+		Limit:               int32(limit),
 	})
 	if err != nil {
 		return nil, murphymysql.Error("incident", err)
@@ -175,4 +179,12 @@ func (r *Repository) DeleteMessages(ctx context.Context, ids []string) (err erro
 		return nil
 	}
 	return murphymysql.Error("scheduled message", r.queries.DeleteMessages(ctx, ids))
+}
+
+func texts[T interface{ Text() string }](values []T) []string {
+	out := make([]string, len(values))
+	for i, value := range values {
+		out[i] = value.Text()
+	}
+	return out
 }

@@ -473,6 +473,45 @@ paths:
             type: array
             items:
               type: string
+        - name: team_id
+          in: query
+          description: Only incidents owned by one of these teams, through their escalation policies.
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              type: string
+        - name: paged_user_id
+          in: query
+          description: Only incidents that paged one of these people.
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              type: string
+        - name: urgency
+          in: query
+          description: Only incidents with one of these urgencies.
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              $ref: "#/components/schemas/Urgency"
+        - name: created_after
+          in: query
+          description: Only incidents opened after this time.
+          schema:
+            type: string
+            format: date-time
+        - name: created_before
+          in: query
+          description: Only incidents opened before this time.
+          schema:
+            type: string
+            format: date-time
       responses:
         "200":
           description: Incidents, newest first.
@@ -876,6 +915,22 @@ paths:
       responses:
         "200":
           description: The team's members with their roles.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamMembershipList"
+        "404":
+          $ref: "#/components/responses/Problem"
+  /v1/users/{id}/memberships:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    get:
+      operationId: listUserMemberships
+      summary: List the teams a user belongs to
+      tags: [people]
+      responses:
+        "200":
+          description: The user's teams with their role in each.
           content:
             application/json:
               schema:
@@ -1583,6 +1638,9 @@ components:
           enum: [triggered, alerted, acknowledged, resolved, escalated, escalation_skipped, escalation_exhausted, notified, notification_failed]
         alert:
           $ref: "#/components/schemas/Reference"
+        actor:
+          $ref: "#/components/schemas/Reference"
+          description: The person who did it; absent for what Murphy did on its own.
         summary:
           type: string
         at:

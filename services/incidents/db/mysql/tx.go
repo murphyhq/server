@@ -181,3 +181,14 @@ func (t *Tx) ClaimMessages(ctx context.Context, ids []string, until time.Time) (
 	until = until.UTC()
 	return murphymysql.Error("scheduled message", t.queries.ClaimMessages(ctx, ClaimMessagesParams{ClaimedUntil: &until, Ids: ids}))
 }
+
+func (t *Tx) CreatePages(ctx context.Context, incidentID string, userIDs []string, at time.Time) (err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	rows := murphymysql.Rows{Name: "CreatePages", Table: "incident_pages", Columns: []string{"id", "incident_id", "user_id", "created_at"}}
+	for _, userID := range userIDs {
+		rows.Values = append(rows.Values, []any{murphy.NewID(), incidentID, userID, at})
+	}
+	return murphymysql.Error("page", murphymysql.Insert(ctx, t.tx, rows))
+}

@@ -120,3 +120,19 @@ func toMembership(membership *murphy.TeamMembership, n *names) TeamMembership {
 		UpdatedAt: membership.GetUpdatedAt().AsTime(),
 	}
 }
+
+func (s *Server) ListUserMemberships(ctx context.Context, request ListUserMembershipsRequestObject) (_ ListUserMembershipsResponseObject, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	memberships, err := s.people.ListMembershipsOfUser(ctx, request.Id)
+	if err != nil {
+		return nil, err
+	}
+	n := newNames()
+	items := make([]TeamMembership, len(memberships))
+	for i, membership := range memberships {
+		items[i] = toMembership(membership, n)
+	}
+	return ListUserMemberships200JSONResponse{Items: items}, s.name(ctx, n)
+}

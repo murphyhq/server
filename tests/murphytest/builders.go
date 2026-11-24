@@ -8,15 +8,21 @@ import (
 )
 
 type Team struct {
-	ID string
-	m  *Murphy
+	ID   string
+	Name string
+	m    *Murphy
 }
 
 func (m *Murphy) Team() *Team {
 	m.t.Helper()
-	created, err := m.API.CreateTeamWithResponse(m.t.Context(), nil, client.TeamInput{Name: m.Name("team")})
+	name := m.Name("team")
+	created, err := m.API.CreateTeamWithResponse(m.t.Context(), nil, client.TeamInput{Name: name})
 	m.created(created, err, "create a team")
-	return &Team{ID: created.JSON201.Id, m: m}
+	return &Team{ID: created.JSON201.Id, Name: name, m: m}
+}
+
+func (t *Team) Reference() client.Reference {
+	return client.Reference{Id: t.ID, Name: &t.Name}
 }
 
 func (t *Team) Add(member *Member, role client.TeamRole) {
@@ -35,11 +41,12 @@ func (m *Murphy) Member(email string) *Member {
 	api := m.ClientWith(m.SessionAs(email))
 	session, err := api.GetSessionWithResponse(m.t.Context())
 	m.ok(session, err, "read who signed in")
-	return &Member{User: &User{ID: session.JSON200.User.Id, Email: email, m: m}, API: api}
+	return &Member{User: &User{ID: session.JSON200.User.Id, Name: session.JSON200.User.Name, Email: email, m: m}, API: api}
 }
 
 type User struct {
 	ID       string
+	Name     string
 	Email    string
 	webhooks []*Webhook
 	phones   []*Phone
@@ -89,7 +96,7 @@ func (m *Murphy) User(options ...UserOption) *User {
 	}
 	created, err := m.API.CreateUserWithResponse(m.t.Context(), nil, spec.input)
 	m.created(created, err, "create a user")
-	user := &User{ID: created.JSON201.Id, Email: spec.input.Email, m: m}
+	user := &User{ID: created.JSON201.Id, Name: spec.input.Name, Email: spec.input.Email, m: m}
 	for _, options := range spec.webhooks {
 		hook := m.Receiver().Webhook(options...)
 		spec.methods = append(spec.methods, client.ContactMethodInput{Type: client.Webhook, Address: hook.Address})
@@ -132,11 +139,16 @@ func (u *User) Webhook() *Webhook {
 }
 
 func (u *User) Target() client.EscalationTarget {
-	return client.EscalationTarget{Type: client.EscalationTargetTypeUser, Id: u.ID}
+	return client.EscalationTarget{Type: client.EscalationTargetTypeUser, Id: u.ID, Name: &u.Name}
+}
+
+func (u *User) Reference() client.Reference {
+	return client.Reference{Id: u.ID, Name: &u.Name}
 }
 
 type Schedule struct {
-	ID string
+	ID   string
+	Name string
 }
 
 func (m *Murphy) Schedule(team *Team, participants ...*User) *Schedule {
@@ -150,13 +162,14 @@ func (m *Murphy) Schedule(team *Team, participants ...*User) *Schedule {
 		people[i] = client.Reference{Id: user.ID}
 	}
 	teams := []client.Reference{{Id: team.ID}}
+	name := m.Name("schedule")
 	created, err := m.API.CreateScheduleWithResponse(m.t.Context(), nil, client.ScheduleInput{
-		Name:   m.Name("schedule"),
+		Name:   name,
 		Teams:  &teams,
 		Layers: []client.Layer{{TurnLengthSeconds: 7 * 24 * 60 * 60, StartsAt: starts, Participants: people}},
 	})
 	m.created(created, err, "create a schedule")
-	return &Schedule{ID: created.JSON201.Id}
+	return &Schedule{ID: created.JSON201.Id, Name: name}
 }
 
 func (m *Murphy) Override(schedule *Schedule, user *User, from, to time.Time) {
@@ -166,7 +179,7 @@ func (m *Murphy) Override(schedule *Schedule, user *User, from, to time.Time) {
 }
 
 func (s *Schedule) Target() client.EscalationTarget {
-	return client.EscalationTarget{Type: client.EscalationTargetTypeSchedule, Id: s.ID}
+	return client.EscalationTarget{Type: client.EscalationTargetTypeSchedule, Id: s.ID, Name: &s.Name}
 }
 
 type Level struct {
@@ -211,17 +224,18 @@ func Receives(kind client.IntegrationType) ServiceOption {
 type Service struct {
 	ID            string
 	PolicyID      string
+	PolicyName    string
 	PolicyVersion int32
 	IntegrationID string
+	Name          string
 	key           string
-	name          string
 	m             *Murphy
 }
 
 func (s *Service) Disable() {
 	s.m.t.Helper()
 	disabled := client.ServiceStatusDisabled
-	updated, err := s.m.API.UpdateServiceWithResponse(s.m.t.Context(), s.ID, client.ServiceInput{Name: s.name, EscalationPolicy: client.Reference{Id: s.PolicyID}, Status: &disabled})
+	updated, err := s.m.API.UpdateServiceWithResponse(s.m.t.Context(), s.ID, client.ServiceInput{Name: s.Name, EscalationPolicy: client.Reference{Id: s.PolicyID}, Status: &disabled})
 	s.m.ok(updated, err, "disable the service")
 }
 
@@ -248,13 +262,14 @@ func (m *Murphy) Service(options ...ServiceOption) *Service {
 	integration, err := m.API.CreateIntegrationWithResponse(m.t.Context(), service.JSON201.Id, nil, client.IntegrationCreate{Name: string(spec.integration), Type: spec.integration})
 	m.created(integration, err, "create an integration")
 	return &Service{
-		ID: service.JSON201.Id, PolicyID: policy.ID, PolicyVersion: policy.Version,
-		IntegrationID: integration.JSON201.Id, key: integration.JSON201.Key, name: name, m: m,
+		ID: service.JSON201.Id, PolicyID: policy.ID, PolicyName: policy.Name, PolicyVersion: policy.Version,
+		IntegrationID: integration.JSON201.Id, key: integration.JSON201.Key, Name: name, m: m,
 	}
 }
 
 type Policy struct {
 	ID      string
+	Name    string
 	Version int32
 }
 
@@ -275,11 +290,12 @@ func (m *Murphy) policy(spec serviceSpec) *Policy {
 	if len(spec.levels) == 0 {
 		spec.levels = []Level{{Delay: time.Hour, Targets: []client.EscalationTarget{m.User().Target()}}}
 	}
+	name := m.Name("policy")
 	policy, err := m.API.CreateEscalationPolicyWithResponse(m.t.Context(), nil, client.EscalationPolicyInput{
-		Name: m.Name("policy"), Team: client.Reference{Id: spec.team.ID}, Levels: escalationLevels(spec.levels), RepeatCount: &spec.repeats,
+		Name: name, Team: client.Reference{Id: spec.team.ID}, Levels: escalationLevels(spec.levels), RepeatCount: &spec.repeats,
 	})
 	m.created(policy, err, "create an escalation policy")
-	return &Policy{ID: policy.JSON201.Id, Version: policy.JSON201.Version}
+	return &Policy{ID: policy.JSON201.Id, Name: name, Version: policy.JSON201.Version}
 }
 
 func (s *Service) Key() string {

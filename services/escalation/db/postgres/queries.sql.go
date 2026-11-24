@@ -343,6 +343,32 @@ func (q *Queries) ListPolicies(ctx context.Context, arg ListPoliciesParams) ([]L
 	return items, nil
 }
 
+const policiesOfTeams = `-- name: PoliciesOfTeams :many
+SELECT id
+FROM escalation_policies
+WHERE team_id = ANY($1::uuid[])
+`
+
+func (q *Queries) PoliciesOfTeams(ctx context.Context, teamIds []string) ([]string, error) {
+	rows, err := q.db.Query(ctx, policiesOfTeams, teamIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const policyNames = `-- name: PolicyNames :many
 SELECT id, name
 FROM escalation_policies

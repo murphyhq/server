@@ -178,20 +178,24 @@ func (s *Service) notificationOutcome(ctx context.Context, messageID string, not
 	return s.record(ctx, &Change{MessageID: messageID, IncidentID: notification.GetIncident().GetId(), Decision: NotificationOutcome(notification, failed)})
 }
 
-func (s *Service) Acknowledge(ctx context.Context, id string) (_ *murphy.Incident, err error) {
+func (s *Service) Acknowledge(ctx context.Context, id, actorID string) (_ *murphy.Incident, err error) {
 	ctx, span := tracer.Span(ctx)
 	ctx = span.Set(ctx, telemetry.WithField("incident.id", id))
 	defer span.End(&err)
 
-	return s.change(ctx, id, AcknowledgeIncident)
+	return s.change(ctx, id, func(incident *murphy.Incident, now *timestamppb.Timestamp) *Decision {
+		return AcknowledgeIncident(incident, actorID, now)
+	})
 }
 
-func (s *Service) Resolve(ctx context.Context, id string) (_ *murphy.Incident, err error) {
+func (s *Service) Resolve(ctx context.Context, id, actorID string) (_ *murphy.Incident, err error) {
 	ctx, span := tracer.Span(ctx)
 	ctx = span.Set(ctx, telemetry.WithField("incident.id", id))
 	defer span.End(&err)
 
-	return s.change(ctx, id, ResolveIncident)
+	return s.change(ctx, id, func(incident *murphy.Incident, now *timestamppb.Timestamp) *Decision {
+		return ResolveIncident(incident, actorID, now)
+	})
 }
 
 func (s *Service) change(ctx context.Context, id string, decide func(*murphy.Incident, *timestamppb.Timestamp) *Decision) (*murphy.Incident, error) {
@@ -329,8 +333,13 @@ func (s *Service) GetIncident(ctx context.Context, id string) (_ *murphy.Inciden
 }
 
 type Filter struct {
-	Statuses   []murphy.IncidentStatus
-	ServiceIDs []string
+	Statuses      []murphy.IncidentStatus
+	ServiceIDs    []string
+	PolicyIDs     []string
+	Urgencies     []murphy.Urgency
+	PagedUserIDs  []string
+	CreatedAfter  *time.Time
+	CreatedBefore *time.Time
 }
 
 func (s *Service) ListIncidents(ctx context.Context, filter Filter, page pagination.Page) (_ []*murphy.Incident, _ string, err error) {
@@ -345,6 +354,16 @@ func (s *Service) ListIncidents(ctx context.Context, filter Filter, page paginat
 	for _, id := range filter.ServiceIDs {
 		if err := murphy.LookupID("service", id); err != nil {
 			return nil, "", err
+		}
+	}
+	for _, id := range filter.PagedUserIDs {
+		if err := murphy.LookupID("user", id); err != nil {
+			return nil, "", err
+		}
+	}
+	for _, urgency := range filter.Urgencies {
+		if urgency == murphy.Urgency_URGENCY_UNSPECIFIED || murphy.Urgency_name[int32(urgency)] == "" {
+			return nil, "", &murphy.FieldError{Field: "urgency", Reason: "must be high or low"}
 		}
 	}
 	window, err := pagination.Resolve(page)

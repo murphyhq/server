@@ -216,3 +216,14 @@ func (r *Repository) PolicyNames(ctx context.Context, ids []string) (_ map[strin
 	}
 	return names, nil
 }
+
+func (r *Repository) PoliciesOfTeams(ctx context.Context, teamIDs []string) (_ []string, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	ids, err := r.queries.PoliciesOfTeams(ctx, teamIDs)
+	if err != nil {
+		return nil, murphymysql.Error("escalation policy", err)
+	}
+	return ids, nil
+}

@@ -437,6 +437,21 @@ func (s *Service) ContactMethodsOfUsers(ctx context.Context, userIDs []string) (
 	return byUser, nil
 }
 
+func (s *Service) ListMembershipsOfUser(ctx context.Context, userID string) (_ []*murphy.TeamMembership, err error) {
+	ctx, span := tracer.Span(ctx)
+	ctx = span.Set(ctx, telemetry.WithField("user.id", userID))
+	defer span.End(&err)
+
+	if _, err := s.GetUser(ctx, userID); err != nil {
+		return nil, err
+	}
+	memberships, err := s.repo.ListMembershipsOfUser(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("list the user's memberships: %w", err)
+	}
+	return memberships, nil
+}
+
 func (s *Service) TeamRolesOf(ctx context.Context, userID string) (_ map[string]murphy.TeamRole, err error) {
 	ctx, span := tracer.Span(ctx)
 	ctx = span.Set(ctx, telemetry.WithField("user.id", userID))

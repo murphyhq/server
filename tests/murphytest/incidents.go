@@ -248,7 +248,7 @@ func Paged(users ...*User) Expectation {
 
 func PagedVia(user *User, via client.EscalationTarget) Expectation {
 	return func(c *assert.CollectT, incident *client.IncidentWithTimeline) {
-		assert.Contains(c, pages(incident), client.Page{User: client.Reference{Id: user.ID}, Via: via})
+		assert.Contains(c, pages(incident), client.Page{User: user.Reference(), Via: via})
 	}
 }
 
@@ -310,4 +310,27 @@ func notification(kind client.TimelineEntryType, user *User, channel client.Cont
 		}
 		assert.Fail(c, "no such notification on the timeline", "%s for %s by %q", kind, user.Email, channel)
 	}
+}
+
+func ActedBy(kind client.TimelineEntryType, user *User) Expectation {
+	return func(c *assert.CollectT, incident *client.IncidentWithTimeline) {
+		var actors []client.Reference
+		for _, entry := range incident.Timeline {
+			if entry.Type == kind && entry.Actor != nil {
+				actors = append(actors, *entry.Actor)
+			}
+		}
+		assert.Equal(c, []client.Reference{user.Reference()}, actors, "who did it")
+	}
+}
+
+func (m *Murphy) IncidentsMatching(filter client.ListIncidentsParams) []string {
+	m.t.Helper()
+	list, err := m.API.ListIncidentsWithResponse(m.t.Context(), &filter)
+	m.ok(list, err, "list incidents")
+	ids := make([]string, len(list.JSON200.Items))
+	for i, incident := range list.JSON200.Items {
+		ids[i] = incident.Id
+	}
+	return ids
 }
