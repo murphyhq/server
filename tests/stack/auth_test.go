@@ -356,3 +356,29 @@ func TestWritesSignedInWithTheCookieMustSendJSON(t *testing.T) {
 
 	assert.Equal(t, http.StatusUnsupportedMediaType, got.StatusCode)
 }
+
+func TestAMemberCannotChangeTheirOwnStatus(t *testing.T) {
+	m := murphytest.New(t)
+	bo := m.Member(murphytest.Bo)
+	deactivated := client.UserStatusDeactivated
+
+	got, err := bo.API.UpdateUserWithResponse(t.Context(), bo.ID, client.UserInput{Name: "Bo", Email: murphytest.Bo, Status: &deactivated})
+
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusForbidden, got.StatusCode())
+}
+
+func TestAPolicyCannotBeCreatedForATeamYouDontManage(t *testing.T) {
+	m := murphytest.New(t)
+	theirs := m.Team()
+	bo := m.Member(murphytest.Bo)
+	m.Team().Add(bo, client.Manager)
+
+	got, err := bo.API.CreateEscalationPolicyWithResponse(t.Context(), nil, client.EscalationPolicyInput{
+		Name: m.Name("policy"), Team: client.Reference{Id: theirs.ID},
+		Levels: []client.EscalationLevel{{DelaySeconds: 300, Targets: []client.EscalationTarget{bo.Target()}}},
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusForbidden, got.StatusCode())
+}
