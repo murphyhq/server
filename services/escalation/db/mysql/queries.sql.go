@@ -329,12 +329,17 @@ func (q *Queries) ListPolicies(ctx context.Context, arg ListPoliciesParams) ([]L
 }
 
 const policiesOfTeams = `-- name: PoliciesOfTeams :many
-SELECT id
+SELECT id, name
 FROM escalation_policies
 WHERE team_id IN (/*SLICE:team_ids*/?)
 `
 
-func (q *Queries) PoliciesOfTeams(ctx context.Context, teamIds []string) ([]string, error) {
+type PoliciesOfTeamsRow struct {
+	ID   string
+	Name string
+}
+
+func (q *Queries) PoliciesOfTeams(ctx context.Context, teamIds []string) ([]PoliciesOfTeamsRow, error) {
 	query := policiesOfTeams
 	var queryParams []interface{}
 	if len(teamIds) > 0 {
@@ -350,13 +355,13 @@ func (q *Queries) PoliciesOfTeams(ctx context.Context, teamIds []string) ([]stri
 		return nil, err
 	}
 	defer rows.Close()
-	var items []string
+	var items []PoliciesOfTeamsRow
 	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err != nil {
+		var i PoliciesOfTeamsRow
+		if err := rows.Scan(&i.ID, &i.Name); err != nil {
 			return nil, err
 		}
-		items = append(items, id)
+		items = append(items, i)
 	}
 	if err := rows.Close(); err != nil {
 		return nil, err

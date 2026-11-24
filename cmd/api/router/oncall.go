@@ -31,12 +31,11 @@ func (s *Server) CreateSchedule(ctx context.Context, request CreateScheduleReque
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
-	n := newNames()
 	schedule, err := s.oncall.CreateSchedule(ctx, fromScheduleInput(request.Body))
 	if err != nil {
 		return nil, err
 	}
-	return CreateSchedule201JSONResponse(toSchedule(schedule, n)), s.name(ctx, n)
+	return CreateSchedule201JSONResponse(toSchedule(schedule, nil)), s.name(ctx, nil)
 }
 
 func (s *Server) GetSchedule(ctx context.Context, request GetScheduleRequestObject) (_ GetScheduleResponseObject, err error) {
@@ -55,14 +54,13 @@ func (s *Server) UpdateSchedule(ctx context.Context, request UpdateScheduleReque
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
-	n := newNames()
 	in := fromScheduleInput(request.Body)
 	in.Id = request.Id
 	schedule, err := s.oncall.UpdateSchedule(ctx, in)
 	if err != nil {
 		return nil, err
 	}
-	return UpdateSchedule200JSONResponse(toSchedule(schedule, n)), s.name(ctx, n)
+	return UpdateSchedule200JSONResponse(toSchedule(schedule, nil)), s.name(ctx, nil)
 }
 
 func (s *Server) DeleteSchedule(ctx context.Context, request DeleteScheduleRequestObject) (_ DeleteScheduleResponseObject, err error) {
@@ -84,10 +82,11 @@ func (s *Server) ListOverrides(ctx context.Context, request ListOverridesRequest
 	if request.Params.EndsAfter != nil {
 		endsAfter = *request.Params.EndsAfter
 	}
-	overrides, err := s.oncall.ListOverrides(ctx, request.Id, endsAfter)
+	scheduleName, overrides, err := s.oncall.ListOverrides(ctx, request.Id, endsAfter)
 	if err != nil {
 		return nil, err
 	}
+	n.knowSchedule(request.Id, scheduleName)
 	items := make([]Override, len(overrides))
 	for i, override := range overrides {
 		items[i] = toOverride(override, n)
@@ -99,7 +98,6 @@ func (s *Server) CreateOverride(ctx context.Context, request CreateOverrideReque
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
-	n := newNames()
 	override, err := s.oncall.CreateOverride(ctx, &murphy.Override{
 		ScheduleId: request.Id,
 		UserId:     request.Body.User.Id,
@@ -109,7 +107,7 @@ func (s *Server) CreateOverride(ctx context.Context, request CreateOverrideReque
 	if err != nil {
 		return nil, err
 	}
-	return CreateOverride201JSONResponse(toOverride(override, n)), s.name(ctx, n)
+	return CreateOverride201JSONResponse(toOverride(override, nil)), s.name(ctx, nil)
 }
 
 func (s *Server) DeleteOverride(ctx context.Context, request DeleteOverrideRequestObject) (_ DeleteOverrideResponseObject, err error) {

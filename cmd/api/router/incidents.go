@@ -26,12 +26,16 @@ func (s *Server) ListIncidents(ctx context.Context, request ListIncidentsRequest
 		filter.Urgencies = append(filter.Urgencies, murphy.UrgencyFromText(string(urgency)))
 	}
 	if teams := all(request.Params.TeamId); len(teams) > 0 {
-		filter.PolicyIDs, err = s.escalation.PoliciesOfTeams(ctx, teams)
+		policies, err := s.escalation.PoliciesOfTeams(ctx, teams)
 		if err != nil {
 			return nil, err
 		}
-		if len(filter.PolicyIDs) == 0 {
+		if len(policies) == 0 {
 			return ListIncidents200JSONResponse{Items: []Incident{}}, nil
+		}
+		for id, name := range policies {
+			filter.PolicyIDs = append(filter.PolicyIDs, id)
+			n.knowPolicy(id, name)
 		}
 	}
 	found, next, err := s.incidents.ListIncidents(ctx, filter, page(request.Params.Limit, request.Params.Cursor))
@@ -148,24 +152,22 @@ func (s *Server) AcknowledgeIncident(ctx context.Context, request AcknowledgeInc
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
-	n := newNames()
 	incident, err := s.incidents.Acknowledge(ctx, request.Id, sessionFrom(ctx).session.GetUserId())
 	if err != nil {
 		return nil, err
 	}
-	return AcknowledgeIncident200JSONResponse(toIncident(incident, n)), s.name(ctx, n)
+	return AcknowledgeIncident200JSONResponse(toIncident(incident, nil)), s.name(ctx, nil)
 }
 
 func (s *Server) ResolveIncident(ctx context.Context, request ResolveIncidentRequestObject) (_ ResolveIncidentResponseObject, err error) {
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
-	n := newNames()
 	incident, err := s.incidents.Resolve(ctx, request.Id, sessionFrom(ctx).session.GetUserId())
 	if err != nil {
 		return nil, err
 	}
-	return ResolveIncident200JSONResponse(toIncident(incident, n)), s.name(ctx, n)
+	return ResolveIncident200JSONResponse(toIncident(incident, nil)), s.name(ctx, nil)
 }
 
 func all[T any](values *[]T) []T {

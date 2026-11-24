@@ -70,10 +70,11 @@ func (s *Server) ListTeamMembers(ctx context.Context, request ListTeamMembersReq
 	defer span.End(&err)
 
 	n := newNames()
-	memberships, err := s.people.ListMemberships(ctx, request.Id)
+	team, memberships, err := s.people.ListMemberships(ctx, request.Id)
 	if err != nil {
 		return nil, err
 	}
+	n.knowTeam(team)
 	items := make([]TeamMembership, len(memberships))
 	for i, membership := range memberships {
 		items[i] = toMembership(membership, n)
@@ -85,7 +86,6 @@ func (s *Server) SetTeamMember(ctx context.Context, request SetTeamMemberRequest
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
-	n := newNames()
 	membership, err := s.people.SetMembership(ctx, &murphy.TeamMembership{
 		TeamId: request.Id,
 		UserId: request.UserId,
@@ -94,7 +94,7 @@ func (s *Server) SetTeamMember(ctx context.Context, request SetTeamMemberRequest
 	if err != nil {
 		return nil, err
 	}
-	return SetTeamMember200JSONResponse(toMembership(membership, n)), s.name(ctx, n)
+	return SetTeamMember200JSONResponse(toMembership(membership, nil)), s.name(ctx, nil)
 }
 
 func (s *Server) RemoveTeamMember(ctx context.Context, request RemoveTeamMemberRequestObject) (_ RemoveTeamMemberResponseObject, err error) {
@@ -125,11 +125,12 @@ func (s *Server) ListUserMemberships(ctx context.Context, request ListUserMember
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
-	memberships, err := s.people.ListMembershipsOfUser(ctx, request.Id)
+	user, memberships, err := s.people.ListMembershipsOfUser(ctx, request.Id)
 	if err != nil {
 		return nil, err
 	}
 	n := newNames()
+	n.knowUser(user)
 	items := make([]TeamMembership, len(memberships))
 	for i, membership := range memberships {
 		items[i] = toMembership(membership, n)

@@ -30,12 +30,11 @@ func (s *Server) CreateEscalationPolicy(ctx context.Context, request CreateEscal
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
-	n := newNames()
 	policy, err := s.escalation.CreatePolicy(ctx, fromPolicyInput(request.Body))
 	if err != nil {
 		return nil, err
 	}
-	return CreateEscalationPolicy201JSONResponse(toPolicy(policy, n)), s.name(ctx, n)
+	return CreateEscalationPolicy201JSONResponse(toPolicy(policy, nil)), s.name(ctx, nil)
 }
 
 func (s *Server) GetEscalationPolicy(ctx context.Context, request GetEscalationPolicyRequestObject) (_ GetEscalationPolicyResponseObject, err error) {
@@ -54,14 +53,13 @@ func (s *Server) UpdateEscalationPolicy(ctx context.Context, request UpdateEscal
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
-	n := newNames()
 	in := fromPolicyInput(request.Body)
 	in.Id = request.Id
 	policy, err := s.escalation.UpdatePolicy(ctx, in)
 	if err != nil {
 		return nil, err
 	}
-	return UpdateEscalationPolicy200JSONResponse(toPolicy(policy, n)), s.name(ctx, n)
+	return UpdateEscalationPolicy200JSONResponse(toPolicy(policy, nil)), s.name(ctx, nil)
 }
 
 func (s *Server) DeleteEscalationPolicy(ctx context.Context, request DeleteEscalationPolicyRequestObject) (_ DeleteEscalationPolicyResponseObject, err error) {

@@ -28,12 +28,11 @@ func (s *Server) CreateService(ctx context.Context, request CreateServiceRequest
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
-	n := newNames()
 	service, err := s.catalog.CreateService(ctx, fromServiceInput("", request.Body))
 	if err != nil {
 		return nil, err
 	}
-	return CreateService201JSONResponse(toService(service, n)), s.name(ctx, n)
+	return CreateService201JSONResponse(toService(service, nil)), s.name(ctx, nil)
 }
 
 func (s *Server) GetService(ctx context.Context, request GetServiceRequestObject) (_ GetServiceResponseObject, err error) {
@@ -52,12 +51,11 @@ func (s *Server) UpdateService(ctx context.Context, request UpdateServiceRequest
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
-	n := newNames()
 	service, err := s.catalog.UpdateService(ctx, fromServiceInput(request.Id, request.Body))
 	if err != nil {
 		return nil, err
 	}
-	return UpdateService200JSONResponse(toService(service, n)), s.name(ctx, n)
+	return UpdateService200JSONResponse(toService(service, nil)), s.name(ctx, nil)
 }
 
 func (s *Server) DeleteService(ctx context.Context, request DeleteServiceRequestObject) (_ DeleteServiceResponseObject, err error) {
@@ -75,10 +73,11 @@ func (s *Server) ListIntegrations(ctx context.Context, request ListIntegrationsR
 	defer span.End(&err)
 
 	n := newNames()
-	integrations, next, err := s.catalog.ListIntegrations(ctx, request.Id, page(request.Params.Limit, request.Params.Cursor))
+	service, integrations, next, err := s.catalog.ListIntegrations(ctx, request.Id, page(request.Params.Limit, request.Params.Cursor))
 	if err != nil {
 		return nil, err
 	}
+	n.knowService(service)
 	items := make([]Integration, len(integrations))
 	for i, integration := range integrations {
 		items[i] = toIntegration(integration, n)
@@ -90,7 +89,6 @@ func (s *Server) CreateIntegration(ctx context.Context, request CreateIntegratio
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
-	n := newNames()
 	integration, key, err := s.catalog.CreateIntegration(ctx, &murphy.Integration{
 		ServiceId: request.Id,
 		Name:      request.Body.Name,
@@ -100,19 +98,18 @@ func (s *Server) CreateIntegration(ctx context.Context, request CreateIntegratio
 	if err != nil {
 		return nil, err
 	}
-	return CreateIntegration201JSONResponse(withKey(integration, key, n)), s.name(ctx, n)
+	return CreateIntegration201JSONResponse(withKey(integration, key, nil)), s.name(ctx, nil)
 }
 
 func (s *Server) RotateIntegrationKey(ctx context.Context, request RotateIntegrationKeyRequestObject) (_ RotateIntegrationKeyResponseObject, err error) {
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
-	n := newNames()
 	integration, key, err := s.catalog.RotateIntegrationKey(ctx, request.Id)
 	if err != nil {
 		return nil, err
 	}
-	return RotateIntegrationKey200JSONResponse(withKey(integration, key, n)), s.name(ctx, n)
+	return RotateIntegrationKey200JSONResponse(withKey(integration, key, nil)), s.name(ctx, nil)
 }
 
 func (s *Server) GetIntegration(ctx context.Context, request GetIntegrationRequestObject) (_ GetIntegrationResponseObject, err error) {
@@ -131,7 +128,6 @@ func (s *Server) UpdateIntegration(ctx context.Context, request UpdateIntegratio
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
-	n := newNames()
 	integration, err := s.catalog.UpdateIntegration(ctx, &murphy.Integration{
 		Id:     request.Id,
 		Name:   request.Body.Name,
@@ -140,7 +136,7 @@ func (s *Server) UpdateIntegration(ctx context.Context, request UpdateIntegratio
 	if err != nil {
 		return nil, err
 	}
-	return UpdateIntegration200JSONResponse(toIntegration(integration, n)), s.name(ctx, n)
+	return UpdateIntegration200JSONResponse(toIntegration(integration, nil)), s.name(ctx, nil)
 }
 
 func (s *Server) DeleteIntegration(ctx context.Context, request DeleteIntegrationRequestObject) (_ DeleteIntegrationResponseObject, err error) {

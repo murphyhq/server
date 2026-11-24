@@ -2,8 +2,6 @@ package router
 
 import (
 	"context"
-	"maps"
-	"slices"
 
 	"github.com/murphyhq/server"
 )
@@ -28,11 +26,18 @@ func newNames() *names {
 	return &names{users: map[string]*string{}, teams: map[string]*string{}, schedules: map[string]*string{}, services: map[string]*string{}, policies: map[string]*string{}}
 }
 
-func (n *names) user(id string) Reference     { return named(n.users, id) }
-func (n *names) team(id string) Reference     { return named(n.teams, id) }
-func (n *names) schedule(id string) Reference { return named(n.schedules, id) }
-func (n *names) service(id string) Reference  { return named(n.services, id) }
-func (n *names) policy(id string) Reference   { return named(n.policies, id) }
+func (n *names) user(id string) Reference     { return named(n.of().users, id) }
+func (n *names) team(id string) Reference     { return named(n.of().teams, id) }
+func (n *names) schedule(id string) Reference { return named(n.of().schedules, id) }
+func (n *names) service(id string) Reference  { return named(n.of().services, id) }
+func (n *names) policy(id string) Reference   { return named(n.of().policies, id) }
+
+func (n *names) of() *names {
+	if n == nil {
+		return &names{}
+	}
+	return n
+}
 
 func (n *names) target(target *murphy.EscalationTarget) EscalationTarget {
 	reference := n.user(target.GetId())
@@ -50,7 +55,18 @@ func each(ids []string, reference func(id string) Reference) []Reference {
 	return out
 }
 
+func (n *names) knowUser(user *murphy.User) { *n.user(user.GetId()).Name = user.GetName() }
+func (n *names) knowTeam(team *murphy.Team) { *n.team(team.GetId()).Name = team.GetName() }
+func (n *names) knowService(service *murphy.Service) {
+	*n.service(service.GetId()).Name = service.GetName()
+}
+func (n *names) knowSchedule(id, name string) { *n.schedule(id).Name = name }
+func (n *names) knowPolicy(id, name string)   { *n.policy(id).Name = name }
+
 func named(slots map[string]*string, id string) Reference {
+	if slots == nil {
+		return Reference{Id: id}
+	}
 	if _, ok := slots[id]; !ok {
 		slots[id] = new(string)
 	}
@@ -69,12 +85,18 @@ func (s *Server) name(ctx context.Context, n *names) error {
 		{n.policies, s.escalation.PolicyNames},
 	}
 	for _, lookup := range lookups {
-		found, err := lookup.find(ctx, slices.Collect(maps.Keys(lookup.slots)))
+		var unknown []string
+		for id, name := range lookup.slots {
+			if *name == "" {
+				unknown = append(unknown, id)
+			}
+		}
+		found, err := lookup.find(ctx, unknown)
 		if err != nil {
 			return err
 		}
-		for id, name := range lookup.slots {
-			*name = found[id]
+		for _, id := range unknown {
+			*lookup.slots[id] = found[id]
 		}
 	}
 	return nil

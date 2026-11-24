@@ -1719,7 +1719,7 @@ components:
           type: string
         name:
           type: string
-          description: The resource's current name, in responses, for resources that have one; empty once the resource is deleted. Ignored in requests.
+          description: The resource's current name, for resources that have one, in responses to reads; empty once the resource is deleted. Ignored in requests.
     PolicyVersionReference:
       type: object
       required: [id, version]
@@ -1729,7 +1729,7 @@ components:
           type: string
         name:
           type: string
-          description: The policy's current name; empty once the policy is deleted.
+          description: The policy's current name, in responses to reads; empty once the policy is deleted.
         version:
           type: integer
           format: int32
@@ -2052,7 +2052,7 @@ components:
           type: string
         name:
           type: string
-          description: The user's or schedule's current name, in responses; empty once it is deleted. Ignored in requests.
+          description: The user's or schedule's current name, in responses to reads; empty once it is deleted. Ignored in requests.
     EscalationLevel:
       type: object
       required: [delay_seconds, targets]

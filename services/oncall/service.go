@@ -180,19 +180,27 @@ func (s *Service) CreateOverride(ctx context.Context, in *murphy.Override) (_ *m
 	return override, nil
 }
 
-func (s *Service) ListOverrides(ctx context.Context, scheduleID string, endsAfter time.Time) (_ []*murphy.Override, err error) {
+func (s *Service) ListOverrides(ctx context.Context, scheduleID string, endsAfter time.Time) (scheduleName string, _ []*murphy.Override, err error) {
 	ctx, span := tracer.Span(ctx)
 	ctx = span.Set(ctx, telemetry.WithField("schedule.id", scheduleID))
 	defer span.End(&err)
 
-	if _, err := s.GetSchedule(ctx, scheduleID); err != nil {
-		return nil, err
+	if err := murphy.LookupID("schedule", scheduleID); err != nil {
+		return "", nil, err
+	}
+	names, err := s.ScheduleNames(ctx, []string{scheduleID})
+	if err != nil {
+		return "", nil, fmt.Errorf("find schedule: %w", err)
+	}
+	name, ok := names[scheduleID]
+	if !ok {
+		return "", nil, &murphy.NotFoundError{Entity: "schedule"}
 	}
 	overrides, err := s.repo.ListOverrides(ctx, scheduleID, endsAfter)
 	if err != nil {
-		return nil, fmt.Errorf("list overrides: %w", err)
+		return "", nil, fmt.Errorf("list overrides: %w", err)
 	}
-	return overrides, nil
+	return name, overrides, nil
 }
 
 func (s *Service) GetOverride(ctx context.Context, id string) (_ *murphy.Override, err error) {

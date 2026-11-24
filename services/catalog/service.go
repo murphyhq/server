@@ -205,24 +205,25 @@ func (s *Service) GetIntegration(ctx context.Context, id string) (_ *murphy.Inte
 	return integration, nil
 }
 
-func (s *Service) ListIntegrations(ctx context.Context, serviceID string, page pagination.Page) (_ []*murphy.Integration, _ string, err error) {
+func (s *Service) ListIntegrations(ctx context.Context, serviceID string, page pagination.Page) (_ *murphy.Service, _ []*murphy.Integration, _ string, err error) {
 	ctx, span := tracer.Span(ctx)
 	ctx = span.Set(ctx, telemetry.WithField("service.id", serviceID))
 	defer span.End(&err)
 
 	window, err := pagination.Resolve(page)
 	if err != nil {
-		return nil, "", err
+		return nil, nil, "", err
 	}
-	if _, err := s.GetService(ctx, serviceID); err != nil {
-		return nil, "", err
+	service, err := s.GetService(ctx, serviceID)
+	if err != nil {
+		return nil, nil, "", err
 	}
 	integrations, err := s.repo.ListIntegrations(ctx, serviceID, window.Before, window.Rows())
 	if err != nil {
-		return nil, "", fmt.Errorf("list integrations: %w", err)
+		return nil, nil, "", fmt.Errorf("list integrations: %w", err)
 	}
 	items, next := pagination.Trim(integrations, window)
-	return items, next, nil
+	return service, items, next, nil
 }
 
 func (s *Service) UpdateIntegration(ctx context.Context, in *murphy.Integration) (_ *murphy.Integration, err error) {

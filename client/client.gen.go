@@ -413,7 +413,7 @@ type EscalationPolicyPage struct {
 type EscalationTarget struct {
 	Id string `json:"id"`
 
-	// Name The user's or schedule's current name, in responses; empty once it is deleted. Ignored in requests.
+	// Name The user's or schedule's current name, in responses to reads; empty once it is deleted. Ignored in requests.
 	Name *string              `json:"name,omitempty"`
 	Type EscalationTargetType `json:"type"`
 }
@@ -609,7 +609,7 @@ type Page struct {
 type PolicyVersionReference struct {
 	Id string `json:"id"`
 
-	// Name The policy's current name; empty once the policy is deleted.
+	// Name The policy's current name, in responses to reads; empty once the policy is deleted.
 	Name    *string `json:"name,omitempty"`
 	Version int32   `json:"version"`
 }
@@ -631,7 +631,7 @@ type PushPlatform string
 type Reference struct {
 	Id string `json:"id"`
 
-	// Name The resource's current name, in responses, for resources that have one; empty once the resource is deleted. Ignored in requests.
+	// Name The resource's current name, for resources that have one, in responses to reads; empty once the resource is deleted. Ignored in requests.
 	Name *string `json:"name,omitempty"`
 }
 

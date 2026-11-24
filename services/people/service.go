@@ -185,19 +185,20 @@ func (s *Service) GetContactMethod(ctx context.Context, id string) (_ *murphy.Co
 	return method, nil
 }
 
-func (s *Service) ListContactMethods(ctx context.Context, userID string) (_ []*murphy.ContactMethod, err error) {
+func (s *Service) ListContactMethods(ctx context.Context, userID string) (_ *murphy.User, _ []*murphy.ContactMethod, err error) {
 	ctx, span := tracer.Span(ctx)
 	ctx = span.Set(ctx, telemetry.WithField("user.id", userID))
 	defer span.End(&err)
 
-	if _, err := s.GetUser(ctx, userID); err != nil {
-		return nil, err
+	user, err := s.GetUser(ctx, userID)
+	if err != nil {
+		return nil, nil, err
 	}
 	methods, err := s.repo.ListContactMethods(ctx, userID)
 	if err != nil {
-		return nil, fmt.Errorf("list contact methods: %w", err)
+		return nil, nil, fmt.Errorf("list contact methods: %w", err)
 	}
-	return methods, nil
+	return user, methods, nil
 }
 
 func (s *Service) UpdateContactMethod(ctx context.Context, in *murphy.ContactMethod) (_ *murphy.ContactMethod, err error) {
@@ -349,19 +350,20 @@ func (s *Service) SetMembership(ctx context.Context, in *murphy.TeamMembership) 
 	return stored, nil
 }
 
-func (s *Service) ListMemberships(ctx context.Context, teamID string) (_ []*murphy.TeamMembership, err error) {
+func (s *Service) ListMemberships(ctx context.Context, teamID string) (_ *murphy.Team, _ []*murphy.TeamMembership, err error) {
 	ctx, span := tracer.Span(ctx)
 	ctx = span.Set(ctx, telemetry.WithField("team.id", teamID))
 	defer span.End(&err)
 
-	if _, err := s.GetTeam(ctx, teamID); err != nil {
-		return nil, err
+	team, err := s.GetTeam(ctx, teamID)
+	if err != nil {
+		return nil, nil, err
 	}
 	memberships, err := s.repo.ListMemberships(ctx, teamID)
 	if err != nil {
-		return nil, fmt.Errorf("list team memberships: %w", err)
+		return nil, nil, fmt.Errorf("list team memberships: %w", err)
 	}
-	return memberships, nil
+	return team, memberships, nil
 }
 
 func (s *Service) RemoveMembership(ctx context.Context, teamID, userID string) (err error) {
@@ -437,19 +439,20 @@ func (s *Service) ContactMethodsOfUsers(ctx context.Context, userIDs []string) (
 	return byUser, nil
 }
 
-func (s *Service) ListMembershipsOfUser(ctx context.Context, userID string) (_ []*murphy.TeamMembership, err error) {
+func (s *Service) ListMembershipsOfUser(ctx context.Context, userID string) (_ *murphy.User, _ []*murphy.TeamMembership, err error) {
 	ctx, span := tracer.Span(ctx)
 	ctx = span.Set(ctx, telemetry.WithField("user.id", userID))
 	defer span.End(&err)
 
-	if _, err := s.GetUser(ctx, userID); err != nil {
-		return nil, err
+	user, err := s.GetUser(ctx, userID)
+	if err != nil {
+		return nil, nil, err
 	}
 	memberships, err := s.repo.ListMembershipsOfUser(ctx, userID)
 	if err != nil {
-		return nil, fmt.Errorf("list the user's memberships: %w", err)
+		return nil, nil, fmt.Errorf("list the user's memberships: %w", err)
 	}
-	return memberships, nil
+	return user, memberships, nil
 }
 
 func (s *Service) TeamRolesOf(ctx context.Context, userID string) (_ map[string]murphy.TeamRole, err error) {

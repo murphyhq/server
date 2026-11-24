@@ -68,6 +68,6 @@ FROM escalation_policies
 WHERE id = ANY(@ids::uuid[]);
 
 -- name: PoliciesOfTeams :many
-SELECT id
+SELECT id, name
 FROM escalation_policies
 WHERE team_id = ANY(@team_ids::uuid[]);
