@@ -19,7 +19,7 @@ Murphy is an open-source, self-hostable on-call paging server: schedules, rotati
 
 ## How it works
 
-Murphy runs as six small components: `ingest` receives webhooks, `api` serves the management API, `engine` decides how an incident escalates, `scheduler` publishes what's due, `notifier` works out whom a page reaches and sends notifications, and `migrate` prepares the database. They talk through a message broker, keep their state in a database, and are released together under one version.
+Murphy runs as six small components: `ingest` receives webhooks, `api` serves the management API, `engine` makes Murphy's decisions, `scheduler` publishes what's due, `notifier` reaches people and systems outside Murphy, and `migrate` prepares the database. They talk through a message broker, keep their state in a database, and are released together under one version.
 
 The [architecture overview](docs/architecture.md) explains each component and shows how an alert becomes a page.
 

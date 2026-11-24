@@ -80,17 +80,17 @@ The management API, described by an OpenAPI spec and used by people and automati
 
 ### Engine
 
-Decides what happens to an incident when a message arrives; no other component changes incidents in response to messages. An alert opens or updates an incident, and the version of the escalation policy the incident follows decides which targets each level pages and when the next level is due. `engine` stores each change together with the messages it causes. It learns from `notifier` whom a level reached, and when a level reached nobody it moves on to the next one at once. It also records what comes back on the incident's timeline: the outcome of each notification, and delivery updates and replies from providers. It handles every message exactly once, even when the broker delivers it twice.
+Decides what happens when a message arrives, and stores each change together with the messages it causes. It handles every message exactly once, even when the broker delivers it twice. It makes no calls outside Murphy, so its work depends only on Murphy's database and broker.
 
 ### Scheduler
 
-Turns stored messages into published ones. Every message that decides whether someone is paged is saved as a scheduled message in its domain's database, in the same transaction as the change that caused it; `scheduler` reads them from every domain that has them, today incidents and notifications. `scheduler` publishes each one when it is due, timers at their time and everything else right away, and deletes it once the broker confirms. A change and its messages are therefore never separated: a crash or a broker outage delays a message, and loses none. A due timer is published as `TimerExpired`, and `engine` decides what it means.
+Turns stored messages into published ones. Every message that decides whether someone is paged is saved as a scheduled message in the database, in the same transaction as the change that caused it. `scheduler` publishes each one when it is due, timers at their time and everything else right away, and deletes it once the broker confirms. A change and its messages are therefore never separated: a crash or a broker outage delays a message, and loses none.
 
 ### Notifier
 
-Owns notifications: whom a page reaches, and how. When an incident escalates, `notifier` resolves the level's targets to people through their on-call schedules, looks up their contact methods, and stores a page with one notification per contact method, together with the messages they cause. When an incident is acknowledged or resolved, it notifies everyone its pages reached.
+Reaches everything outside Murphy: it works out whom to notify and how, and sends through providers (webhooks, email, chat, SMS and voice). Its work waits on receivers and providers that can be slow or down, so it runs apart from `engine`, and a failing receiver delays notifications without delaying incidents. It is also the only component that needs outbound network access.
 
-Sending is a step of its own that doesn't use the database. `notifier` sends each notification through its provider (webhooks, email, chat, SMS and voice) and publishes the outcome as `NotificationSent` or `NotificationFailed`, which it then records on the notification. Notifications already handed to the broker therefore still go out when the database is unavailable. The provider's later delivery update arrives through `ingest`.
+Each external call is a step of its own that doesn't use the database: `notifier` makes the call and publishes its outcome as a message. Calls already handed to the broker therefore still go out when the database is unavailable.
 
 Webhooks follow [Standard Webhooks](https://www.standardwebhooks.com) and are described by [`openapi/webhooks/v1.yaml`](../openapi/webhooks/v1.yaml). `notifier` signs each one with Murphy's Ed25519 private key, which is part of its configuration and never leaves it. Receivers check the signature with the public key the API serves, and hold no secret of their own. While the key is being replaced, `notifier` signs with both the old and the new key, so receivers switch at their own pace.
 
