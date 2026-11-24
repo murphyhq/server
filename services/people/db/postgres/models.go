@@ -41,6 +41,7 @@ type SignIn struct {
 	StateHash []byte
 	Nonce     string
 	Verifier  string
+	ReturnTo  *string
 	ExpiresAt time.Time
 	UsedAt    *time.Time
 	CreatedAt time.Time

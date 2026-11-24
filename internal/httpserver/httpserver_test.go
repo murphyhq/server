@@ -169,3 +169,24 @@ func TestCORSSendsNoOriginToUndeclaredCallers(t *testing.T) {
 		assert.Empty(t, rec.Header().Get("Access-Control-Allow-Origin"))
 	}
 }
+
+func TestCORSLetsDeclaredOriginsSendCredentialsOnlyWhenAllowed(t *testing.T) {
+	ok := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
+	withCredentials := corsPolicy("http://localhost:8090")
+	withCredentials.Credentials = true
+
+	declared, undeclared, without := httptest.NewRecorder(), httptest.NewRecorder(), httptest.NewRecorder()
+	corsServer(withCredentials, ok).ServeHTTP(declared, requestFrom("http://localhost:8090"))
+	corsServer(withCredentials, ok).ServeHTTP(undeclared, requestFrom("https://evil.example"))
+	corsServer(corsPolicy("http://localhost:8090"), ok).ServeHTTP(without, requestFrom("http://localhost:8090"))
+
+	assert.Equal(t, "true", declared.Header().Get("Access-Control-Allow-Credentials"))
+	assert.Empty(t, undeclared.Header().Get("Access-Control-Allow-Credentials"))
+	assert.Empty(t, without.Header().Get("Access-Control-Allow-Credentials"))
+}
+
+func requestFrom(origin string) *http.Request {
+	req := httptest.NewRequest(http.MethodGet, "/v1/services", nil)
+	req.Header.Set("Origin", origin)
+	return req
+}

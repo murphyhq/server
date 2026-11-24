@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 
@@ -52,15 +53,25 @@ type AuthRepository interface {
 	ClaimFirstAdmin(ctx context.Context, userID string, now time.Time) (bool, error)
 }
 
-type Auth struct {
-	repo            AuthRepository
-	provider        Provider
-	sessionDuration time.Duration
-	initialAdmin    string
+type AuthSettings struct {
+	SessionDuration   time.Duration
+	InitialAdminEmail string
+	ReturnOrigins     []string
 }
 
-func NewAuth(repo AuthRepository, provider Provider, sessionDuration time.Duration, initialAdmin string) *Auth {
-	return &Auth{repo: repo, provider: provider, sessionDuration: sessionDuration, initialAdmin: initialAdmin}
+type Auth struct {
+	repo          AuthRepository
+	provider      Provider
+	settings      AuthSettings
+	returnOrigins map[string]bool
+}
+
+func NewAuth(repo AuthRepository, provider Provider, settings AuthSettings) *Auth {
+	origins := make(map[string]bool, len(settings.ReturnOrigins))
+	for _, origin := range settings.ReturnOrigins {
+		origins[strings.ToLower(strings.TrimSuffix(origin, "/"))] = true
+	}
+	return &Auth{repo: repo, provider: provider, settings: settings, returnOrigins: origins}
 }
 
 type StartedSignIn struct {
@@ -69,14 +80,18 @@ type StartedSignIn struct {
 }
 
 type SignedIn struct {
-	Token   string
-	Session *murphy.Session
+	Token    string
+	Session  *murphy.Session
+	ReturnTo string
 }
 
-func (a *Auth) StartSignIn(ctx context.Context) (_ *StartedSignIn, err error) {
+func (a *Auth) StartSignIn(ctx context.Context, returnTo string) (_ *StartedSignIn, err error) {
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
+	if err := a.checkReturnTo(returnTo); err != nil {
+		return nil, err
+	}
 	state, nonce, verifier := secret(), secret(), secret()
 	now := time.Now().UTC()
 	signIn := &murphy.SignIn{
@@ -84,6 +99,7 @@ func (a *Auth) StartSignIn(ctx context.Context) (_ *StartedSignIn, err error) {
 		StateHash: hash(state),
 		Nonce:     nonce,
 		Verifier:  verifier,
+		ReturnTo:  returnTo,
 		ExpiresAt: timestamppb.New(now.Add(signInDuration)),
 		CreatedAt: timestamppb.New(now),
 		UpdatedAt: timestamppb.New(now),
@@ -124,7 +140,12 @@ func (a *Auth) FinishSignIn(ctx context.Context, state, browserState, code strin
 	if err != nil {
 		return nil, err
 	}
-	return a.startSession(ctx, userID, now)
+	signedIn, err := a.startSession(ctx, userID, now)
+	if err != nil {
+		return nil, err
+	}
+	signedIn.ReturnTo = signIn.GetReturnTo()
+	return signedIn, nil
 }
 
 func (a *Auth) SignInWithIDToken(ctx context.Context, idToken string) (_ *SignedIn, err error) {
@@ -226,7 +247,7 @@ func (a *Auth) signedInUser(ctx context.Context, claims *Claims, now time.Time) 
 		return ctx, "", err
 	}
 	ctx = telemetry.With(ctx, telemetry.WithField("user.id", userID))
-	if a.initialAdmin == "" || !claims.EmailVerified || !strings.EqualFold(claims.Email, a.initialAdmin) {
+	if a.settings.InitialAdminEmail == "" || !claims.EmailVerified || !strings.EqualFold(claims.Email, a.settings.InitialAdminEmail) {
 		return ctx, userID, nil
 	}
 	claimed, err := a.repo.ClaimFirstAdmin(ctx, userID, now)
@@ -245,7 +266,7 @@ func (a *Auth) startSession(ctx context.Context, userID string, now time.Time) (
 		Id:        murphy.NewID(),
 		UserId:    userID,
 		TokenHash: hash(token),
-		ExpiresAt: timestamppb.New(now.Add(a.sessionDuration)),
+		ExpiresAt: timestamppb.New(now.Add(a.settings.SessionDuration)),
 		CreatedAt: timestamppb.New(now),
 		UpdatedAt: timestamppb.New(now),
 	}
@@ -253,6 +274,17 @@ func (a *Auth) startSession(ctx context.Context, userID string, now time.Time) (
 		return nil, fmt.Errorf("create session: %w", err)
 	}
 	return &SignedIn{Token: token, Session: session}, nil
+}
+
+func (a *Auth) checkReturnTo(returnTo string) error {
+	if returnTo == "" {
+		return nil
+	}
+	u, err := url.Parse(returnTo)
+	if err != nil || u.User != nil || !a.returnOrigins[strings.ToLower(u.Scheme+"://"+u.Host)] {
+		return &murphy.FieldError{Field: "return_to", Reason: "must be on an origin this install allows"}
+	}
+	return nil
 }
 
 func secret() string {

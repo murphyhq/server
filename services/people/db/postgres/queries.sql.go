@@ -126,8 +126,8 @@ func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) er
 }
 
 const createSignIn = `-- name: CreateSignIn :exec
-INSERT INTO sign_ins (id, state_hash, nonce, verifier, expires_at, created_at, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
+INSERT INTO sign_ins (id, state_hash, nonce, verifier, return_to, expires_at, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 `
 
 type CreateSignInParams struct {
@@ -135,6 +135,7 @@ type CreateSignInParams struct {
 	StateHash []byte
 	Nonce     string
 	Verifier  string
+	ReturnTo  *string
 	ExpiresAt time.Time
 	CreatedAt time.Time
 	UpdatedAt time.Time
@@ -146,6 +147,7 @@ func (q *Queries) CreateSignIn(ctx context.Context, arg CreateSignInParams) erro
 		arg.StateHash,
 		arg.Nonce,
 		arg.Verifier,
+		arg.ReturnTo,
 		arg.ExpiresAt,
 		arg.CreatedAt,
 		arg.UpdatedAt,
@@ -425,7 +427,7 @@ func (q *Queries) GetMembership(ctx context.Context, arg GetMembershipParams) (T
 }
 
 const getSignIn = `-- name: GetSignIn :one
-SELECT id, state_hash, nonce, verifier, expires_at, used_at, created_at, updated_at
+SELECT id, state_hash, nonce, verifier, return_to, expires_at, used_at, created_at, updated_at
 FROM sign_ins
 WHERE state_hash = $1
 `
@@ -438,6 +440,7 @@ func (q *Queries) GetSignIn(ctx context.Context, stateHash []byte) (SignIn, erro
 		&i.StateHash,
 		&i.Nonce,
 		&i.Verifier,
+		&i.ReturnTo,
 		&i.ExpiresAt,
 		&i.UsedAt,
 		&i.CreatedAt,

@@ -114,7 +114,11 @@ func New(ctx context.Context, s Settings) (_ *App, err error) {
 		ClientID:       s.OIDCClientID,
 		ClientSecret:   s.OIDCClientSecret,
 		RedirectURL:    s.PublicURL + "/v1/auth/callback",
-	}), s.SessionDuration, s.InitialAdminEmail)
+	}), people.AuthSettings{
+		SessionDuration:   s.SessionDuration,
+		InitialAdminEmail: s.InitialAdminEmail,
+		ReturnOrigins:     append([]string{s.PublicURL}, s.CORSOrigins...),
+	})
 	oncallService := oncall.New(oncallStorage, peopleService)
 	escalationService := escalation.New(escalationStorage, peopleService, oncallService, catalogService, s.EscalationMinimumDelay)
 	a.Handler, err = router.New(router.Services{
@@ -144,5 +148,6 @@ func (s Settings) CORS() httpserver.CORS {
 		Methods:       []string{"GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"},
 		AllowHeaders:  []string{"Authorization", "Content-Type", "Idempotency-Key"},
 		ExposeHeaders: []string{"Idempotent-Replayed"},
+		Credentials:   true,
 	}
 }

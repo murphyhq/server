@@ -62,11 +62,11 @@ func sessionFrom(ctx context.Context) *currentSession {
 	return current
 }
 
-func (s *Server) SignIn(ctx context.Context, _ SignInRequestObject) (_ SignInResponseObject, err error) {
+func (s *Server) SignIn(ctx context.Context, request SignInRequestObject) (_ SignInResponseObject, err error) {
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
-	started, err := s.auth.StartSignIn(ctx)
+	started, err := s.auth.StartSignIn(ctx, *murphy.Or(request.Params.ReturnTo, new(string)))
 	if err != nil {
 		return nil, err
 	}
@@ -88,11 +88,14 @@ func (s *Server) FinishSignIn(ctx context.Context, request FinishSignInRequestOb
 	if err != nil {
 		return nil, err
 	}
+	cookie := s.cookie(signedIn.Token, signedIn.Session.GetExpiresAt().AsTime())
+	if signedIn.ReturnTo != "" {
+		return FinishSignIn303Response{Headers: FinishSignIn303ResponseHeaders{Location: &signedIn.ReturnTo, SetCookie: &cookie}}, nil
+	}
 	session, err := s.session(ctx, signedIn.Session)
 	if err != nil {
 		return nil, err
 	}
-	cookie := s.cookie(signedIn.Token, signedIn.Session.GetExpiresAt().AsTime())
 	return FinishSignIn200JSONResponse{Body: session, Headers: FinishSignIn200ResponseHeaders{SetCookie: &cookie}}, nil
 }
 

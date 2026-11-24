@@ -61,6 +61,28 @@ func TestSigningInThroughTheBrowserSetsASessionCookie(t *testing.T) {
 	assert.Equal(t, murphytest.Bo, session.JSON200.User.Email)
 }
 
+func TestSigningInReturnsTheBrowserToWhereItCameFrom(t *testing.T) {
+	m := murphytest.New(t)
+
+	browser, signedIn := m.SignInThroughBrowserReturningTo(murphytest.Bo, m.DocsURL())
+	session, err := browser.GetSessionWithResponse(t.Context())
+
+	require.NoError(t, err)
+	assert.Equal(t, m.DocsURL(), signedIn.Request.URL.String())
+	require.Equal(t, http.StatusOK, session.StatusCode())
+	assert.Equal(t, murphytest.Bo, session.JSON200.User.Email)
+}
+
+func TestSigningInNeverReturnsToAnotherOrigin(t *testing.T) {
+	m := murphytest.New(t)
+	elsewhere := "https://evil.example/"
+
+	got, err := m.Anonymous().SignInWithResponse(t.Context(), &client.SignInParams{ReturnTo: &elsewhere})
+
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusBadRequest, got.StatusCode())
+}
+
 func TestASignInOnlyFinishesInTheBrowserThatStartedIt(t *testing.T) {
 	m := murphytest.New(t)
 	callback := m.CallbackFor(murphytest.Bo)

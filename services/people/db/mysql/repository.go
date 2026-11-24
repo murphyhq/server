@@ -8,6 +8,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/murphyhq/server"
+	"github.com/murphyhq/server/internal/database"
 	murphymysql "github.com/murphyhq/server/internal/mysql"
 	"github.com/murphyhq/server/internal/tracer"
 )
@@ -387,6 +388,7 @@ func (r *Repository) CreateSignIn(ctx context.Context, signIn *murphy.SignIn) (e
 
 	return murphymysql.Error("sign-in", r.queries.CreateSignIn(ctx, CreateSignInParams{
 		ID: signIn.GetId(), StateHash: signIn.GetStateHash(), Nonce: signIn.GetNonce(), Verifier: signIn.GetVerifier(),
+		ReturnTo:  database.Text(signIn.GetReturnTo()),
 		ExpiresAt: signIn.GetExpiresAt().AsTime(),
 		CreatedAt: signIn.GetCreatedAt().AsTime(), UpdatedAt: signIn.GetUpdatedAt().AsTime(),
 	}))
@@ -412,7 +414,7 @@ func (r *Repository) GetSignIn(ctx context.Context, stateHash []byte) (_ *murphy
 		return nil, murphymysql.Error("sign-in", err)
 	}
 	return &murphy.SignIn{
-		Id: row.ID, StateHash: row.StateHash, Nonce: row.Nonce, Verifier: row.Verifier,
+		Id: row.ID, StateHash: row.StateHash, Nonce: row.Nonce, Verifier: row.Verifier, ReturnTo: database.TextValue(row.ReturnTo),
 		ExpiresAt: timestamppb.New(row.ExpiresAt), CreatedAt: timestamppb.New(row.CreatedAt), UpdatedAt: timestamppb.New(row.UpdatedAt),
 	}, nil
 }

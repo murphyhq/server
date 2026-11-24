@@ -828,6 +828,12 @@ type FinishSignInParams struct {
 	MurphySignIn *string `form:"murphy_sign_in,omitempty" json:"murphy_sign_in,omitempty"`
 }
 
+// SignInParams defines parameters for SignIn.
+type SignInParams struct {
+	// ReturnTo Where to send the browser once signed in. It must be on `api`'s own origin or one of the install's CORS origins.
+	ReturnTo *string `form:"return_to,omitempty" json:"return_to,omitempty"`
+}
+
 // ListEscalationPoliciesParams defines parameters for ListEscalationPolicies.
 type ListEscalationPoliciesParams struct {
 	// Limit Items per page, 50 by default and at most 100.
@@ -1148,7 +1154,7 @@ type ClientInterface interface {
 	// Sends the browser to the install's identity provider. Once the person has signed in there, the provider sends them back to `/v1/auth/callback`.
 	//
 	// Corresponds with GET /v1/auth/sign-in (the `SignIn` operationId).
-	SignIn(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+	SignIn(ctx context.Context, params *SignInParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DeleteContactMethod Delete a contact method
 	//
@@ -1642,8 +1648,8 @@ func (c *Client) CreateSession(ctx context.Context, body CreateSessionJSONReques
 // Sends the browser to the install's identity provider. Once the person has signed in there, the provider sends them back to `/v1/auth/callback`.
 //
 // Corresponds with GET /v1/auth/sign-in (the `SignIn` operationId).
-func (c *Client) SignIn(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewSignInRequest(c.Server)
+func (c *Client) SignIn(ctx context.Context, params *SignInParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSignInRequest(c.Server, params)
 	if err != nil {
 		return nil, err
 	}
@@ -2905,7 +2911,7 @@ func NewCreateSessionRequestWithBody(server string, contentType string, body io.
 }
 
 // NewSignInRequest constructs an http.Request for the SignIn method
-func NewSignInRequest(server string) (*http.Request, error) {
+func NewSignInRequest(server string, params *SignInParams) (*http.Request, error) {
 	var err error
 
 	serverURL, err := url.Parse(server)
@@ -2921,6 +2927,33 @@ func NewSignInRequest(server string) (*http.Request, error) {
 	queryURL, err := serverURL.Parse(operationPath)
 	if err != nil {
 		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.ReturnTo != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "return_to", *params.ReturnTo, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
 	}
 
 	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
@@ -5376,7 +5409,7 @@ type ClientWithResponsesInterface interface {
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /v1/auth/sign-in (the `SignIn` operationId).
-	SignInWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*SignInResponse, error)
+	SignInWithResponse(ctx context.Context, params *SignInParams, reqEditors ...RequestEditorFn) (*SignInResponse, error)
 
 	// DeleteContactMethodWithResponse Delete a contact method
 	//
@@ -5849,6 +5882,12 @@ type FinishSignInResponse200Headers struct {
 	SetCookie *string
 }
 
+// FinishSignInResponse303Headers the declared response headers of an HTTP 303 response for FinishSignIn
+type FinishSignInResponse303Headers struct {
+	Location  *string
+	SetCookie *string
+}
+
 type FinishSignInResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -5858,6 +5897,8 @@ type FinishSignInResponse struct {
 	ApplicationproblemJSON401 *Problem
 	// Headers200 the parsed response headers for an HTTP 200 response
 	Headers200 *FinishSignInResponse200Headers
+	// Headers303 the parsed response headers for an HTTP 303 response
+	Headers303 *FinishSignInResponse303Headers
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -6045,8 +6086,15 @@ type SignInResponse302Headers struct {
 type SignInResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *Problem
 	// Headers302 the parsed response headers for an HTTP 302 response
 	Headers302 *SignInResponse302Headers
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r SignInResponse) GetApplicationproblemJSON400() *Problem {
+	return r.ApplicationproblemJSON400
 }
 
 // GetBody returns the raw response body bytes
@@ -8706,8 +8754,8 @@ func (c *ClientWithResponses) CreateSessionWithResponse(ctx context.Context, bod
 // Returns a wrapper object for the known response body format(s).
 //
 // Corresponds with GET /v1/auth/sign-in (the `SignIn` operationId).
-func (c *ClientWithResponses) SignInWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*SignInResponse, error) {
-	rsp, err := c.SignIn(ctx, reqEditors...)
+func (c *ClientWithResponses) SignInWithResponse(ctx context.Context, params *SignInParams, reqEditors ...RequestEditorFn) (*SignInResponse, error) {
+	rsp, err := c.SignIn(ctx, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -9590,6 +9638,9 @@ func ParseFinishSignInResponse(rsp *http.Response) (*FinishSignInResponse, error
 		}
 		response.JSON200 = &dest
 
+	case rsp.StatusCode == 303:
+		break // No content-type
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest Problem
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -9610,6 +9661,23 @@ func ParseFinishSignInResponse(rsp *http.Response) (*FinishSignInResponse, error
 			headers.SetCookie = &value
 		}
 		response.Headers200 = &headers
+	case rsp.StatusCode == 303:
+		var headers FinishSignInResponse303Headers
+		if values := rsp.Header.Values("Location"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Location", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.Location = &value
+		}
+		if values := rsp.Header.Values("Set-Cookie"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Set-Cookie", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.SetCookie = &value
+		}
+		response.Headers303 = &headers
 	}
 
 	return response, nil
@@ -9721,6 +9789,19 @@ func ParseSignInResponse(rsp *http.Response) (*SignInResponse, error) {
 	response := &SignInResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 302:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
 	}
 
 	switch {

@@ -18,7 +18,15 @@ paths:
       description: Sends the browser to the install's identity provider. Once the person has signed in there, the provider sends them back to `/v1/auth/callback`.
       tags: [auth]
       security: []
+      parameters:
+        - name: return_to
+          in: query
+          description: Where to send the browser once signed in. It must be on `api`'s own origin or one of the install's CORS origins.
+          schema:
+            type: string
       responses:
+        "400":
+          $ref: "#/components/responses/Problem"
         "302":
           description: Go to the identity provider. The `murphy_sign_in` cookie ties the sign-in to this browser.
           headers:
@@ -58,6 +66,15 @@ paths:
           schema:
             type: string
       responses:
+        "303":
+          description: Signed in, and sent back to the `return_to` the sign-in started with. The session is in the `murphy_session` cookie.
+          headers:
+            Location:
+              schema:
+                type: string
+            Set-Cookie:
+              schema:
+                type: string
         "200":
           description: Signed in. The session is in the `murphy_session` cookie.
           headers:

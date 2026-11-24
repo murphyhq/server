@@ -151,8 +151,8 @@ SET revoked_at = sqlc.arg(revoked_at), updated_at = sqlc.arg(updated_at)
 WHERE token_hash = sqlc.arg(token_hash) AND revoked_at IS NULL;
 
 -- name: CreateSignIn :exec
-INSERT INTO sign_ins (id, state_hash, nonce, verifier, expires_at, created_at, updated_at)
-VALUES (sqlc.arg(id), sqlc.arg(state_hash), sqlc.arg(nonce), sqlc.arg(verifier), sqlc.arg(expires_at), sqlc.arg(created_at), sqlc.arg(updated_at));
+INSERT INTO sign_ins (id, state_hash, nonce, verifier, return_to, expires_at, created_at, updated_at)
+VALUES (sqlc.arg(id), sqlc.arg(state_hash), sqlc.arg(nonce), sqlc.arg(verifier), sqlc.narg(return_to), sqlc.arg(expires_at), sqlc.arg(created_at), sqlc.arg(updated_at));
 
 -- name: UseSignIn :execrows
 UPDATE sign_ins
@@ -160,7 +160,7 @@ SET used_at = sqlc.arg(used_at), updated_at = sqlc.arg(updated_at)
 WHERE state_hash = sqlc.arg(state_hash) AND used_at IS NULL AND expires_at > sqlc.arg(now);
 
 -- name: GetSignIn :one
-SELECT id, state_hash, nonce, verifier, expires_at, used_at, created_at, updated_at
+SELECT id, state_hash, nonce, verifier, return_to, expires_at, used_at, created_at, updated_at
 FROM sign_ins
 WHERE state_hash = sqlc.arg(state_hash);
 

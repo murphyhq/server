@@ -87,6 +87,7 @@ CREATE TABLE sign_ins (
   state_hash VARBINARY(32) NOT NULL,
   nonce VARCHAR(64) NOT NULL,
   verifier VARCHAR(128) NOT NULL,
+  return_to VARCHAR(2048),
   expires_at DATETIME(6) NOT NULL,
   used_at DATETIME(6),
   created_at DATETIME(6) NOT NULL,

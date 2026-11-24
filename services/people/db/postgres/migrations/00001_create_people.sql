@@ -87,6 +87,7 @@ CREATE TABLE sign_ins (
   state_hash bytea NOT NULL,
   nonce text NOT NULL,
   verifier text NOT NULL,
+  return_to text,
   expires_at timestamptz NOT NULL,
   used_at timestamptz,
   created_at timestamptz NOT NULL,

@@ -97,4 +97,5 @@ message SignIn {
   google.protobuf.Timestamp expires_at = 5;
   google.protobuf.Timestamp created_at = 6;
   google.protobuf.Timestamp updated_at = 7;
+  string return_to = 8;
 }

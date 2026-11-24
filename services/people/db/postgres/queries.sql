@@ -152,8 +152,8 @@ SET revoked_at = @revoked_at, updated_at = @updated_at
 WHERE token_hash = @token_hash AND revoked_at IS NULL;
 
 -- name: CreateSignIn :exec
-INSERT INTO sign_ins (id, state_hash, nonce, verifier, expires_at, created_at, updated_at)
-VALUES (@id, @state_hash, @nonce, @verifier, @expires_at, @created_at, @updated_at);
+INSERT INTO sign_ins (id, state_hash, nonce, verifier, return_to, expires_at, created_at, updated_at)
+VALUES (@id, @state_hash, @nonce, @verifier, sqlc.narg(return_to), @expires_at, @created_at, @updated_at);
 
 -- name: UseSignIn :execrows
 UPDATE sign_ins
@@ -161,7 +161,7 @@ SET used_at = @used_at, updated_at = @updated_at
 WHERE state_hash = @state_hash AND used_at IS NULL AND expires_at > @now;
 
 -- name: GetSignIn :one
-SELECT id, state_hash, nonce, verifier, expires_at, used_at, created_at, updated_at
+SELECT id, state_hash, nonce, verifier, return_to, expires_at, used_at, created_at, updated_at
 FROM sign_ins
 WHERE state_hash = @state_hash;
 
