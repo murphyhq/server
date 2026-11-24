@@ -165,6 +165,9 @@ func (s *Service) CreateContactMethod(ctx context.Context, in *murphy.ContactMet
 	if err := method.Validate(); err != nil {
 		return nil, err
 	}
+	if err := sendable(method.GetType()); err != nil {
+		return nil, err
+	}
 	if _, err := s.GetUser(ctx, method.GetUserId()); err != nil {
 		return nil, err
 	}
@@ -227,6 +230,9 @@ func (s *Service) UpdateContactMethod(ctx context.Context, in *murphy.ContactMet
 		method.DisabledAt, method.DisabledReason = current.GetDisabledAt(), current.GetDisabledReason()
 	}
 	if err := method.Validate(); err != nil {
+		return nil, err
+	}
+	if err := sendable(method.GetType()); err != nil {
 		return nil, err
 	}
 	if err := s.repo.UpdateContactMethod(ctx, method); err != nil {
@@ -488,4 +494,12 @@ func (s *Service) TeamRolesOf(ctx context.Context, userID string) (_ map[string]
 		roles[membership.GetTeamId()] = membership.GetRole()
 	}
 	return roles, nil
+}
+
+func sendable(kind murphy.ContactMethodType) error {
+	switch kind {
+	case murphy.ContactMethodType_CONTACT_METHOD_TYPE_EMAIL, murphy.ContactMethodType_CONTACT_METHOD_TYPE_SMS, murphy.ContactMethodType_CONTACT_METHOD_TYPE_VOICE:
+		return &murphy.FieldError{Field: "type", Reason: "can't be " + kind.Text() + " yet: Murphy can only send by webhook and push for now"}
+	}
+	return nil
 }

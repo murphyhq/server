@@ -17,7 +17,7 @@ import (
 
 func TestAPageReachesEveryContactMethodOfEveryonePaged(t *testing.T) {
 	m := murphytest.New(t)
-	ana := m.User(murphytest.WithWebhook(), murphytest.Email())
+	ana := m.User(murphytest.WithWebhook(), murphytest.WithPhone())
 	service := m.Service(murphytest.Pages(ana.Target()))
 
 	incident := service.Fire("disk-full")
@@ -25,7 +25,7 @@ func TestAPageReachesEveryContactMethodOfEveryonePaged(t *testing.T) {
 	incident.WaitFor(
 		murphytest.Paged(ana),
 		murphytest.Notified(ana, client.Webhook),
-		murphytest.NotificationFailed(ana, client.Email),
+		murphytest.Notified(ana, client.Push),
 	)
 	page := ana.Webhook().WaitForWebhooks(1)[0]
 	assert.True(t, page.Verified, "signed with a key the API publishes")

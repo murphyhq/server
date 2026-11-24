@@ -69,12 +69,6 @@ func Deactivated() UserOption {
 	}
 }
 
-func Email() UserOption {
-	return func(s *userSpec) {
-		s.methods = append(s.methods, client.ContactMethodInput{Type: client.Email, Address: s.input.Email})
-	}
-}
-
 func WithWebhook(options ...WebhookOption) UserOption {
 	return func(s *userSpec) { s.webhooks = append(s.webhooks, options) }
 }

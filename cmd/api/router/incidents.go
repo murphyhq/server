@@ -99,6 +99,12 @@ func (s *Server) GetIncident(ctx context.Context, request GetIncidentRequestObje
 			entries[i].Notification = out
 		}
 	}
+	if err := s.name(ctx, n); err != nil {
+		return nil, err
+	}
+	for i := range entries {
+		entries[i].Summary = summarize(entries[i])
+	}
 	return GetIncident200JSONResponse{
 		Id:         out.Id,
 		Number:     out.Number,
@@ -114,7 +120,7 @@ func (s *Server) GetIncident(ctx context.Context, request GetIncidentRequestObje
 
 		AcknowledgedAt: out.AcknowledgedAt,
 		Escalation:     out.Escalation,
-	}, s.name(ctx, n)
+	}, nil
 }
 
 func toIncident(incident *murphy.Incident, n *names) Incident {
