@@ -40,7 +40,6 @@ packages:
     interfaces:
       AuthRepository: {}
       Provider: {}
-      Repository: {}
   github.com/murphyhq/server/cmd/api/router:
     config:
       dir: "{{.InterfaceDir}}"

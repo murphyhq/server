@@ -66,6 +66,35 @@ func TestAPhoneWhoseTokenIsGoneIsDisabledAndNotTriedAgain(t *testing.T) {
 	next.WaitFor(murphytest.Unreachable(ana))
 }
 
+func TestANewTokenEnablesADisabledPhone(t *testing.T) {
+	m := murphytest.New(t)
+	ana := m.User(murphytest.WithGonePhone())
+	m.Service(murphytest.Pages(ana.Target())).Fire("disk-full")
+	phone := ana.WaitForDisabledPhone()
+	ios := client.Ios
+
+	updated, err := m.API.UpdateContactMethodWithResponse(t.Context(), phone.Id, client.ContactMethodInput{Type: client.Push, Address: m.Name("device"), Platform: &ios})
+
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, updated.StatusCode())
+	assert.Nil(t, updated.JSON200.DisabledAt)
+	assert.Nil(t, updated.JSON200.DisabledReason)
+}
+
+func TestTheSameDeadTokenKeepsAPhoneDisabled(t *testing.T) {
+	m := murphytest.New(t)
+	ana := m.User(murphytest.WithGonePhone())
+	m.Service(murphytest.Pages(ana.Target())).Fire("disk-full")
+	phone := ana.WaitForDisabledPhone()
+	ios := client.Ios
+
+	updated, err := m.API.UpdateContactMethodWithResponse(t.Context(), phone.Id, client.ContactMethodInput{Type: client.Push, Address: phone.Address, Platform: &ios})
+
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, updated.StatusCode())
+	assert.Equal(t, phone.DisabledAt, updated.JSON200.DisabledAt)
+}
+
 func TestSomeoneOnCallIsPagedThroughTheirSchedule(t *testing.T) {
 	m := murphytest.New(t)
 	team := m.Team()
