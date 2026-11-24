@@ -36,6 +36,8 @@ type Engine[T Tx] interface {
 	UseSignIn(ctx context.Context, stateHash []byte, now time.Time) (bool, error)
 	GetSignIn(ctx context.Context, stateHash []byte) (*murphy.SignIn, error)
 	DeleteExpiredSignIns(ctx context.Context, before time.Time) error
+	SetPassword(ctx context.Context, userID, hash string, at time.Time) error
+	GetPasswordHash(ctx context.Context, userID string) (string, error)
 	Transaction(ctx context.Context, work func(tx T) error) error
 	Migrate(ctx context.Context) error
 	Ping(ctx context.Context) error

@@ -92,6 +92,28 @@ paths:
                 $ref: "#/components/schemas/Session"
         "401":
           $ref: "#/components/responses/Problem"
+  /v1/auth/password:
+    post:
+      operationId: setPassword
+      summary: Set a password from a set-password link
+      description: Takes the code from a set-password link and the new password, sets it, and ends the person's other sessions. A password too short or too long leaves the link usable.
+      tags: [auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PasswordInput"
+      responses:
+        "204":
+          description: The password is set.
+        "400":
+          $ref: "#/components/responses/Problem"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
   /v1/auth/sessions:
     get:
       operationId: listSessions
@@ -700,6 +722,28 @@ paths:
       responses:
         "204":
           description: Ended.
+        "403":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+  /v1/users/{id}/password-links:
+    post:
+      operationId: createPasswordLink
+      security:
+        - session: [install:manage]
+        - sessionCookie: [install:manage]
+      summary: Create a link to set a user's password
+      description: A link that lets the person choose a password, to invite them or to reset theirs. Share it however you like; it works once, for 24 hours. Only admins may do this, on installs that allow passwords.
+      tags: [people]
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "201":
+          description: The link.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PasswordLink"
         "403":
           $ref: "#/components/responses/Problem"
         "404":
@@ -1410,6 +1454,26 @@ components:
           schema:
             $ref: "#/components/schemas/Problem"
   schemas:
+    PasswordLink:
+      type: object
+      required: [link, expires_at]
+      properties:
+        link:
+          type: string
+          description: Leads to where the person chooses a password; its `code` goes to `POST /v1/auth/password`.
+        expires_at:
+          type: string
+          format: date-time
+    PasswordInput:
+      type: object
+      additionalProperties: false
+      required: [code, password]
+      properties:
+        code:
+          type: string
+        password:
+          type: string
+          format: password
     SessionInput:
       type: object
       additionalProperties: false
@@ -1423,6 +1487,13 @@ components:
         code_verifier:
           type: string
           description: The PKCE verifier of the app's sign-in, needed with its code.
+        email:
+          type: string
+          description: With `password`, where the install allows passwords.
+        password:
+          type: string
+          format: password
+          description: With `email`. Repeated failures for a person or from an address are refused with `429` for a while.
     SessionSummary:
       type: object
       required: [id, client, current, created_at, expires_at]

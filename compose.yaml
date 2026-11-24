@@ -256,6 +256,8 @@ services:
       MURPHY_OIDC_CLIENT_ID: murphy
       MURPHY_OIDC_CLIENT_SECRET: murphy-local-secret
       MURPHY_INITIAL_ADMIN_EMAIL: ana@murphy.test
+      MURPHY_ALLOW_PASSWORDS: "true"
+      MURPHY_RATE_LIMIT_STORE_URL: redis://redis:6379/0
     ports:
       - "8080:8080"
     depends_on:

@@ -51,6 +51,8 @@ func WriteError(w http.ResponseWriter, r *http.Request, err error) {
 		WriteProblem(w, r, http.StatusConflict, "conflicts with an existing resource")
 	case errors.Is(err, murphy.ErrUnauthenticated):
 		WriteProblem(w, r, http.StatusUnauthorized, "sign in first")
+	case errors.Is(err, murphy.ErrTooManyAttempts):
+		WriteProblem(w, r, http.StatusTooManyRequests, "too many failed attempts; try again later")
 	case errors.Is(err, murphy.ErrForbidden):
 		var forbidden *murphy.ForbiddenError
 		detail := "you aren't allowed to do this"

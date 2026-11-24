@@ -22,6 +22,8 @@ CREATE TABLE contact_methods (
   push_platform VARCHAR(16),
   created_at DATETIME(6) NOT NULL,
   updated_at DATETIME(6) NOT NULL,
+  disabled_at DATETIME(6) NULL,
+  disabled_reason TEXT NULL,
   CONSTRAINT contact_methods_pkey PRIMARY KEY (id),
   CONSTRAINT contact_methods_user_id_fkey FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
   CONSTRAINT contact_methods_type_check CHECK (type IN ('email', 'sms', 'voice', 'webhook', 'push')),
@@ -116,7 +118,18 @@ CREATE TABLE one_time_codes (
   CONSTRAINT one_time_codes_pkey PRIMARY KEY (id),
   CONSTRAINT one_time_codes_code_hash_key UNIQUE (code_hash),
   CONSTRAINT one_time_codes_user_id_fkey FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
-  CONSTRAINT one_time_codes_purpose_check CHECK (purpose IN ('app_sign_in', 'connect'))
+  CONSTRAINT one_time_codes_purpose_check CHECK (purpose IN ('app_sign_in', 'connect', 'set_password'))
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
 
 CREATE INDEX one_time_codes_user_id_idx ON one_time_codes (user_id);
+
+CREATE TABLE passwords (
+  id CHAR(36) NOT NULL,
+  user_id CHAR(36) NOT NULL,
+  hash TEXT NOT NULL,
+  created_at DATETIME(6) NOT NULL,
+  updated_at DATETIME(6) NOT NULL,
+  CONSTRAINT passwords_pkey PRIMARY KEY (id),
+  CONSTRAINT passwords_user_id_key UNIQUE (user_id),
+  CONSTRAINT passwords_user_id_fkey FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;

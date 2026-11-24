@@ -2,8 +2,11 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
+	"net/netip"
+	"slices"
 	"strings"
 	"time"
 
@@ -11,6 +14,7 @@ import (
 	"github.com/murphyhq/server/internal/httpserver"
 	idempotencystore "github.com/murphyhq/server/internal/idempotency/store"
 	"github.com/murphyhq/server/internal/lifecycle"
+	ratelimitstore "github.com/murphyhq/server/internal/ratelimit/store"
 	"github.com/murphyhq/server/services/catalog"
 	catalogdb "github.com/murphyhq/server/services/catalog/db"
 	"github.com/murphyhq/server/services/escalation"
@@ -38,12 +42,16 @@ type Settings struct {
 	EscalationMinimumDelay time.Duration `env:"ESCALATION_MINIMUM_DELAY" default:"1m"`
 	CORSOrigins            []string      `env:"CORS_ORIGINS" validate:"base-url"`
 	PublicURL              string        `env:"PUBLIC_URL" required:"true" validate:"base-url"`
-	OIDCIssuer             string        `env:"OIDC_ISSUER" required:"true" validate:"http-url"`
+	OIDCIssuer             string        `env:"OIDC_ISSUER" validate:"http-url"`
 	OIDCBackchannelURL     string        `env:"OIDC_BACKCHANNEL_URL" validate:"http-url"`
-	OIDCClientID           string        `env:"OIDC_CLIENT_ID" required:"true"`
-	OIDCClientSecret       string        `env:"OIDC_CLIENT_SECRET" required:"true"`
+	OIDCClientID           string        `env:"OIDC_CLIENT_ID"`
+	OIDCClientSecret       string        `env:"OIDC_CLIENT_SECRET"`
+	AllowPasswords         bool          `env:"ALLOW_PASSWORDS"`
+	RateLimitStoreURL      string        `env:"RATE_LIMIT_STORE_URL"`
+	TrustedProxies         []string      `env:"TRUSTED_PROXIES" validate:"cidr"`
 	SessionDuration        time.Duration `env:"SESSION_DURATION" default:"720h"`
 	InitialAdminEmail      string        `env:"INITIAL_ADMIN_EMAIL"`
+	InitialAdminPassword   string        `env:"INITIAL_ADMIN_PASSWORD"`
 	AppScheme              string        `env:"APP_SCHEME" default:"murphy"`
 	AllowedEmailDomains    []string      `env:"ALLOWED_EMAIL_DOMAINS"`
 }
@@ -108,34 +116,53 @@ func New(ctx context.Context, s Settings) (_ *App, err error) {
 		return nil, fmt.Errorf("MURPHY_WEBHOOK_PUBLIC_KEYS: %w", err)
 	}
 
+	provider, err := identityProvider(s)
+	if err != nil {
+		return nil, err
+	}
+	passwords := provider == nil || s.AllowPasswords
+	var limiter people.Limiter
+	if passwords {
+		if s.RateLimitStoreURL == "" {
+			return nil, errors.New("MURPHY_RATE_LIMIT_STORE_URL: required when people sign in with passwords")
+		}
+		store, err := ratelimitstore.Open(ctx, s.RateLimitStoreURL)
+		if err != nil {
+			return nil, fmt.Errorf("MURPHY_RATE_LIMIT_STORE_URL: %w", err)
+		}
+		a.resources.Add(func() { _ = store.Close() }, store.Ping)
+		limiter = store
+	}
+	trusted, err := networks(s.TrustedProxies)
+	if err != nil {
+		return nil, fmt.Errorf("MURPHY_TRUSTED_PROXIES: %w", err)
+	}
+
 	catalogService := catalog.New(catalogStorage, keyring)
 	peopleService := people.New(peopleStorage)
-	auth := people.NewAuth(peopleStorage, oidc.New(oidc.Config{
-		Issuer:         s.OIDCIssuer,
-		BackchannelURL: s.OIDCBackchannelURL,
-		ClientID:       s.OIDCClientID,
-		ClientSecret:   s.OIDCClientSecret,
-		RedirectURL:    s.PublicURL + "/v1/auth/callback",
-	}), people.AuthSettings{
-		SessionDuration:     s.SessionDuration,
-		InitialAdminEmail:   s.InitialAdminEmail,
-		ReturnOrigins:       append([]string{s.PublicURL}, s.CORSOrigins...),
-		PublicURL:           s.PublicURL,
-		AppScheme:           s.AppScheme,
-		AllowedEmailDomains: s.AllowedEmailDomains,
+	auth := people.NewAuth(peopleStorage, provider, limiter, people.AuthSettings{
+		SessionDuration:      s.SessionDuration,
+		InitialAdminEmail:    s.InitialAdminEmail,
+		ReturnOrigins:        append([]string{s.PublicURL}, s.CORSOrigins...),
+		PublicURL:            s.PublicURL,
+		AppScheme:            s.AppScheme,
+		AllowedEmailDomains:  s.AllowedEmailDomains,
+		PasswordsAllowed:     passwords,
+		InitialAdminPassword: s.InitialAdminPassword,
 	})
 	oncallService := oncall.New(oncallStorage, peopleService)
 	escalationService := escalation.New(escalationStorage, peopleService, oncallService, catalogService, s.EscalationMinimumDelay)
 	incidentsService := incidents.New(incidentsStorage, catalogService, escalationService)
 	a.Handler, err = router.New(router.Services{
-		Catalog:       catalogService,
-		Incidents:     incidentsService,
-		People:        peopleService,
-		OnCall:        oncallService,
-		Escalation:    escalationService,
-		PublicKeys:    publicKeys,
-		Auth:          auth,
-		SecureCookies: strings.HasPrefix(s.PublicURL, "https://"),
+		Catalog:        catalogService,
+		Incidents:      incidentsService,
+		People:         peopleService,
+		OnCall:         oncallService,
+		Escalation:     escalationService,
+		PublicKeys:     publicKeys,
+		Auth:           auth,
+		SecureCookies:  strings.HasPrefix(s.PublicURL, "https://"),
+		TrustedProxies: trusted,
 	}, keys)
 	if err != nil {
 		return nil, err
@@ -156,4 +183,33 @@ func (s Settings) CORS() httpserver.CORS {
 		ExposeHeaders: []string{"Idempotent-Replayed"},
 		Credentials:   true,
 	}
+}
+
+func identityProvider(s Settings) (people.Provider, error) {
+	set := []bool{s.OIDCIssuer != "", s.OIDCClientID != "", s.OIDCClientSecret != ""}
+	if !slices.Contains(set, true) {
+		return nil, nil
+	}
+	if slices.Contains(set, false) {
+		return nil, errors.New("MURPHY_OIDC_ISSUER, MURPHY_OIDC_CLIENT_ID and MURPHY_OIDC_CLIENT_SECRET: set all three, or none to sign in with passwords only")
+	}
+	return oidc.New(oidc.Config{
+		Issuer:         s.OIDCIssuer,
+		BackchannelURL: s.OIDCBackchannelURL,
+		ClientID:       s.OIDCClientID,
+		ClientSecret:   s.OIDCClientSecret,
+		RedirectURL:    s.PublicURL + "/v1/auth/callback",
+	}), nil
+}
+
+func networks(cidrs []string) ([]netip.Prefix, error) {
+	prefixes := make([]netip.Prefix, len(cidrs))
+	for i, cidr := range cidrs {
+		prefix, err := netip.ParsePrefix(cidr)
+		if err != nil {
+			return nil, err
+		}
+		prefixes[i] = prefix
+	}
+	return prefixes, nil
 }

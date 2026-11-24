@@ -619,6 +619,20 @@ type Page struct {
 	Via  EscalationTarget `json:"via"`
 }
 
+// PasswordInput defines model for PasswordInput.
+type PasswordInput struct {
+	Code     string `json:"code"`
+	Password string `json:"password"`
+}
+
+// PasswordLink defines model for PasswordLink.
+type PasswordLink struct {
+	ExpiresAt time.Time `json:"expires_at"`
+
+	// Link Leads to where the person chooses a password; its `code` goes to `POST /v1/auth/password`.
+	Link string `json:"link"`
+}
+
 // PolicyVersionReference Points at one version of an escalation policy.
 type PolicyVersionReference struct {
 	Id string `json:"id"`
@@ -743,8 +757,14 @@ type SessionInput struct {
 	// CodeVerifier The PKCE verifier of the app's sign-in, needed with its code.
 	CodeVerifier *string `json:"code_verifier,omitempty"`
 
+	// Email With `password`, where the install allows passwords.
+	Email *string `json:"email,omitempty"`
+
 	// IdToken An ID token from the install's identity provider.
 	IdToken *string `json:"id_token,omitempty"`
+
+	// Password With `email`. Repeated failures for a person or from an address are refused with `429` for a while.
+	Password *string `json:"password,omitempty"`
 }
 
 // SessionSummary defines model for SessionSummary.
@@ -1159,6 +1179,9 @@ type CreateContactMethodParams struct {
 	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
 
+// SetPasswordJSONRequestBody defines body for SetPassword for application/json ContentType.
+type SetPasswordJSONRequestBody = PasswordInput
+
 // CreateSessionJSONRequestBody defines body for CreateSession for application/json ContentType.
 type CreateSessionJSONRequestBody = SessionInput
 
@@ -1297,6 +1320,24 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /v1/auth/connect-codes (the `CreateConnectCode` operationId).
 	CreateConnectCode(ctx context.Context, params *CreateConnectCodeParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetPasswordWithBody Set a password from a set-password link
+	//
+	// Takes the code from a set-password link and the new password, sets it, and ends the person's other sessions. A password too short or too long leaves the link usable.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /v1/auth/password (the `SetPassword` operationId).
+	SetPasswordWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetPassword Set a password from a set-password link
+	//
+	// Takes the code from a set-password link and the new password, sets it, and ends the person's other sessions. A password too short or too long leaves the link usable.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /v1/auth/password (the `SetPassword` operationId).
+	SetPassword(ctx context.Context, body SetPasswordJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// SignOut Sign out
 	//
@@ -1767,6 +1808,13 @@ type ClientInterface interface {
 	// Corresponds with GET /v1/users/{id}/memberships (the `ListUserMemberships` operationId).
 	ListUserMemberships(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// CreatePasswordLink Create a link to set a user's password
+	//
+	// A link that lets the person choose a password, to invite them or to reset theirs. Share it however you like; it works once, for 24 hours. Only admins may do this, on installs that allow passwords.
+	//
+	// Corresponds with POST /v1/users/{id}/password-links (the `CreatePasswordLink` operationId).
+	CreatePasswordLink(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// EndUserSessions End all of a user's sessions
 	//
 	// Ends all the user's sessions at once and discards their unused one-time codes, without deactivating them. Only admins may do this.
@@ -1799,6 +1847,44 @@ func (c *Client) FinishSignIn(ctx context.Context, params *FinishSignInParams, r
 // Corresponds with POST /v1/auth/connect-codes (the `CreateConnectCode` operationId).
 func (c *Client) CreateConnectCode(ctx context.Context, params *CreateConnectCodeParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCreateConnectCodeRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SetPasswordWithBody Set a password from a set-password link
+//
+// Takes the code from a set-password link and the new password, sets it, and ends the person's other sessions. A password too short or too long leaves the link usable.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /v1/auth/password (the `SetPassword` operationId).
+func (c *Client) SetPasswordWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetPasswordRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SetPassword Set a password from a set-password link
+//
+// Takes the code from a set-password link and the new password, sets it, and ends the person's other sessions. A password too short or too long leaves the link usable.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /v1/auth/password (the `SetPassword` operationId).
+func (c *Client) SetPassword(ctx context.Context, body SetPasswordJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetPasswordRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
@@ -3028,6 +3114,23 @@ func (c *Client) ListUserMemberships(ctx context.Context, id ID, reqEditors ...R
 	return c.Client.Do(req)
 }
 
+// CreatePasswordLink Create a link to set a user's password
+//
+// A link that lets the person choose a password, to invite them or to reset theirs. Share it however you like; it works once, for 24 hours. Only admins may do this, on installs that allow passwords.
+//
+// Corresponds with POST /v1/users/{id}/password-links (the `CreatePasswordLink` operationId).
+func (c *Client) CreatePasswordLink(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreatePasswordLinkRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // EndUserSessions End all of a user's sessions
 //
 // Ends all the user's sessions at once and discards their unused one-time codes, without deactivating them. Only admins may do this.
@@ -3190,6 +3293,46 @@ func NewCreateConnectCodeRequest(server string, params *CreateConnectCodeParams)
 		}
 
 	}
+
+	return req, nil
+}
+
+// NewSetPasswordRequest calls the generic SetPassword builder with application/json body
+func NewSetPasswordRequest(server string, body SetPasswordJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewSetPasswordRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewSetPasswordRequestWithBody constructs an http.Request for the SetPassword method, with any body, and a specified content type
+func NewSetPasswordRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/auth/password")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
 
 	return req, nil
 }
@@ -6016,6 +6159,40 @@ func NewListUserMembershipsRequest(server string, id ID) (*http.Request, error) 
 	return req, nil
 }
 
+// NewCreatePasswordLinkRequest constructs an http.Request for the CreatePasswordLink method
+func NewCreatePasswordLinkRequest(server string, id ID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/users/%s/password-links", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewEndUserSessionsRequest constructs an http.Request for the EndUserSessions method
 func NewEndUserSessionsRequest(server string, id ID) (*http.Request, error) {
 	var err error
@@ -6111,6 +6288,24 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /v1/auth/connect-codes (the `CreateConnectCode` operationId).
 	CreateConnectCodeWithResponse(ctx context.Context, params *CreateConnectCodeParams, reqEditors ...RequestEditorFn) (*CreateConnectCodeResponse, error)
+
+	// SetPasswordWithBodyWithResponse Set a password from a set-password link
+	//
+	// Takes the code from a set-password link and the new password, sets it, and ends the person's other sessions. A password too short or too long leaves the link usable.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /v1/auth/password (the `SetPassword` operationId).
+	SetPasswordWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetPasswordResponse, error)
+
+	// SetPasswordWithResponse Set a password from a set-password link
+	//
+	// Takes the code from a set-password link and the new password, sets it, and ends the person's other sessions. A password too short or too long leaves the link usable.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /v1/auth/password (the `SetPassword` operationId).
+	SetPasswordWithResponse(ctx context.Context, body SetPasswordJSONRequestBody, reqEditors ...RequestEditorFn) (*SetPasswordResponse, error)
 
 	// SignOutWithResponse Sign out
 	//
@@ -6663,6 +6858,15 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with GET /v1/users/{id}/memberships (the `ListUserMemberships` operationId).
 	ListUserMembershipsWithResponse(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*ListUserMembershipsResponse, error)
 
+	// CreatePasswordLinkWithResponse Create a link to set a user's password
+	//
+	// A link that lets the person choose a password, to invite them or to reset theirs. Share it however you like; it works once, for 24 hours. Only admins may do this, on installs that allow passwords.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /v1/users/{id}/password-links (the `CreatePasswordLink` operationId).
+	CreatePasswordLinkWithResponse(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*CreatePasswordLinkResponse, error)
+
 	// EndUserSessionsWithResponse End all of a user's sessions
 	//
 	// Ends all the user's sessions at once and discards their unused one-time codes, without deactivating them. Only admins may do this.
@@ -6771,6 +6975,61 @@ func (r CreateConnectCodeResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r CreateConnectCodeResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type SetPasswordResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *Problem
+	// ApplicationproblemJSON401 the response for an HTTP 401 `application/problem+json` response
+	ApplicationproblemJSON401 *Problem
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Problem
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r SetPasswordResponse) GetApplicationproblemJSON400() *Problem {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON401 returns the response for an HTTP 401 `application/problem+json` response
+func (r SetPasswordResponse) GetApplicationproblemJSON401() *Problem {
+	return r.ApplicationproblemJSON401
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r SetPasswordResponse) GetApplicationproblemJSON403() *Problem {
+	return r.ApplicationproblemJSON403
+}
+
+// GetBody returns the raw response body bytes
+func (r SetPasswordResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r SetPasswordResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r SetPasswordResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r SetPasswordResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -9737,6 +9996,61 @@ func (r ListUserMembershipsResponse) ContentType() string {
 	return ""
 }
 
+type CreatePasswordLinkResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON201 the response for an HTTP 201 `application/json` response
+	JSON201 *PasswordLink
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Problem
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *Problem
+}
+
+// GetJSON201 returns the response for an HTTP 201 `application/json` response
+func (r CreatePasswordLinkResponse) GetJSON201() *PasswordLink {
+	return r.JSON201
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r CreatePasswordLinkResponse) GetApplicationproblemJSON403() *Problem {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r CreatePasswordLinkResponse) GetApplicationproblemJSON404() *Problem {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r CreatePasswordLinkResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CreatePasswordLinkResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreatePasswordLinkResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CreatePasswordLinkResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type EndUserSessionsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -9813,6 +10127,36 @@ func (c *ClientWithResponses) CreateConnectCodeWithResponse(ctx context.Context,
 		return nil, err
 	}
 	return ParseCreateConnectCodeResponse(rsp)
+}
+
+// SetPasswordWithBodyWithResponse Set a password from a set-password link
+//
+// Takes the code from a set-password link and the new password, sets it, and ends the person's other sessions. A password too short or too long leaves the link usable.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /v1/auth/password (the `SetPassword` operationId).
+func (c *ClientWithResponses) SetPasswordWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetPasswordResponse, error) {
+	rsp, err := c.SetPasswordWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSetPasswordResponse(rsp)
+}
+
+// SetPasswordWithResponse Set a password from a set-password link
+//
+// Takes the code from a set-password link and the new password, sets it, and ends the person's other sessions. A password too short or too long leaves the link usable.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /v1/auth/password (the `SetPassword` operationId).
+func (c *ClientWithResponses) SetPasswordWithResponse(ctx context.Context, body SetPasswordJSONRequestBody, reqEditors ...RequestEditorFn) (*SetPasswordResponse, error) {
+	rsp, err := c.SetPassword(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSetPasswordResponse(rsp)
 }
 
 // SignOutWithResponse Sign out
@@ -10816,6 +11160,21 @@ func (c *ClientWithResponses) ListUserMembershipsWithResponse(ctx context.Contex
 	return ParseListUserMembershipsResponse(rsp)
 }
 
+// CreatePasswordLinkWithResponse Create a link to set a user's password
+//
+// A link that lets the person choose a password, to invite them or to reset theirs. Share it however you like; it works once, for 24 hours. Only admins may do this, on installs that allow passwords.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /v1/users/{id}/password-links (the `CreatePasswordLink` operationId).
+func (c *ClientWithResponses) CreatePasswordLinkWithResponse(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*CreatePasswordLinkResponse, error) {
+	rsp, err := c.CreatePasswordLink(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreatePasswordLinkResponse(rsp)
+}
+
 // EndUserSessionsWithResponse End all of a user's sessions
 //
 // Ends all the user's sessions at once and discards their unused one-time codes, without deactivating them. Only admins may do this.
@@ -10917,6 +11276,49 @@ func ParseCreateConnectCodeResponse(rsp *http.Response) (*CreateConnectCodeRespo
 			return nil, err
 		}
 		response.JSON201 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseSetPasswordResponse parses an HTTP response from a SetPasswordWithResponse call
+func ParseSetPasswordResponse(rsp *http.Response) (*SetPasswordResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &SetPasswordResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
 
 	}
 
@@ -13051,6 +13453,46 @@ func ParseListUserMembershipsResponse(rsp *http.Response) (*ListUserMembershipsR
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreatePasswordLinkResponse parses an HTTP response from a CreatePasswordLinkWithResponse call
+func ParseCreatePasswordLinkResponse(rsp *http.Response) (*CreatePasswordLinkResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreatePasswordLinkResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest PasswordLink
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest Problem

@@ -413,6 +413,21 @@ func Run(t *testing.T, open func(t *testing.T) Storage) {
 		assert.Empty(t, got.GetDisabledReason())
 	})
 
+	t.Run("keeps one password hash per person, replaced when set again", func(t *testing.T) {
+		repo := open(t)
+		ana := newUser("ana@example.com")
+		require.NoError(t, repo.CreateUser(t.Context(), ana))
+		_, missing := repo.GetPasswordHash(t.Context(), ana.GetId())
+
+		require.NoError(t, repo.SetPassword(t.Context(), ana.GetId(), "$argon2id$first", time.Now()))
+		require.NoError(t, repo.SetPassword(t.Context(), ana.GetId(), "$argon2id$second", time.Now()))
+
+		got, err := repo.GetPasswordHash(t.Context(), ana.GetId())
+		require.NoError(t, err)
+		assert.ErrorIs(t, missing, murphy.ErrNotFound)
+		assert.Equal(t, "$argon2id$second", got)
+	})
+
 	t.Run("reports missing users, teams and memberships", func(t *testing.T) {
 		repo := open(t)
 		_, err := repo.GetUser(t.Context(), murphy.NewID())
