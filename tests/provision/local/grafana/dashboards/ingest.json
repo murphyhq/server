@@ -71,7 +71,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (http_request_method, http_route, http_response_status_code) (rate(http_server_request_duration_seconds_count{service_namespace=\"murphy\", service_name=\"ingest\"}[$__rate_interval]))",
+          "expr": "sum by (http_request_method, http_route, http_response_status_code) (rate(http_server_request_duration_seconds_count{service_namespace=\"murphy\", murphy_component=\"ingest\"}[$__rate_interval]))",
           "legendFormat": "{{http_request_method}} {{http_route}} {{http_response_status_code}}"
         }
       ]
@@ -120,7 +120,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.5, sum by (le) (rate(http_server_request_duration_seconds_bucket{service_namespace=\"murphy\", service_name=\"ingest\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.5, sum by (le) (rate(http_server_request_duration_seconds_bucket{service_namespace=\"murphy\", murphy_component=\"ingest\"}[$__rate_interval])))",
           "legendFormat": "all routes p50"
         },
         {
@@ -129,7 +129,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.99, sum by (le) (rate(http_server_request_duration_seconds_bucket{service_namespace=\"murphy\", service_name=\"ingest\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(http_server_request_duration_seconds_bucket{service_namespace=\"murphy\", murphy_component=\"ingest\"}[$__rate_interval])))",
           "legendFormat": "all routes p99"
         }
       ]
@@ -178,7 +178,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (http_route) (rate(http_server_request_duration_seconds_count{service_namespace=\"murphy\", service_name=\"ingest\", http_response_status_code=~\"5..\"}[$__rate_interval]))",
+          "expr": "sum by (http_route) (rate(http_server_request_duration_seconds_count{service_namespace=\"murphy\", murphy_component=\"ingest\", http_response_status_code=~\"5..\"}[$__rate_interval]))",
           "legendFormat": "{{http_route}}"
         }
       ]
@@ -227,7 +227,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "topk(5, histogram_quantile(0.99, sum by (le, http_request_method, http_route) (rate(http_server_request_duration_seconds_bucket{service_namespace=\"murphy\", service_name=\"ingest\"}[$__rate_interval]))))",
+          "expr": "topk(5, histogram_quantile(0.99, sum by (le, http_request_method, http_route) (rate(http_server_request_duration_seconds_bucket{service_namespace=\"murphy\", murphy_component=\"ingest\"}[$__rate_interval]))))",
           "legendFormat": "{{http_request_method}} {{http_route}}"
         }
       ]
@@ -289,7 +289,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum by (murphy_event_type) (rate(murphy_messages_published_total{service_namespace=\"murphy\", service_name=\"ingest\"}[$__rate_interval]))",
+          "expr": "sum by (murphy_event_type) (rate(murphy_messages_published_total{service_namespace=\"murphy\", murphy_component=\"ingest\"}[$__rate_interval]))",
           "legendFormat": "{{murphy_event_type}}"
         }
       ]
@@ -351,7 +351,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(go_goroutine_count{service_namespace=\"murphy\", service_name=\"ingest\"})",
+          "expr": "sum(go_goroutine_count{service_namespace=\"murphy\", service_name=~\"ingest|murphy\"})",
           "legendFormat": "goroutines"
         }
       ]
@@ -400,7 +400,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(go_memory_used_bytes{service_namespace=\"murphy\", service_name=\"ingest\"})",
+          "expr": "sum(go_memory_used_bytes{service_namespace=\"murphy\", service_name=~\"ingest|murphy\"})",
           "legendFormat": "in use"
         },
         {
@@ -409,7 +409,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(go_memory_gc_goal_bytes{service_namespace=\"murphy\", service_name=\"ingest\"})",
+          "expr": "sum(go_memory_gc_goal_bytes{service_namespace=\"murphy\", service_name=~\"ingest|murphy\"})",
           "legendFormat": "GC target"
         }
       ]
@@ -458,7 +458,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(rate(go_memory_allocated_bytes_total{service_namespace=\"murphy\", service_name=\"ingest\"}[$__rate_interval]))",
+          "expr": "sum(rate(go_memory_allocated_bytes_total{service_namespace=\"murphy\", service_name=~\"ingest|murphy\"}[$__rate_interval]))",
           "legendFormat": "allocated"
         }
       ]

@@ -30,11 +30,11 @@ func run(ctx context.Context) error {
 		return err
 	}
 
-	a, err := app.New(ctx, s.App)
+	a, err := app.New(telemetry.WithComponent(ctx, "notifier"), s.App)
 	if err != nil {
 		return err
 	}
 	defer a.Close()
 
-	return lifecycle.Run(ctx, "notifier", s.Lifecycle, a.Run, a.Ready...)
+	return lifecycle.Run(ctx, "notifier", s.Lifecycle, lifecycle.Component("notifier", a.Run), a.Ready...)
 }

@@ -103,3 +103,9 @@ func shutdown(server *http.Server, timeout time.Duration) error {
 	}
 	return nil
 }
+
+func Component(name string, run func(context.Context) error) func(context.Context) error {
+	return func(ctx context.Context) error {
+		return run(telemetry.WithComponent(ctx, name))
+	}
+}

@@ -74,3 +74,22 @@ func TestHistogramRecordsValues(t *testing.T) {
 	assert.Equal(t, uint64(1), h.DataPoints[0].Count)
 	assert.Equal(t, 1.5, h.DataPoints[0].Sum)
 }
+
+func TestTheComponentIsTheOneContextFieldOnMetrics(t *testing.T) {
+	read := collect(t)
+	counter, err := metrics.NewCounter("alerts.received", "Alerts received")
+	require.NoError(t, err)
+	ctx := telemetry.WithComponent(context.Background(), "ingest")
+	ctx = telemetry.With(ctx, telemetry.WithField("incident.id", "inc-1"))
+
+	counter.Add(ctx, 1)
+
+	sum, ok := read()["murphy.alerts.received"].data.(metricdata.Sum[int64])
+	require.True(t, ok)
+	require.Len(t, sum.DataPoints, 1)
+	component, ok := sum.DataPoints[0].Attributes.Value("murphy.component")
+	assert.True(t, ok)
+	assert.Equal(t, "ingest", component.AsString())
+	_, leaked := sum.DataPoints[0].Attributes.Value("murphy.incident.id")
+	assert.False(t, leaked)
+}

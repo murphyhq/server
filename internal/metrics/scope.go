@@ -83,7 +83,7 @@ func (s *Scope) Record(ctx context.Context, unit string, dimensions ...Dimension
 	s.mu.Lock()
 	counts, durations := s.counts, s.durations
 	s.mu.Unlock()
-	attrs := metric.WithAttributes(attributes(dimensions)...)
+	attrs := metric.WithAttributes(attributes(ctx, dimensions)...)
 
 	registry.Lock()
 	defer registry.Unlock()

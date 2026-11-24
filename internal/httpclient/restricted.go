@@ -8,8 +8,6 @@ import (
 	"slices"
 	"syscall"
 	"time"
-
-	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 var ErrForbiddenAddress = errors.New("the address is on a network this client may not reach")
@@ -21,7 +19,7 @@ func Restricted(timeout time.Duration, allowed []netip.Prefix) *http.Client {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	transport.Proxy = nil
 	transport.DialContext = dialer.DialContext
-	return &http.Client{Timeout: timeout, Transport: otelhttp.NewTransport(transport)}
+	return &http.Client{Timeout: timeout, Transport: Instrument(transport)}
 }
 
 func Guard(allowed []netip.Prefix) func(network, address string, conn syscall.RawConn) error {

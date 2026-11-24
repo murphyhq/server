@@ -30,7 +30,7 @@ import (
 )
 
 type Settings struct {
-	HTTPAddr               string        `env:"HTTP_ADDR" default:":8080"`
+	Addr                   string        `env:"API_ADDR" default:":8080"`
 	CatalogDatabaseURL     string        `env:"CATALOG_DATABASE_URL" required:"true"`
 	IncidentsDatabaseURL   string        `env:"INCIDENTS_DATABASE_URL" required:"true"`
 	PeopleDatabaseURL      string        `env:"PEOPLE_DATABASE_URL" required:"true"`
@@ -60,10 +60,12 @@ type App struct {
 	Handler   http.Handler
 	Ready     []lifecycle.Check
 	resources lifecycle.Resources
+	addr      string
+	cors      httpserver.CORS
 }
 
 func New(ctx context.Context, s Settings) (_ *App, err error) {
-	a := &App{}
+	a := &App{addr: s.Addr, cors: s.CORS()}
 	defer func() {
 		if err != nil {
 			a.Close()
@@ -212,4 +214,8 @@ func networks(cidrs []string) ([]netip.Prefix, error) {
 		prefixes[i] = prefix
 	}
 	return prefixes, nil
+}
+
+func (a *App) Serve(ctx context.Context, shutdownTimeout time.Duration) error {
+	return httpserver.New(httpserver.Config{Addr: a.addr, ShutdownTimeout: shutdownTimeout, CORS: a.cors}, a.Handler).Serve(ctx)
 }

@@ -13,6 +13,8 @@ import (
 	"github.com/XSAM/otelsql"
 	mysqldriver "github.com/go-sql-driver/mysql"
 	"go.opentelemetry.io/otel/attribute"
+
+	"github.com/murphyhq/server/internal/telemetry"
 )
 
 type Config struct {
@@ -29,7 +31,7 @@ func Open(ctx context.Context, cfg Config) (*sql.DB, error) {
 		return nil, errors.New("not a valid MySQL connection string")
 	}
 
-	attributes := otelsql.WithAttributes(attribute.String("db.system.name", "mysql"))
+	attributes := otelsql.WithAttributes(append([]attribute.KeyValue{attribute.String("db.system.name", "mysql")}, telemetry.ComponentAttributes(ctx)...)...)
 	db := otelsql.OpenDB(connector, attributes,
 		otelsql.WithSpanNameFormatter(queryName),
 		otelsql.WithSpanOptions(otelsql.SpanOptions{OmitConnResetSession: true, OmitRows: true, OmitConnPrepare: true}),

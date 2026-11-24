@@ -3,6 +3,8 @@ package telemetry
 import (
 	"context"
 	"strings"
+
+	"go.opentelemetry.io/otel/attribute"
 )
 
 const prefix = "murphy."
@@ -64,4 +66,22 @@ func replaced(f Field, fields []Field) bool {
 func Fields(ctx context.Context) []Field {
 	fields, _ := ctx.Value(contextKey{}).([]Field)
 	return fields
+}
+
+type componentKey struct{}
+
+func WithComponent(ctx context.Context, name string) context.Context {
+	return context.WithValue(With(ctx, WithField("component", name)), componentKey{}, name)
+}
+
+func Component(ctx context.Context) string {
+	name, _ := ctx.Value(componentKey{}).(string)
+	return name
+}
+
+func ComponentAttributes(ctx context.Context) []attribute.KeyValue {
+	if name := Component(ctx); name != "" {
+		return []attribute.KeyValue{attribute.String(prefix+"component", name)}
+	}
+	return nil
 }

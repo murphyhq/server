@@ -62,7 +62,8 @@ func (s *Server) Serve(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("listen for HTTP on %s: %w", s.cfg.Addr, err)
 	}
-	server := &http.Server{Handler: s.handler, ReadHeaderTimeout: 10 * time.Second}
+	base := context.WithoutCancel(ctx)
+	server := &http.Server{Handler: s.handler, ReadHeaderTimeout: 10 * time.Second, BaseContext: func(net.Listener) context.Context { return base }}
 	errs := make(chan error, 1)
 	go func() { errs <- server.Serve(listener) }()
 	logger.Info(ctx, "serving HTTP", telemetry.WithField("http_addr", listener.Addr().String()))
@@ -104,6 +105,9 @@ func observe(next http.Handler) http.Handler {
 			trace.SpanFromContext(ctx).SetAttributes(attribute.String("http.route", route))
 			if labeler, ok := otelhttp.LabelerFromContext(ctx); ok {
 				labeler.Add(attribute.String("http.route", route))
+				if component := telemetry.Component(ctx); component != "" {
+					labeler.Add(attribute.String("murphy.component", component))
+				}
 			}
 			fields = append(fields, telemetry.Standard("http.route", route))
 			scope.Record(ctx, "http.request", metrics.Dimension{Name: "http.request.method", Value: r.Method}, metrics.Dimension{Name: "http.route", Value: route})

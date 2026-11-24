@@ -18,7 +18,7 @@ type dogfoodSettings struct {
 	GrafanaURL      string `env:"SEED_GRAFANA_URL" default:"http://localhost:3000"`
 	GrafanaUser     string `env:"SEED_GRAFANA_USER" default:"admin"`
 	GrafanaPassword string `env:"SEED_GRAFANA_PASSWORD" default:"admin"`
-	IngestURL       string `env:"SEED_DOGFOOD_INGEST_URL" default:"http://ingest:8080"`
+	IngestURL       string `env:"SEED_DOGFOOD_INGEST_URL" default:"http://ingest:8081"`
 	KeyFile         string `env:"SEED_DOGFOOD_KEY_FILE" default:".murphy/dogfood.json"`
 }
 

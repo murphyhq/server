@@ -17,3 +17,5 @@ builds:
     main: ./cmd/notifier
   - id: migrate
     main: ./cmd/migrate
+  - id: murphy
+    main: ./cmd/murphy

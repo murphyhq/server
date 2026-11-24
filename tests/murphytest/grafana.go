@@ -12,7 +12,7 @@ import (
 
 var (
 	grafanaURL       = setting("MURPHY_TEST_GRAFANA_URL", "http://localhost:3000")
-	ingestForGrafana = setting("MURPHY_TEST_GRAFANA_INGEST_URL", "http://ingest:8080")
+	ingestForGrafana = setting("MURPHY_TEST_GRAFANA_INGEST_URL", "http://ingest:8081")
 )
 
 type GrafanaRule struct {

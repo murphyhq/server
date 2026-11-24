@@ -28,7 +28,7 @@ import (
 const purgeInterval = time.Hour
 
 type Settings struct {
-	EventsSubscriptionURL    string   `env:"EVENTS_SUBSCRIPTION_URL" required:"true"`
+	EventsSubscriptionURL    string   `env:"NOTIFIER_SUBSCRIPTION_URL" required:"true"`
 	EventsTopicURL           string   `env:"EVENTS_TOPIC_URL" required:"true"`
 	NotificationsDatabaseURL string   `env:"NOTIFICATIONS_DATABASE_URL" required:"true"`
 	PeopleDatabaseURL        string   `env:"PEOPLE_DATABASE_URL" required:"true"`
@@ -98,7 +98,7 @@ func New(ctx context.Context, s Settings) (_ *App, err error) {
 
 	a.subscription, err = broker.OpenSubscription(ctx, s.EventsSubscriptionURL)
 	if err != nil {
-		return nil, fmt.Errorf("MURPHY_EVENTS_SUBSCRIPTION_URL: %w", err)
+		return nil, fmt.Errorf("MURPHY_NOTIFIER_SUBSCRIPTION_URL: %w", err)
 	}
 	a.resources.Add(func() { _ = a.subscription.Close() }, a.subscription.Ping)
 
