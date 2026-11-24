@@ -2,6 +2,8 @@
 
 Murphy is a set of small components that talk through a message broker and keep their state in databases.
 
+This overview describes the components, what each depends on, how they communicate, and the guarantees that follow. It changes only when one of those changes. Features, rules, event names and payloads belong in the specs and the code.
+
 ```mermaid
 flowchart LR
   subgraph external [External]
@@ -72,27 +74,23 @@ flowchart LR
 
 ### Ingest
 
-The public entry point for webhooks. Monitoring tools such as Alertmanager, Grafana and Datadog send it alerts, and notification providers send it delivery updates and replies, like an SMS answer or a button pressed in a chat. It checks who is calling, turns each payload into a message (`AlertReceived`, `NotificationDelivered` or `NotificationReplied`), and answers only once the message is published, so an accepted webhook is never lost. It doesn't use the database, which keeps intake working when the rest of Murphy is slow or down.
+The public entry point for webhooks. Monitoring tools send it alerts, and notification providers send it delivery updates and replies. It checks who is calling, turns each payload into a message, and answers only once the message is published, so an accepted webhook is never lost. It doesn't use the database, which keeps intake working when the rest of Murphy is slow or down.
 
 ### API
 
-The management API, described by an OpenAPI spec and used by people and automation. It reads and writes the database directly: schedules, rotations, escalation policies, users, teams and incidents. Changes that belong together happen in one transaction; acknowledging an incident, for example, also cancels its pending escalation timers and stores the messages it causes.
+The management API, described by an OpenAPI spec and used by people and automation. It reads and writes the database directly, and changes that belong together happen in one transaction, together with the messages they cause.
 
 ### Engine
 
-Decides what happens when a message arrives, and stores each change together with the messages it causes. It handles every message exactly once, even when the broker delivers it twice. It makes no calls outside Murphy, so its work depends only on Murphy's database and broker.
+Decides what happens to incidents, and only ever reacts to messages. It stores each change together with the messages it causes, and handles every message exactly once, even when the broker delivers it twice. It makes no calls outside Murphy.
 
 ### Scheduler
 
-Turns stored messages into published ones. Every message that decides whether someone is paged is saved as a scheduled message in the database, in the same transaction as the change that caused it. `scheduler` publishes each one when it is due, timers at their time and everything else right away, and deletes it once the broker confirms. A change and its messages are therefore never separated: a crash or a broker outage delays a message, and loses none.
+Publishes stored messages. Every message that decides whether someone is paged is saved in the database in the same transaction as the change that caused it, and `scheduler` publishes it when it is due, then deletes it once the broker confirms. A crash or a broker outage delays a message and loses none. Escalation timers are stored messages too, so they survive restarts and can be due any time in the future.
 
 ### Notifier
 
-Reaches everything outside Murphy: it works out whom to notify and how, and sends through providers (webhooks, email, chat, SMS and voice). Its work waits on receivers and providers that can be slow or down, so it runs apart from `engine`, and a failing receiver delays notifications without delaying incidents. It is also the only component that needs outbound network access.
-
-Each external call is a step of its own that doesn't use the database: `notifier` makes the call and publishes its outcome as a message. Calls already handed to the broker therefore still go out when the database is unavailable.
-
-Webhooks follow [Standard Webhooks](https://www.standardwebhooks.com) and are described by [`openapi/webhooks/v1.yaml`](../openapi/webhooks/v1.yaml). `notifier` signs each one with Murphy's Ed25519 private key, which is part of its configuration and never leaves it. Receivers check the signature with the public key the API serves, and hold no secret of their own. While the key is being replaced, `notifier` signs with both the old and the new key, so receivers switch at their own pace.
+Reaches people outside Murphy. It decides whom to notify and how, and sends through providers: webhooks, email, chat, SMS and voice. Its work waits on receivers that can be slow or down, so it runs apart from `engine`, and a failing receiver delays notifications without delaying incidents. Sending doesn't use the database, so notifications already handed to the broker still go out when the database is unavailable. Webhooks are signed with a private key that only `notifier` holds, and receivers check them with the public key `api` serves.
 
 ### Migrate
 
@@ -102,11 +100,11 @@ Applies database schema changes. It runs once before the other components start,
 
 Murphy depends on what it needs from a message broker, a database and a key-value store, never on a specific product. Each product is an implementation chosen by configuration, and every implementation passes the same test suite against the real service. Supporting another product means adding an implementation that passes it, without touching the components.
 
-The message broker keeps every message until it is processed, delivers it at least once, and hands each message to every component subscribed to its event type, such as `murphy.v1.alert.received`; a component never receives event types it has no use for. It promises no order: the incident's state machine decides what a late message means. It never has to delay a message, because timers live in the database. Its topics and subscriptions are created outside Murphy, like the databases, and labelled with a topology version. Each component is given its exact topic and queue, and refuses to start on a topology older than its release needs. The implementations are SNS with SQS, and NATS JetStream.
+The message broker keeps every message until it is processed, delivers it at least once, and hands each message to every component subscribed to its event type. It promises no order, and never has to delay a message, because timers live in the database. Its topics and subscriptions are created outside Murphy, like the databases, and labelled with a topology version; a component refuses to start on a topology older than its release needs. The implementations are SNS with SQS, and NATS JetStream.
 
 A key-value store keeps the `Idempotency-Key` of every request that creates something, with its response, for 24 hours, so `api` answers a retry without doing the work twice. The implementation is Redis.
 
-The database provides transactions, so changes that belong together are applied together, and row locking, so two `scheduler` instances never claim the same scheduled message. The implementations are PostgreSQL and MySQL.
+The database provides transactions, so changes that belong together are applied together, and row locking, so two `scheduler` instances never publish the same message. The implementations are PostgreSQL and MySQL.
 
 ## Flows
 
@@ -124,51 +122,36 @@ sequenceDiagram
   participant N as notifier
   participant P as Provider
   M->>I: webhook
-  I-->>E: AlertReceived
+  I-->>E: alert
   I->>M: 202
-  E->>D: open the incident at level 1, store IncidentEscalated and the next level's timer (one transaction)
-  S-->>N: IncidentEscalated (level 1 and its targets)
-  N->>D: resolve the targets to people and contact methods, store the page and its notifications (one transaction)
-  S-->>E: PageCreated
-  E->>D: add who was paged to the incident timeline
-  S-->>N: NotificationCreated
+  E->>D: open incident, store "incident escalated" and the next escalation timer (one transaction)
+  S->>D: claim due messages
+  S-->>N: incident escalated
+  N->>D: decide whom to notify and how, store the notifications (one transaction)
+  S->>D: claim due messages
+  S-->>N: notification due
   N->>P: send
-  alt accepted
-    N-->>E: NotificationSent
-  else failed
-    N-->>E: NotificationFailed
-  end
-  E->>D: add to the incident timeline
-  N->>D: record the outcome on the notification
-  opt the provider reports delivery
-    P->>I: delivery callback
-    I-->>E: NotificationDelivered
-    E->>D: add to the incident timeline
-  end
+  N-->>E: outcome
+  P->>I: delivery callback
+  I-->>E: delivery update
 ```
 
-`scheduler` publishes every message stored in the database, and deletes it once the broker confirms; the diagrams show that as a single arrow from `scheduler`.
+`scheduler` deletes each message once the broker confirms it.
 
 ### Escalation
 
 ```mermaid
 sequenceDiagram
   participant S as scheduler
-  participant E as engine
   participant D as database
+  participant E as engine
   participant N as notifier
-  S-->>E: TimerExpired
-  E->>D: incident still unacknowledged?
-  alt unacknowledged
-    E->>D: move to the next level, store IncidentEscalated and the following timer (one transaction)
-    S-->>N: IncidentEscalated (next level and its targets)
-    N->>D: resolve the targets, store the page and its notifications (one transaction)
-    S-->>E: PageCreated
-    alt the level reached nobody
-      E->>D: move to the next level at once, store IncidentEscalated (one transaction)
-    else someone was reached
-      E->>D: add who was paged to the incident timeline
-    end
+  S->>D: claim due messages
+  S-->>E: timer due
+  alt incident still unacknowledged
+    E->>D: move to the next step, store "incident escalated" and the next timer (one transaction)
+    S->>D: claim due messages
+    S-->>N: incident escalated
   else acknowledged or resolved
     E->>E: ignore
   end
@@ -184,14 +167,12 @@ sequenceDiagram
   participant S as scheduler
   participant N as notifier
   C->>A: acknowledge incident
-  A->>D: update incident, cancel its timers, store IncidentAcknowledged (one transaction)
+  A->>D: update incident, cancel its timers, store "incident acknowledged" (one transaction)
   A->>C: 200
-  S-->>N: IncidentAcknowledged
-  N->>D: find everyone the incident's pages reached, store a notification per contact method (one transaction)
-  S-->>N: NotificationCreated (acknowledged)
+  S->>D: claim due messages
+  S-->>N: incident acknowledged
+  N->>N: notify everyone already paged
 ```
-
-Resolving an incident works the same way, with `IncidentResolved`.
 
 ### Acknowledgement from a notification
 
@@ -204,9 +185,10 @@ sequenceDiagram
   participant S as scheduler
   participant N as notifier
   P->>I: reply callback
-  I-->>E: NotificationReplied
+  I-->>E: reply
   I->>P: 200
-  E->>D: the reply acknowledges: update incident, cancel its timers, store IncidentAcknowledged (one transaction)
-  S-->>N: IncidentAcknowledged
-  N->>D: find everyone the incident's pages reached, store a notification per contact method (one transaction)
+  E->>D: update incident, cancel its timers, store "incident acknowledged" (one transaction)
+  S->>D: claim due messages
+  S-->>N: incident acknowledged
+  N->>N: notify everyone already paged
 ```

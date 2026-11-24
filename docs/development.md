@@ -176,4 +176,5 @@ Every kind of failure Murphy guards against is tested, without changing the code
 
 1. Docs MUST describe what the code is and does now: no status tables, TODO lists or history.
 2. Comments MUST explain *why*, never *what*.
-3. Comments are written by people. A coding agent MUST NOT add a comment, not even a single line, without asking for permission first.
+3. `docs/architecture.md` describes the components, what each depends on, how they communicate and the guarantees that follow. It MUST change only when one of those changes, and MUST NOT be updated to record a feature, a rule or the work done in a PR. Features, rules, event names and payloads belong in the specs and the code.
+4. Comments are written by people. A coding agent MUST NOT add a comment, not even a single line, without asking for permission first.
