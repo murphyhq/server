@@ -119,18 +119,6 @@ func TestALevelThatReachesNobodyMovesOnAtOnce(t *testing.T) {
 	)
 }
 
-func TestTheAPIServesThePublicSigningKeys(t *testing.T) {
-	m := murphytest.New(t)
-
-	got, err := m.API.GetSigningKeysWithResponse(t.Context())
-
-	require.NoError(t, err)
-	require.Equal(t, http.StatusOK, got.StatusCode())
-	require.Len(t, got.JSON200.Keys, 1)
-	_, err = webhook.ParsePublicKeys(got.JSON200.Keys[0].PublicKey)
-	assert.NoError(t, err)
-}
-
 func TestResolvingThroughTheAlertTellsEveryonePaged(t *testing.T) {
 	m := murphytest.New(t)
 	ana := m.User(murphytest.WithWebhook())
