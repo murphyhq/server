@@ -42,6 +42,7 @@ type Session struct {
 	ID        string
 	UserID    string
 	TokenHash []byte
+	Client    string
 	ExpiresAt time.Time
 	RevokedAt *time.Time
 	CreatedAt time.Time

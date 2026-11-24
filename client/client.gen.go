@@ -149,6 +149,27 @@ func (e ServiceStatus) Valid() bool {
 	}
 }
 
+// Defines values for SessionSummaryClient.
+const (
+	App     SessionSummaryClient = "app"
+	Browser SessionSummaryClient = "browser"
+	Token   SessionSummaryClient = "token"
+)
+
+// Valid indicates whether the value is a known member of the SessionSummaryClient enum.
+func (e SessionSummaryClient) Valid() bool {
+	switch e {
+	case App:
+		return true
+	case Browser:
+		return true
+	case Token:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for TeamRole.
 const (
 	Manager   TeamRole = "manager"
@@ -664,6 +685,29 @@ type SessionInput struct {
 	IdToken *string `json:"id_token,omitempty"`
 }
 
+// SessionSummary defines model for SessionSummary.
+type SessionSummary struct {
+	// Client How the session started: signing in through a browser, the app, or an identity token.
+	Client    SessionSummaryClient `json:"client"`
+	CreatedAt time.Time            `json:"created_at"`
+
+	// Current Whether this is the session the request was made with.
+	Current   bool      `json:"current"`
+	ExpiresAt time.Time `json:"expires_at"`
+	Id        string    `json:"id"`
+}
+
+// SessionSummaryClient How the session started: signing in through a browser, the app, or an identity token.
+type SessionSummaryClient string
+
+// SessionSummaryPage defines model for SessionSummaryPage.
+type SessionSummaryPage struct {
+	Items []SessionSummary `json:"items"`
+
+	// NextCursor Empty on the last page.
+	NextCursor string `json:"next_cursor"`
+}
+
 // SessionToken defines model for SessionToken.
 type SessionToken struct {
 	Session Session `json:"session"`
@@ -847,6 +891,15 @@ type FinishSignInParams struct {
 type CreateConnectCodeParams struct {
 	// IdempotencyKey Makes retries safe. A retry with the same key and request returns the original response for 24 hours; the same key with a different request is rejected with 422, and a retry while the first request is still running gets 409.
 	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// ListSessionsParams defines parameters for ListSessions.
+type ListSessionsParams struct {
+	// Limit Items per page, 50 by default and at most 100.
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Cursor The next_cursor of the previous page.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
 }
 
 // SignInParams defines parameters for SignIn.
@@ -1162,6 +1215,20 @@ type ClientInterface interface {
 	// Corresponds with GET /v1/auth/session (the `GetSession` operationId).
 	GetSession(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// SignOutEverywhere Sign out everywhere
+	//
+	// Ends all your sessions at once, this one included, and discards your unused one-time codes, such as connect codes.
+	//
+	// Corresponds with DELETE /v1/auth/sessions (the `SignOutEverywhere` operationId).
+	SignOutEverywhere(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListSessions List your sessions
+	//
+	// Your sessions that are still active, newest first.
+	//
+	// Corresponds with GET /v1/auth/sessions (the `ListSessions` operationId).
+	ListSessions(ctx context.Context, params *ListSessionsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// CreateSessionWithBody Sign in with an identity token or a one-time code
 	//
 	// Signs in with an ID token the install's identity provider issued to Murphy's client, or with a one-time code from the app's sign-in or a connect code. Send exactly one of `id_token` and `code`.
@@ -1179,6 +1246,13 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /v1/auth/sessions (the `CreateSession` operationId).
 	CreateSession(ctx context.Context, body CreateSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// EndSession End one of your sessions
+	//
+	// Ends one of your own sessions at once, such as a lost phone's.
+	//
+	// Corresponds with DELETE /v1/auth/sessions/{id} (the `EndSession` operationId).
+	EndSession(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// SignIn Sign in through the identity provider
 	//
@@ -1585,6 +1659,13 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /v1/users/{id}/contact-methods (the `CreateContactMethod` operationId).
 	CreateContactMethod(ctx context.Context, id ID, params *CreateContactMethodParams, body CreateContactMethodJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// EndUserSessions End all of a user's sessions
+	//
+	// Ends all the user's sessions at once and discards their unused one-time codes, without deactivating them. Only admins may do this.
+	//
+	// Corresponds with DELETE /v1/users/{id}/sessions (the `EndUserSessions` operationId).
+	EndUserSessions(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
 // FinishSignIn Finish signing in
@@ -1653,6 +1734,40 @@ func (c *Client) GetSession(ctx context.Context, reqEditors ...RequestEditorFn) 
 	return c.Client.Do(req)
 }
 
+// SignOutEverywhere Sign out everywhere
+//
+// Ends all your sessions at once, this one included, and discards your unused one-time codes, such as connect codes.
+//
+// Corresponds with DELETE /v1/auth/sessions (the `SignOutEverywhere` operationId).
+func (c *Client) SignOutEverywhere(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSignOutEverywhereRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListSessions List your sessions
+//
+// Your sessions that are still active, newest first.
+//
+// Corresponds with GET /v1/auth/sessions (the `ListSessions` operationId).
+func (c *Client) ListSessions(ctx context.Context, params *ListSessionsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListSessionsRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // CreateSessionWithBody Sign in with an identity token or a one-time code
 //
 // Signs in with an ID token the install's identity provider issued to Murphy's client, or with a one-time code from the app's sign-in or a connect code. Send exactly one of `id_token` and `code`.
@@ -1681,6 +1796,23 @@ func (c *Client) CreateSessionWithBody(ctx context.Context, contentType string, 
 // Corresponds with POST /v1/auth/sessions (the `CreateSession` operationId).
 func (c *Client) CreateSession(ctx context.Context, body CreateSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCreateSessionRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// EndSession End one of your sessions
+//
+// Ends one of your own sessions at once, such as a lost phone's.
+//
+// Corresponds with DELETE /v1/auth/sessions/{id} (the `EndSession` operationId).
+func (c *Client) EndSession(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewEndSessionRequest(c.Server, id)
 	if err != nil {
 		return nil, err
 	}
@@ -2757,6 +2889,23 @@ func (c *Client) CreateContactMethod(ctx context.Context, id ID, params *CreateC
 	return c.Client.Do(req)
 }
 
+// EndUserSessions End all of a user's sessions
+//
+// Ends all the user's sessions at once and discards their unused one-time codes, without deactivating them. Only admins may do this.
+//
+// Corresponds with DELETE /v1/users/{id}/sessions (the `EndUserSessions` operationId).
+func (c *Client) EndUserSessions(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewEndUserSessionsRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // NewFinishSignInRequest constructs an http.Request for the FinishSignIn method
 func NewFinishSignInRequest(server string, params *FinishSignInParams) (*http.Request, error) {
 	var err error
@@ -2960,6 +3109,99 @@ func NewGetSessionRequest(server string) (*http.Request, error) {
 	return req, nil
 }
 
+// NewSignOutEverywhereRequest constructs an http.Request for the SignOutEverywhere method
+func NewSignOutEverywhereRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/auth/sessions")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListSessionsRequest constructs an http.Request for the ListSessions method
+func NewListSessionsRequest(server string, params *ListSessionsParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/auth/sessions")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Cursor != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewCreateSessionRequest calls the generic CreateSession builder with application/json body
 func NewCreateSessionRequest(server string, body CreateSessionJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -2996,6 +3238,40 @@ func NewCreateSessionRequestWithBody(server string, contentType string, body io.
 	}
 
 	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewEndSessionRequest constructs an http.Request for the EndSession method
+func NewEndSessionRequest(server string, id ID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/auth/sessions/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
 
 	return req, nil
 }
@@ -5417,6 +5693,40 @@ func NewCreateContactMethodRequestWithBody(server string, id ID, params *CreateC
 	return req, nil
 }
 
+// NewEndUserSessionsRequest constructs an http.Request for the EndUserSessions method
+func NewEndUserSessionsRequest(server string, id ID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/users/%s/sessions", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 func (c *Client) applyEditors(ctx context.Context, req *http.Request, additionalEditors []RequestEditorFn) error {
 	for _, r := range c.RequestEditors {
 		if err := r(ctx, req); err != nil {
@@ -5495,6 +5805,24 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with GET /v1/auth/session (the `GetSession` operationId).
 	GetSessionWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetSessionResponse, error)
 
+	// SignOutEverywhereWithResponse Sign out everywhere
+	//
+	// Ends all your sessions at once, this one included, and discards your unused one-time codes, such as connect codes.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /v1/auth/sessions (the `SignOutEverywhere` operationId).
+	SignOutEverywhereWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*SignOutEverywhereResponse, error)
+
+	// ListSessionsWithResponse List your sessions
+	//
+	// Your sessions that are still active, newest first.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /v1/auth/sessions (the `ListSessions` operationId).
+	ListSessionsWithResponse(ctx context.Context, params *ListSessionsParams, reqEditors ...RequestEditorFn) (*ListSessionsResponse, error)
+
 	// CreateSessionWithBodyWithResponse Sign in with an identity token or a one-time code
 	//
 	// Signs in with an ID token the install's identity provider issued to Murphy's client, or with a one-time code from the app's sign-in or a connect code. Send exactly one of `id_token` and `code`.
@@ -5512,6 +5840,15 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /v1/auth/sessions (the `CreateSession` operationId).
 	CreateSessionWithResponse(ctx context.Context, body CreateSessionJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateSessionResponse, error)
+
+	// EndSessionWithResponse End one of your sessions
+	//
+	// Ends one of your own sessions at once, such as a lost phone's.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /v1/auth/sessions/{id} (the `EndSession` operationId).
+	EndSessionWithResponse(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*EndSessionResponse, error)
 
 	// SignInWithResponse Sign in through the identity provider
 	//
@@ -5986,6 +6323,15 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /v1/users/{id}/contact-methods (the `CreateContactMethod` operationId).
 	CreateContactMethodWithResponse(ctx context.Context, id ID, params *CreateContactMethodParams, body CreateContactMethodJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateContactMethodResponse, error)
+
+	// EndUserSessionsWithResponse End all of a user's sessions
+	//
+	// Ends all the user's sessions at once and discards their unused one-time codes, without deactivating them. Only admins may do this.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /v1/users/{id}/sessions (the `EndUserSessions` operationId).
+	EndUserSessionsWithResponse(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*EndUserSessionsResponse, error)
 }
 
 // FinishSignInResponse200Headers the declared response headers of an HTTP 200 response for FinishSignIn
@@ -6174,6 +6520,95 @@ func (r GetSessionResponse) ContentType() string {
 	return ""
 }
 
+// SignOutEverywhereResponse204Headers the declared response headers of an HTTP 204 response for SignOutEverywhere
+type SignOutEverywhereResponse204Headers struct {
+	SetCookie *string
+}
+
+type SignOutEverywhereResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// Headers204 the parsed response headers for an HTTP 204 response
+	Headers204 *SignOutEverywhereResponse204Headers
+}
+
+// GetBody returns the raw response body bytes
+func (r SignOutEverywhereResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r SignOutEverywhereResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r SignOutEverywhereResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r SignOutEverywhereResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ListSessionsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *SessionSummaryPage
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *Problem
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListSessionsResponse) GetJSON200() *SessionSummaryPage {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r ListSessionsResponse) GetApplicationproblemJSON400() *Problem {
+	return r.ApplicationproblemJSON400
+}
+
+// GetBody returns the raw response body bytes
+func (r ListSessionsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListSessionsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListSessionsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListSessionsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type CreateSessionResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -6223,6 +6658,47 @@ func (r CreateSessionResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r CreateSessionResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type EndSessionResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *Problem
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r EndSessionResponse) GetApplicationproblemJSON404() *Problem {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r EndSessionResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r EndSessionResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r EndSessionResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r EndSessionResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -8826,6 +9302,54 @@ func (r CreateContactMethodResponse) ContentType() string {
 	return ""
 }
 
+type EndUserSessionsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// ApplicationproblemJSON403 the response for an HTTP 403 `application/problem+json` response
+	ApplicationproblemJSON403 *Problem
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *Problem
+}
+
+// GetApplicationproblemJSON403 returns the response for an HTTP 403 `application/problem+json` response
+func (r EndUserSessionsResponse) GetApplicationproblemJSON403() *Problem {
+	return r.ApplicationproblemJSON403
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r EndUserSessionsResponse) GetApplicationproblemJSON404() *Problem {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r EndUserSessionsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r EndUserSessionsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r EndUserSessionsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r EndUserSessionsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 // FinishSignInWithResponse Finish signing in
 //
 // Where the identity provider sends the browser back. Signs the person in and sets the session cookie.
@@ -8884,6 +9408,36 @@ func (c *ClientWithResponses) GetSessionWithResponse(ctx context.Context, reqEdi
 	return ParseGetSessionResponse(rsp)
 }
 
+// SignOutEverywhereWithResponse Sign out everywhere
+//
+// Ends all your sessions at once, this one included, and discards your unused one-time codes, such as connect codes.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /v1/auth/sessions (the `SignOutEverywhere` operationId).
+func (c *ClientWithResponses) SignOutEverywhereWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*SignOutEverywhereResponse, error) {
+	rsp, err := c.SignOutEverywhere(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSignOutEverywhereResponse(rsp)
+}
+
+// ListSessionsWithResponse List your sessions
+//
+// Your sessions that are still active, newest first.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /v1/auth/sessions (the `ListSessions` operationId).
+func (c *ClientWithResponses) ListSessionsWithResponse(ctx context.Context, params *ListSessionsParams, reqEditors ...RequestEditorFn) (*ListSessionsResponse, error) {
+	rsp, err := c.ListSessions(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListSessionsResponse(rsp)
+}
+
 // CreateSessionWithBodyWithResponse Sign in with an identity token or a one-time code
 //
 // Signs in with an ID token the install's identity provider issued to Murphy's client, or with a one-time code from the app's sign-in or a connect code. Send exactly one of `id_token` and `code`.
@@ -8912,6 +9466,21 @@ func (c *ClientWithResponses) CreateSessionWithResponse(ctx context.Context, bod
 		return nil, err
 	}
 	return ParseCreateSessionResponse(rsp)
+}
+
+// EndSessionWithResponse End one of your sessions
+//
+// Ends one of your own sessions at once, such as a lost phone's.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /v1/auth/sessions/{id} (the `EndSession` operationId).
+func (c *ClientWithResponses) EndSessionWithResponse(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*EndSessionResponse, error) {
+	rsp, err := c.EndSession(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseEndSessionResponse(rsp)
 }
 
 // SignInWithResponse Sign in through the identity provider
@@ -9784,6 +10353,21 @@ func (c *ClientWithResponses) CreateContactMethodWithResponse(ctx context.Contex
 	return ParseCreateContactMethodResponse(rsp)
 }
 
+// EndUserSessionsWithResponse End all of a user's sessions
+//
+// Ends all the user's sessions at once and discards their unused one-time codes, without deactivating them. Only admins may do this.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /v1/users/{id}/sessions (the `EndUserSessions` operationId).
+func (c *ClientWithResponses) EndUserSessionsWithResponse(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*EndUserSessionsResponse, error) {
+	rsp, err := c.EndUserSessions(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseEndUserSessionsResponse(rsp)
+}
+
 // ParseFinishSignInResponse parses an HTTP response from a FinishSignInWithResponse call
 func ParseFinishSignInResponse(rsp *http.Response) (*FinishSignInResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -9931,6 +10515,68 @@ func ParseGetSessionResponse(rsp *http.Response) (*GetSessionResponse, error) {
 	return response, nil
 }
 
+// ParseSignOutEverywhereResponse parses an HTTP response from a SignOutEverywhereWithResponse call
+func ParseSignOutEverywhereResponse(rsp *http.Response) (*SignOutEverywhereResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &SignOutEverywhereResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		var headers SignOutEverywhereResponse204Headers
+		if values := rsp.Header.Values("Set-Cookie"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Set-Cookie", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.SetCookie = &value
+		}
+		response.Headers204 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseListSessionsResponse parses an HTTP response from a ListSessionsWithResponse call
+func ParseListSessionsResponse(rsp *http.Response) (*ListSessionsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListSessionsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SessionSummaryPage
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseCreateSessionResponse parses an HTTP response from a CreateSessionWithResponse call
 func ParseCreateSessionResponse(rsp *http.Response) (*CreateSessionResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -9965,6 +10611,35 @@ func ParseCreateSessionResponse(rsp *http.Response) (*CreateSessionResponse, err
 			return nil, err
 		}
 		response.ApplicationproblemJSON401 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseEndSessionResponse parses an HTTP response from a EndSessionWithResponse call
+func ParseEndSessionResponse(rsp *http.Response) (*EndSessionResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &EndSessionResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
 
 	}
 
@@ -11854,6 +12529,42 @@ func ParseCreateContactMethodResponse(rsp *http.Response) (*CreateContactMethodR
 			return nil, err
 		}
 		response.ApplicationproblemJSON422 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseEndUserSessionsResponse parses an HTTP response from a EndUserSessionsWithResponse call
+func ParseEndUserSessionsResponse(rsp *http.Response) (*EndUserSessionsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &EndUserSessionsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
 
 	}
 

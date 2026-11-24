@@ -93,6 +93,35 @@ paths:
         "401":
           $ref: "#/components/responses/Problem"
   /v1/auth/sessions:
+    get:
+      operationId: listSessions
+      summary: List your sessions
+      description: Your sessions that are still active, newest first.
+      tags: [auth]
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: Your active sessions, newest first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionSummaryPage"
+        "400":
+          $ref: "#/components/responses/Problem"
+    delete:
+      operationId: signOutEverywhere
+      summary: Sign out everywhere
+      description: Ends all your sessions at once, this one included, and discards your unused one-time codes, such as connect codes.
+      tags: [auth]
+      responses:
+        "204":
+          description: Signed out everywhere.
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
     post:
       operationId: createSession
       summary: Sign in with an identity token or a one-time code
@@ -115,6 +144,19 @@ paths:
         "400":
           $ref: "#/components/responses/Problem"
         "401":
+          $ref: "#/components/responses/Problem"
+  /v1/auth/sessions/{id}:
+    delete:
+      operationId: endSession
+      summary: End one of your sessions
+      description: Ends one of your own sessions at once, such as a lost phone's.
+      tags: [auth]
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "204":
+          description: Ended.
+        "404":
           $ref: "#/components/responses/Problem"
   /v1/auth/connect-codes:
     post:
@@ -543,6 +585,21 @@ paths:
       responses:
         "204":
           description: Done.
+        "404":
+          $ref: "#/components/responses/Problem"
+  /v1/users/{id}/sessions:
+    delete:
+      operationId: endUserSessions
+      summary: End all of a user's sessions
+      description: Ends all the user's sessions at once and discards their unused one-time codes, without deactivating them. Only admins may do this.
+      tags: [people]
+      parameters:
+        - $ref: "#/components/parameters/ID"
+      responses:
+        "204":
+          description: Ended.
+        "403":
+          $ref: "#/components/responses/Problem"
         "404":
           $ref: "#/components/responses/Problem"
   /v1/users/{id}/contact-methods:
@@ -1153,6 +1210,36 @@ components:
         code_verifier:
           type: string
           description: The PKCE verifier of the app's sign-in, needed with its code.
+    SessionSummary:
+      type: object
+      required: [id, client, current, created_at, expires_at]
+      properties:
+        id:
+          type: string
+        client:
+          type: string
+          enum: [browser, app, token]
+          description: "How the session started: signing in through a browser, the app, or an identity token."
+        current:
+          type: boolean
+          description: Whether this is the session the request was made with.
+        created_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+    SessionSummaryPage:
+      type: object
+      required: [items, next_cursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/SessionSummary"
+        next_cursor:
+          type: string
+          description: Empty on the last page.
     ConnectCode:
       type: object
       required: [code, link, expires_at]

@@ -166,3 +166,89 @@ func TestAnAppCodeIsUselessWithoutTheAppsVerifier(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusUnauthorized, session.StatusCode())
 }
+
+func TestYourSessionsAreListedWithThisOneMarked(t *testing.T) {
+	m := murphytest.New(t)
+	m.SignedOutEverywhere(murphytest.Cy)
+	m.SessionAs(murphytest.Cy)
+	api := m.ClientWith(m.SessionAs(murphytest.Cy))
+
+	got, err := api.ListSessionsWithResponse(t.Context(), nil)
+
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, got.StatusCode())
+	require.Len(t, got.JSON200.Items, 2)
+	assert.True(t, got.JSON200.Items[0].Current, "newest first, and the newest is this one")
+	assert.False(t, got.JSON200.Items[1].Current)
+	assert.Equal(t, client.Token, got.JSON200.Items[0].Client)
+}
+
+func TestEndingOneOfYourSessionsEndsOnlyThatOne(t *testing.T) {
+	m := murphytest.New(t)
+	m.SignedOutEverywhere(murphytest.Cy)
+	lostPhone := m.ClientWith(m.SessionAs(murphytest.Cy))
+	api := m.ClientWith(m.SessionAs(murphytest.Cy))
+	sessions, err := api.ListSessionsWithResponse(t.Context(), nil)
+	require.NoError(t, err)
+	require.Len(t, sessions.JSON200.Items, 2)
+
+	ended, err := api.EndSessionWithResponse(t.Context(), sessions.JSON200.Items[1].Id)
+	require.NoError(t, err)
+	lost, err := lostPhone.GetSessionWithResponse(t.Context())
+	require.NoError(t, err)
+	kept, err := api.GetSessionWithResponse(t.Context())
+	require.NoError(t, err)
+
+	assert.Equal(t, http.StatusNoContent, ended.StatusCode())
+	assert.Equal(t, http.StatusUnauthorized, lost.StatusCode())
+	assert.Equal(t, http.StatusOK, kept.StatusCode())
+}
+
+func TestSigningOutEverywhereEndsEverySessionAndConnectCode(t *testing.T) {
+	m := murphytest.New(t)
+	m.SignedOutEverywhere(murphytest.Cy)
+	other := m.ClientWith(m.SessionAs(murphytest.Cy))
+	api := m.ClientWith(m.SessionAs(murphytest.Cy))
+	connect, err := api.CreateConnectCodeWithResponse(t.Context(), nil)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusCreated, connect.StatusCode())
+
+	signedOut, err := api.SignOutEverywhereWithResponse(t.Context())
+	require.NoError(t, err)
+	here, err := api.GetSessionWithResponse(t.Context())
+	require.NoError(t, err)
+	elsewhere, err := other.GetSessionWithResponse(t.Context())
+	require.NoError(t, err)
+	scanned, err := m.SessionFromCode(connect.JSON201.Code, "")
+	require.NoError(t, err)
+
+	assert.Equal(t, http.StatusNoContent, signedOut.StatusCode())
+	assert.Equal(t, http.StatusUnauthorized, here.StatusCode())
+	assert.Equal(t, http.StatusUnauthorized, elsewhere.StatusCode())
+	assert.Equal(t, http.StatusUnauthorized, scanned.StatusCode(), "a connect code made before can't outlive signing out")
+}
+
+func TestAnAdminCanEndSomeonesSessions(t *testing.T) {
+	m := murphytest.New(t)
+	cy := m.SignedOutEverywhere(murphytest.Cy)
+	cysPhone := m.ClientWith(m.SessionAs(murphytest.Cy))
+
+	ended, err := m.API.EndUserSessionsWithResponse(t.Context(), cy)
+	require.NoError(t, err)
+	after, err := cysPhone.GetSessionWithResponse(t.Context())
+	require.NoError(t, err)
+
+	assert.Equal(t, http.StatusNoContent, ended.StatusCode())
+	assert.Equal(t, http.StatusUnauthorized, after.StatusCode())
+}
+
+func TestAMemberCannotEndSomeoneElsesSessions(t *testing.T) {
+	m := murphytest.New(t)
+	cy := m.SignedOutEverywhere(murphytest.Cy)
+	bo := m.ClientWith(m.SessionAs(murphytest.Bo))
+
+	got, err := bo.EndUserSessionsWithResponse(t.Context(), cy)
+
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusForbidden, got.StatusCode())
+}

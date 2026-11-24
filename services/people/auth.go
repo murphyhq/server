@@ -16,6 +16,7 @@ import (
 
 	"github.com/murphyhq/server"
 	"github.com/murphyhq/server/internal/logger"
+	"github.com/murphyhq/server/internal/pagination"
 	"github.com/murphyhq/server/internal/telemetry"
 	"github.com/murphyhq/server/internal/tracer"
 )
@@ -60,6 +61,9 @@ type AuthRepository interface {
 	ClaimFirstAdmin(ctx context.Context, userID string, now time.Time) (bool, error)
 	CreateOneTimeCode(ctx context.Context, code *murphy.OneTimeCode) error
 	TakeOneTimeCode(ctx context.Context, codeHash []byte, now time.Time) (*murphy.OneTimeCode, error)
+	ListActiveSessions(ctx context.Context, userID, before string, limit int, now time.Time) ([]*murphy.Session, error)
+	RevokeSessionOfUser(ctx context.Context, userID, id string, at time.Time) error
+	EndSessionsOfUser(ctx context.Context, userID string, at time.Time) error
 }
 
 type AuthSettings struct {
@@ -161,7 +165,7 @@ func (a *Auth) FinishSignIn(ctx context.Context, state, browserState, code strin
 	if signIn.GetCodeChallenge() != "" {
 		return a.handToApp(ctx, signIn, userID, now)
 	}
-	signedIn, err := a.startSession(ctx, userID, now)
+	signedIn, err := a.startSession(ctx, userID, murphy.SessionClient_SESSION_CLIENT_BROWSER, now)
 	if err != nil {
 		return nil, err
 	}
@@ -182,7 +186,7 @@ func (a *Auth) SignInWithIDToken(ctx context.Context, idToken string) (_ *Signed
 	if err != nil {
 		return nil, err
 	}
-	return a.startSession(ctx, userID, now)
+	return a.startSession(ctx, userID, murphy.SessionClient_SESSION_CLIENT_TOKEN, now)
 }
 
 func (a *Auth) SignInWithCode(ctx context.Context, code, codeVerifier string) (_ *SignedIn, err error) {
@@ -201,7 +205,49 @@ func (a *Auth) SignInWithCode(ctx context.Context, code, codeVerifier string) (_
 		return nil, fmt.Errorf("%w: the code verifier doesn't match the sign-in", murphy.ErrUnauthenticated)
 	}
 	ctx = span.Set(ctx, telemetry.WithField("user.id", taken.GetUserId()))
-	return a.startSession(ctx, taken.GetUserId(), now)
+	return a.startSession(ctx, taken.GetUserId(), murphy.SessionClient_SESSION_CLIENT_APP, now)
+}
+
+func (a *Auth) ListSessions(ctx context.Context, userID string, page pagination.Page) (_ []*murphy.Session, _ string, err error) {
+	ctx, span := tracer.Span(ctx)
+	ctx = span.Set(ctx, telemetry.WithField("user.id", userID))
+	defer span.End(&err)
+
+	window, err := pagination.Resolve(page)
+	if err != nil {
+		return nil, "", err
+	}
+	sessions, err := a.repo.ListActiveSessions(ctx, userID, window.Before, window.Rows(), time.Now().UTC())
+	if err != nil {
+		return nil, "", fmt.Errorf("list sessions: %w", err)
+	}
+	items, next := pagination.Trim(sessions, window)
+	return items, next, nil
+}
+
+func (a *Auth) EndSession(ctx context.Context, userID, sessionID string) (err error) {
+	ctx, span := tracer.Span(ctx)
+	ctx = span.Set(ctx, telemetry.WithField("user.id", userID))
+	defer span.End(&err)
+
+	if err := murphy.LookupID("session", sessionID); err != nil {
+		return err
+	}
+	if err := a.repo.RevokeSessionOfUser(ctx, userID, sessionID, time.Now().UTC()); err != nil {
+		return fmt.Errorf("end session: %w", err)
+	}
+	return nil
+}
+
+func (a *Auth) EndAllSessions(ctx context.Context, userID string) (err error) {
+	ctx, span := tracer.Span(ctx)
+	ctx = span.Set(ctx, telemetry.WithField("user.id", userID))
+	defer span.End(&err)
+
+	if err := a.repo.EndSessionsOfUser(ctx, userID, time.Now().UTC()); err != nil {
+		return fmt.Errorf("end all sessions: %w", err)
+	}
+	return nil
 }
 
 func (a *Auth) CreateConnectCode(ctx context.Context, userID string) (_ *ConnectCode, err error) {
@@ -314,12 +360,13 @@ func (a *Auth) signedInUser(ctx context.Context, claims *Claims, now time.Time) 
 	return ctx, userID, nil
 }
 
-func (a *Auth) startSession(ctx context.Context, userID string, now time.Time) (*SignedIn, error) {
+func (a *Auth) startSession(ctx context.Context, userID string, client murphy.SessionClient, now time.Time) (*SignedIn, error) {
 	token := sessionPrefix + secret()
 	session := &murphy.Session{
 		Id:        murphy.NewID(),
 		UserId:    userID,
 		TokenHash: hash(token),
+		Client:    client,
 		ExpiresAt: timestamppb.New(now.Add(a.settings.SessionDuration)),
 		CreatedAt: timestamppb.New(now),
 		UpdatedAt: timestamppb.New(now),

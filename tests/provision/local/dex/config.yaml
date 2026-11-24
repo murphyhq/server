@@ -25,3 +25,7 @@ staticPasswords:
     username: bo
     userID: 7d3c3f4e-5c1a-4e1e-9d1a-0a1b2c3d4e02
     hash: "$2a$10$BuslZ90klud4bHQ.XkTUGet1imZh84OTvRSC3XpI5QnYGqWw674py"
+  - email: cy@murphy.test
+    username: cy
+    userID: 7d3c3f4e-5c1a-4e1e-9d1a-0a1b2c3d4e03
+    hash: "$2a$10$BuslZ90klud4bHQ.XkTUGet1imZh84OTvRSC3XpI5QnYGqWw674py"

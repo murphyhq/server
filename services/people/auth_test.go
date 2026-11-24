@@ -416,3 +416,22 @@ func TestAOneTimeCodeWorksOnce(t *testing.T) {
 
 	require.ErrorIs(t, err, murphy.ErrUnauthenticated)
 }
+
+func TestEachSessionRemembersHowItStarted(t *testing.T) {
+	a := newAccounts(t)
+	_, err := a.auth.FinishSignIn(t.Context(), state, state, code)
+	require.NoError(t, err)
+	browser := a.session.GetClient()
+	_, err = a.auth.SignInWithIDToken(t.Context(), "id-token")
+	require.NoError(t, err)
+	token := a.session.GetClient()
+	connect, err := a.auth.CreateConnectCode(t.Context(), murphy.NewID())
+	require.NoError(t, err)
+
+	_, err = a.auth.SignInWithCode(t.Context(), connect.Code, "")
+
+	require.NoError(t, err)
+	assert.Equal(t, murphy.SessionClient_SESSION_CLIENT_BROWSER, browser)
+	assert.Equal(t, murphy.SessionClient_SESSION_CLIENT_TOKEN, token)
+	assert.Equal(t, murphy.SessionClient_SESSION_CLIENT_APP, a.session.GetClient())
+}

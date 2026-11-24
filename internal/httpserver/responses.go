@@ -51,6 +51,8 @@ func WriteError(w http.ResponseWriter, r *http.Request, err error) {
 		WriteProblem(w, r, http.StatusConflict, "conflicts with an existing resource")
 	case errors.Is(err, murphy.ErrUnauthenticated):
 		WriteProblem(w, r, http.StatusUnauthorized, "sign in first")
+	case errors.Is(err, murphy.ErrForbidden):
+		WriteProblem(w, r, http.StatusForbidden, "only admins may do this")
 	default:
 		logger.Error(r.Context(), "request failed", telemetry.WithError(err))
 		WriteProblem(w, r, http.StatusInternalServerError, "")

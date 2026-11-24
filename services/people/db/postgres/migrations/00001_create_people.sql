@@ -71,12 +71,14 @@ CREATE TABLE sessions (
   id uuid NOT NULL,
   user_id uuid NOT NULL,
   token_hash bytea NOT NULL,
+  client text NOT NULL,
   expires_at timestamptz NOT NULL,
   revoked_at timestamptz,
   created_at timestamptz NOT NULL,
   updated_at timestamptz NOT NULL,
   CONSTRAINT sessions_pkey PRIMARY KEY (id),
   CONSTRAINT sessions_token_hash_key UNIQUE (token_hash),
+  CONSTRAINT sessions_client_check CHECK (client IN ('browser', 'app', 'token')),
   CONSTRAINT sessions_user_id_fkey FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 );
 

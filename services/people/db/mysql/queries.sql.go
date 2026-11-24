@@ -144,14 +144,15 @@ func (q *Queries) CreateOneTimeCode(ctx context.Context, arg CreateOneTimeCodePa
 }
 
 const createSession = `-- name: CreateSession :exec
-INSERT INTO sessions (id, user_id, token_hash, expires_at, created_at, updated_at)
-VALUES (?, ?, ?, ?, ?, ?)
+INSERT INTO sessions (id, user_id, token_hash, client, expires_at, created_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?)
 `
 
 type CreateSessionParams struct {
 	ID        string
 	UserID    string
 	TokenHash []byte
+	Client    string
 	ExpiresAt time.Time
 	CreatedAt time.Time
 	UpdatedAt time.Time
@@ -162,6 +163,7 @@ func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) er
 		arg.ID,
 		arg.UserID,
 		arg.TokenHash,
+		arg.Client,
 		arg.ExpiresAt,
 		arg.CreatedAt,
 		arg.UpdatedAt,
@@ -323,6 +325,26 @@ func (q *Queries) DeleteUser(ctx context.Context, id string) (int64, error) {
 	return result.RowsAffected()
 }
 
+const discardOneTimeCodesOfUser = `-- name: DiscardOneTimeCodesOfUser :execrows
+UPDATE one_time_codes
+SET used_at = ?, updated_at = ?
+WHERE user_id = ? AND used_at IS NULL
+`
+
+type DiscardOneTimeCodesOfUserParams struct {
+	UsedAt    *time.Time
+	UpdatedAt time.Time
+	UserID    string
+}
+
+func (q *Queries) DiscardOneTimeCodesOfUser(ctx context.Context, arg DiscardOneTimeCodesOfUserParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, discardOneTimeCodesOfUser, arg.UsedAt, arg.UpdatedAt, arg.UserID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 const existingTeams = `-- name: ExistingTeams :many
 SELECT id
 FROM teams
@@ -402,7 +424,7 @@ func (q *Queries) ExistingUsers(ctx context.Context, ids []string) ([]string, er
 }
 
 const getActiveSession = `-- name: GetActiveSession :one
-SELECT sessions.id, sessions.user_id, sessions.token_hash, sessions.expires_at, sessions.revoked_at, sessions.created_at, sessions.updated_at
+SELECT sessions.id, sessions.user_id, sessions.token_hash, sessions.client, sessions.expires_at, sessions.revoked_at, sessions.created_at, sessions.updated_at
 FROM sessions
 JOIN users ON users.id = sessions.user_id
 WHERE sessions.token_hash = ? AND sessions.revoked_at IS NULL AND sessions.expires_at > ? AND users.status = 'active'
@@ -420,6 +442,7 @@ func (q *Queries) GetActiveSession(ctx context.Context, arg GetActiveSessionPara
 		&i.ID,
 		&i.UserID,
 		&i.TokenHash,
+		&i.Client,
 		&i.ExpiresAt,
 		&i.RevokedAt,
 		&i.CreatedAt,
@@ -605,6 +628,58 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const listActiveSessions = `-- name: ListActiveSessions :many
+SELECT id, user_id, token_hash, client, expires_at, revoked_at, created_at, updated_at
+FROM sessions
+WHERE user_id = ? AND revoked_at IS NULL AND expires_at > ? AND id < ?
+ORDER BY id DESC
+LIMIT ?
+`
+
+type ListActiveSessionsParams struct {
+	UserID string
+	Now    time.Time
+	Before string
+	Limit  int32
+}
+
+func (q *Queries) ListActiveSessions(ctx context.Context, arg ListActiveSessionsParams) ([]Session, error) {
+	rows, err := q.db.QueryContext(ctx, listActiveSessions,
+		arg.UserID,
+		arg.Now,
+		arg.Before,
+		arg.Limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Session
+	for rows.Next() {
+		var i Session
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.TokenHash,
+			&i.Client,
+			&i.ExpiresAt,
+			&i.RevokedAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listContactMethods = `-- name: ListContactMethods :many
@@ -828,6 +903,52 @@ type RevokeSessionParams struct {
 
 func (q *Queries) RevokeSession(ctx context.Context, arg RevokeSessionParams) (int64, error) {
 	result, err := q.db.ExecContext(ctx, revokeSession, arg.RevokedAt, arg.UpdatedAt, arg.TokenHash)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const revokeSessionOfUser = `-- name: RevokeSessionOfUser :execrows
+UPDATE sessions
+SET revoked_at = ?, updated_at = ?
+WHERE id = ? AND user_id = ? AND revoked_at IS NULL
+`
+
+type RevokeSessionOfUserParams struct {
+	RevokedAt *time.Time
+	UpdatedAt time.Time
+	ID        string
+	UserID    string
+}
+
+func (q *Queries) RevokeSessionOfUser(ctx context.Context, arg RevokeSessionOfUserParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, revokeSessionOfUser,
+		arg.RevokedAt,
+		arg.UpdatedAt,
+		arg.ID,
+		arg.UserID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const revokeSessionsOfUser = `-- name: RevokeSessionsOfUser :execrows
+UPDATE sessions
+SET revoked_at = ?, updated_at = ?
+WHERE user_id = ? AND revoked_at IS NULL
+`
+
+type RevokeSessionsOfUserParams struct {
+	RevokedAt *time.Time
+	UpdatedAt time.Time
+	UserID    string
+}
+
+func (q *Queries) RevokeSessionsOfUser(ctx context.Context, arg RevokeSessionsOfUserParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, revokeSessionsOfUser, arg.RevokedAt, arg.UpdatedAt, arg.UserID)
 	if err != nil {
 		return 0, err
 	}
