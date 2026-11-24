@@ -12,8 +12,9 @@ import (
 )
 
 type settings struct {
-	APIURL  string `env:"SEED_API_URL" default:"http://localhost:8080"`
-	Dogfood dogfoodSettings
+	APIURL     string `env:"SEED_API_URL" default:"http://localhost:8080"`
+	WebhookURL string `env:"SEED_WEBHOOK_URL" default:"http://localhost:8092"`
+	Dogfood    dogfoodSettings
 }
 
 func main() {
@@ -36,6 +37,9 @@ func run(ctx context.Context) error {
 	}
 	teams, users, err := seedPeople(ctx, api)
 	if err != nil {
+		return err
+	}
+	if err := seedWebhooks(ctx, api, users, s.WebhookURL); err != nil {
 		return err
 	}
 	schedules, err := seedSchedules(ctx, api, teams, users)

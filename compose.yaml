@@ -1,4 +1,6 @@
 x-integration-key-secrets: &integration-key-secrets "1:AAEqhKjSkvjtvtCA2YD2wSsiQGaN/H1phWMk1vn35QQ="
+x-webhook-signing-keys: &webhook-signing-keys "whsk_UW0+6vtujGqtA8mY1l74ElfidVaK+KajuF6iJGP7Yasdb3Ug5E4PquJNExug7UeRFC9yLYyvbz4TdxuNJAzS2g=="
+x-webhook-public-keys: &webhook-public-keys "whpk_HW91IOROD6riTRMboO1HkRQvci2Mr28+E3cbjSQM0to="
 
 x-component-environment: &component-environment
   OTEL_EXPORTER_OTLP_ENDPOINT: http://lgtm:4318
@@ -205,6 +207,7 @@ services:
     environment:
       <<: *component-environment
       MURPHY_SEED_API_URL: http://api:8080
+      MURPHY_SEED_WEBHOOK_URL: http://webhook-receiver:8080
       MURPHY_SEED_GRAFANA_URL: http://lgtm:3000
     healthcheck:
       disable: true
@@ -238,6 +241,7 @@ services:
       MURPHY_ESCALATION_DATABASE_URL: postgres://murphy:murphy@postgres:5432/escalation?sslmode=disable
       MURPHY_IDEMPOTENCY_STORE_URL: redis://redis:6379/0
       MURPHY_INTEGRATION_KEY_SECRETS: *integration-key-secrets
+      MURPHY_WEBHOOK_PUBLIC_KEYS: *webhook-public-keys
       MURPHY_CORS_ORIGINS: http://localhost:8090
     ports:
       - "8080:8080"
@@ -277,6 +281,20 @@ services:
     environment:
       <<: *component-environment
       MURPHY_EVENTS_SUBSCRIPTION_URL: nats://nats:4222/events/notifier
+      MURPHY_EVENTS_TOPIC_URL: nats://nats:4222/events
+      MURPHY_WEBHOOK_SIGNING_KEYS: *webhook-signing-keys
+
+  webhook-receiver:
+    <<: *component
+    command: ["sh", "-c", "go build -o /tmp/receiver ./tests/receiver && exec /tmp/receiver"]
+    environment:
+      <<: *component-environment
+      MURPHY_RECEIVER_PUBLIC_KEYS: *webhook-public-keys
+    ports:
+      - "8092:8080"
+    depends_on:
+      lgtm:
+        condition: service_started
 
   api-docs:
     image: nginx:1.27-alpine

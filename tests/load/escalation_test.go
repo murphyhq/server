@@ -52,12 +52,12 @@ func TestEveryIncidentPagesItsFirstLevel(t *testing.T) {
 		var unpaged int
 		delays, unpaged = pageDelays(t, murphy, service.JSON201.Id)
 		return unpaged == 0 && len(delays) > 0
-	}, p.Settle, time.Second, "every incident pages its first level")
+	}, p.Settle, time.Second, "every incident's first level gets its webhook")
 
 	slices.Sort(delays)
 	p50, p90, p99 := percentile(delays, 0.5), percentile(delays, 0.9), percentile(delays, 0.99)
-	t.Logf("time from opening to the first page, over %d incidents: p50 %s, p90 %s, p99 %s", len(delays), p50, p90, p99)
-	assert.LessOrEqual(t, p99, pageDelayP99, "p99 time from opening to the first page")
+	t.Logf("time from opening to the first webhook sent, over %d incidents: p50 %s, p90 %s, p99 %s", len(delays), p50, p90, p99)
+	assert.LessOrEqual(t, p99, pageDelayP99, "p99 time from opening to the first webhook sent")
 }
 
 func pageDelays(t *testing.T, murphy *client.ClientWithResponses, serviceID string) (delays []time.Duration, unpaged int) {
@@ -110,7 +110,7 @@ func pageDelays(t *testing.T, murphy *client.ClientWithResponses, serviceID stri
 
 func firstPage(incident *client.IncidentWithTimeline) (time.Duration, bool) {
 	for _, entry := range incident.Timeline {
-		if entry.Type == client.TimelineEntryTypeEscalated {
+		if entry.Type == client.TimelineEntryTypeNotified && entry.Notification.Reason == client.TimelineNotificationReasonPaged {
 			return entry.At.Sub(incident.CreatedAt), true
 		}
 	}

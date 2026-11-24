@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"slices"
+	"strings"
 
 	"github.com/murphyhq/server/client"
 )
@@ -72,4 +74,23 @@ func seedPeople(ctx context.Context, api *client.ClientWithResponses) (teams, us
 		}
 	}
 	return teams, users, nil
+}
+
+func seedWebhooks(ctx context.Context, api *client.ClientWithResponses, users map[string]string, receiver string) error {
+	for _, user := range seededUsers {
+		id := users[user.email]
+		methods, err := api.ListContactMethodsWithResponse(ctx, id)
+		if err := expect(methods, err, http.StatusOK, "list contact methods of "+user.email); err != nil {
+			return err
+		}
+		if slices.ContainsFunc(methods.JSON200.Items, func(method client.ContactMethod) bool { return method.Type == client.Webhook }) {
+			continue
+		}
+		local, _, _ := strings.Cut(user.email, "@")
+		created, err := api.CreateContactMethodWithResponse(ctx, id, nil, client.ContactMethodInput{Type: client.Webhook, Address: receiver + "/" + local})
+		if err := expect(created, err, http.StatusCreated, "create webhook for "+user.email); err != nil {
+			return err
+		}
+	}
+	return nil
 }
