@@ -1,4 +1,4 @@
-package murphy_test
+package incidents_test
 
 import (
 	"testing"
@@ -9,12 +9,12 @@ import (
 	"google.golang.org/protobuf/types/known/durationpb"
 
 	"github.com/murphyhq/server"
+	"github.com/murphyhq/server/services/incidents"
 )
 
 const (
 	primary = "0195f3a0-0000-7000-8000-00000000000a"
 	ana     = "0195f3a0-0000-7000-8000-0000000000a1"
-	bo      = "0195f3a0-0000-7000-8000-0000000000b1"
 )
 
 func twoLevels() *murphy.EscalationPolicy {
@@ -27,7 +27,7 @@ func twoLevels() *murphy.EscalationPolicy {
 	}
 }
 
-func triggered(level, round int32) *murphy.Incident {
+func incidentAt(level, round int32) *murphy.Incident {
 	return &murphy.Incident{
 		Id: murphy.NewID(), Status: murphy.IncidentStatus_INCIDENT_STATUS_TRIGGERED, Version: 2,
 		EscalationPolicyVersion: 3, EscalationLevel: level, EscalationRound: round,
@@ -38,7 +38,7 @@ func firing() *murphy.Alert {
 	return &murphy.Alert{Id: murphy.NewID(), ServiceId: murphy.NewID(), DedupKey: "disk-full", Status: murphy.AlertStatus_ALERT_STATUS_FIRING, Summary: "Disk almost full"}
 }
 
-func verbs(decision *murphy.IncidentDecision) []murphy.IncidentVerb {
+func verbs(decision *incidents.Decision) []murphy.IncidentVerb {
 	out := make([]murphy.IncidentVerb, len(decision.Announce))
 	for i, announcement := range decision.Announce {
 		out[i] = announcement.Verb
@@ -46,7 +46,7 @@ func verbs(decision *murphy.IncidentDecision) []murphy.IncidentVerb {
 	return out
 }
 
-func entries(decision *murphy.IncidentDecision) []murphy.TimelineEntryType {
+func entries(decision *incidents.Decision) []murphy.TimelineEntryType {
 	out := make([]murphy.TimelineEntryType, len(decision.Timeline))
 	for i, entry := range decision.Timeline {
 		out[i] = entry.GetType()
@@ -58,7 +58,7 @@ func TestAnIncidentOpensOnItsFirstLevel(t *testing.T) {
 	policy := twoLevels()
 	service := &murphy.Service{Urgency: murphy.Urgency_URGENCY_LOW, EscalationPolicyId: policy.GetId()}
 
-	decision := murphy.OpenIncident(firing(), service, policy, murphy.Now())
+	decision := incidents.OpenIncident(firing(), service, policy, murphy.Now())
 
 	opened := decision.Incident
 	assert.True(t, decision.Created)
@@ -74,7 +74,7 @@ func TestAnIncidentOpensOnItsFirstLevel(t *testing.T) {
 }
 
 func TestAnIncidentWhosePolicyIsGoneOpensWithoutPaging(t *testing.T) {
-	decision := murphy.OpenIncident(firing(), &murphy.Service{}, nil, murphy.Now())
+	decision := incidents.OpenIncident(firing(), &murphy.Service{}, nil, murphy.Now())
 
 	assert.True(t, decision.Incident.GetEscalationExhausted())
 	assert.Nil(t, decision.NextTimer)
@@ -83,9 +83,9 @@ func TestAnIncidentWhosePolicyIsGoneOpensWithoutPaging(t *testing.T) {
 }
 
 func TestAnAlertJoinsAnIncidentWhileAnythingStillFires(t *testing.T) {
-	incident := triggered(1, 1)
+	incident := incidentAt(1, 1)
 
-	decision := incident.Receive(firing(), true, murphy.Now())
+	decision := incidents.ReceiveAlert(incident, firing(), true, murphy.Now())
 
 	assert.Equal(t, murphy.IncidentStatus_INCIDENT_STATUS_TRIGGERED, decision.Incident.GetStatus())
 	assert.Equal(t, int32(3), decision.Incident.GetVersion())
@@ -95,9 +95,9 @@ func TestAnAlertJoinsAnIncidentWhileAnythingStillFires(t *testing.T) {
 }
 
 func TestTheLastResolveResolvesTheIncident(t *testing.T) {
-	incident := triggered(1, 1)
+	incident := incidentAt(1, 1)
 
-	decision := incident.Receive(firing(), false, murphy.Now())
+	decision := incidents.ReceiveAlert(incident, firing(), false, murphy.Now())
 
 	assert.Equal(t, murphy.IncidentStatus_INCIDENT_STATUS_RESOLVED, decision.Incident.GetStatus())
 	assert.NotNil(t, decision.Incident.GetResolvedAt())
@@ -107,9 +107,9 @@ func TestTheLastResolveResolvesTheIncident(t *testing.T) {
 }
 
 func TestATimerMovesTheIncidentToTheNextLevel(t *testing.T) {
-	incident := triggered(1, 1)
+	incident := incidentAt(1, 1)
 
-	decision := incident.TimerExpired(&murphy.Timer{EscalationLevel: 2, EscalationRound: 1}, twoLevels(), murphy.Now())
+	decision := incidents.ExpireTimer(incident, &murphy.Timer{EscalationLevel: 2, EscalationRound: 1}, twoLevels(), murphy.Now())
 
 	assert.Equal(t, []int32{2, 1}, []int32{decision.Incident.GetEscalationLevel(), decision.Incident.GetEscalationRound()})
 	assert.Empty(t, decision.Timeline, "whom the level reached is recorded when its page comes back")
@@ -119,9 +119,9 @@ func TestATimerMovesTheIncidentToTheNextLevel(t *testing.T) {
 }
 
 func TestEscalationIsExhaustedAfterItsRepeats(t *testing.T) {
-	incident := triggered(2, 2)
+	incident := incidentAt(2, 2)
 
-	decision := incident.TimerExpired(&murphy.Timer{}, twoLevels(), murphy.Now())
+	decision := incidents.ExpireTimer(incident, &murphy.Timer{}, twoLevels(), murphy.Now())
 
 	assert.True(t, decision.Incident.GetEscalationExhausted())
 	assert.True(t, decision.CancelTimers)
@@ -130,17 +130,17 @@ func TestEscalationIsExhaustedAfterItsRepeats(t *testing.T) {
 }
 
 func TestATimerThatIsNoLongerNeededDecidesNothing(t *testing.T) {
-	acknowledged := triggered(1, 1)
+	acknowledged := incidentAt(1, 1)
 	acknowledged.Status = murphy.IncidentStatus_INCIDENT_STATUS_ACKNOWLEDGED
 	for name, test := range map[string]struct {
 		incident *murphy.Incident
 		timer    *murphy.Timer
 	}{
 		"incident acknowledged": {acknowledged, &murphy.Timer{EscalationLevel: 2, EscalationRound: 1}},
-		"step already taken":    {triggered(2, 1), &murphy.Timer{EscalationLevel: 2, EscalationRound: 1}},
+		"step already taken":    {incidentAt(2, 1), &murphy.Timer{EscalationLevel: 2, EscalationRound: 1}},
 	} {
 		t.Run(name, func(t *testing.T) {
-			assert.Nil(t, test.incident.TimerExpired(test.timer, twoLevels(), murphy.Now()))
+			assert.Nil(t, incidents.ExpireTimer(test.incident, test.timer, twoLevels(), murphy.Now()))
 		})
 	}
 }
@@ -150,10 +150,10 @@ func page(level, round int32, reached ...*murphy.PageRecipient) *murphy.Page {
 }
 
 func TestAPageRecordsWhomItReached(t *testing.T) {
-	incident := triggered(1, 1)
+	incident := incidentAt(1, 1)
 	via := &murphy.EscalationTarget{Type: murphy.EscalationTargetType_ESCALATION_TARGET_TYPE_SCHEDULE, Id: primary}
 
-	decision := incident.PageCreated(page(1, 1, &murphy.PageRecipient{UserId: ana, Via: via, ContactMethods: 2}), twoLevels(), murphy.Now())
+	decision := incidents.RecordPage(incident, page(1, 1, &murphy.PageRecipient{UserId: ana, Via: via, ContactMethods: 2}), twoLevels(), murphy.Now())
 
 	assert.Nil(t, decision.Incident, "the incident stays on its level")
 	require.Len(t, decision.Timeline, 1)
@@ -163,7 +163,7 @@ func TestAPageRecordsWhomItReached(t *testing.T) {
 }
 
 func TestSomeoneReachedWithoutContactMethodsIsOnTheTimeline(t *testing.T) {
-	decision := triggered(1, 1).PageCreated(page(1, 1, &murphy.PageRecipient{UserId: ana}), twoLevels(), murphy.Now())
+	decision := incidents.RecordPage(incidentAt(1, 1), page(1, 1, &murphy.PageRecipient{UserId: ana}), twoLevels(), murphy.Now())
 
 	assert.Equal(t, []murphy.TimelineEntryType{murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_ESCALATED, murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_NOTIFICATION_FAILED}, entries(decision))
 	assert.Equal(t, ana, decision.Timeline[1].GetNotification().GetUserId())
@@ -173,7 +173,7 @@ func TestAPageThatReachedNobodyMovesOnAtOnce(t *testing.T) {
 	empty := page(1, 1)
 	empty.Unreached = []*murphy.EscalationTarget{{Type: murphy.EscalationTargetType_ESCALATION_TARGET_TYPE_SCHEDULE, Id: primary}}
 
-	decision := triggered(1, 1).PageCreated(empty, twoLevels(), murphy.Now())
+	decision := incidents.RecordPage(incidentAt(1, 1), empty, twoLevels(), murphy.Now())
 
 	assert.Equal(t, []murphy.TimelineEntryType{murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_ESCALATION_SKIPPED}, entries(decision))
 	assert.Equal(t, primary, decision.Timeline[0].GetEscalation().GetReachedNobody()[0].GetId())
@@ -184,14 +184,14 @@ func TestAPageThatReachedNobodyMovesOnAtOnce(t *testing.T) {
 }
 
 func TestAnEmptyPageForALevelAlreadyLeftOnlyRecordsIt(t *testing.T) {
-	decision := triggered(2, 1).PageCreated(page(1, 1), twoLevels(), murphy.Now())
+	decision := incidents.RecordPage(incidentAt(2, 1), page(1, 1), twoLevels(), murphy.Now())
 
 	assert.Nil(t, decision.Incident)
 	assert.Equal(t, []murphy.TimelineEntryType{murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_ESCALATION_SKIPPED}, entries(decision))
 }
 
 func TestAcknowledgingCancelsTimersAndAnnouncesIt(t *testing.T) {
-	decision := triggered(1, 1).Acknowledge(murphy.Now())
+	decision := incidents.AcknowledgeIncident(incidentAt(1, 1), murphy.Now())
 
 	assert.Equal(t, murphy.IncidentStatus_INCIDENT_STATUS_ACKNOWLEDGED, decision.Incident.GetStatus())
 	assert.NotNil(t, decision.Incident.GetAcknowledgedAt())
@@ -201,13 +201,13 @@ func TestAcknowledgingCancelsTimersAndAnnouncesIt(t *testing.T) {
 }
 
 func TestAcknowledgingOrResolvingTwiceDecidesNothing(t *testing.T) {
-	acknowledged := triggered(1, 1)
+	acknowledged := incidentAt(1, 1)
 	acknowledged.Status = murphy.IncidentStatus_INCIDENT_STATUS_ACKNOWLEDGED
-	resolved := triggered(1, 1)
+	resolved := incidentAt(1, 1)
 	resolved.Status = murphy.IncidentStatus_INCIDENT_STATUS_RESOLVED
 
-	assert.Nil(t, acknowledged.Acknowledge(murphy.Now()))
-	assert.Nil(t, resolved.Resolve(murphy.Now()))
+	assert.Nil(t, incidents.AcknowledgeIncident(acknowledged, murphy.Now()))
+	assert.Nil(t, incidents.ResolveIncident(resolved, murphy.Now()))
 }
 
 func TestANotificationOutcomeGoesOnTheTimeline(t *testing.T) {
@@ -216,7 +216,7 @@ func TestANotificationOutcomeGoesOnTheTimeline(t *testing.T) {
 		ContactMethod: &murphy.ContactMethod{Id: murphy.NewID(), Type: murphy.ContactMethodType_CONTACT_METHOD_TYPE_WEBHOOK}, Failure: "the receiver answered 410",
 	}
 
-	decision := murphy.NotificationOutcome(notification, true)
+	decision := incidents.NotificationOutcome(notification, true)
 
 	assert.Nil(t, decision.Incident, "an outcome changes only the timeline")
 	require.Len(t, decision.Timeline, 1)

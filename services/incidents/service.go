@@ -41,7 +41,7 @@ type Change struct {
 	MessageID  string
 	IncidentID string
 	Alert      *murphy.Alert
-	Decision   *murphy.IncidentDecision
+	Decision   *Decision
 }
 
 type MessageKind string
@@ -101,14 +101,14 @@ func (s *Service) AlertReceived(ctx context.Context, messageID string, alert *mu
 	}
 
 	firing := alert.GetStatus() == murphy.AlertStatus_ALERT_STATUS_FIRING
-	var decision *murphy.IncidentDecision
+	var decision *Decision
 	switch {
 	case open == nil && firing:
 		policy, err := s.currentPolicy(ctx, service.GetEscalationPolicyId())
 		if err != nil {
 			return err
 		}
-		decision = murphy.OpenIncident(alert, service, policy, murphy.Now())
+		decision = OpenIncident(alert, service, policy, murphy.Now())
 	case open == nil && time.Since(alert.GetReceivedAt().AsTime()) < resolveWait:
 		return errNothingToResolve
 	case open != nil:
@@ -116,7 +116,7 @@ func (s *Service) AlertReceived(ctx context.Context, messageID string, alert *mu
 		if err != nil {
 			return err
 		}
-		decision = open.Receive(alert, stillFiring, murphy.Now())
+		decision = ReceiveAlert(open, alert, stillFiring, murphy.Now())
 	}
 
 	incidentID := decision.GetIncident().GetId()
@@ -140,7 +140,7 @@ func (s *Service) TimerExpired(ctx context.Context, messageID string, timer *mur
 	if err != nil {
 		return err
 	}
-	return s.record(ctx, &Change{MessageID: messageID, IncidentID: incident.GetId(), Decision: incident.TimerExpired(timer, policy, murphy.Now())})
+	return s.record(ctx, &Change{MessageID: messageID, IncidentID: incident.GetId(), Decision: ExpireTimer(incident, timer, policy, murphy.Now())})
 }
 
 func (s *Service) PageCreated(ctx context.Context, messageID string, page *murphy.Page) (err error) {
@@ -156,7 +156,7 @@ func (s *Service) PageCreated(ctx context.Context, messageID string, page *murph
 	if err != nil {
 		return err
 	}
-	return s.record(ctx, &Change{MessageID: messageID, IncidentID: incident.GetId(), Decision: incident.PageCreated(page, policy, murphy.Now())})
+	return s.record(ctx, &Change{MessageID: messageID, IncidentID: incident.GetId(), Decision: RecordPage(incident, page, policy, murphy.Now())})
 }
 
 func (s *Service) NotificationSent(ctx context.Context, messageID string, notification *murphy.Notification) error {
@@ -175,7 +175,7 @@ func (s *Service) notificationOutcome(ctx context.Context, messageID string, not
 	)
 	defer span.End(&err)
 
-	return s.record(ctx, &Change{MessageID: messageID, IncidentID: notification.GetIncident().GetId(), Decision: murphy.NotificationOutcome(notification, failed)})
+	return s.record(ctx, &Change{MessageID: messageID, IncidentID: notification.GetIncident().GetId(), Decision: NotificationOutcome(notification, failed)})
 }
 
 func (s *Service) Acknowledge(ctx context.Context, id string) (_ *murphy.Incident, err error) {
@@ -183,7 +183,7 @@ func (s *Service) Acknowledge(ctx context.Context, id string) (_ *murphy.Inciden
 	ctx = span.Set(ctx, telemetry.WithField("incident.id", id))
 	defer span.End(&err)
 
-	return s.change(ctx, id, (*murphy.Incident).Acknowledge)
+	return s.change(ctx, id, AcknowledgeIncident)
 }
 
 func (s *Service) Resolve(ctx context.Context, id string) (_ *murphy.Incident, err error) {
@@ -191,10 +191,10 @@ func (s *Service) Resolve(ctx context.Context, id string) (_ *murphy.Incident, e
 	ctx = span.Set(ctx, telemetry.WithField("incident.id", id))
 	defer span.End(&err)
 
-	return s.change(ctx, id, (*murphy.Incident).Resolve)
+	return s.change(ctx, id, ResolveIncident)
 }
 
-func (s *Service) change(ctx context.Context, id string, decide func(*murphy.Incident, *timestamppb.Timestamp) *murphy.IncidentDecision) (*murphy.Incident, error) {
+func (s *Service) change(ctx context.Context, id string, decide func(*murphy.Incident, *timestamppb.Timestamp) *Decision) (*murphy.Incident, error) {
 	if err := murphy.LookupID("incident", id); err != nil {
 		return nil, err
 	}
@@ -235,7 +235,7 @@ func (s *Service) escalatingIncident(ctx context.Context, id string) (*murphy.In
 	if err != nil {
 		return nil, nil, fmt.Errorf("get incident: %w", err)
 	}
-	if !incident.Escalating() {
+	if !Escalating(incident) {
 		return incident, nil, nil
 	}
 	policy, err := s.policyVersion(ctx, incident.GetEscalationPolicyId(), incident.GetEscalationPolicyVersion())

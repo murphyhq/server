@@ -159,7 +159,7 @@ func Run(t *testing.T, open func(t *testing.T) incidents.Repository) {
 		acknowledged.Alert = nil
 		acknowledged.Decision.Incident.Status = murphy.IncidentStatus_INCIDENT_STATUS_ACKNOWLEDGED
 		acknowledged.Decision.CancelTimers = true
-		acknowledged.Decision.Announce = []murphy.Announcement{{Verb: murphy.IncidentVerb_INCIDENT_VERB_ACKNOWLEDGED}}
+		acknowledged.Decision.Announce = []incidents.Announcement{{Verb: murphy.IncidentVerb_INCIDENT_VERB_ACKNOWLEDGED}}
 		_, err = repo.Record(t.Context(), acknowledged)
 		require.NoError(t, err)
 
@@ -345,9 +345,9 @@ func opened(serviceID, dedupKey string) *incidents.Change {
 	}
 	return &incidents.Change{
 		MessageID: murphy.NewID(), Alert: a, IncidentID: incident.GetId(),
-		Decision: &murphy.IncidentDecision{
+		Decision: &incidents.Decision{
 			Incident: incident, Created: true,
-			Announce: []murphy.Announcement{{Verb: murphy.IncidentVerb_INCIDENT_VERB_CREATED}},
+			Announce: []incidents.Announcement{{Verb: murphy.IncidentVerb_INCIDENT_VERB_CREATED}},
 			Timeline: []*murphy.TimelineEntry{entry(incident.GetId(), murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_TRIGGERED, a)},
 		},
 	}
@@ -364,7 +364,7 @@ func joined(incident *murphy.Incident, messageID string) *incidents.Change {
 	}
 	return &incidents.Change{
 		MessageID: messageID, Alert: a, IncidentID: incident.GetId(),
-		Decision: &murphy.IncidentDecision{
+		Decision: &incidents.Decision{
 			Incident: updated,
 			Timeline: []*murphy.TimelineEntry{entry(incident.GetId(), murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_ALERTED, a)},
 		},

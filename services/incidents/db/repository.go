@@ -96,7 +96,7 @@ func (r *Repository[T]) Record(ctx context.Context, change *incidents.Change) (r
 	return recorded, err
 }
 
-func scheduledMessages(ctx context.Context, decision *murphy.IncidentDecision) ([]*incidents.ScheduledMessage, error) {
+func scheduledMessages(ctx context.Context, decision *incidents.Decision) ([]*incidents.ScheduledMessage, error) {
 	var messages []*incidents.ScheduledMessage
 	for _, announcement := range decision.GetAnnounce() {
 		event, err := scheduled(ctx, decision.Incident.GetId(), incidents.MessageEvent, decision.Incident.GetUpdatedAt().AsTime(), &murphy.Envelope{
