@@ -304,7 +304,7 @@ func Run(t *testing.T, open func(t *testing.T) Storage) {
 		assert.ErrorIs(t, err, murphy.ErrNotFound)
 	})
 
-	t.Run("finds which of many users and teams exist in one call", func(t *testing.T) {
+	t.Run("names many users and teams in one call", func(t *testing.T) {
 		repo := open(t)
 		ana, bo := newUser("ana@example.com"), newUser("bo@example.com")
 		team := newTeam("platform")
@@ -312,13 +312,13 @@ func Run(t *testing.T, open func(t *testing.T) Storage) {
 		require.NoError(t, repo.CreateUser(t.Context(), bo))
 		require.NoError(t, repo.CreateTeam(t.Context(), team))
 
-		users, err := repo.ExistingUsers(t.Context(), []string{ana.GetId(), murphy.NewID(), bo.GetId()})
+		users, err := repo.UserNames(t.Context(), []string{ana.GetId(), murphy.NewID(), bo.GetId()})
 		require.NoError(t, err)
-		assert.ElementsMatch(t, []string{ana.GetId(), bo.GetId()}, users)
+		assert.Equal(t, map[string]string{ana.GetId(): ana.GetName(), bo.GetId(): bo.GetName()}, users)
 
-		teams, err := repo.ExistingTeams(t.Context(), []string{murphy.NewID(), team.GetId()})
+		teams, err := repo.TeamNames(t.Context(), []string{murphy.NewID(), team.GetId()})
 		require.NoError(t, err)
-		assert.Equal(t, []string{team.GetId()}, teams)
+		assert.Equal(t, map[string]string{team.GetId(): team.GetName()}, teams)
 	})
 
 	t.Run("finds which of many users are active in one call", func(t *testing.T) {

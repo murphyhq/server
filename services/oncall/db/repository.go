@@ -32,7 +32,7 @@ type Engine[T Tx] interface {
 	ListOverrides(ctx context.Context, scheduleID string, endsAfter time.Time) ([]*murphy.Override, error)
 	GetOverride(ctx context.Context, id string) (*murphy.Override, error)
 	DeleteOverride(ctx context.Context, id string) error
-	ExistingSchedules(ctx context.Context, ids []string) ([]string, error)
+	ScheduleNames(ctx context.Context, ids []string) (map[string]string, error)
 	Transaction(ctx context.Context, work func(tx T) error) error
 	Migrate(ctx context.Context) error
 	Ping(ctx context.Context) error

@@ -182,32 +182,6 @@ func (q *Queries) DeleteScheduleTeams(ctx context.Context, scheduleID string) er
 	return err
 }
 
-const existingSchedules = `-- name: ExistingSchedules :many
-SELECT id
-FROM schedules
-WHERE id = ANY($1::uuid[])
-`
-
-func (q *Queries) ExistingSchedules(ctx context.Context, ids []string) ([]string, error) {
-	rows, err := q.db.Query(ctx, existingSchedules, ids)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []string
-	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err != nil {
-			return nil, err
-		}
-		items = append(items, id)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const getOverride = `-- name: GetOverride :one
 SELECT id, schedule_id, user_id, starts_at, ends_at, created_at, updated_at
 FROM overrides
@@ -499,6 +473,37 @@ func (q *Queries) ListSchedules(ctx context.Context, arg ListSchedulesParams) ([
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const scheduleNames = `-- name: ScheduleNames :many
+SELECT id, name
+FROM schedules
+WHERE id = ANY($1::uuid[])
+`
+
+type ScheduleNamesRow struct {
+	ID   string
+	Name string
+}
+
+func (q *Queries) ScheduleNames(ctx context.Context, ids []string) ([]ScheduleNamesRow, error) {
+	rows, err := q.db.Query(ctx, scheduleNames, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ScheduleNamesRow
+	for rows.Next() {
+		var i ScheduleNamesRow
+		if err := rows.Scan(&i.ID, &i.Name); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

@@ -64,8 +64,8 @@ ORDER BY starts_at, id;
 DELETE FROM overrides
 WHERE id = sqlc.arg(id);
 
--- name: ExistingSchedules :many
-SELECT id
+-- name: ScheduleNames :many
+SELECT id, name
 FROM schedules
 WHERE id IN (sqlc.slice(ids));
 

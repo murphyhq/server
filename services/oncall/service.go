@@ -22,14 +22,14 @@ type Repository interface {
 	ListOverrides(ctx context.Context, scheduleID string, endsAfter time.Time) ([]*murphy.Override, error)
 	GetOverride(ctx context.Context, id string) (*murphy.Override, error)
 	DeleteOverride(ctx context.Context, id string) error
-	ExistingSchedules(ctx context.Context, ids []string) ([]string, error)
+	ScheduleNames(ctx context.Context, ids []string) (map[string]string, error)
 	GetSchedules(ctx context.Context, ids []string) ([]*murphy.Schedule, error)
 	ListOverridesAt(ctx context.Context, scheduleIDs []string, at time.Time) (map[string][]*murphy.Override, error)
 }
 
 type People interface {
-	ExistingUsers(ctx context.Context, ids []string) (map[string]bool, error)
-	ExistingTeams(ctx context.Context, ids []string) (map[string]bool, error)
+	UserNames(ctx context.Context, ids []string) (map[string]string, error)
+	TeamNames(ctx context.Context, ids []string) (map[string]string, error)
 }
 
 type Service struct {
@@ -160,18 +160,18 @@ func (s *Service) CreateOverride(ctx context.Context, in *murphy.Override) (_ *m
 	if err := override.Validate(); err != nil {
 		return nil, err
 	}
-	schedules, err := s.ExistingSchedules(ctx, []string{override.GetScheduleId()})
+	schedules, err := s.ScheduleNames(ctx, []string{override.GetScheduleId()})
 	if err != nil {
 		return nil, err
 	}
-	if !schedules[override.GetScheduleId()] {
+	if _, ok := schedules[override.GetScheduleId()]; !ok {
 		return nil, &murphy.NotFoundError{Entity: "schedule"}
 	}
-	users, err := s.people.ExistingUsers(ctx, []string{override.GetUserId()})
+	users, err := s.people.UserNames(ctx, []string{override.GetUserId()})
 	if err != nil {
 		return nil, fmt.Errorf("check user: %w", err)
 	}
-	if !users[override.GetUserId()] {
+	if _, ok := users[override.GetUserId()]; !ok {
 		return nil, &murphy.FieldError{Field: "user_id", Reason: "must be an existing user"}
 	}
 	if err := s.repo.CreateOverride(ctx, override); err != nil {
@@ -244,7 +244,7 @@ func (s *Service) check(ctx context.Context, schedule *murphy.Schedule) error {
 	if err := schedule.Validate(); err != nil {
 		return err
 	}
-	teams, err := s.people.ExistingTeams(ctx, schedule.GetTeamIds())
+	teams, err := s.people.TeamNames(ctx, schedule.GetTeamIds())
 	if err != nil {
 		return fmt.Errorf("check teams: %w", err)
 	}
@@ -252,20 +252,20 @@ func (s *Service) check(ctx context.Context, schedule *murphy.Schedule) error {
 	for _, layer := range schedule.GetLayers() {
 		participants = append(participants, layer.GetParticipants()...)
 	}
-	users, err := s.people.ExistingUsers(ctx, participants)
+	users, err := s.people.UserNames(ctx, participants)
 	if err != nil {
 		return fmt.Errorf("check participants: %w", err)
 	}
 
 	var errs []error
 	for i, team := range schedule.GetTeamIds() {
-		if !teams[team] {
+		if _, ok := teams[team]; !ok {
 			errs = append(errs, &murphy.FieldError{Field: fmt.Sprintf("team_ids[%d]", i), Reason: "must be an existing team"})
 		}
 	}
 	for i, layer := range schedule.GetLayers() {
 		for j, participant := range layer.GetParticipants() {
-			if !users[participant] {
+			if _, ok := users[participant]; !ok {
 				errs = append(errs, &murphy.FieldError{Field: fmt.Sprintf("layers[%d].participants[%d]", i, j), Reason: "must be an existing user"})
 			}
 		}
@@ -273,22 +273,14 @@ func (s *Service) check(ctx context.Context, schedule *murphy.Schedule) error {
 	return errors.Join(errs...)
 }
 
-func (s *Service) ExistingSchedules(ctx context.Context, ids []string) (_ map[string]bool, err error) {
+func (s *Service) ScheduleNames(ctx context.Context, ids []string) (_ map[string]string, err error) {
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
-	found := map[string]bool{}
 	if len(ids) == 0 {
-		return found, nil
+		return map[string]string{}, nil
 	}
-	rows, err := s.repo.ExistingSchedules(ctx, ids)
-	if err != nil {
-		return nil, fmt.Errorf("find schedules: %w", err)
-	}
-	for _, id := range rows {
-		found[id] = true
-	}
-	return found, nil
+	return s.repo.ScheduleNames(ctx, ids)
 }
 
 func (s *Service) WhoIsOnCall(ctx context.Context, scheduleIDs []string, at time.Time) (_ map[string]string, err error) {

@@ -71,21 +71,23 @@ func (s *Server) ListContactMethods(ctx context.Context, request ListContactMeth
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
+	n := newNames()
 	methods, err := s.people.ListContactMethods(ctx, request.Id)
 	if err != nil {
 		return nil, err
 	}
 	items := make([]ContactMethod, len(methods))
 	for i, method := range methods {
-		items[i] = toContactMethod(method)
+		items[i] = toContactMethod(method, n)
 	}
-	return ListContactMethods200JSONResponse{Items: items}, nil
+	return ListContactMethods200JSONResponse{Items: items}, s.name(ctx, n)
 }
 
 func (s *Server) CreateContactMethod(ctx context.Context, request CreateContactMethodRequestObject) (_ CreateContactMethodResponseObject, err error) {
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
+	n := newNames()
 	method, err := s.people.CreateContactMethod(ctx, &murphy.ContactMethod{
 		UserId:       request.Id,
 		Type:         murphy.ContactMethodTypeFromText(string(request.Body.Type)),
@@ -95,24 +97,26 @@ func (s *Server) CreateContactMethod(ctx context.Context, request CreateContactM
 	if err != nil {
 		return nil, err
 	}
-	return CreateContactMethod201JSONResponse(toContactMethod(method)), nil
+	return CreateContactMethod201JSONResponse(toContactMethod(method, n)), s.name(ctx, n)
 }
 
 func (s *Server) GetContactMethod(ctx context.Context, request GetContactMethodRequestObject) (_ GetContactMethodResponseObject, err error) {
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
+	n := newNames()
 	method, err := s.people.GetContactMethod(ctx, request.Id)
 	if err != nil {
 		return nil, err
 	}
-	return GetContactMethod200JSONResponse(toContactMethod(method)), nil
+	return GetContactMethod200JSONResponse(toContactMethod(method, n)), s.name(ctx, n)
 }
 
 func (s *Server) UpdateContactMethod(ctx context.Context, request UpdateContactMethodRequestObject) (_ UpdateContactMethodResponseObject, err error) {
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
+	n := newNames()
 	method, err := s.people.UpdateContactMethod(ctx, &murphy.ContactMethod{
 		Id:           request.Id,
 		Type:         murphy.ContactMethodTypeFromText(string(request.Body.Type)),
@@ -122,7 +126,7 @@ func (s *Server) UpdateContactMethod(ctx context.Context, request UpdateContactM
 	if err != nil {
 		return nil, err
 	}
-	return UpdateContactMethod200JSONResponse(toContactMethod(method)), nil
+	return UpdateContactMethod200JSONResponse(toContactMethod(method, n)), s.name(ctx, n)
 }
 
 func (s *Server) DeleteContactMethod(ctx context.Context, request DeleteContactMethodRequestObject) (_ DeleteContactMethodResponseObject, err error) {
@@ -157,10 +161,10 @@ func toUser(user *murphy.User) User {
 	}
 }
 
-func toContactMethod(method *murphy.ContactMethod) ContactMethod {
+func toContactMethod(method *murphy.ContactMethod, n *names) ContactMethod {
 	return ContactMethod{
 		Id:        method.GetId(),
-		User:      ref(method.GetUserId()),
+		User:      n.user(method.GetUserId()),
 		Type:      ContactMethodType(method.GetType().Text()),
 		Address:   method.GetAddress(),
 		Platform:  pushPlatform(method.GetPushPlatform()),

@@ -15,50 +15,54 @@ func (s *Server) ListSchedules(ctx context.Context, request ListSchedulesRequest
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
+	n := newNames()
 	schedules, next, err := s.oncall.ListSchedules(ctx, text(request.Params.TeamId), page(request.Params.Limit, request.Params.Cursor))
 	if err != nil {
 		return nil, err
 	}
 	items := make([]Schedule, len(schedules))
 	for i, schedule := range schedules {
-		items[i] = toSchedule(schedule)
+		items[i] = toSchedule(schedule, n)
 	}
-	return ListSchedules200JSONResponse{Items: items, NextCursor: next}, nil
+	return ListSchedules200JSONResponse{Items: items, NextCursor: next}, s.name(ctx, n)
 }
 
 func (s *Server) CreateSchedule(ctx context.Context, request CreateScheduleRequestObject) (_ CreateScheduleResponseObject, err error) {
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
+	n := newNames()
 	schedule, err := s.oncall.CreateSchedule(ctx, fromScheduleInput(request.Body))
 	if err != nil {
 		return nil, err
 	}
-	return CreateSchedule201JSONResponse(toSchedule(schedule)), nil
+	return CreateSchedule201JSONResponse(toSchedule(schedule, n)), s.name(ctx, n)
 }
 
 func (s *Server) GetSchedule(ctx context.Context, request GetScheduleRequestObject) (_ GetScheduleResponseObject, err error) {
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
+	n := newNames()
 	schedule, err := s.oncall.GetSchedule(ctx, request.Id)
 	if err != nil {
 		return nil, err
 	}
-	return GetSchedule200JSONResponse(toSchedule(schedule)), nil
+	return GetSchedule200JSONResponse(toSchedule(schedule, n)), s.name(ctx, n)
 }
 
 func (s *Server) UpdateSchedule(ctx context.Context, request UpdateScheduleRequestObject) (_ UpdateScheduleResponseObject, err error) {
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
+	n := newNames()
 	in := fromScheduleInput(request.Body)
 	in.Id = request.Id
 	schedule, err := s.oncall.UpdateSchedule(ctx, in)
 	if err != nil {
 		return nil, err
 	}
-	return UpdateSchedule200JSONResponse(toSchedule(schedule)), nil
+	return UpdateSchedule200JSONResponse(toSchedule(schedule, n)), s.name(ctx, n)
 }
 
 func (s *Server) DeleteSchedule(ctx context.Context, request DeleteScheduleRequestObject) (_ DeleteScheduleResponseObject, err error) {
@@ -75,6 +79,7 @@ func (s *Server) ListOverrides(ctx context.Context, request ListOverridesRequest
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
+	n := newNames()
 	endsAfter := time.Now()
 	if request.Params.EndsAfter != nil {
 		endsAfter = *request.Params.EndsAfter
@@ -85,15 +90,16 @@ func (s *Server) ListOverrides(ctx context.Context, request ListOverridesRequest
 	}
 	items := make([]Override, len(overrides))
 	for i, override := range overrides {
-		items[i] = toOverride(override)
+		items[i] = toOverride(override, n)
 	}
-	return ListOverrides200JSONResponse{Items: items}, nil
+	return ListOverrides200JSONResponse{Items: items}, s.name(ctx, n)
 }
 
 func (s *Server) CreateOverride(ctx context.Context, request CreateOverrideRequestObject) (_ CreateOverrideResponseObject, err error) {
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
+	n := newNames()
 	override, err := s.oncall.CreateOverride(ctx, &murphy.Override{
 		ScheduleId: request.Id,
 		UserId:     request.Body.User.Id,
@@ -103,7 +109,7 @@ func (s *Server) CreateOverride(ctx context.Context, request CreateOverrideReque
 	if err != nil {
 		return nil, err
 	}
-	return CreateOverride201JSONResponse(toOverride(override)), nil
+	return CreateOverride201JSONResponse(toOverride(override, n)), s.name(ctx, n)
 }
 
 func (s *Server) DeleteOverride(ctx context.Context, request DeleteOverrideRequestObject) (_ DeleteOverrideResponseObject, err error) {
@@ -128,12 +134,13 @@ func (s *Server) GetOnCall(ctx context.Context, request GetOnCallRequestObject) 
 	if err != nil {
 		return nil, err
 	}
+	n := newNames()
 	out := GetOnCall200JSONResponse{At: at}
 	if user != "" {
-		reference := ref(user)
+		reference := n.user(user)
 		out.User = &reference
 	}
-	return out, nil
+	return out, s.name(ctx, n)
 }
 
 func fromScheduleInput(in *ScheduleInput) *murphy.Schedule {
@@ -152,19 +159,19 @@ func fromScheduleInput(in *ScheduleInput) *murphy.Schedule {
 	return schedule
 }
 
-func toSchedule(schedule *murphy.Schedule) Schedule {
+func toSchedule(schedule *murphy.Schedule, n *names) Schedule {
 	out := Schedule{
 		Id:        schedule.GetId(),
 		Name:      schedule.GetName(),
 		TimeZone:  schedule.GetTimeZone(),
-		Teams:     refs(schedule.GetTeamIds()),
+		Teams:     each(schedule.GetTeamIds(), n.team),
 		Layers:    []Layer{},
 		CreatedAt: schedule.GetCreatedAt().AsTime(),
 		UpdatedAt: schedule.GetUpdatedAt().AsTime(),
 	}
 	for _, layer := range schedule.GetLayers() {
 		l := Layer{
-			Participants:      refs(layer.GetParticipants()),
+			Participants:      each(layer.GetParticipants(), n.user),
 			TurnLengthSeconds: int64(layer.GetTurnLength().AsDuration() / time.Second),
 			StartsAt:          layer.GetStartsAt().AsTime(),
 		}
@@ -176,11 +183,11 @@ func toSchedule(schedule *murphy.Schedule) Schedule {
 	return out
 }
 
-func toOverride(override *murphy.Override) Override {
+func toOverride(override *murphy.Override, n *names) Override {
 	return Override{
 		Id:        override.GetId(),
-		Schedule:  ref(override.GetScheduleId()),
-		User:      ref(override.GetUserId()),
+		Schedule:  n.schedule(override.GetScheduleId()),
+		User:      n.user(override.GetUserId()),
 		StartsAt:  override.GetStartsAt().AsTime(),
 		EndsAt:    override.GetEndsAt().AsTime(),
 		CreatedAt: override.GetCreatedAt().AsTime(),

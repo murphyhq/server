@@ -305,26 +305,34 @@ func toMembership(row TeamMembership) *murphy.TeamMembership {
 	}
 }
 
-func (r *Repository) ExistingUsers(ctx context.Context, ids []string) (_ []string, err error) {
+func (r *Repository) UserNames(ctx context.Context, ids []string) (_ map[string]string, err error) {
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
-	existing, err := r.queries.ExistingUsers(ctx, ids)
+	rows, err := r.queries.UserNames(ctx, ids)
 	if err != nil {
 		return nil, murphypostgres.Error("user", err)
 	}
-	return existing, nil
+	names := make(map[string]string, len(rows))
+	for _, row := range rows {
+		names[row.ID] = row.Name
+	}
+	return names, nil
 }
 
-func (r *Repository) ExistingTeams(ctx context.Context, ids []string) (_ []string, err error) {
+func (r *Repository) TeamNames(ctx context.Context, ids []string) (_ map[string]string, err error) {
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
-	existing, err := r.queries.ExistingTeams(ctx, ids)
+	rows, err := r.queries.TeamNames(ctx, ids)
 	if err != nil {
 		return nil, murphypostgres.Error("team", err)
 	}
-	return existing, nil
+	names := make(map[string]string, len(rows))
+	for _, row := range rows {
+		names[row.ID] = row.Name
+	}
+	return names, nil
 }
 
 func (r *Repository) ActiveUsers(ctx context.Context, ids []string) (_ []string, err error) {

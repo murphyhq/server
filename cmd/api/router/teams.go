@@ -69,21 +69,23 @@ func (s *Server) ListTeamMembers(ctx context.Context, request ListTeamMembersReq
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
+	n := newNames()
 	memberships, err := s.people.ListMemberships(ctx, request.Id)
 	if err != nil {
 		return nil, err
 	}
 	items := make([]TeamMembership, len(memberships))
 	for i, membership := range memberships {
-		items[i] = toMembership(membership)
+		items[i] = toMembership(membership, n)
 	}
-	return ListTeamMembers200JSONResponse{Items: items}, nil
+	return ListTeamMembers200JSONResponse{Items: items}, s.name(ctx, n)
 }
 
 func (s *Server) SetTeamMember(ctx context.Context, request SetTeamMemberRequestObject) (_ SetTeamMemberResponseObject, err error) {
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
+	n := newNames()
 	membership, err := s.people.SetMembership(ctx, &murphy.TeamMembership{
 		TeamId: request.Id,
 		UserId: request.UserId,
@@ -92,7 +94,7 @@ func (s *Server) SetTeamMember(ctx context.Context, request SetTeamMemberRequest
 	if err != nil {
 		return nil, err
 	}
-	return SetTeamMember200JSONResponse(toMembership(membership)), nil
+	return SetTeamMember200JSONResponse(toMembership(membership, n)), s.name(ctx, n)
 }
 
 func (s *Server) RemoveTeamMember(ctx context.Context, request RemoveTeamMemberRequestObject) (_ RemoveTeamMemberResponseObject, err error) {
@@ -109,10 +111,10 @@ func toTeam(team *murphy.Team) Team {
 	return Team{Id: team.GetId(), Name: team.GetName(), CreatedAt: team.GetCreatedAt().AsTime(), UpdatedAt: team.GetUpdatedAt().AsTime()}
 }
 
-func toMembership(membership *murphy.TeamMembership) TeamMembership {
+func toMembership(membership *murphy.TeamMembership, n *names) TeamMembership {
 	return TeamMembership{
-		Team:      ref(membership.GetTeamId()),
-		User:      ref(membership.GetUserId()),
+		Team:      n.team(membership.GetTeamId()),
+		User:      n.user(membership.GetUserId()),
 		Role:      TeamRole(membership.GetRole().Text()),
 		CreatedAt: membership.GetCreatedAt().AsTime(),
 		UpdatedAt: membership.GetUpdatedAt().AsTime(),

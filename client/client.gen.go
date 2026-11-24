@@ -411,7 +411,10 @@ type EscalationPolicyPage struct {
 
 // EscalationTarget defines model for EscalationTarget.
 type EscalationTarget struct {
-	Id   string               `json:"id"`
+	Id string `json:"id"`
+
+	// Name The user's or schedule's current name, in responses; empty once it is deleted. Ignored in requests.
+	Name *string              `json:"name,omitempty"`
 	Type EscalationTargetType `json:"type"`
 }
 
@@ -604,8 +607,11 @@ type Page struct {
 
 // PolicyVersionReference Points at one version of an escalation policy.
 type PolicyVersionReference struct {
-	Id      string `json:"id"`
-	Version int32  `json:"version"`
+	Id string `json:"id"`
+
+	// Name The policy's current name; empty once the policy is deleted.
+	Name    *string `json:"name,omitempty"`
+	Version int32   `json:"version"`
 }
 
 // Problem defines model for Problem.
@@ -624,6 +630,9 @@ type PushPlatform string
 // Reference Points at another resource.
 type Reference struct {
 	Id string `json:"id"`
+
+	// Name The resource's current name, in responses, for resources that have one; empty once the resource is deleted. Ignored in requests.
+	Name *string `json:"name,omitempty"`
 }
 
 // Schedule defines model for Schedule.

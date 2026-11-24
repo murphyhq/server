@@ -20,15 +20,16 @@ type Repository interface {
 	DeletePolicy(ctx context.Context, id string) error
 	GetPolicyVersion(ctx context.Context, id string, version int32) (*murphy.EscalationPolicy, error)
 	CurrentVersion(ctx context.Context, id string) (int32, error)
+	PolicyNames(ctx context.Context, ids []string) (map[string]string, error)
 }
 
 type People interface {
-	ExistingUsers(ctx context.Context, ids []string) (map[string]bool, error)
-	ExistingTeams(ctx context.Context, ids []string) (map[string]bool, error)
+	UserNames(ctx context.Context, ids []string) (map[string]string, error)
+	TeamNames(ctx context.Context, ids []string) (map[string]string, error)
 }
 
 type Schedules interface {
-	ExistingSchedules(ctx context.Context, ids []string) (map[string]bool, error)
+	ScheduleNames(ctx context.Context, ids []string) (map[string]string, error)
 }
 
 type Catalog interface {
@@ -178,30 +179,30 @@ func (s *Service) check(ctx context.Context, policy *murphy.EscalationPolicy) er
 			}
 		}
 	}
-	teams, err := s.people.ExistingTeams(ctx, []string{policy.GetTeamId()})
+	teams, err := s.people.TeamNames(ctx, []string{policy.GetTeamId()})
 	if err != nil {
 		return fmt.Errorf("check team: %w", err)
 	}
-	users, err := s.people.ExistingUsers(ctx, userIDs)
+	users, err := s.people.UserNames(ctx, userIDs)
 	if err != nil {
 		return fmt.Errorf("check user targets: %w", err)
 	}
-	schedules, err := s.schedules.ExistingSchedules(ctx, scheduleIDs)
+	schedules, err := s.schedules.ScheduleNames(ctx, scheduleIDs)
 	if err != nil {
 		return fmt.Errorf("check schedule targets: %w", err)
 	}
 
 	var errs []error
-	if !teams[policy.GetTeamId()] {
+	if _, ok := teams[policy.GetTeamId()]; !ok {
 		errs = append(errs, &murphy.FieldError{Field: "team_id", Reason: "must be an existing team"})
 	}
 	for i, level := range policy.GetLevels() {
 		for j, target := range level.GetTargets() {
-			exists := users[target.GetId()]
+			found := users
 			if target.GetType() == murphy.EscalationTargetType_ESCALATION_TARGET_TYPE_SCHEDULE {
-				exists = schedules[target.GetId()]
+				found = schedules
 			}
-			if !exists {
+			if _, exists := found[target.GetId()]; !exists {
 				errs = append(errs, &murphy.FieldError{
 					Field:  fmt.Sprintf("levels[%d].targets[%d].id", i, j),
 					Reason: "must be an existing " + target.GetType().Text(),
@@ -243,4 +244,14 @@ func (s *Service) CurrentVersion(ctx context.Context, id string) (_ int32, err e
 		return 0, fmt.Errorf("get the escalation policy's current version: %w", err)
 	}
 	return version, nil
+}
+
+func (s *Service) PolicyNames(ctx context.Context, ids []string) (_ map[string]string, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	if len(ids) == 0 {
+		return map[string]string{}, nil
+	}
+	return s.repo.PolicyNames(ctx, ids)
 }

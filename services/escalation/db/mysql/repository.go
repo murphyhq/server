@@ -201,3 +201,18 @@ func (r *Repository) CurrentVersion(ctx context.Context, id string) (_ int32, er
 	}
 	return version, nil
 }
+
+func (r *Repository) PolicyNames(ctx context.Context, ids []string) (_ map[string]string, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	rows, err := r.queries.PolicyNames(ctx, ids)
+	if err != nil {
+		return nil, murphymysql.Error("escalation policy", err)
+	}
+	names := make(map[string]string, len(rows))
+	for _, row := range rows {
+		names[row.ID] = row.Name
+	}
+	return names, nil
+}

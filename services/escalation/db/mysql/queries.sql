@@ -53,3 +53,8 @@ ORDER BY lt.level_id, lt.position;
 SELECT version
 FROM escalation_policies
 WHERE id = sqlc.arg(id) AND deleted_at IS NULL;
+
+-- name: PolicyNames :many
+SELECT id, name
+FROM escalation_policies
+WHERE id IN (sqlc.slice(ids));

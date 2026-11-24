@@ -64,3 +64,8 @@ SELECT sqlc.embed(i), sqlc.embed(s)
 FROM integrations AS i
 JOIN services AS s ON s.id = i.service_id
 WHERE i.id = @id;
+
+-- name: ServiceNames :many
+SELECT id, name
+FROM services
+WHERE id = ANY(@ids::uuid[]);

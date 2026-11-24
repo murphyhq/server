@@ -115,6 +115,19 @@ func Run(t *testing.T, open func(t *testing.T) escalation.Repository) {
 		assert.NoError(t, repo.CreatePolicy(t.Context(), newPolicy("payments", team)), "the name is free again")
 	})
 
+	t.Run("names many policies in one call, deleted ones included", func(t *testing.T) {
+		repo := open(t)
+		payments, deleted := newPolicy("payments", murphy.NewID()), newPolicy("retired", murphy.NewID())
+		require.NoError(t, repo.CreatePolicy(t.Context(), payments))
+		require.NoError(t, repo.CreatePolicy(t.Context(), deleted))
+		require.NoError(t, repo.DeletePolicy(t.Context(), deleted.GetId()))
+
+		got, err := repo.PolicyNames(t.Context(), []string{payments.GetId(), murphy.NewID(), deleted.GetId()})
+
+		require.NoError(t, err)
+		assert.Equal(t, map[string]string{payments.GetId(): "payments", deleted.GetId(): "retired"}, got)
+	})
+
 	t.Run("lists policies newest first, optionally of one team", func(t *testing.T) {
 		repo := open(t)
 		platform, payments := murphy.NewID(), murphy.NewID()

@@ -24,6 +24,7 @@ type Repository interface {
 	RotateIntegrationKey(ctx context.Context, id string, previousValidUntil, updatedAt time.Time) (*murphy.Integration, error)
 	DeleteIntegration(ctx context.Context, id string) error
 	PolicyInUse(ctx context.Context, policyID string) (bool, error)
+	ServiceNames(ctx context.Context, ids []string) (map[string]string, error)
 	GetIntegrationAndService(ctx context.Context, integrationID string) (*murphy.Integration, *murphy.Service, error)
 }
 
@@ -277,6 +278,16 @@ func (s *Service) PolicyInUse(ctx context.Context, policyID string) (_ bool, err
 		return false, fmt.Errorf("check services using the escalation policy: %w", err)
 	}
 	return inUse, nil
+}
+
+func (s *Service) ServiceNames(ctx context.Context, ids []string) (_ map[string]string, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	if len(ids) == 0 {
+		return map[string]string{}, nil
+	}
+	return s.repo.ServiceNames(ctx, ids)
 }
 
 func (s *Service) GetIntegrationAndService(ctx context.Context, integrationID string) (_ *murphy.Integration, _ *murphy.Service, err error) {

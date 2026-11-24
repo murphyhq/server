@@ -788,6 +788,74 @@ func (_c *MockRepository_RotateIntegrationKey_Call) RunAndReturn(run func(ctx co
 	return _c
 }
 
+// ServiceNames provides a mock function for the type MockRepository
+func (_mock *MockRepository) ServiceNames(ctx context.Context, ids []string) (map[string]string, error) {
+	ret := _mock.Called(ctx, ids)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ServiceNames")
+	}
+
+	var r0 map[string]string
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, []string) (map[string]string, error)); ok {
+		return returnFunc(ctx, ids)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, []string) map[string]string); ok {
+		r0 = returnFunc(ctx, ids)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(map[string]string)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, []string) error); ok {
+		r1 = returnFunc(ctx, ids)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockRepository_ServiceNames_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ServiceNames'
+type MockRepository_ServiceNames_Call struct {
+	*mock.Call
+}
+
+// ServiceNames is a helper method to define mock.On call
+//   - ctx context.Context
+//   - ids []string
+func (_e *MockRepository_Expecter) ServiceNames(ctx any, ids any) *MockRepository_ServiceNames_Call {
+	return &MockRepository_ServiceNames_Call{Call: _e.mock.On("ServiceNames", ctx, ids)}
+}
+
+func (_c *MockRepository_ServiceNames_Call) Run(run func(ctx context.Context, ids []string)) *MockRepository_ServiceNames_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 []string
+		if args[1] != nil {
+			arg1 = args[1].([]string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_ServiceNames_Call) Return(stringToString map[string]string, err error) *MockRepository_ServiceNames_Call {
+	_c.Call.Return(stringToString, err)
+	return _c
+}
+
+func (_c *MockRepository_ServiceNames_Call) RunAndReturn(run func(ctx context.Context, ids []string) (map[string]string, error)) *MockRepository_ServiceNames_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // UpdateIntegration provides a mock function for the type MockRepository
 func (_mock *MockRepository) UpdateIntegration(ctx context.Context, integration *murphy.Integration) error {
 	ret := _mock.Called(ctx, integration)
