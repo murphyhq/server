@@ -3,6 +3,9 @@
 package integration
 
 import (
+	"github.com/murphyhq/server/services/notifications"
+	notificationsdb "github.com/murphyhq/server/services/notifications/db"
+	notificationsstoragetest "github.com/murphyhq/server/services/notifications/db/storagetest"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -73,6 +76,17 @@ func TestEscalationStorage(t *testing.T) {
 	testenv.EachDatabase(t, func(t *testing.T, engine testenv.DatabaseEngine) {
 		escalationstoragetest.Run(t, func(t *testing.T) escalation.Repository {
 			storage, err := escalationdb.Open(t.Context(), testenv.Databases(t, engine).EscalationDatabaseURL)
+			require.NoError(t, err)
+			t.Cleanup(storage.Close)
+			return storage
+		})
+	})
+}
+
+func TestNotificationsStorage(t *testing.T) {
+	testenv.EachDatabase(t, func(t *testing.T, engine testenv.DatabaseEngine) {
+		notificationsstoragetest.Run(t, func(t *testing.T) notifications.Repository {
+			storage, err := notificationsdb.Open(t.Context(), testenv.Databases(t, engine).NotificationsDatabaseURL)
 			require.NoError(t, err)
 			t.Cleanup(storage.Close)
 			return storage

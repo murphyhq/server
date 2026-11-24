@@ -94,6 +94,10 @@ func requireID(field, value string) error {
 	return nil
 }
 
+func (r NotificationReason) Text() string {
+	return enumText(r, "NOTIFICATION_REASON_")
+}
+
 func (u Urgency) Text() string {
 	return enumText(u, "URGENCY_")
 }

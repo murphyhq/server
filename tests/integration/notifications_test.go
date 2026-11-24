@@ -16,13 +16,19 @@ import (
 
 	"github.com/murphyhq/server"
 	"github.com/murphyhq/server/client"
-	notifierhandlers "github.com/murphyhq/server/cmd/notifier/handlers"
 	"github.com/murphyhq/server/internal/messaging"
 	brokerpkg "github.com/murphyhq/server/internal/messaging/broker"
 	"github.com/murphyhq/server/internal/pagination"
+	"github.com/murphyhq/server/services/escalation"
+	escalationdb "github.com/murphyhq/server/services/escalation/db"
 	"github.com/murphyhq/server/services/incidents"
 	"github.com/murphyhq/server/services/notifications"
+	notificationsdb "github.com/murphyhq/server/services/notifications/db"
 	"github.com/murphyhq/server/services/notifications/webhook"
+	"github.com/murphyhq/server/services/oncall"
+	oncalldb "github.com/murphyhq/server/services/oncall/db"
+	"github.com/murphyhq/server/services/people"
+	peopledb "github.com/murphyhq/server/services/people/db"
 	"github.com/murphyhq/server/tests/testenv"
 )
 
@@ -289,13 +295,17 @@ func TestANotifierCrashSendsTheWebhookAgainWithTheSameID(t *testing.T) {
 				keys, err := webhook.ParseSigningKeys(testenv.WebhookSigningKey)
 				require.NoError(t, err)
 				crashing := &crashingPublisher{publisher: publisher, after: after}
-				service := notifications.New(crashing, map[murphy.ContactMethodType]notifications.Provider{
+				sender := notifications.NewSender(crashing, map[murphy.ContactMethodType]notifications.Provider{
 					murphy.ContactMethodType_CONTACT_METHOD_TYPE_WEBHOOK: webhook.New(keys),
 				})
 				notifierSubscription, err := brokerpkg.OpenSubscription(ctx, endpoints.Subscriptions["notifier"])
 				require.NoError(t, err)
 				t.Cleanup(func() { _ = notifierSubscription.Close() })
-				notifier, err := messaging.Consume(ctx, notifierSubscription, "notifier", notifierhandlers.New(service))
+				notifier, err := messaging.Consume(ctx, notifierSubscription, "notifier", messaging.Handlers{
+					messaging.On(murphy.NotificationVerb_NOTIFICATION_VERB_CREATED, func(ctx context.Context, envelope *murphy.Envelope) error {
+						return sender.Send(ctx, envelope.GetId(), envelope.GetNotification().GetCurrent())
+					}),
+				})
 				require.NoError(t, err)
 				t.Cleanup(notifier.Stop)
 
@@ -342,4 +352,50 @@ func TestANotifierCrashSendsTheWebhookAgainWithTheSameID(t *testing.T) {
 			})
 		}
 	}
+}
+
+func TestARedeliveredEscalationPagesOnce(t *testing.T) {
+	testenv.EachDatabase(t, func(t *testing.T, engine testenv.DatabaseEngine) {
+		ctx := t.Context()
+		databases := testenv.Databases(t, engine)
+		api, _ := testenv.APIWith(t, databases)
+		team := createTeam(t, api, "payments")
+		ana := createUser(t, api, "ana@example.com")
+		method, err := api.CreateContactMethodWithResponse(ctx, ana, nil, client.ContactMethodInput{Type: client.Webhook, Address: "https://example.com/ana"})
+		require.NoError(t, err)
+		require.Equal(t, http.StatusCreated, method.StatusCode())
+		policy, err := api.CreateEscalationPolicyWithResponse(ctx, nil, policyInput("payments", team, client.EscalationTarget{Type: client.EscalationTargetTypeUser, Id: ana}))
+		require.NoError(t, err)
+		require.Equal(t, http.StatusCreated, policy.StatusCode())
+
+		storage, err := notificationsdb.Open(ctx, databases.NotificationsDatabaseURL)
+		require.NoError(t, err)
+		t.Cleanup(storage.Close)
+		peopleStorage, err := peopledb.Open(ctx, databases.PeopleDatabaseURL)
+		require.NoError(t, err)
+		t.Cleanup(peopleStorage.Close)
+		oncallStorage, err := oncalldb.Open(ctx, databases.OnCallDatabaseURL)
+		require.NoError(t, err)
+		t.Cleanup(oncallStorage.Close)
+		escalationStorage, err := escalationdb.Open(ctx, databases.EscalationDatabaseURL)
+		require.NoError(t, err)
+		t.Cleanup(escalationStorage.Close)
+		peopleService := people.New(peopleStorage)
+		service := notifications.New(storage, escalation.New(escalationStorage, nil, nil, nil), oncall.New(oncallStorage, peopleService), peopleService)
+
+		incident := &murphy.Incident{
+			Id: murphy.NewID(), Status: murphy.IncidentStatus_INCIDENT_STATUS_TRIGGERED,
+			EscalationPolicyId: policy.JSON201.Id, EscalationPolicyVersion: policy.JSON201.Version, EscalationLevel: 1, EscalationRound: 1,
+		}
+		messageID := murphy.NewID()
+		require.NoError(t, service.IncidentEscalated(ctx, messageID, incident))
+		require.NoError(t, service.IncidentEscalated(ctx, messageID, incident))
+
+		due, err := storage.ClaimDueMessages(ctx, time.Now().Add(time.Second), 10, time.Minute)
+		require.NoError(t, err)
+		assert.Len(t, due, 2, "one page and one notification, not two of each")
+		users, err := storage.RecipientsOf(ctx, incident.GetId())
+		require.NoError(t, err)
+		assert.Equal(t, []string{ana}, users)
+	})
 }

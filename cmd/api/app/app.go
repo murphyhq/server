@@ -101,7 +101,7 @@ func New(ctx context.Context, s Settings) (_ *App, err error) {
 	escalationService := escalation.New(escalationStorage, peopleService, oncallService, catalogService)
 	a.Handler, err = router.New(router.Services{
 		Catalog:    catalogService,
-		Incidents:  incidents.New(incidentsStorage, catalogService, escalationService, oncallService, peopleService),
+		Incidents:  incidents.New(incidentsStorage, catalogService, escalationService),
 		People:     peopleService,
 		OnCall:     oncallService,
 		Escalation: escalationService,

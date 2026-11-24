@@ -31,7 +31,3 @@ func (t TimelineEntryType) Text() string {
 func TimelineEntryTypeFromText(text string) TimelineEntryType {
 	return enumFromText[TimelineEntryType](TimelineEntryType_value, "TIMELINE_ENTRY_TYPE_", text)
 }
-
-func (r NotificationReason) Text() string {
-	return enumText(r, "NOTIFICATION_REASON_")
-}

@@ -70,6 +70,58 @@ func (Urgency) EnumDescriptor() ([]byte, []int) {
 	return file_murphy_v1_shared_proto_rawDescGZIP(), []int{0}
 }
 
+type NotificationReason int32
+
+const (
+	NotificationReason_NOTIFICATION_REASON_UNSPECIFIED  NotificationReason = 0
+	NotificationReason_NOTIFICATION_REASON_PAGED        NotificationReason = 1
+	NotificationReason_NOTIFICATION_REASON_ACKNOWLEDGED NotificationReason = 2
+	NotificationReason_NOTIFICATION_REASON_RESOLVED     NotificationReason = 3
+)
+
+// Enum value maps for NotificationReason.
+var (
+	NotificationReason_name = map[int32]string{
+		0: "NOTIFICATION_REASON_UNSPECIFIED",
+		1: "NOTIFICATION_REASON_PAGED",
+		2: "NOTIFICATION_REASON_ACKNOWLEDGED",
+		3: "NOTIFICATION_REASON_RESOLVED",
+	}
+	NotificationReason_value = map[string]int32{
+		"NOTIFICATION_REASON_UNSPECIFIED":  0,
+		"NOTIFICATION_REASON_PAGED":        1,
+		"NOTIFICATION_REASON_ACKNOWLEDGED": 2,
+		"NOTIFICATION_REASON_RESOLVED":     3,
+	}
+)
+
+func (x NotificationReason) Enum() *NotificationReason {
+	p := new(NotificationReason)
+	*p = x
+	return p
+}
+
+func (x NotificationReason) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (NotificationReason) Descriptor() protoreflect.EnumDescriptor {
+	return file_murphy_v1_shared_proto_enumTypes[1].Descriptor()
+}
+
+func (NotificationReason) Type() protoreflect.EnumType {
+	return &file_murphy_v1_shared_proto_enumTypes[1]
+}
+
+func (x NotificationReason) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use NotificationReason.Descriptor instead.
+func (NotificationReason) EnumDescriptor() ([]byte, []int) {
+	return file_murphy_v1_shared_proto_rawDescGZIP(), []int{1}
+}
+
 var File_murphy_v1_shared_proto protoreflect.FileDescriptor
 
 const file_murphy_v1_shared_proto_rawDesc = "" +
@@ -78,7 +130,12 @@ const file_murphy_v1_shared_proto_rawDesc = "" +
 	"\aUrgency\x12\x17\n" +
 	"\x13URGENCY_UNSPECIFIED\x10\x00\x12\x10\n" +
 	"\fURGENCY_HIGH\x10\x01\x12\x0f\n" +
-	"\vURGENCY_LOW\x10\x02B#Z!github.com/murphyhq/server;murphyb\x06proto3"
+	"\vURGENCY_LOW\x10\x02*\xa0\x01\n" +
+	"\x12NotificationReason\x12#\n" +
+	"\x1fNOTIFICATION_REASON_UNSPECIFIED\x10\x00\x12\x1d\n" +
+	"\x19NOTIFICATION_REASON_PAGED\x10\x01\x12$\n" +
+	" NOTIFICATION_REASON_ACKNOWLEDGED\x10\x02\x12 \n" +
+	"\x1cNOTIFICATION_REASON_RESOLVED\x10\x03B#Z!github.com/murphyhq/server;murphyb\x06proto3"
 
 var (
 	file_murphy_v1_shared_proto_rawDescOnce sync.Once
@@ -92,9 +149,10 @@ func file_murphy_v1_shared_proto_rawDescGZIP() []byte {
 	return file_murphy_v1_shared_proto_rawDescData
 }
 
-var file_murphy_v1_shared_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_murphy_v1_shared_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
 var file_murphy_v1_shared_proto_goTypes = []any{
-	(Urgency)(0), // 0: murphy.v1.Urgency
+	(Urgency)(0),            // 0: murphy.v1.Urgency
+	(NotificationReason)(0), // 1: murphy.v1.NotificationReason
 }
 var file_murphy_v1_shared_proto_depIdxs = []int32{
 	0, // [0:0] is the sub-list for method output_type
@@ -114,7 +172,7 @@ func file_murphy_v1_shared_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_murphy_v1_shared_proto_rawDesc), len(file_murphy_v1_shared_proto_rawDesc)),
-			NumEnums:      1,
+			NumEnums:      2,
 			NumMessages:   0,
 			NumExtensions: 0,
 			NumServices:   0,

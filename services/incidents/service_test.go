@@ -22,10 +22,6 @@ type fixture struct {
 	policies    *MockPolicies
 	integration *murphy.Integration
 	policy      *murphy.EscalationPolicy
-	onCall      map[string]string
-	active      map[string]bool
-	methods     map[string][]*murphy.ContactMethod
-	timeline    []*murphy.TimelineEntry
 	recorded    *incidents.Change
 }
 
@@ -38,9 +34,9 @@ const (
 func setup(t *testing.T) *fixture {
 	t.Helper()
 	repo, catalog := NewMockRepository(t), NewMockCatalog(t)
-	policies, oncall, people := NewMockPolicies(t), NewMockOnCall(t), NewMockPeople(t)
+	policies := NewMockPolicies(t)
 	f := &fixture{
-		service:  incidents.New(repo, catalog, policies, oncall, people),
+		service:  incidents.New(repo, catalog, policies),
 		repo:     repo,
 		policies: policies,
 		policy: &murphy.EscalationPolicy{
@@ -49,12 +45,6 @@ func setup(t *testing.T) *fixture {
 				{Delay: durationpb.New(5 * time.Minute), Targets: []*murphy.EscalationTarget{{Type: murphy.EscalationTargetType_ESCALATION_TARGET_TYPE_SCHEDULE, Id: schedule}}},
 				{Delay: durationpb.New(10 * time.Minute), Targets: []*murphy.EscalationTarget{{Type: murphy.EscalationTargetType_ESCALATION_TARGET_TYPE_USER, Id: bo}}},
 			},
-		},
-		onCall: map[string]string{schedule: ana},
-		active: map[string]bool{ana: true, bo: true},
-		methods: map[string][]*murphy.ContactMethod{
-			ana: {webhookOf(ana)},
-			bo:  {webhookOf(bo)},
 		},
 		integration: &murphy.Integration{
 			Id:         murphy.NewID(),
@@ -78,43 +68,11 @@ func setup(t *testing.T) *fixture {
 	policies.EXPECT().GetPolicyVersion(mock.Anything, mock.Anything, mock.Anything).RunAndReturn(func(context.Context, string, int32) (*murphy.EscalationPolicy, error) {
 		return f.policy, nil
 	}).Maybe()
-	oncall.EXPECT().WhoIsOnCall(mock.Anything, mock.Anything, mock.Anything).RunAndReturn(func(_ context.Context, ids []string, _ time.Time) (map[string]string, error) {
-		found := map[string]string{}
-		for _, id := range ids {
-			if user, ok := f.onCall[id]; ok {
-				found[id] = user
-			}
-		}
-		return found, nil
-	}).Maybe()
-	people.EXPECT().ActiveUsers(mock.Anything, mock.Anything).RunAndReturn(func(_ context.Context, ids []string) (map[string]bool, error) {
-		found := map[string]bool{}
-		for _, id := range ids {
-			found[id] = f.active[id]
-		}
-		return found, nil
-	}).Maybe()
-	people.EXPECT().ContactMethodsOfUsers(mock.Anything, mock.Anything).RunAndReturn(func(_ context.Context, ids []string) (map[string][]*murphy.ContactMethod, error) {
-		found := map[string][]*murphy.ContactMethod{}
-		for _, id := range ids {
-			if methods, ok := f.methods[id]; ok {
-				found[id] = methods
-			}
-		}
-		return found, nil
-	}).Maybe()
-	repo.EXPECT().ListTimeline(mock.Anything, mock.Anything).RunAndReturn(func(context.Context, string) ([]*murphy.TimelineEntry, error) {
-		return f.timeline, nil
-	}).Maybe()
 	repo.EXPECT().Record(mock.Anything, mock.Anything).RunAndReturn(func(_ context.Context, outcome *incidents.Change) (bool, error) {
 		f.recorded = outcome
 		return true, nil
 	}).Maybe()
 	return f
-}
-
-func webhookOf(user string) *murphy.ContactMethod {
-	return &murphy.ContactMethod{Id: murphy.NewID(), UserId: user, Type: murphy.ContactMethodType_CONTACT_METHOD_TYPE_WEBHOOK, Address: "https://example.com/" + user}
 }
 
 func (f *fixture) alert(status murphy.AlertStatus) *murphy.Alert {
@@ -156,15 +114,19 @@ func TestAFiringAlertOpensAnIncident(t *testing.T) {
 	assert.Equal(t, f.policy.GetId(), opened.GetEscalationPolicyId())
 	assert.Equal(t, int32(3), opened.GetEscalationPolicyVersion())
 
+	assert.Equal(t, int32(1), opened.GetEscalationLevel(), "pages its first level straight away")
+	assert.Equal(t, int32(1), opened.GetEscalationRound())
 	messages := f.messages(t)
-	require.Len(t, messages, 2)
+	require.Len(t, messages, 3)
 	assert.Equal(t, murphy.IncidentVerb_INCIDENT_VERB_CREATED, messages[0].envelope.GetIncident().GetVerb())
 	assert.Equal(t, opened.GetId(), messages[0].envelope.GetIncident().GetCurrent().GetId())
-	timer := messages[1].envelope.GetTimer().GetCurrent()
-	assert.Equal(t, incidents.MessageTimer, messages[1].Kind)
-	assert.Equal(t, int32(1), timer.GetEscalationLevel())
+	assert.Equal(t, murphy.IncidentVerb_INCIDENT_VERB_ESCALATED, messages[1].envelope.GetIncident().GetVerb())
+	assert.Equal(t, int32(1), messages[1].envelope.GetIncident().GetCurrent().GetEscalationLevel())
+	timer := messages[2].envelope.GetTimer().GetCurrent()
+	assert.Equal(t, incidents.MessageTimer, messages[2].Kind)
+	assert.Equal(t, int32(2), timer.GetEscalationLevel(), "the next level")
 	assert.Equal(t, int32(1), timer.GetEscalationRound())
-	assert.WithinDuration(t, time.Now(), messages[1].DueAt, time.Second)
+	assert.WithinDuration(t, time.Now().Add(5*time.Minute), messages[2].DueAt, time.Second, "after the first level's delay")
 }
 
 func TestAFiringAlertJoinsTheOpenIncident(t *testing.T) {
@@ -346,82 +308,94 @@ func timer(incident *murphy.Incident, level, round int32) *murphy.Timer {
 	return &murphy.Timer{Id: murphy.NewID(), IncidentId: incident.GetId(), EscalationLevel: level, EscalationRound: round}
 }
 
-func TestATimerPagesItsLevelAndSchedulesTheNext(t *testing.T) {
+func TestATimerMovesTheIncidentToTheNextLevel(t *testing.T) {
 	f := setup(t)
-	incident := f.triggered(0, 1)
+	incident := f.triggered(1, 1)
 
-	require.NoError(t, f.service.TimerExpired(t.Context(), "message-1", timer(incident, 1, 1)))
+	require.NoError(t, f.service.TimerExpired(t.Context(), "message-1", timer(incident, 2, 1)))
 
 	escalated := f.recorded.Updated
-	assert.Equal(t, int32(1), escalated.GetEscalationLevel())
+	assert.Equal(t, int32(2), escalated.GetEscalationLevel())
 	assert.Equal(t, int32(1), escalated.GetEscalationRound())
 	assert.Equal(t, int32(3), escalated.GetVersion())
-	require.Len(t, f.recorded.Timeline, 1)
-	assert.Equal(t, murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_ESCALATED, f.recorded.Timeline[0].GetType())
-	paged := f.recorded.Timeline[0].GetEscalation().GetPaged()
-	require.Len(t, paged, 1)
-	assert.Equal(t, ana, paged[0].GetUserId())
-	assert.Equal(t, schedule, paged[0].GetVia().GetId(), "reached through the schedule she is on call for")
-
+	assert.Empty(t, f.recorded.Timeline, "whom the level reached is recorded when its page comes back")
 	messages := f.messages(t)
-	require.Len(t, messages, 3)
+	require.Len(t, messages, 2)
 	assert.Equal(t, murphy.IncidentVerb_INCIDENT_VERB_ESCALATED, messages[0].envelope.GetIncident().GetVerb())
-	assert.Equal(t, murphy.NotificationVerb_NOTIFICATION_VERB_CREATED, messages[1].envelope.GetNotification().GetVerb())
-	next := messages[2].envelope.GetTimer().GetCurrent()
-	assert.Equal(t, int32(2), next.GetEscalationLevel())
-	assert.Equal(t, int32(1), next.GetEscalationRound())
-	assert.WithinDuration(t, time.Now().Add(5*time.Minute), messages[2].DueAt, time.Second)
+	next := messages[1].envelope.GetTimer().GetCurrent()
+	assert.Equal(t, int32(1), next.GetEscalationLevel(), "after the last level, back to the first")
+	assert.Equal(t, int32(2), next.GetEscalationRound())
+	assert.WithinDuration(t, time.Now().Add(10*time.Minute), messages[1].DueAt, time.Second)
 }
 
-func notifications(messages []message) []*murphy.Notification {
-	var out []*murphy.Notification
-	for _, m := range messages {
-		if n := m.envelope.GetNotification().GetCurrent(); n != nil {
-			out = append(out, n)
-		}
-	}
-	return out
+func page(incident *murphy.Incident, level, round int32, reached ...*murphy.PageRecipient) *murphy.Page {
+	return &murphy.Page{Id: murphy.NewID(), Incident: incident, EscalationLevel: level, EscalationRound: round, Reached: reached}
 }
 
-func TestAPageNotifiesEveryContactMethodOfEveryonePaged(t *testing.T) {
+func TestAPageRecordsWhomItReached(t *testing.T) {
 	f := setup(t)
-	email := &murphy.ContactMethod{Id: murphy.NewID(), UserId: ana, Type: murphy.ContactMethodType_CONTACT_METHOD_TYPE_EMAIL, Address: "ana@example.com"}
-	f.methods[ana] = append(f.methods[ana], email)
-	incident := f.triggered(0, 1)
+	incident := f.triggered(1, 1)
+	via := &murphy.EscalationTarget{Type: murphy.EscalationTargetType_ESCALATION_TARGET_TYPE_SCHEDULE, Id: schedule}
 
-	require.NoError(t, f.service.TimerExpired(t.Context(), "message-1", timer(incident, 1, 1)))
+	require.NoError(t, f.service.PageCreated(t.Context(), "message-1", page(incident, 1, 1, &murphy.PageRecipient{UserId: ana, Via: via, ContactMethods: 2})))
 
-	sent := notifications(f.messages(t))
-	require.Len(t, sent, 2)
-	for i, method := range []*murphy.ContactMethod{f.methods[ana][0], email} {
-		assert.Equal(t, method.GetId(), sent[i].GetContactMethod().GetId())
-		assert.Equal(t, ana, sent[i].GetUserId())
-		assert.Equal(t, murphy.NotificationReason_NOTIFICATION_REASON_PAGED, sent[i].GetReason())
-		assert.Equal(t, int32(1), sent[i].GetEscalationLevel())
-		assert.Equal(t, schedule, sent[i].GetVia().GetId())
-		assert.Equal(t, incident.GetId(), sent[i].GetIncident().GetId())
-	}
+	assert.Equal(t, "message-1", f.recorded.MessageID)
+	assert.Nil(t, f.recorded.Updated, "the incident stays on its level")
+	require.Len(t, f.recorded.Timeline, 1)
+	entry := f.recorded.Timeline[0]
+	assert.Equal(t, murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_ESCALATED, entry.GetType())
+	assert.Equal(t, []string{ana}, pagedUsers(entry))
+	assert.Equal(t, schedule, entry.GetEscalation().GetPaged()[0].GetVia().GetId())
 }
 
-func TestSomeonePagedWithoutContactMethodsIsRecordedAsNotReached(t *testing.T) {
+func TestSomeoneReachedWithoutContactMethodsIsOnTheTimeline(t *testing.T) {
 	f := setup(t)
-	delete(f.methods, ana)
-	incident := f.triggered(0, 1)
+	incident := f.triggered(1, 1)
 
-	require.NoError(t, f.service.TimerExpired(t.Context(), "message-1", timer(incident, 1, 1)))
+	require.NoError(t, f.service.PageCreated(t.Context(), "message-1", page(incident, 1, 1, &murphy.PageRecipient{UserId: ana})))
 
-	assert.Empty(t, notifications(f.messages(t)))
 	require.Len(t, f.recorded.Timeline, 2)
 	failed := f.recorded.Timeline[1]
 	assert.Equal(t, murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_NOTIFICATION_FAILED, failed.GetType())
 	assert.Equal(t, ana, failed.GetNotification().GetUserId())
 }
 
+func TestAPageThatReachedNobodyMovesOnAtOnce(t *testing.T) {
+	f := setup(t)
+	incident := f.triggered(1, 1)
+	empty := page(incident, 1, 1)
+	empty.Unreached = []*murphy.EscalationTarget{{Type: murphy.EscalationTargetType_ESCALATION_TARGET_TYPE_SCHEDULE, Id: schedule}}
+
+	require.NoError(t, f.service.PageCreated(t.Context(), "message-1", empty))
+
+	require.Len(t, f.recorded.Timeline, 1)
+	assert.Equal(t, murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_ESCALATION_SKIPPED, f.recorded.Timeline[0].GetType())
+	assert.Equal(t, schedule, f.recorded.Timeline[0].GetEscalation().GetReachedNobody()[0].GetId())
+	assert.Equal(t, int32(2), f.recorded.Updated.GetEscalationLevel())
+	assert.True(t, f.recorded.CancelTimers, "the timer for the level it moved to is no longer needed")
+	messages := f.messages(t)
+	require.Len(t, messages, 2)
+	assert.Equal(t, murphy.IncidentVerb_INCIDENT_VERB_ESCALATED, messages[0].envelope.GetIncident().GetVerb())
+	assert.Equal(t, int32(1), messages[1].envelope.GetTimer().GetCurrent().GetEscalationLevel())
+}
+
+func TestAnEmptyPageForALevelAlreadyLeftOnlyRecordsIt(t *testing.T) {
+	f := setup(t)
+	incident := f.triggered(2, 1)
+
+	require.NoError(t, f.service.PageCreated(t.Context(), "message-1", page(incident, 1, 1)))
+
+	assert.Nil(t, f.recorded.Updated)
+	require.Len(t, f.recorded.Timeline, 1)
+	assert.Equal(t, murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_ESCALATION_SKIPPED, f.recorded.Timeline[0].GetType())
+}
+
 func TestANotificationOutcomeIsRecordedOnTheTimeline(t *testing.T) {
 	f := setup(t)
 	notification := &murphy.Notification{
 		Id: murphy.NewID(), Reason: murphy.NotificationReason_NOTIFICATION_REASON_PAGED, Incident: &murphy.Incident{Id: murphy.NewID()},
-		UserId: ana, ContactMethod: webhookOf(ana), Failure: "the receiver answered 410",
+		UserId: ana, ContactMethod: &murphy.ContactMethod{Id: murphy.NewID(), UserId: ana, Type: murphy.ContactMethodType_CONTACT_METHOD_TYPE_WEBHOOK},
+		Failure: "the receiver answered 410",
 	}
 
 	require.NoError(t, f.service.NotificationFailed(t.Context(), "message-1", notification))
@@ -434,36 +408,6 @@ func TestANotificationOutcomeIsRecordedOnTheTimeline(t *testing.T) {
 	assert.Equal(t, "Page by webhook failed: the receiver answered 410", entry.GetSummary())
 	assert.Equal(t, notification.GetContactMethod().GetId(), entry.GetNotification().GetContactMethodId())
 	assert.Nil(t, f.recorded.Updated, "an outcome changes only the timeline")
-}
-
-func TestALevelThatReachesNobodyIsSkipped(t *testing.T) {
-	f := setup(t)
-	delete(f.onCall, schedule)
-	incident := f.triggered(0, 1)
-
-	require.NoError(t, f.service.TimerExpired(t.Context(), "message-1", timer(incident, 1, 1)))
-
-	require.Len(t, f.recorded.Timeline, 2)
-	assert.Equal(t, murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_ESCALATION_SKIPPED, f.recorded.Timeline[0].GetType())
-	assert.Equal(t, murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_ESCALATED, f.recorded.Timeline[1].GetType())
-	assert.Equal(t, []string{bo}, pagedUsers(f.recorded.Timeline[1]))
-	assert.Equal(t, schedule, f.recorded.Timeline[0].GetEscalation().GetReachedNobody()[0].GetId())
-	assert.Equal(t, int32(2), f.recorded.Updated.GetEscalationLevel())
-	messages := f.messages(t)
-	next := messages[len(messages)-1].envelope.GetTimer().GetCurrent()
-	assert.Equal(t, int32(1), next.GetEscalationLevel(), "after the last level, back to the first")
-	assert.Equal(t, int32(2), next.GetEscalationRound())
-}
-
-func TestDeactivatedPeopleAreNotPaged(t *testing.T) {
-	f := setup(t)
-	f.active[ana] = false
-	incident := f.triggered(0, 1)
-
-	require.NoError(t, f.service.TimerExpired(t.Context(), "message-1", timer(incident, 1, 1)))
-
-	assert.Equal(t, murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_ESCALATION_SKIPPED, f.recorded.Timeline[0].GetType())
-	assert.Equal(t, []string{bo}, pagedUsers(f.recorded.Timeline[1]))
 }
 
 func TestEscalationIsExhaustedAfterItsRepeats(t *testing.T) {
@@ -480,20 +424,6 @@ func TestEscalationIsExhaustedAfterItsRepeats(t *testing.T) {
 	assert.True(t, messages[0].envelope.GetIncident().GetCurrent().GetEscalationExhausted())
 }
 
-func TestEveryLevelReachingNobodyExhaustsEscalation(t *testing.T) {
-	f := setup(t)
-	delete(f.onCall, schedule)
-	f.active[bo] = false
-	incident := f.triggered(0, 1)
-
-	require.NoError(t, f.service.TimerExpired(t.Context(), "message-1", timer(incident, 1, 1)))
-
-	assert.True(t, f.recorded.Updated.GetEscalationExhausted())
-	require.Len(t, f.recorded.Timeline, 3)
-	assert.Equal(t, murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_ESCALATION_EXHAUSTED, f.recorded.Timeline[2].GetType())
-	assert.Len(t, f.messages(t), 1)
-}
-
 func TestATimerThatIsNoLongerNeededOnlyMarksItsMessage(t *testing.T) {
 	for name, prepare := range map[string]func(f *fixture) (*murphy.Incident, *murphy.Timer){
 		"incident acknowledged": func(f *fixture) (*murphy.Incident, *murphy.Timer) {
@@ -502,8 +432,8 @@ func TestATimerThatIsNoLongerNeededOnlyMarksItsMessage(t *testing.T) {
 			return incident, timer(incident, 2, 1)
 		},
 		"step already taken": func(f *fixture) (*murphy.Incident, *murphy.Timer) {
-			incident := f.triggered(1, 1)
-			return incident, timer(incident, 1, 1)
+			incident := f.triggered(2, 1)
+			return incident, timer(incident, 2, 1)
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -536,28 +466,6 @@ func TestAcknowledgingCancelsTimersAndAnnouncesIt(t *testing.T) {
 	assert.Equal(t, murphy.IncidentStatus_INCIDENT_STATUS_TRIGGERED, event.GetPrevious().GetStatus())
 }
 
-func TestAcknowledgingTellsEveryonePagedOnEveryContactMethod(t *testing.T) {
-	f := setup(t)
-	incident := f.triggered(2, 1)
-	f.timeline = []*murphy.TimelineEntry{
-		{Type: murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_ESCALATED, Escalation: &murphy.TimelineEscalation{Level: 1, Paged: []*murphy.TimelinePage{{UserId: ana}}}},
-		{Type: murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_ESCALATED, Escalation: &murphy.TimelineEscalation{Level: 2, Paged: []*murphy.TimelinePage{{UserId: bo}, {UserId: ana}}}},
-	}
-
-	_, err := f.service.Acknowledge(t.Context(), incident.GetId())
-
-	require.NoError(t, err)
-	sent := notifications(f.messages(t))
-	require.Len(t, sent, 2, "once per contact method, however often someone was paged")
-	var methods []string
-	for _, notification := range sent {
-		assert.Equal(t, murphy.NotificationReason_NOTIFICATION_REASON_ACKNOWLEDGED, notification.GetReason())
-		assert.Equal(t, murphy.IncidentStatus_INCIDENT_STATUS_ACKNOWLEDGED, notification.GetIncident().GetStatus())
-		methods = append(methods, notification.GetContactMethod().GetId())
-	}
-	assert.ElementsMatch(t, []string{f.methods[ana][0].GetId(), f.methods[bo][0].GetId()}, methods)
-}
-
 func TestAcknowledgingTwiceChangesNothing(t *testing.T) {
 	f := setup(t)
 	incident := f.triggered(1, 1)
@@ -573,12 +481,11 @@ func TestAcknowledgingTwiceChangesNothing(t *testing.T) {
 func TestAcknowledgingRetriesAfterAConcurrentChange(t *testing.T) {
 	f := setup(t)
 	repo := NewMockRepository(t)
-	f.service = incidents.New(repo, nil, nil, nil, nil)
+	f.service = incidents.New(repo, nil, nil)
 	id := murphy.NewID()
 	repo.EXPECT().GetIncident(mock.Anything, id).RunAndReturn(func(context.Context, string) (*murphy.Incident, error) {
 		return &murphy.Incident{Id: id, Status: murphy.IncidentStatus_INCIDENT_STATUS_TRIGGERED, Version: 2}, nil
 	}).Times(2)
-	repo.EXPECT().ListTimeline(mock.Anything, id).Return(nil, nil)
 	repo.EXPECT().Record(mock.Anything, mock.Anything).Return(false, murphy.ErrConflict).Once()
 	repo.EXPECT().Record(mock.Anything, mock.Anything).Return(true, nil).Once()
 
@@ -598,10 +505,10 @@ func pagedUsers(entry *murphy.TimelineEntry) []string {
 
 func TestAPolicyVersionIsReadOnceAndReused(t *testing.T) {
 	f := setup(t)
-	first, second := f.triggered(0, 1), f.triggered(0, 1)
+	first, second := f.triggered(1, 1), f.triggered(1, 1)
 
-	require.NoError(t, f.service.TimerExpired(t.Context(), "message-1", timer(first, 1, 1)))
-	require.NoError(t, f.service.TimerExpired(t.Context(), "message-2", timer(second, 1, 1)))
+	require.NoError(t, f.service.TimerExpired(t.Context(), "message-1", timer(first, 2, 1)))
+	require.NoError(t, f.service.TimerExpired(t.Context(), "message-2", timer(second, 2, 1)))
 
 	f.policies.AssertNumberOfCalls(t, "GetPolicyVersion", 1)
 }

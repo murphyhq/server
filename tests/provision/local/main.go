@@ -16,10 +16,10 @@ import (
 )
 
 var (
-	databases = []string{"catalog", "incidents", "people", "oncall", "escalation"}
+	databases = []string{"catalog", "incidents", "people", "oncall", "escalation", "notifications"}
 	topology  = messaging.Topology{
-		"engine":   {"murphy.v1.alert": {"received"}, "murphy.v1.timer": {"expired"}, "murphy.v1.notification": {"sent", "failed"}},
-		"notifier": {"murphy.v1.notification": {"created"}},
+		"engine":   {"murphy.v1.alert": {"received"}, "murphy.v1.timer": {"expired"}, "murphy.v1.page": {"created"}, "murphy.v1.notification": {"sent", "failed"}},
+		"notifier": {"murphy.v1.incident": {"escalated", "acknowledged", "resolved"}, "murphy.v1.notification": {"created", "sent", "failed"}},
 	}
 )
 

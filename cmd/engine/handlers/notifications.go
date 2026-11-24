@@ -20,3 +20,10 @@ func (h *Handlers) NotificationFailed(ctx context.Context, envelope *murphy.Enve
 
 	return h.incidents.NotificationFailed(ctx, envelope.GetId(), envelope.GetNotification().GetCurrent())
 }
+
+func (h *Handlers) PageCreated(ctx context.Context, envelope *murphy.Envelope) (err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	return h.incidents.PageCreated(ctx, envelope.GetId(), envelope.GetPage().GetCurrent())
+}

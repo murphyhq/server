@@ -38,15 +38,6 @@ type Policies interface {
 	GetPolicyVersion(ctx context.Context, id string, version int32) (*murphy.EscalationPolicy, error)
 }
 
-type OnCall interface {
-	WhoIsOnCall(ctx context.Context, scheduleIDs []string, at time.Time) (map[string]string, error)
-}
-
-type People interface {
-	ActiveUsers(ctx context.Context, ids []string) (map[string]bool, error)
-	ContactMethodsOfUsers(ctx context.Context, userIDs []string) (map[string][]*murphy.ContactMethod, error)
-}
-
 type Change struct {
 	MessageID    string
 	IncidentID   string
@@ -86,13 +77,11 @@ type Service struct {
 	repo     Repository
 	catalog  Catalog
 	policies Policies
-	oncall   OnCall
-	people   People
 	versions sync.Map
 }
 
-func New(repo Repository, catalog Catalog, policies Policies, oncall OnCall, people People) *Service {
-	return &Service{repo: repo, catalog: catalog, policies: policies, oncall: oncall, people: people}
+func New(repo Repository, catalog Catalog, policies Policies) *Service {
+	return &Service{repo: repo, catalog: catalog, policies: policies}
 }
 
 func (s *Service) AlertReceived(ctx context.Context, messageID string, alert *murphy.Alert) (err error) {
@@ -131,13 +120,19 @@ func (s *Service) AlertReceived(ctx context.Context, messageID string, alert *mu
 		if incident.GetEscalationExhausted() {
 			change.Timeline = append(change.Timeline, note(incident, murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_ESCALATION_EXHAUSTED, "Not paged: the service's escalation policy no longer exists", now))
 		}
-		change.Messages = s.messages(ctx, incident, murphy.IncidentVerb_INCIDENT_VERB_CREATED, nil, func() ([]*ScheduledMessage, error) {
-			if incident.GetEscalationExhausted() {
-				return nil, nil
+		created := s.messages(ctx, incident, murphy.IncidentVerb_INCIDENT_VERB_CREATED, nil, nil)
+		escalation, err := s.escalate(ctx, incident, 1, 1, now)
+		if err != nil {
+			return err
+		}
+		change.Messages = func() ([]*ScheduledMessage, error) {
+			messages, err := created()
+			if err != nil {
+				return nil, err
 			}
-			first, err := s.timer(ctx, incident, 1, 1, now.AsTime())
-			return []*ScheduledMessage{first}, err
-		})
+			more, err := escalation()
+			return append(messages, more...), err
+		}
 	case open == nil:
 		if time.Since(alert.GetReceivedAt().AsTime()) < resolveWait {
 			return errNothingToResolve
@@ -158,11 +153,7 @@ func (s *Service) AlertReceived(ctx context.Context, messageID string, alert *mu
 			open.Resolve(now)
 			change.CancelTimers = true
 			change.Timeline = append(change.Timeline, entry(open, murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_RESOLVED, alert, now))
-			followUps, err := s.followUps(ctx, open, murphy.NotificationReason_NOTIFICATION_REASON_RESOLVED, now)
-			if err != nil {
-				return err
-			}
-			change.Messages = s.messages(ctx, open, murphy.IncidentVerb_INCIDENT_VERB_RESOLVED, previous, notificationMessages(ctx, followUps))
+			change.Messages = s.messages(ctx, open, murphy.IncidentVerb_INCIDENT_VERB_RESOLVED, previous, nil)
 			break
 		}
 		change.Timeline = append(change.Timeline, entry(open, murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_ALERTED, alert, now))
@@ -192,7 +183,6 @@ func (s *Service) open(ctx context.Context, service *murphy.Service, alert *murp
 		CreatedAt:          now,
 		UpdatedAt:          now,
 		EscalationPolicyId: service.GetEscalationPolicyId(),
-		EscalationRound:    1,
 	}
 	version, err := s.policies.CurrentVersion(ctx, service.GetEscalationPolicyId())
 	switch {
@@ -326,104 +316,6 @@ func (s *Service) PurgeHandledMessages(ctx context.Context) (err error) {
 	return nil
 }
 
-func (s *Service) TimerExpired(ctx context.Context, messageID string, timer *murphy.Timer) (err error) {
-	ctx, span := tracer.Span(ctx)
-	ctx = span.Set(ctx,
-		telemetry.WithField("incident.id", timer.GetIncidentId()),
-		telemetry.WithField("escalation.level", timer.GetEscalationLevel()),
-		telemetry.WithField("escalation.round", timer.GetEscalationRound()),
-	)
-	defer span.End(&err)
-
-	handled := &Change{MessageID: messageID, IncidentID: timer.GetIncidentId()}
-	incident, err := s.repo.GetIncident(ctx, timer.GetIncidentId())
-	if errors.Is(err, murphy.ErrNotFound) {
-		_, err = s.repo.Record(ctx, handled)
-		return err
-	}
-	if err != nil {
-		return fmt.Errorf("get incident: %w", err)
-	}
-	if incident.GetStatus() != murphy.IncidentStatus_INCIDENT_STATUS_TRIGGERED || incident.GetEscalationExhausted() {
-		_, err = s.repo.Record(ctx, handled)
-		return err
-	}
-
-	policy, err := s.policyVersion(ctx, incident.GetEscalationPolicyId(), incident.GetEscalationPolicyVersion())
-	if err != nil && !errors.Is(err, murphy.ErrNotFound) {
-		return fmt.Errorf("get the incident's escalation policy version: %w", err)
-	}
-	expectedLevel, expectedRound := next(incident.GetEscalationLevel(), incident.GetEscalationRound(), policy)
-	if incident.GetEscalationLevel() == 0 {
-		expectedLevel, expectedRound = 1, 1
-	}
-	if timer.GetEscalationLevel() != expectedLevel || timer.GetEscalationRound() != expectedRound {
-		_, err = s.repo.Record(ctx, handled)
-		return err
-	}
-
-	previous := clone(incident)
-	now := murphy.Now()
-	incident.Version, incident.UpdatedAt = incident.GetVersion()+1, now
-	change := &Change{MessageID: messageID, IncidentID: incident.GetId(), Updated: incident}
-	var nextTimer func() (*ScheduledMessage, error)
-	var pages []*murphy.Notification
-
-	level, round := timer.GetEscalationLevel(), timer.GetEscalationRound()
-	levels := policy.GetLevels()
-	for skipped := 0; ; skipped++ {
-		if level == 0 || skipped >= len(levels) {
-			incident.EscalationExhausted = true
-			change.Timeline = append(change.Timeline, note(incident, murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_ESCALATION_EXHAUSTED, "Escalation is exhausted: every level and repeat was paged", now))
-			break
-		}
-		current := levels[level-1]
-		paged, unreached, err := s.reach(ctx, current, now.AsTime())
-		if err != nil {
-			return err
-		}
-		incident.EscalationLevel, incident.EscalationRound = level, round
-		if len(paged) == 0 {
-			entry := note(incident, murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_ESCALATION_SKIPPED, fmt.Sprintf("Level %d reached nobody", level), now)
-			entry.Escalation = &murphy.TimelineEscalation{Level: level, Round: round, ReachedNobody: unreached}
-			change.Timeline = append(change.Timeline, entry)
-			level, round = next(level, round, policy)
-			continue
-		}
-		entry := note(incident, murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_ESCALATED, fmt.Sprintf("Level %d paged", level), now)
-		entry.Escalation = &murphy.TimelineEscalation{Level: level, Round: round, Paged: paged, ReachedNobody: unreached}
-		change.Timeline = append(change.Timeline, entry)
-		var unreachable []*murphy.TimelineEntry
-		pages, unreachable, err = s.page(ctx, incident, paged, now)
-		if err != nil {
-			return err
-		}
-		change.Timeline = append(change.Timeline, unreachable...)
-		followingLevel, followingRound := next(level, round, policy)
-		due := now.AsTime().Add(current.GetDelay().AsDuration())
-		nextTimer = func() (*ScheduledMessage, error) { return s.timer(ctx, incident, followingLevel, followingRound, due) }
-		break
-	}
-
-	change.Messages = s.messages(ctx, incident, murphy.IncidentVerb_INCIDENT_VERB_ESCALATED, previous, func() ([]*ScheduledMessage, error) {
-		messages, err := notificationMessages(ctx, pages)()
-		if err != nil || nextTimer == nil {
-			return messages, err
-		}
-		message, err := nextTimer()
-		return append(messages, message), err
-	})
-	recorded, err := s.repo.Record(ctx, change)
-	if errors.Is(err, murphy.ErrConflict) {
-		return fmt.Errorf("the incident changed while escalating; retrying: %w", err)
-	}
-	if err != nil {
-		return fmt.Errorf("record escalation: %w", err)
-	}
-	span.Set(ctx, telemetry.WithField("message.duplicate", !recorded))
-	return nil
-}
-
 func (s *Service) policyVersion(ctx context.Context, id string, version int32) (*murphy.EscalationPolicy, error) {
 	key := fmt.Sprintf("%s/%d", id, version)
 	if cached, ok := s.versions.Load(key); ok {
@@ -445,130 +337,6 @@ func next(level, round int32, policy *murphy.EscalationPolicy) (int32, int32) {
 		return 1, round + 1
 	default:
 		return 0, 0
-	}
-}
-
-func (s *Service) reach(ctx context.Context, level *murphy.EscalationLevel, at time.Time) (paged []*murphy.TimelinePage, unreached []*murphy.EscalationTarget, err error) {
-	var schedules []string
-	for _, target := range level.GetTargets() {
-		if target.GetType() == murphy.EscalationTargetType_ESCALATION_TARGET_TYPE_SCHEDULE {
-			schedules = append(schedules, target.GetId())
-		}
-	}
-	onCall, err := s.oncall.WhoIsOnCall(ctx, schedules, at)
-	if err != nil {
-		return nil, nil, fmt.Errorf("find who is on call: %w", err)
-	}
-	candidates := make([]string, 0, len(level.GetTargets()))
-	for _, target := range level.GetTargets() {
-		user := target.GetId()
-		if target.GetType() == murphy.EscalationTargetType_ESCALATION_TARGET_TYPE_SCHEDULE {
-			user = onCall[target.GetId()]
-		}
-		candidates = append(candidates, user)
-	}
-	active, err := s.people.ActiveUsers(ctx, candidates)
-	if err != nil {
-		return nil, nil, fmt.Errorf("find active users: %w", err)
-	}
-	seen := map[string]bool{}
-	for i, target := range level.GetTargets() {
-		user := candidates[i]
-		switch {
-		case user == "" || !active[user]:
-			unreached = append(unreached, target)
-		case !seen[user]:
-			seen[user] = true
-			paged = append(paged, &murphy.TimelinePage{UserId: user, Via: target})
-		}
-	}
-	return paged, unreached, nil
-}
-
-func (s *Service) page(ctx context.Context, incident *murphy.Incident, paged []*murphy.TimelinePage, now *timestamppb.Timestamp) ([]*murphy.Notification, []*murphy.TimelineEntry, error) {
-	users := make([]string, len(paged))
-	for i, page := range paged {
-		users[i] = page.GetUserId()
-	}
-	methods, err := s.people.ContactMethodsOfUsers(ctx, users)
-	if err != nil {
-		return nil, nil, fmt.Errorf("find contact methods: %w", err)
-	}
-	var notifications []*murphy.Notification
-	var unreachable []*murphy.TimelineEntry
-	for _, page := range paged {
-		if len(methods[page.GetUserId()]) == 0 {
-			entry := note(incident, murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_NOTIFICATION_FAILED, "Not paged: the user has no contact methods", now)
-			entry.Notification = &murphy.TimelineNotification{Reason: murphy.NotificationReason_NOTIFICATION_REASON_PAGED, UserId: page.GetUserId(), Failure: "the user has no contact methods"}
-			unreachable = append(unreachable, entry)
-			continue
-		}
-		for _, method := range methods[page.GetUserId()] {
-			notification := newNotification(incident, murphy.NotificationReason_NOTIFICATION_REASON_PAGED, method, now)
-			notification.Via = page.GetVia()
-			notifications = append(notifications, notification)
-		}
-	}
-	return notifications, unreachable, nil
-}
-
-func (s *Service) followUps(ctx context.Context, incident *murphy.Incident, reason murphy.NotificationReason, now *timestamppb.Timestamp) ([]*murphy.Notification, error) {
-	timeline, err := s.repo.ListTimeline(ctx, incident.GetId())
-	if err != nil {
-		return nil, fmt.Errorf("list timeline: %w", err)
-	}
-	seen := map[string]bool{}
-	var users []string
-	for _, entry := range timeline {
-		for _, page := range entry.GetEscalation().GetPaged() {
-			if !seen[page.GetUserId()] {
-				seen[page.GetUserId()] = true
-				users = append(users, page.GetUserId())
-			}
-		}
-	}
-	if len(users) == 0 {
-		return nil, nil
-	}
-	methods, err := s.people.ContactMethodsOfUsers(ctx, users)
-	if err != nil {
-		return nil, fmt.Errorf("find contact methods: %w", err)
-	}
-	var notifications []*murphy.Notification
-	for _, user := range users {
-		for _, method := range methods[user] {
-			notifications = append(notifications, newNotification(incident, reason, method, now))
-		}
-	}
-	return notifications, nil
-}
-
-func newNotification(incident *murphy.Incident, reason murphy.NotificationReason, method *murphy.ContactMethod, now *timestamppb.Timestamp) *murphy.Notification {
-	return &murphy.Notification{
-		Id:              murphy.NewID(),
-		Reason:          reason,
-		Incident:        clone(incident),
-		UserId:          method.GetUserId(),
-		ContactMethod:   method,
-		EscalationLevel: incident.GetEscalationLevel(),
-		EscalationRound: incident.GetEscalationRound(),
-		CreatedAt:       now,
-	}
-}
-
-func notificationMessages(ctx context.Context, notifications []*murphy.Notification) func() ([]*ScheduledMessage, error) {
-	return func() ([]*ScheduledMessage, error) {
-		messages := make([]*ScheduledMessage, 0, len(notifications))
-		for _, notification := range notifications {
-			message, err := scheduled(ctx, notification.GetIncident().GetId(), MessageEvent, notification.GetCreatedAt().AsTime(), &murphy.Envelope{
-				Event: &murphy.Envelope_Notification{Notification: &murphy.NotificationEvent{Verb: murphy.NotificationVerb_NOTIFICATION_VERB_CREATED, Current: notification}},
-			})
-			if err != nil {
-				return nil, err
-			}
-			messages = append(messages, message)
-		}
-		return messages, nil
 	}
 }
 
@@ -629,7 +397,7 @@ func (s *Service) Acknowledge(ctx context.Context, id string) (_ *murphy.Inciden
 	ctx = span.Set(ctx, telemetry.WithField("incident.id", id))
 	defer span.End(&err)
 
-	return s.change(ctx, id, murphy.IncidentVerb_INCIDENT_VERB_ACKNOWLEDGED, murphy.NotificationReason_NOTIFICATION_REASON_ACKNOWLEDGED, func(incident *murphy.Incident, now *timestamppb.Timestamp) *murphy.TimelineEntry {
+	return s.change(ctx, id, murphy.IncidentVerb_INCIDENT_VERB_ACKNOWLEDGED, func(incident *murphy.Incident, now *timestamppb.Timestamp) *murphy.TimelineEntry {
 		if incident.GetStatus() != murphy.IncidentStatus_INCIDENT_STATUS_TRIGGERED {
 			return nil
 		}
@@ -643,7 +411,7 @@ func (s *Service) Resolve(ctx context.Context, id string) (_ *murphy.Incident, e
 	ctx = span.Set(ctx, telemetry.WithField("incident.id", id))
 	defer span.End(&err)
 
-	return s.change(ctx, id, murphy.IncidentVerb_INCIDENT_VERB_RESOLVED, murphy.NotificationReason_NOTIFICATION_REASON_RESOLVED, func(incident *murphy.Incident, now *timestamppb.Timestamp) *murphy.TimelineEntry {
+	return s.change(ctx, id, murphy.IncidentVerb_INCIDENT_VERB_RESOLVED, func(incident *murphy.Incident, now *timestamppb.Timestamp) *murphy.TimelineEntry {
 		if !incident.Resolve(now) {
 			return nil
 		}
@@ -651,7 +419,7 @@ func (s *Service) Resolve(ctx context.Context, id string) (_ *murphy.Incident, e
 	})
 }
 
-func (s *Service) change(ctx context.Context, id string, verb murphy.IncidentVerb, reason murphy.NotificationReason, apply func(*murphy.Incident, *timestamppb.Timestamp) *murphy.TimelineEntry) (*murphy.Incident, error) {
+func (s *Service) change(ctx context.Context, id string, verb murphy.IncidentVerb, apply func(*murphy.Incident, *timestamppb.Timestamp) *murphy.TimelineEntry) (*murphy.Incident, error) {
 	if err := murphy.LookupID("incident", id); err != nil {
 		return nil, err
 	}
@@ -667,16 +435,12 @@ func (s *Service) change(ctx context.Context, id string, verb murphy.IncidentVer
 			return previous, nil
 		}
 		incident.Version, incident.UpdatedAt = incident.GetVersion()+1, now
-		followUps, err := s.followUps(ctx, incident, reason, now)
-		if err != nil {
-			return nil, err
-		}
 		change := &Change{
 			IncidentID:   id,
 			Updated:      incident,
 			CancelTimers: true,
 			Timeline:     []*murphy.TimelineEntry{entry},
-			Messages:     s.messages(ctx, incident, verb, previous, notificationMessages(ctx, followUps)),
+			Messages:     s.messages(ctx, incident, verb, previous, nil),
 		}
 		_, err = s.repo.Record(ctx, change)
 		if errors.Is(err, murphy.ErrConflict) && attempt < changeAttempts {

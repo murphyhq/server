@@ -136,7 +136,7 @@ func alertEntries(incident *client.IncidentWithTimeline) []client.TimelineEntry 
 	}
 	var entries []client.TimelineEntry
 	for _, entry := range incident.Timeline {
-		if entry.Escalation == nil && entry.Type != client.TimelineEntryTypeEscalationExhausted {
+		if entry.Escalation == nil && entry.Notification == nil && entry.Type != client.TimelineEntryTypeEscalationExhausted {
 			entries = append(entries, entry)
 		}
 	}

@@ -171,6 +171,7 @@ services:
       MURPHY_PEOPLE_DATABASE_URL: postgres://murphy:murphy@postgres:5432/people?sslmode=disable
       MURPHY_ONCALL_DATABASE_URL: postgres://murphy:murphy@postgres:5432/oncall?sslmode=disable
       MURPHY_ESCALATION_DATABASE_URL: postgres://murphy:murphy@postgres:5432/escalation?sslmode=disable
+      MURPHY_NOTIFICATIONS_DATABASE_URL: postgres://murphy:murphy@postgres:5432/notifications?sslmode=disable
     healthcheck:
       disable: true
     depends_on:
@@ -196,6 +197,10 @@ services:
           path: ./services/oncall/db/postgres/migrations
         - action: restart
           path: ./services/oncall/db/mysql/migrations
+        - action: restart
+          path: ./services/notifications/db/postgres/migrations
+        - action: restart
+          path: ./services/notifications/db/mysql/migrations
         - action: restart
           path: ./services/escalation/db/postgres/migrations
         - action: restart
@@ -263,8 +268,6 @@ services:
       MURPHY_EVENTS_SUBSCRIPTION_URL: nats://nats:4222/events/engine
       MURPHY_CATALOG_DATABASE_URL: postgres://murphy:murphy@postgres:5432/catalog?sslmode=disable
       MURPHY_INCIDENTS_DATABASE_URL: postgres://murphy:murphy@postgres:5432/incidents?sslmode=disable&pool_max_conns=16
-      MURPHY_PEOPLE_DATABASE_URL: postgres://murphy:murphy@postgres:5432/people?sslmode=disable
-      MURPHY_ONCALL_DATABASE_URL: postgres://murphy:murphy@postgres:5432/oncall?sslmode=disable
       MURPHY_ESCALATION_DATABASE_URL: postgres://murphy:murphy@postgres:5432/escalation?sslmode=disable
 
   scheduler:
@@ -274,6 +277,7 @@ services:
       <<: *component-environment
       MURPHY_EVENTS_TOPIC_URL: nats://nats:4222/events
       MURPHY_INCIDENTS_DATABASE_URL: postgres://murphy:murphy@postgres:5432/incidents?sslmode=disable
+      MURPHY_NOTIFICATIONS_DATABASE_URL: postgres://murphy:murphy@postgres:5432/notifications?sslmode=disable
 
   notifier:
     <<: *component
@@ -282,6 +286,10 @@ services:
       <<: *component-environment
       MURPHY_EVENTS_SUBSCRIPTION_URL: nats://nats:4222/events/notifier
       MURPHY_EVENTS_TOPIC_URL: nats://nats:4222/events
+      MURPHY_NOTIFICATIONS_DATABASE_URL: postgres://murphy:murphy@postgres:5432/notifications?sslmode=disable
+      MURPHY_PEOPLE_DATABASE_URL: postgres://murphy:murphy@postgres:5432/people?sslmode=disable
+      MURPHY_ONCALL_DATABASE_URL: postgres://murphy:murphy@postgres:5432/oncall?sslmode=disable
+      MURPHY_ESCALATION_DATABASE_URL: postgres://murphy:murphy@postgres:5432/escalation?sslmode=disable
       MURPHY_WEBHOOK_SIGNING_KEYS: *webhook-signing-keys
 
   webhook-receiver:

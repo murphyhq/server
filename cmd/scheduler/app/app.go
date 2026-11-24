@@ -3,6 +3,8 @@ package app
 import (
 	"context"
 	"fmt"
+	"github.com/murphyhq/server/services/notifications"
+	notificationsdb "github.com/murphyhq/server/services/notifications/db"
 
 	"github.com/murphyhq/server/internal/lifecycle"
 	"github.com/murphyhq/server/internal/messaging"
@@ -12,9 +14,10 @@ import (
 )
 
 type Settings struct {
-	EventsTopicURL       string `env:"EVENTS_TOPIC_URL" required:"true"`
-	IncidentsDatabaseURL string `env:"INCIDENTS_DATABASE_URL" required:"true"`
-	Relay                messaging.RelaySettings
+	EventsTopicURL           string `env:"EVENTS_TOPIC_URL" required:"true"`
+	IncidentsDatabaseURL     string `env:"INCIDENTS_DATABASE_URL" required:"true"`
+	NotificationsDatabaseURL string `env:"NOTIFICATIONS_DATABASE_URL" required:"true"`
+	Relay                    messaging.RelaySettings
 }
 
 type App struct {
@@ -37,6 +40,12 @@ func New(ctx context.Context, s Settings) (_ *App, err error) {
 	}
 	a.resources.Add(storage.Close, storage.Ping)
 
+	notificationsStorage, err := notificationsdb.Open(ctx, s.NotificationsDatabaseURL)
+	if err != nil {
+		return nil, fmt.Errorf("MURPHY_NOTIFICATIONS_DATABASE_URL: %w", err)
+	}
+	a.resources.Add(notificationsStorage.Close, notificationsStorage.Ping)
+
 	topic, err := broker.OpenTopic(ctx, s.EventsTopicURL)
 	if err != nil {
 		return nil, fmt.Errorf("MURPHY_EVENTS_TOPIC_URL: %w", err)
@@ -45,7 +54,8 @@ func New(ctx context.Context, s Settings) (_ *App, err error) {
 
 	publisher := messaging.NewPublisher(topic)
 	a.relays = []func(context.Context) error{
-		messaging.Relay("incidents", incidents.New(storage, nil, nil, nil, nil), publisher, s.Relay),
+		messaging.Relay("incidents", incidents.New(storage, nil, nil), publisher, s.Relay),
+		messaging.Relay("notifications", notifications.New(notificationsStorage, nil, nil, nil), publisher, s.Relay),
 	}
 	a.Ready = a.resources.Checks()
 	return a, nil

@@ -26,10 +26,6 @@ import (
 	escalationdb "github.com/murphyhq/server/services/escalation/db"
 	"github.com/murphyhq/server/services/incidents"
 	incidentsdb "github.com/murphyhq/server/services/incidents/db"
-	"github.com/murphyhq/server/services/oncall"
-	oncalldb "github.com/murphyhq/server/services/oncall/db"
-	"github.com/murphyhq/server/services/people"
-	peopledb "github.com/murphyhq/server/services/people/db"
 	"github.com/murphyhq/server/tests/testenv"
 )
 
@@ -81,7 +77,7 @@ func alertEntries(t *testing.T, api *client.ClientWithResponses, id string) []cl
 	require.Equal(t, http.StatusOK, got.StatusCode())
 	var types []client.TimelineEntryType
 	for _, entry := range got.JSON200.Timeline {
-		if entry.Escalation == nil && entry.Type != client.TimelineEntryTypeEscalationExhausted {
+		if entry.Escalation == nil && entry.Notification == nil && entry.Type != client.TimelineEntryTypeEscalationExhausted {
 			types = append(types, entry.Type)
 		}
 	}
@@ -242,12 +238,6 @@ func incidentsFor(t *testing.T, databases migrateapp.Settings) (*incidents.Servi
 	catalogStorage, err := catalogdb.Open(ctx, databases.CatalogDatabaseURL)
 	require.NoError(t, err)
 	t.Cleanup(catalogStorage.Close)
-	peopleStorage, err := peopledb.Open(ctx, databases.PeopleDatabaseURL)
-	require.NoError(t, err)
-	t.Cleanup(peopleStorage.Close)
-	oncallStorage, err := oncalldb.Open(ctx, databases.OnCallDatabaseURL)
-	require.NoError(t, err)
-	t.Cleanup(oncallStorage.Close)
 	escalationStorage, err := escalationdb.Open(ctx, databases.EscalationDatabaseURL)
 	require.NoError(t, err)
 	t.Cleanup(escalationStorage.Close)
@@ -255,11 +245,7 @@ func incidentsFor(t *testing.T, databases migrateapp.Settings) (*incidents.Servi
 	require.NoError(t, err)
 	t.Cleanup(storage.Close)
 
-	catalogService := catalog.New(catalogStorage, nil)
-	peopleService := people.New(peopleStorage)
-	oncallService := oncall.New(oncallStorage, peopleService)
-	escalationService := escalation.New(escalationStorage, peopleService, oncallService, catalogService)
-	return incidents.New(storage, catalogService, escalationService, oncallService, peopleService), storage
+	return incidents.New(storage, catalog.New(catalogStorage, nil), escalation.New(escalationStorage, nil, nil, nil)), storage
 }
 
 func TestAnIncidentPagesItsFirstLevelUntilAcknowledged(t *testing.T) {
@@ -336,10 +322,10 @@ func TestARedeliveredTimerTakesEffectOnce(t *testing.T) {
 		databases := testenv.Databases(t, engine)
 		api, _ := testenv.APIWith(t, databases)
 		serviceID, integrationID, _ := integrationKey(t, api)
-		service, _ := incidentsFor(t, databases)
+		service, storage := incidentsFor(t, databases)
 		require.NoError(t, service.AlertReceived(ctx, murphy.NewID(), firingAlert(serviceID, integrationID)))
 
-		due, err := service.ClaimDueMessages(ctx, 10, time.Minute)
+		due, err := storage.ClaimDueMessages(ctx, time.Now().Add(24*time.Hour), 10, time.Minute)
 		require.NoError(t, err)
 		var expired *murphy.Envelope
 		for _, message := range due {
@@ -349,21 +335,14 @@ func TestARedeliveredTimerTakesEffectOnce(t *testing.T) {
 				expired = envelope
 			}
 		}
-		require.NotNil(t, expired, "opening the incident scheduled its first timer")
+		require.NotNil(t, expired, "opening the incident scheduled the timer for after its first level")
 
 		require.NoError(t, service.TimerExpired(ctx, expired.GetId(), expired.GetTimer().GetCurrent()))
 		require.NoError(t, service.TimerExpired(ctx, expired.GetId(), expired.GetTimer().GetCurrent()))
 
-		incident, timeline, err := service.GetIncident(ctx, expired.GetTimer().GetCurrent().GetIncidentId())
+		incident, _, err := service.GetIncident(ctx, expired.GetTimer().GetCurrent().GetIncidentId())
 		require.NoError(t, err)
-		assert.Equal(t, int32(1), incident.GetEscalationLevel())
-		escalated := 0
-		for _, entry := range timeline {
-			if entry.GetType() == murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_ESCALATED {
-				escalated++
-			}
-		}
-		assert.Equal(t, 1, escalated)
+		assert.Equal(t, int32(2), incident.GetVersion(), "the timer moved the incident on once")
 	})
 }
 
@@ -395,7 +374,7 @@ func TestAMessagePublishedBeforeACrashIsPublishedAgain(t *testing.T) {
 				api, _ := testenv.APIWith(t, databases)
 				serviceID, integrationID, _ := integrationKey(t, api)
 				service, storage := incidentsFor(t, databases)
-				endpoints := broker(t).Provision(t, messaging.Topology{"engine": {"murphy.v1.timer": {"expired"}}}, messaging.TopologyVersion)
+				endpoints := broker(t).Provision(t, messaging.Topology{"engine": {"murphy.v1.incident": {"created"}}}, messaging.TopologyVersion)
 				topic, err := brokerpkg.OpenTopic(ctx, endpoints.Topic)
 				require.NoError(t, err)
 				t.Cleanup(func() { _ = topic.Close() })
@@ -404,10 +383,10 @@ func TestAMessagePublishedBeforeACrashIsPublishedAgain(t *testing.T) {
 				t.Cleanup(func() { _ = subscription.Close() })
 
 				var deliveries atomic.Int32
-				var timerID atomic.Value
+				var createdID atomic.Value
 				consumer, err := messaging.Consume(ctx, subscription, "engine", messaging.Handlers{
-					messaging.On(murphy.TimerVerb_TIMER_VERB_EXPIRED, func(_ context.Context, envelope *murphy.Envelope) error {
-						timerID.Store(envelope.GetId())
+					messaging.On(murphy.IncidentVerb_INCIDENT_VERB_CREATED, func(_ context.Context, envelope *murphy.Envelope) error {
+						createdID.Store(envelope.GetId())
 						deliveries.Add(1)
 						return nil
 					}),
@@ -428,11 +407,11 @@ func TestAMessagePublishedBeforeACrashIsPublishedAgain(t *testing.T) {
 				stop()
 				require.NoError(t, <-done)
 				assert.True(t, source.crashed.Load())
-				remaining, err := storage.ClaimDueMessages(ctx, time.Now().Add(time.Hour), 10, time.Minute)
+				remaining, err := storage.ClaimDueMessages(ctx, time.Now().Add(time.Second), 10, time.Minute)
 				require.NoError(t, err)
 				assert.Empty(t, remaining)
 				assert.GreaterOrEqual(t, deliveries.Load(), int32(1), "delivered: NATS drops the repeated publish by ID, SQS delivers it for the consumer to drop")
-				assert.NotEmpty(t, timerID.Load())
+				assert.NotEmpty(t, createdID.Load())
 			})
 		}
 	})

@@ -2,84 +2,299 @@ package notifications
 
 import (
 	"context"
-	"errors"
 	"fmt"
+	"sync"
 	"time"
 
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
+
 	"github.com/murphyhq/server"
+	"github.com/murphyhq/server/internal/messaging"
 	"github.com/murphyhq/server/internal/telemetry"
 	"github.com/murphyhq/server/internal/tracer"
-	"google.golang.org/protobuf/proto"
 )
 
-type Provider interface {
-	Send(ctx context.Context, notification *murphy.Notification) error
+type Repository interface {
+	Record(ctx context.Context, change *Change) (recorded bool, err error)
+	RecipientsOf(ctx context.Context, incidentID string) ([]string, error)
+	ClaimDueMessages(ctx context.Context, now time.Time, limit int, lease time.Duration) ([]*ScheduledMessage, error)
+	DeleteMessages(ctx context.Context, ids []string) error
+	PurgeHandledMessages(ctx context.Context, before time.Time) (int64, error)
 }
 
-type Publisher interface {
-	Publish(ctx context.Context, envelope *murphy.Envelope) error
+type Policies interface {
+	GetPolicyVersion(ctx context.Context, id string, version int32) (*murphy.EscalationPolicy, error)
 }
 
-const GiveUpAfter = 5 * time.Minute
-
-type RefusedError struct {
-	Reason string
+type OnCall interface {
+	WhoIsOnCall(ctx context.Context, scheduleIDs []string, at time.Time) (map[string]string, error)
 }
 
-func (e *RefusedError) Error() string {
-	return "refused: " + e.Reason
+type People interface {
+	ActiveUsers(ctx context.Context, ids []string) (map[string]bool, error)
+	ContactMethodsOfUsers(ctx context.Context, userIDs []string) (map[string][]*murphy.ContactMethod, error)
 }
+
+type Change struct {
+	MessageID     string
+	Page          *murphy.Page
+	Notifications []*murphy.Notification
+	Outcome       *murphy.Notification
+	Messages      []*ScheduledMessage
+}
+
+type ScheduledMessage struct {
+	ID       string
+	DueAt    time.Time
+	Envelope []byte
+}
+
+const HandledRetention = 7 * 24 * time.Hour
 
 type Service struct {
-	providers map[murphy.ContactMethodType]Provider
-	publisher Publisher
+	repo     Repository
+	policies Policies
+	oncall   OnCall
+	people   People
+	versions sync.Map
 }
 
-func New(publisher Publisher, providers map[murphy.ContactMethodType]Provider) *Service {
-	return &Service{providers: providers, publisher: publisher}
+func New(repo Repository, policies Policies, oncall OnCall, people People) *Service {
+	return &Service{repo: repo, policies: policies, oncall: oncall, people: people}
 }
 
-func (s *Service) Send(ctx context.Context, messageID string, notification *murphy.Notification) (err error) {
+func (s *Service) IncidentEscalated(ctx context.Context, messageID string, incident *murphy.Incident) (err error) {
 	ctx, span := tracer.Span(ctx)
-	channel := notification.GetContactMethod().GetType()
 	ctx = span.Set(ctx,
-		telemetry.WithField("incident.id", notification.GetIncident().GetId()),
-		telemetry.WithField("notification.id", notification.GetId()),
-		telemetry.WithField("notification.channel", channel.Text()),
+		telemetry.WithField("incident.id", incident.GetId()),
+		telemetry.WithField("escalation.level", incident.GetEscalationLevel()),
+		telemetry.WithField("escalation.round", incident.GetEscalationRound()),
 	)
 	defer span.End(&err)
 
-	provider, ok := s.providers[channel]
-	if !ok {
-		return s.outcome(ctx, messageID, notification, murphy.NotificationVerb_NOTIFICATION_VERB_FAILED, "Murphy can't send by "+channel.Text()+" yet")
+	policy, err := s.policyVersion(ctx, incident.GetEscalationPolicyId(), incident.GetEscalationPolicyVersion())
+	if err != nil {
+		return fmt.Errorf("get the incident's escalation policy version: %w", err)
 	}
-	sendErr := provider.Send(ctx, notification)
-	var refused *RefusedError
-	switch {
-	case sendErr == nil:
-		return s.outcome(ctx, messageID, notification, murphy.NotificationVerb_NOTIFICATION_VERB_SENT, "")
-	case errors.As(sendErr, &refused):
-		return s.outcome(ctx, messageID, notification, murphy.NotificationVerb_NOTIFICATION_VERB_FAILED, refused.Reason)
-	case time.Since(notification.GetCreatedAt().AsTime()) >= GiveUpAfter:
-		return s.outcome(ctx, messageID, notification, murphy.NotificationVerb_NOTIFICATION_VERB_FAILED, "still failing after 5 minutes: "+sendErr.Error())
-	default:
-		return fmt.Errorf("send notification: %w", sendErr)
+	level := incident.GetEscalationLevel()
+	if level < 1 || int(level) > len(policy.GetLevels()) {
+		return messaging.Reject(fmt.Errorf("escalation level %d is not in policy version %d", level, policy.GetVersion()))
+	}
+	now := murphy.Now()
+	page := &murphy.Page{
+		Id: murphy.NewID(), Incident: incident, EscalationLevel: level, EscalationRound: incident.GetEscalationRound(), CreatedAt: now,
+	}
+	if err := s.reach(ctx, page, policy.GetLevels()[level-1], now.AsTime()); err != nil {
+		return err
+	}
+	users := make([]string, len(page.GetReached()))
+	for i, recipient := range page.GetReached() {
+		users[i] = recipient.GetUserId()
+	}
+	methods, err := s.people.ContactMethodsOfUsers(ctx, users)
+	if err != nil {
+		return fmt.Errorf("find contact methods: %w", err)
+	}
+	var created []*murphy.Notification
+	for _, recipient := range page.GetReached() {
+		recipient.ContactMethods = int32(len(methods[recipient.GetUserId()]))
+		for _, method := range methods[recipient.GetUserId()] {
+			notification := newNotification(incident, murphy.NotificationReason_NOTIFICATION_REASON_PAGED, method, now)
+			notification.PageId, notification.Via = page.GetId(), recipient.GetVia()
+			created = append(created, notification)
+		}
+	}
+
+	pageCreated, err := message(ctx, now.AsTime(), &murphy.Envelope{
+		Event: &murphy.Envelope_Page{Page: &murphy.PageEvent{Verb: murphy.PageVerb_PAGE_VERB_CREATED, Current: page}},
+	})
+	if err != nil {
+		return err
+	}
+	messages, err := notificationsCreated(ctx, created)
+	if err != nil {
+		return err
+	}
+	return s.record(ctx, &Change{MessageID: messageID, Page: page, Notifications: created, Messages: append([]*ScheduledMessage{pageCreated}, messages...)})
+}
+
+func (s *Service) reach(ctx context.Context, page *murphy.Page, level *murphy.EscalationLevel, at time.Time) error {
+	var schedules []string
+	for _, target := range level.GetTargets() {
+		if target.GetType() == murphy.EscalationTargetType_ESCALATION_TARGET_TYPE_SCHEDULE {
+			schedules = append(schedules, target.GetId())
+		}
+	}
+	onCall, err := s.oncall.WhoIsOnCall(ctx, schedules, at)
+	if err != nil {
+		return fmt.Errorf("find who is on call: %w", err)
+	}
+	candidates := make([]string, len(level.GetTargets()))
+	for i, target := range level.GetTargets() {
+		candidates[i] = target.GetId()
+		if target.GetType() == murphy.EscalationTargetType_ESCALATION_TARGET_TYPE_SCHEDULE {
+			candidates[i] = onCall[target.GetId()]
+		}
+	}
+	active, err := s.people.ActiveUsers(ctx, candidates)
+	if err != nil {
+		return fmt.Errorf("find active users: %w", err)
+	}
+	seen := map[string]bool{}
+	for i, target := range level.GetTargets() {
+		user := candidates[i]
+		switch {
+		case user == "" || !active[user]:
+			page.Unreached = append(page.Unreached, target)
+		case !seen[user]:
+			seen[user] = true
+			page.Reached = append(page.Reached, &murphy.PageRecipient{UserId: user, Via: target})
+		}
+	}
+	return nil
+}
+
+func (s *Service) IncidentAcknowledged(ctx context.Context, messageID string, incident *murphy.Incident) error {
+	return s.followUp(ctx, messageID, incident, murphy.NotificationReason_NOTIFICATION_REASON_ACKNOWLEDGED)
+}
+
+func (s *Service) IncidentResolved(ctx context.Context, messageID string, incident *murphy.Incident) error {
+	return s.followUp(ctx, messageID, incident, murphy.NotificationReason_NOTIFICATION_REASON_RESOLVED)
+}
+
+func (s *Service) followUp(ctx context.Context, messageID string, incident *murphy.Incident, reason murphy.NotificationReason) (err error) {
+	ctx, span := tracer.Span(ctx)
+	ctx = span.Set(ctx, telemetry.WithField("incident.id", incident.GetId()))
+	defer span.End(&err)
+
+	users, err := s.repo.RecipientsOf(ctx, incident.GetId())
+	if err != nil {
+		return fmt.Errorf("find who was paged: %w", err)
+	}
+	methods, err := s.people.ContactMethodsOfUsers(ctx, users)
+	if err != nil {
+		return fmt.Errorf("find contact methods: %w", err)
+	}
+	now := murphy.Now()
+	var created []*murphy.Notification
+	for _, user := range users {
+		for _, method := range methods[user] {
+			created = append(created, newNotification(incident, reason, method, now))
+		}
+	}
+	messages, err := notificationsCreated(ctx, created)
+	if err != nil {
+		return err
+	}
+	return s.record(ctx, &Change{MessageID: messageID, Notifications: created, Messages: messages})
+}
+
+func (s *Service) NotificationSent(ctx context.Context, messageID string, notification *murphy.Notification) error {
+	return s.outcome(ctx, messageID, notification)
+}
+
+func (s *Service) NotificationFailed(ctx context.Context, messageID string, notification *murphy.Notification) error {
+	return s.outcome(ctx, messageID, notification)
+}
+
+func (s *Service) outcome(ctx context.Context, messageID string, notification *murphy.Notification) (err error) {
+	ctx, span := tracer.Span(ctx)
+	ctx = span.Set(ctx, telemetry.WithField("notification.id", notification.GetId()))
+	defer span.End(&err)
+
+	return s.record(ctx, &Change{MessageID: messageID, Outcome: notification})
+}
+
+func (s *Service) record(ctx context.Context, change *Change) error {
+	if _, err := s.repo.Record(ctx, change); err != nil {
+		return fmt.Errorf("record notifications: %w", err)
+	}
+	return nil
+}
+
+func (s *Service) policyVersion(ctx context.Context, id string, version int32) (*murphy.EscalationPolicy, error) {
+	key := fmt.Sprintf("%s/%d", id, version)
+	if cached, ok := s.versions.Load(key); ok {
+		return cached.(*murphy.EscalationPolicy), nil
+	}
+	policy, err := s.policies.GetPolicyVersion(ctx, id, version)
+	if err != nil {
+		return nil, err
+	}
+	s.versions.Store(key, policy)
+	return policy, nil
+}
+
+func newNotification(incident *murphy.Incident, reason murphy.NotificationReason, method *murphy.ContactMethod, now *timestamppb.Timestamp) *murphy.Notification {
+	return &murphy.Notification{
+		Id:              murphy.NewID(),
+		Reason:          reason,
+		Incident:        incident,
+		UserId:          method.GetUserId(),
+		ContactMethod:   method,
+		EscalationLevel: incident.GetEscalationLevel(),
+		EscalationRound: incident.GetEscalationRound(),
+		CreatedAt:       now,
 	}
 }
 
-func (s *Service) outcome(ctx context.Context, messageID string, notification *murphy.Notification, verb murphy.NotificationVerb, reason string) error {
-	current := proto.CloneOf(notification)
-	if verb == murphy.NotificationVerb_NOTIFICATION_VERB_SENT {
-		current.SentAt = murphy.Now()
+func notificationsCreated(ctx context.Context, notifications []*murphy.Notification) ([]*ScheduledMessage, error) {
+	messages := make([]*ScheduledMessage, len(notifications))
+	for i, notification := range notifications {
+		created, err := message(ctx, notification.GetCreatedAt().AsTime(), &murphy.Envelope{
+			Event: &murphy.Envelope_Notification{Notification: &murphy.NotificationEvent{Verb: murphy.NotificationVerb_NOTIFICATION_VERB_CREATED, Current: notification}},
+		})
+		if err != nil {
+			return nil, err
+		}
+		messages[i] = created
 	}
-	current.Failure = reason
-	envelope := &murphy.Envelope{
-		Id:         murphy.DerivedID(messageID, verb.String()),
-		OccurredAt: murphy.Now(),
-		Event:      &murphy.Envelope_Notification{Notification: &murphy.NotificationEvent{Verb: verb, Previous: notification, Current: current}},
+	return messages, nil
+}
+
+func message(ctx context.Context, due time.Time, envelope *murphy.Envelope) (*ScheduledMessage, error) {
+	envelope.Id, envelope.OccurredAt, envelope.TraceContext = murphy.NewID(), murphy.Now(), tracer.Inject(ctx)
+	data, err := proto.Marshal(envelope)
+	if err != nil {
+		return nil, fmt.Errorf("encode message: %w", err)
 	}
-	if err := s.publisher.Publish(ctx, envelope); err != nil {
-		return fmt.Errorf("publish notification outcome: %w", err)
+	return &ScheduledMessage{ID: envelope.GetId(), DueAt: due, Envelope: data}, nil
+}
+
+func (s *Service) ClaimDueMessages(ctx context.Context, limit int, lease time.Duration) (_ []messaging.ScheduledMessage, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	claimed, err := s.repo.ClaimDueMessages(ctx, time.Now().UTC(), limit, lease)
+	if err != nil {
+		return nil, fmt.Errorf("claim due messages: %w", err)
 	}
+	due := make([]messaging.ScheduledMessage, len(claimed))
+	for i, message := range claimed {
+		due[i] = messaging.ScheduledMessage{ID: message.ID, Kind: "event", DueAt: message.DueAt, Envelope: message.Envelope}
+	}
+	return due, nil
+}
+
+func (s *Service) MessagesSent(ctx context.Context, ids []string) (err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	if err := s.repo.DeleteMessages(ctx, ids); err != nil {
+		return fmt.Errorf("delete sent messages: %w", err)
+	}
+	return nil
+}
+
+func (s *Service) PurgeHandledMessages(ctx context.Context) (err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	purged, err := s.repo.PurgeHandledMessages(ctx, time.Now().Add(-HandledRetention))
+	if err != nil {
+		return fmt.Errorf("purge handled messages: %w", err)
+	}
+	span.Set(ctx, telemetry.WithField("messages.purged", purged))
 	return nil
 }

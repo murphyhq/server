@@ -28,8 +28,8 @@ func Murphy(t *testing.T, broker brokertest.Environment, engine DatabaseEngine) 
 	t.Helper()
 	databases := Databases(t, engine)
 	endpoints := broker.Provision(t, messaging.Topology{
-		"engine":   {"murphy.v1.alert": {"received"}, "murphy.v1.timer": {"expired"}, "murphy.v1.notification": {"sent", "failed"}},
-		"notifier": {"murphy.v1.notification": {"created"}},
+		"engine":   {"murphy.v1.alert": {"received"}, "murphy.v1.timer": {"expired"}, "murphy.v1.page": {"created"}, "murphy.v1.notification": {"sent", "failed"}},
+		"notifier": {"murphy.v1.incident": {"escalated", "acknowledged", "resolved"}, "murphy.v1.notification": {"created", "sent", "failed"}},
 	}, messaging.TopologyVersion)
 
 	api, _ := APIWith(t, databases)
@@ -38,22 +38,25 @@ func Murphy(t *testing.T, broker brokertest.Environment, engine DatabaseEngine) 
 		EventsSubscriptionURL: endpoints.Subscriptions["engine"],
 		CatalogDatabaseURL:    databases.CatalogDatabaseURL,
 		IncidentsDatabaseURL:  databases.IncidentsDatabaseURL,
-		PeopleDatabaseURL:     databases.PeopleDatabaseURL,
-		OnCallDatabaseURL:     databases.OnCallDatabaseURL,
 		EscalationDatabaseURL: databases.EscalationDatabaseURL,
 	})
 	run(t, func(ctx context.Context) (runner, error) {
 		return schedulerapp.New(ctx, schedulerapp.Settings{
-			EventsTopicURL:       endpoints.Topic,
-			IncidentsDatabaseURL: databases.IncidentsDatabaseURL,
-			Relay:                messaging.RelaySettings{PollInterval: 50 * time.Millisecond, BatchSize: 100, ClaimLease: 10 * time.Second},
+			EventsTopicURL:           endpoints.Topic,
+			IncidentsDatabaseURL:     databases.IncidentsDatabaseURL,
+			NotificationsDatabaseURL: databases.NotificationsDatabaseURL,
+			Relay:                    messaging.RelaySettings{PollInterval: 50 * time.Millisecond, BatchSize: 100, ClaimLease: 10 * time.Second},
 		})
 	})
 	run(t, func(ctx context.Context) (runner, error) {
 		return notifierapp.New(ctx, notifierapp.Settings{
-			EventsSubscriptionURL: endpoints.Subscriptions["notifier"],
-			EventsTopicURL:        endpoints.Topic,
-			WebhookSigningKeys:    WebhookSigningKey,
+			EventsSubscriptionURL:    endpoints.Subscriptions["notifier"],
+			EventsTopicURL:           endpoints.Topic,
+			NotificationsDatabaseURL: databases.NotificationsDatabaseURL,
+			PeopleDatabaseURL:        databases.PeopleDatabaseURL,
+			OnCallDatabaseURL:        databases.OnCallDatabaseURL,
+			EscalationDatabaseURL:    databases.EscalationDatabaseURL,
+			WebhookSigningKeys:       WebhookSigningKey,
 		})
 	})
 	return Stack{API: api, IngestURL: ingest, Databases: databases}

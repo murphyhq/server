@@ -5,6 +5,7 @@ package murphy.v1;
 import "google/protobuf/timestamp.proto";
 import "murphy/v1/alert.proto";
 import "murphy/v1/incident.proto";
+import "murphy/v1/notifications.proto";
 
 option go_package = "github.com/murphyhq/server;murphy";
 
@@ -18,5 +19,6 @@ message Envelope {
     IncidentEvent incident = 11;
     TimerEvent timer = 12;
     NotificationEvent notification = 13;
+    PageEvent page = 14;
   }
 }

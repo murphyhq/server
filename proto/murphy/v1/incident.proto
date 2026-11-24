@@ -114,37 +114,3 @@ enum TimerVerb {
   TIMER_VERB_UNSPECIFIED = 0;
   TIMER_VERB_EXPIRED = 1;
 }
-
-message Notification {
-  string id = 1;
-  NotificationReason reason = 2;
-  Incident incident = 3;
-  string user_id = 4;
-  ContactMethod contact_method = 5;
-  int32 escalation_level = 6;
-  int32 escalation_round = 7;
-  EscalationTarget via = 8;
-  google.protobuf.Timestamp created_at = 9;
-  google.protobuf.Timestamp sent_at = 10;
-  string failure = 11;
-}
-
-enum NotificationReason {
-  NOTIFICATION_REASON_UNSPECIFIED = 0;
-  NOTIFICATION_REASON_PAGED = 1;
-  NOTIFICATION_REASON_ACKNOWLEDGED = 2;
-  NOTIFICATION_REASON_RESOLVED = 3;
-}
-
-message NotificationEvent {
-  NotificationVerb verb = 1;
-  Notification previous = 2;
-  Notification current = 3;
-}
-
-enum NotificationVerb {
-  NOTIFICATION_VERB_UNSPECIFIED = 0;
-  NOTIFICATION_VERB_CREATED = 1;
-  NOTIFICATION_VERB_SENT = 2;
-  NOTIFICATION_VERB_FAILED = 3;
-}
