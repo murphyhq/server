@@ -4,7 +4,6 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 
 	"github.com/getkin/kin-openapi/openapi3"
@@ -57,12 +56,26 @@ func newInstall(t *testing.T) *install {
 	return i
 }
 
-func (i *install) member(userID, team string, role murphy.TeamRole) caller {
+func (i *install) member(userID, team string, role murphy.TeamRole) string {
 	i.roles[userID] = map[string]murphy.TeamRole{team: role}
-	return caller{userID: userID, role: murphy.UserRole_USER_ROLE_MEMBER}
+	return userID
 }
 
-var admin = caller{userID: "ana", role: murphy.UserRole_USER_ROLE_ADMIN}
+func (i *install) request(t *testing.T, role murphy.UserRole, method, pattern, target string) int {
+	t.Helper()
+	spec, err := GetSwagger()
+	require.NoError(t, err)
+	rules, err := newAccess(spec, i.access.people, i.access.policies, i.access.services, i.access.schedules, i.access.incidents)
+	require.NoError(t, err)
+	mux := http.NewServeMux()
+	mux.Handle(method+" "+pattern, requireAccess(rules)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) })))
+	request := httptest.NewRequest(method, target, nil)
+	session := &currentSession{session: &murphy.Session{UserId: "ana"}, role: role}
+	request = request.WithContext(context.WithValue(request.Context(), sessionContext{}, session))
+	answer := httptest.NewRecorder()
+	mux.ServeHTTP(answer, request)
+	return answer.Code
+}
 
 func TestEveryOperationInTheSpecDeclaresItsAccess(t *testing.T) {
 	spec, err := GetSwagger()
@@ -86,9 +99,17 @@ func TestAChangeWithoutAScopeStopsTheServerFromStarting(t *testing.T) {
 func TestAdminsPassWithoutLookingAnythingUp(t *testing.T) {
 	i := newInstall(t)
 
-	assert.NoError(t, i.access.allows(t.Context(), admin, "install:manage", nil))
-	assert.NoError(t, i.access.allows(t.Context(), admin, "services:manage", []string{"a-service-nobody-looks-up"}))
-	assert.NoError(t, i.access.allows(t.Context(), admin, "incidents:respond", []string{"an-incident-nobody-looks-up"}))
+	got := i.request(t, murphy.UserRole_USER_ROLE_ADMIN, http.MethodDelete, "/v1/services/{id}", "/v1/services/a-service-nobody-looks-up")
+
+	assert.Equal(t, http.StatusNoContent, got)
+}
+
+func TestAMemberIsCheckedOnTheWayIn(t *testing.T) {
+	i := newInstall(t)
+
+	got := i.request(t, murphy.UserRole_USER_ROLE_MEMBER, http.MethodDelete, "/v1/services/{id}", "/v1/services/"+service)
+
+	assert.Equal(t, http.StatusForbidden, got)
 }
 
 func TestMembersDontSetUpTheInstall(t *testing.T) {
@@ -173,14 +194,13 @@ func TestNobodyChangesSomeoneElsesContactMethods(t *testing.T) {
 }
 
 func TestTheResourceComesFromThePathOrTheBody(t *testing.T) {
-	inPath, inBody, inList := locator("path.id"), locator("body.team.id"), locator("body.teams.id")
-	request := httptest.NewRequest(http.MethodPut, "/v1/schedules/schedule-1", strings.NewReader(""))
+	request := httptest.NewRequest(http.MethodPut, "/v1/schedules/schedule-1", nil)
 	request.SetPathValue("id", "schedule-1")
 	body := map[string]any{"team": map[string]any{"id": payments}, "teams": []any{map[string]any{"id": payments}, map[string]any{"id": platform}}}
 
-	fromPath, _ := inPath.find(request, body)
-	fromBody, _ := inBody.find(request, body)
-	fromList, _ := inList.find(request, body)
+	fromPath, _ := resource{inPath: "id"}.in(request, body)
+	fromBody, _ := resource{inBody: []string{"team", "id"}}.in(request, body)
+	fromList, _ := resource{inBody: []string{"teams", "id"}}.in(request, body)
 
 	assert.Equal(t, []string{"schedule-1"}, fromPath)
 	assert.Equal(t, []string{payments}, fromBody)
@@ -188,9 +208,7 @@ func TestTheResourceComesFromThePathOrTheBody(t *testing.T) {
 }
 
 func TestAnOptionalResourceThatIsAbsentDoesntApply(t *testing.T) {
-	status := locator("body.status?")
-
-	_, applies := status.find(httptest.NewRequest(http.MethodPatch, "/v1/users/bo", nil), map[string]any{"name": "Bo"})
+	_, applies := resource{inBody: []string{"status"}, optional: true}.in(httptest.NewRequest(http.MethodPatch, "/v1/users/bo", nil), map[string]any{"name": "Bo"})
 
 	assert.False(t, applies)
 }
