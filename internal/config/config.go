@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"net/netip"
 	"net/url"
 	"os"
 	"reflect"
@@ -117,6 +118,7 @@ func parse(v reflect.Value, raw string) error {
 var rules = map[string]func(string) error{
 	"base-url": baseURL,
 	"http-url": httpURL,
+	"cidr":     cidr,
 }
 
 func validate(v reflect.Value, rule string) error {
@@ -151,6 +153,13 @@ func baseURL(raw string) error {
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" ||
 		u.Path != "" || u.RawQuery != "" || u.Fragment != "" || u.User != nil {
 		return errors.New("not a base URL of the form scheme://host[:port]")
+	}
+	return nil
+}
+
+func cidr(raw string) error {
+	if _, err := netip.ParsePrefix(raw); err != nil {
+		return errors.New("not a network in CIDR notation, as in 10.0.0.0/8")
 	}
 	return nil
 }

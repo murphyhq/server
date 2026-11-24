@@ -95,3 +95,20 @@ func TestLoadAcceptsBaseURLsAndRejectsEverythingElseWithoutEchoingIt(t *testing.
 	assert.ErrorContains(t, err, "MURPHY_ALLOWED_ORIGINS: entry 2")
 	assert.NotContains(t, err.Error(), "s3cret-host")
 }
+
+type networks struct {
+	Allowed []string `env:"ALLOWED_NETWORKS" validate:"cidr"`
+}
+
+func TestLoadAcceptsNetworksAndRejectsEverythingElseWithoutEchoingIt(t *testing.T) {
+	t.Setenv("MURPHY_ALLOWED_NETWORKS", "10.0.0.0/8,fd00::/8")
+	var ok networks
+	require.NoError(t, config.Load(&ok))
+
+	t.Setenv("MURPHY_ALLOWED_NETWORKS", "10.0.0.0/8,s3cret-host")
+	var bad networks
+	err := config.Load(&bad)
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "MURPHY_ALLOWED_NETWORKS: entry 2")
+	assert.NotContains(t, err.Error(), "s3cret-host")
+}

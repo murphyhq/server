@@ -304,6 +304,7 @@ services:
       MURPHY_RELAY_URL: http://webhook-receiver:8080/relay
       MURPHY_RELAY_KEY: mik_local-development-key
       MURPHY_PUBLIC_URL: http://localhost:8080
+      MURPHY_WEBHOOK_ALLOWED_NETWORKS: 10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
 
   dex:
     image: ghcr.io/dexidp/dex:v2.46.1
