@@ -44,6 +44,7 @@ type Settings struct {
 	OIDCClientSecret       string        `env:"OIDC_CLIENT_SECRET" required:"true"`
 	SessionDuration        time.Duration `env:"SESSION_DURATION" default:"720h"`
 	InitialAdminEmail      string        `env:"INITIAL_ADMIN_EMAIL"`
+	AppScheme              string        `env:"APP_SCHEME" default:"murphy"`
 }
 
 type App struct {
@@ -118,6 +119,8 @@ func New(ctx context.Context, s Settings) (_ *App, err error) {
 		SessionDuration:   s.SessionDuration,
 		InitialAdminEmail: s.InitialAdminEmail,
 		ReturnOrigins:     append([]string{s.PublicURL}, s.CORSOrigins...),
+		PublicURL:         s.PublicURL,
+		AppScheme:         s.AppScheme,
 	})
 	oncallService := oncall.New(oncallStorage, peopleService)
 	escalationService := escalation.New(escalationStorage, peopleService, oncallService, catalogService, s.EscalationMinimumDelay)

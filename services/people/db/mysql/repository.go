@@ -388,7 +388,7 @@ func (r *Repository) CreateSignIn(ctx context.Context, signIn *murphy.SignIn) (e
 
 	return murphymysql.Error("sign-in", r.queries.CreateSignIn(ctx, CreateSignInParams{
 		ID: signIn.GetId(), StateHash: signIn.GetStateHash(), Nonce: signIn.GetNonce(), Verifier: signIn.GetVerifier(),
-		ReturnTo:  database.Text(signIn.GetReturnTo()),
+		ReturnTo: database.Text(signIn.GetReturnTo()), CodeChallenge: database.Text(signIn.GetCodeChallenge()),
 		ExpiresAt: signIn.GetExpiresAt().AsTime(),
 		CreatedAt: signIn.GetCreatedAt().AsTime(), UpdatedAt: signIn.GetUpdatedAt().AsTime(),
 	}))
@@ -414,7 +414,7 @@ func (r *Repository) GetSignIn(ctx context.Context, stateHash []byte) (_ *murphy
 		return nil, murphymysql.Error("sign-in", err)
 	}
 	return &murphy.SignIn{
-		Id: row.ID, StateHash: row.StateHash, Nonce: row.Nonce, Verifier: row.Verifier, ReturnTo: database.TextValue(row.ReturnTo),
+		Id: row.ID, StateHash: row.StateHash, Nonce: row.Nonce, Verifier: row.Verifier, ReturnTo: database.TextValue(row.ReturnTo), CodeChallenge: database.TextValue(row.CodeChallenge),
 		ExpiresAt: timestamppb.New(row.ExpiresAt), CreatedAt: timestamppb.New(row.CreatedAt), UpdatedAt: timestamppb.New(row.UpdatedAt),
 	}, nil
 }
@@ -432,4 +432,41 @@ func insertIdentity(ctx context.Context, queries *Queries, identity *murphy.Iden
 		ID: identity.GetId(), UserID: identity.GetUserId(), Issuer: identity.GetIssuer(), Subject: identity.GetSubject(),
 		CreatedAt: identity.GetCreatedAt().AsTime(), UpdatedAt: identity.GetUpdatedAt().AsTime(),
 	}))
+}
+
+func (r *Repository) CreateOneTimeCode(ctx context.Context, code *murphy.OneTimeCode) (err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	return murphymysql.Error("one-time code", r.queries.CreateOneTimeCode(ctx, CreateOneTimeCodeParams{
+		ID: code.GetId(), CodeHash: code.GetCodeHash(), UserID: code.GetUserId(), Purpose: code.GetPurpose().Text(),
+		CodeChallenge: database.Text(code.GetCodeChallenge()), ExpiresAt: code.GetExpiresAt().AsTime(),
+		CreatedAt: code.GetCreatedAt().AsTime(), UpdatedAt: code.GetUpdatedAt().AsTime(),
+	}))
+}
+
+func (r *Repository) UseOneTimeCode(ctx context.Context, codeHash []byte, now time.Time) (_ bool, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	rows, err := r.queries.UseOneTimeCode(ctx, UseOneTimeCodeParams{UsedAt: &now, UpdatedAt: now, CodeHash: codeHash, Now: now})
+	if err != nil {
+		return false, murphymysql.Error("one-time code", err)
+	}
+	return rows == 1, nil
+}
+
+func (r *Repository) GetOneTimeCode(ctx context.Context, codeHash []byte) (_ *murphy.OneTimeCode, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	row, err := r.queries.GetOneTimeCode(ctx, codeHash)
+	if err != nil {
+		return nil, murphymysql.Error("one-time code", err)
+	}
+	return &murphy.OneTimeCode{
+		Id: row.ID, CodeHash: row.CodeHash, UserId: row.UserID, Purpose: murphy.OneTimeCodePurposeFromText(row.Purpose),
+		CodeChallenge: database.TextValue(row.CodeChallenge), ExpiresAt: timestamppb.New(row.ExpiresAt),
+		UsedAt: database.Timestamp(row.UsedAt), CreatedAt: timestamppb.New(row.CreatedAt), UpdatedAt: timestamppb.New(row.UpdatedAt),
+	}, nil
 }

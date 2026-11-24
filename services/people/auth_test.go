@@ -3,6 +3,8 @@ package people_test
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/base64"
+	"net/url"
 	"testing"
 	"time"
 
@@ -30,6 +32,7 @@ type accounts struct {
 	identities map[string]string
 	users      map[string]*murphy.User
 	sessions   map[string]*murphy.Session
+	codes      map[string]*murphy.OneTimeCode
 	started    *murphy.SignIn
 	signInURL  []string
 	created    []*murphy.User
@@ -47,12 +50,13 @@ func newAccounts(t *testing.T) *accounts {
 	t.Helper()
 	repo, provider := NewMockAuthRepository(t), NewMockProvider(t)
 	a := &accounts{
-		auth:       people.NewAuth(repo, provider, people.AuthSettings{SessionDuration: time.Hour, InitialAdminEmail: initialAdmin, ReturnOrigins: []string{"https://murphy.example.com"}}),
+		auth:       people.NewAuth(repo, provider, people.AuthSettings{SessionDuration: time.Hour, InitialAdminEmail: initialAdmin, ReturnOrigins: []string{"https://murphy.example.com"}, PublicURL: "https://murphy.example.com", AppScheme: "murphy"}),
 		claims:     &people.Claims{Issuer: issuer, Subject: "bo-at-the-provider", Email: "bo@example.com", EmailVerified: true, Name: "Bo", Nonce: nonce},
 		signIn:     &murphy.SignIn{StateHash: hashOf(state), Nonce: nonce, Verifier: "verifier-of-the-sign-in"},
 		identities: map[string]string{},
 		users:      map[string]*murphy.User{},
 		sessions:   map[string]*murphy.Session{},
+		codes:      map[string]*murphy.OneTimeCode{},
 	}
 	repo.EXPECT().StartSignIn(mock.Anything, mock.Anything, mock.Anything).RunAndReturn(func(_ context.Context, signIn *murphy.SignIn, _ time.Time) error {
 		a.started = signIn
@@ -106,6 +110,18 @@ func newAccounts(t *testing.T) *accounts {
 		a.session = session
 		return nil
 	}).Maybe()
+	repo.EXPECT().CreateOneTimeCode(mock.Anything, mock.Anything).RunAndReturn(func(_ context.Context, code *murphy.OneTimeCode) error {
+		a.codes[string(code.GetCodeHash())] = code
+		return nil
+	}).Maybe()
+	repo.EXPECT().TakeOneTimeCode(mock.Anything, mock.Anything, mock.Anything).RunAndReturn(func(_ context.Context, codeHash []byte, _ time.Time) (*murphy.OneTimeCode, error) {
+		code, ok := a.codes[string(codeHash)]
+		if !ok {
+			return nil, &murphy.NotFoundError{Entity: "one-time code"}
+		}
+		delete(a.codes, string(codeHash))
+		return code, nil
+	}).Maybe()
 	repo.EXPECT().GetActiveSession(mock.Anything, mock.Anything, mock.Anything).RunAndReturn(func(_ context.Context, tokenHash []byte, _ time.Time) (*murphy.Session, error) {
 		session, ok := a.sessions[string(tokenHash)]
 		if !ok {
@@ -132,7 +148,7 @@ func (a *accounts) unlinked(email string) *murphy.User {
 func TestStartingASignInKeepsOnlyTheStateHash(t *testing.T) {
 	a := newAccounts(t)
 
-	started, err := a.auth.StartSignIn(t.Context(), "")
+	started, err := a.auth.StartSignIn(t.Context(), "", "")
 
 	require.NoError(t, err)
 	require.Len(t, a.signInURL, 3)
@@ -147,7 +163,7 @@ func TestASignInReturnsToAnAllowedOrigin(t *testing.T) {
 	a := newAccounts(t)
 	a.signIn.ReturnTo = "https://murphy.example.com/incidents?status=triggered"
 
-	_, err := a.auth.StartSignIn(t.Context(), "https://MURPHY.example.com/incidents?status=triggered")
+	_, err := a.auth.StartSignIn(t.Context(), "https://MURPHY.example.com/incidents?status=triggered", "")
 	require.NoError(t, err)
 	signedIn, err := a.auth.FinishSignIn(t.Context(), state, state, code)
 
@@ -160,7 +176,7 @@ func TestASignInNeverReturnsToAnotherOrigin(t *testing.T) {
 	a := newAccounts(t)
 
 	for _, returnTo := range []string{"https://evil.example/", "https://murphy.example.com.evil.example/", "//evil.example/", "https://user@murphy.example.com/", "javascript:alert(1)"} {
-		_, err := a.auth.StartSignIn(t.Context(), returnTo)
+		_, err := a.auth.StartSignIn(t.Context(), returnTo, "")
 
 		assert.ErrorIs(t, err, murphy.ErrInvalid, returnTo)
 	}
@@ -301,6 +317,102 @@ func TestAnUnknownSessionIsRefused(t *testing.T) {
 	a := newAccounts(t)
 
 	_, err := a.auth.Authenticate(t.Context(), "mss_ended-or-never-issued")
+
+	require.ErrorIs(t, err, murphy.ErrUnauthenticated)
+}
+
+const (
+	verifier  = "a-verifier-only-the-app-knows-and-at-least-43-characters-long"
+	appReturn = "murphy://signed-in"
+)
+
+func challengeOf(verifier string) string {
+	sum := sha256.Sum256([]byte(verifier))
+	return base64.RawURLEncoding.EncodeToString(sum[:])
+}
+
+func codeIn(t *testing.T, link string) string {
+	t.Helper()
+	parsed, err := url.Parse(link)
+	require.NoError(t, err)
+	return parsed.Query().Get("code")
+}
+
+func TestTheAppsSignInNeedsAPKCEChallenge(t *testing.T) {
+	a := newAccounts(t)
+
+	_, err := a.auth.StartSignIn(t.Context(), appReturn, "")
+
+	assert.ErrorIs(t, err, murphy.ErrInvalid)
+	assert.Nil(t, a.started)
+}
+
+func TestOnlyTheAppsSignInTakesAPKCEChallenge(t *testing.T) {
+	a := newAccounts(t)
+
+	_, err := a.auth.StartSignIn(t.Context(), "", challengeOf(verifier))
+
+	assert.ErrorIs(t, err, murphy.ErrInvalid)
+}
+
+func TestTheAppGetsAOneTimeCodeInsteadOfASession(t *testing.T) {
+	a := newAccounts(t)
+	a.signIn.ReturnTo, a.signIn.CodeChallenge = appReturn, challengeOf(verifier)
+
+	signedIn, err := a.auth.FinishSignIn(t.Context(), state, state, code)
+
+	require.NoError(t, err)
+	assert.Nil(t, signedIn.Session)
+	assert.Nil(t, a.session)
+	assert.Regexp(t, `^murphy://signed-in\?code=mas_`, signedIn.ReturnTo)
+}
+
+func TestTheAppTradesItsCodeAndVerifierForASession(t *testing.T) {
+	a := newAccounts(t)
+	a.signIn.ReturnTo, a.signIn.CodeChallenge = appReturn, challengeOf(verifier)
+	handedOver, err := a.auth.FinishSignIn(t.Context(), state, state, code)
+	require.NoError(t, err)
+
+	signedIn, err := a.auth.SignInWithCode(t.Context(), codeIn(t, handedOver.ReturnTo), verifier)
+
+	require.NoError(t, err)
+	assert.Equal(t, a.created[0].GetId(), signedIn.Session.GetUserId())
+}
+
+func TestAnInterceptedAppCodeIsUselessWithoutTheVerifier(t *testing.T) {
+	a := newAccounts(t)
+	a.signIn.ReturnTo, a.signIn.CodeChallenge = appReturn, challengeOf(verifier)
+	handedOver, err := a.auth.FinishSignIn(t.Context(), state, state, code)
+	require.NoError(t, err)
+
+	_, err = a.auth.SignInWithCode(t.Context(), codeIn(t, handedOver.ReturnTo), "a-guessed-verifier")
+
+	require.ErrorIs(t, err, murphy.ErrUnauthenticated)
+	assert.Nil(t, a.session)
+}
+
+func TestAConnectCodeSignsTheAppInAsWhoeverCreatedIt(t *testing.T) {
+	a := newAccounts(t)
+	bo := murphy.NewID()
+	connect, err := a.auth.CreateConnectCode(t.Context(), bo)
+	require.NoError(t, err)
+
+	signedIn, err := a.auth.SignInWithCode(t.Context(), connect.Code, "")
+
+	require.NoError(t, err)
+	assert.Equal(t, bo, signedIn.Session.GetUserId())
+	assert.Equal(t, "murphy://connect?code="+url.QueryEscape(connect.Code)+"&server=https%3A%2F%2Fmurphy.example.com", connect.Link)
+	assert.WithinDuration(t, time.Now().Add(45*time.Second), connect.ExpiresAt, 5*time.Second)
+}
+
+func TestAOneTimeCodeWorksOnce(t *testing.T) {
+	a := newAccounts(t)
+	connect, err := a.auth.CreateConnectCode(t.Context(), murphy.NewID())
+	require.NoError(t, err)
+	_, err = a.auth.SignInWithCode(t.Context(), connect.Code, "")
+	require.NoError(t, err)
+
+	_, err = a.auth.SignInWithCode(t.Context(), connect.Code, "")
 
 	require.ErrorIs(t, err, murphy.ErrUnauthenticated)
 }

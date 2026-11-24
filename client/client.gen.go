@@ -284,6 +284,15 @@ func (e UserStatus) Valid() bool {
 	}
 }
 
+// ConnectCode defines model for ConnectCode.
+type ConnectCode struct {
+	Code      string    `json:"code"`
+	ExpiresAt time.Time `json:"expires_at"`
+
+	// Link The app's link, `murphy://connect?server=…&code=…`, to show as a QR code.
+	Link string `json:"link"`
+}
+
 // ContactMethod defines model for ContactMethod.
 type ContactMethod struct {
 	// Address An email address, an E.164 phone number, a webhook URL, or a push device's relay handle.
@@ -645,8 +654,14 @@ type Session struct {
 
 // SessionInput defines model for SessionInput.
 type SessionInput struct {
+	// Code A one-time code, from the app's sign-in or from a connect code.
+	Code *string `json:"code,omitempty"`
+
+	// CodeVerifier The PKCE verifier of the app's sign-in, needed with its code.
+	CodeVerifier *string `json:"code_verifier,omitempty"`
+
 	// IdToken An ID token from the install's identity provider.
-	IdToken string `json:"id_token"`
+	IdToken *string `json:"id_token,omitempty"`
 }
 
 // SessionToken defines model for SessionToken.
@@ -828,10 +843,19 @@ type FinishSignInParams struct {
 	MurphySignIn *string `form:"murphy_sign_in,omitempty" json:"murphy_sign_in,omitempty"`
 }
 
+// CreateConnectCodeParams defines parameters for CreateConnectCode.
+type CreateConnectCodeParams struct {
+	// IdempotencyKey Makes retries safe. A retry with the same key and request returns the original response for 24 hours; the same key with a different request is rejected with 422, and a retry while the first request is still running gets 409.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
 // SignInParams defines parameters for SignIn.
 type SignInParams struct {
-	// ReturnTo Where to send the browser once signed in. It must be on `api`'s own origin or one of the install's CORS origins.
+	// ReturnTo Where to send the browser once signed in. It must be on `api`'s own origin or one of the install's CORS origins, or be the app's `murphy://signed-in`, which receives a one-time `code` instead of a cookie.
 	ReturnTo *string `form:"return_to,omitempty" json:"return_to,omitempty"`
+
+	// CodeChallenge Required when returning to the app. The S256 PKCE challenge of a verifier only the app knows; exchanging the one-time code needs that verifier.
+	CodeChallenge *string `form:"code_challenge,omitempty" json:"code_challenge,omitempty"`
 }
 
 // ListEscalationPoliciesParams defines parameters for ListEscalationPolicies.
@@ -1119,6 +1143,13 @@ type ClientInterface interface {
 	// Corresponds with GET /v1/auth/callback (the `FinishSignIn` operationId).
 	FinishSignIn(ctx context.Context, params *FinishSignInParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// CreateConnectCode Connect the app
+	//
+	// Creates a one-time code that signs the app in as you, valid for 45 seconds. Show its link as a QR code for the app to scan.
+	//
+	// Corresponds with POST /v1/auth/connect-codes (the `CreateConnectCode` operationId).
+	CreateConnectCode(ctx context.Context, params *CreateConnectCodeParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// SignOut Sign out
 	//
 	// Ends the current session at once.
@@ -1131,18 +1162,18 @@ type ClientInterface interface {
 	// Corresponds with GET /v1/auth/session (the `GetSession` operationId).
 	GetSession(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// CreateSessionWithBody Sign in with an identity token
+	// CreateSessionWithBody Sign in with an identity token or a one-time code
 	//
-	// Signs in with an ID token the install's identity provider issued to Murphy's client, for apps and automation that sign in with the provider themselves.
+	// Signs in with an ID token the install's identity provider issued to Murphy's client, or with a one-time code from the app's sign-in or a connect code. Send exactly one of `id_token` and `code`.
 	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with POST /v1/auth/sessions (the `CreateSession` operationId).
 	CreateSessionWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// CreateSession Sign in with an identity token
+	// CreateSession Sign in with an identity token or a one-time code
 	//
-	// Signs in with an ID token the install's identity provider issued to Murphy's client, for apps and automation that sign in with the provider themselves.
+	// Signs in with an ID token the install's identity provider issued to Murphy's client, or with a one-time code from the app's sign-in or a connect code. Send exactly one of `id_token` and `code`.
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -1573,6 +1604,23 @@ func (c *Client) FinishSignIn(ctx context.Context, params *FinishSignInParams, r
 	return c.Client.Do(req)
 }
 
+// CreateConnectCode Connect the app
+//
+// Creates a one-time code that signs the app in as you, valid for 45 seconds. Show its link as a QR code for the app to scan.
+//
+// Corresponds with POST /v1/auth/connect-codes (the `CreateConnectCode` operationId).
+func (c *Client) CreateConnectCode(ctx context.Context, params *CreateConnectCodeParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateConnectCodeRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // SignOut Sign out
 //
 // Ends the current session at once.
@@ -1605,9 +1653,9 @@ func (c *Client) GetSession(ctx context.Context, reqEditors ...RequestEditorFn) 
 	return c.Client.Do(req)
 }
 
-// CreateSessionWithBody Sign in with an identity token
+// CreateSessionWithBody Sign in with an identity token or a one-time code
 //
-// Signs in with an ID token the install's identity provider issued to Murphy's client, for apps and automation that sign in with the provider themselves.
+// Signs in with an ID token the install's identity provider issued to Murphy's client, or with a one-time code from the app's sign-in or a connect code. Send exactly one of `id_token` and `code`.
 //
 // Takes any type of body and a specified content type.
 //
@@ -1624,9 +1672,9 @@ func (c *Client) CreateSessionWithBody(ctx context.Context, contentType string, 
 	return c.Client.Do(req)
 }
 
-// CreateSession Sign in with an identity token
+// CreateSession Sign in with an identity token or a one-time code
 //
-// Signs in with an ID token the install's identity provider issued to Murphy's client, for apps and automation that sign in with the provider themselves.
+// Signs in with an ID token the install's identity provider issued to Murphy's client, or with a one-time code from the app's sign-in or a connect code. Send exactly one of `id_token` and `code`.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -2816,6 +2864,48 @@ func NewFinishSignInRequest(server string, params *FinishSignInParams) (*http.Re
 	return req, nil
 }
 
+// NewCreateConnectCodeRequest constructs an http.Request for the CreateConnectCode method
+func NewCreateConnectCodeRequest(server string, params *CreateConnectCodeParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/auth/connect-codes")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+
+		if params.IdempotencyKey != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Idempotency-Key", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
 // NewSignOutRequest constructs an http.Request for the SignOut method
 func NewSignOutRequest(server string) (*http.Request, error) {
 	var err error
@@ -2941,6 +3031,18 @@ func NewSignInRequest(server string, params *SignInParams) (*http.Request, error
 		if params.ReturnTo != nil {
 
 			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "return_to", *params.ReturnTo, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.CodeChallenge != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "code_challenge", *params.CodeChallenge, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
 				return nil, err
 			} else {
 				for _, qp := range strings.Split(queryFrag, "&") {
@@ -5368,6 +5470,15 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with GET /v1/auth/callback (the `FinishSignIn` operationId).
 	FinishSignInWithResponse(ctx context.Context, params *FinishSignInParams, reqEditors ...RequestEditorFn) (*FinishSignInResponse, error)
 
+	// CreateConnectCodeWithResponse Connect the app
+	//
+	// Creates a one-time code that signs the app in as you, valid for 45 seconds. Show its link as a QR code for the app to scan.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /v1/auth/connect-codes (the `CreateConnectCode` operationId).
+	CreateConnectCodeWithResponse(ctx context.Context, params *CreateConnectCodeParams, reqEditors ...RequestEditorFn) (*CreateConnectCodeResponse, error)
+
 	// SignOutWithResponse Sign out
 	//
 	// Ends the current session at once.
@@ -5384,18 +5495,18 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with GET /v1/auth/session (the `GetSession` operationId).
 	GetSessionWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetSessionResponse, error)
 
-	// CreateSessionWithBodyWithResponse Sign in with an identity token
+	// CreateSessionWithBodyWithResponse Sign in with an identity token or a one-time code
 	//
-	// Signs in with an ID token the install's identity provider issued to Murphy's client, for apps and automation that sign in with the provider themselves.
+	// Signs in with an ID token the install's identity provider issued to Murphy's client, or with a one-time code from the app's sign-in or a connect code. Send exactly one of `id_token` and `code`.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /v1/auth/sessions (the `CreateSession` operationId).
 	CreateSessionWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateSessionResponse, error)
 
-	// CreateSessionWithResponse Sign in with an identity token
+	// CreateSessionWithResponse Sign in with an identity token or a one-time code
 	//
-	// Signs in with an ID token the install's identity provider issued to Murphy's client, for apps and automation that sign in with the provider themselves.
+	// Signs in with an ID token the install's identity provider issued to Murphy's client, or with a one-time code from the app's sign-in or a connect code. Send exactly one of `id_token` and `code`.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -5934,6 +6045,47 @@ func (r FinishSignInResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r FinishSignInResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type CreateConnectCodeResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON201 the response for an HTTP 201 `application/json` response
+	JSON201 *ConnectCode
+}
+
+// GetJSON201 returns the response for an HTTP 201 `application/json` response
+func (r CreateConnectCodeResponse) GetJSON201() *ConnectCode {
+	return r.JSON201
+}
+
+// GetBody returns the raw response body bytes
+func (r CreateConnectCodeResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateConnectCodeResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateConnectCodeResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CreateConnectCodeResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -8689,6 +8841,21 @@ func (c *ClientWithResponses) FinishSignInWithResponse(ctx context.Context, para
 	return ParseFinishSignInResponse(rsp)
 }
 
+// CreateConnectCodeWithResponse Connect the app
+//
+// Creates a one-time code that signs the app in as you, valid for 45 seconds. Show its link as a QR code for the app to scan.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /v1/auth/connect-codes (the `CreateConnectCode` operationId).
+func (c *ClientWithResponses) CreateConnectCodeWithResponse(ctx context.Context, params *CreateConnectCodeParams, reqEditors ...RequestEditorFn) (*CreateConnectCodeResponse, error) {
+	rsp, err := c.CreateConnectCode(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateConnectCodeResponse(rsp)
+}
+
 // SignOutWithResponse Sign out
 //
 // Ends the current session at once.
@@ -8717,9 +8884,9 @@ func (c *ClientWithResponses) GetSessionWithResponse(ctx context.Context, reqEdi
 	return ParseGetSessionResponse(rsp)
 }
 
-// CreateSessionWithBodyWithResponse Sign in with an identity token
+// CreateSessionWithBodyWithResponse Sign in with an identity token or a one-time code
 //
-// Signs in with an ID token the install's identity provider issued to Murphy's client, for apps and automation that sign in with the provider themselves.
+// Signs in with an ID token the install's identity provider issued to Murphy's client, or with a one-time code from the app's sign-in or a connect code. Send exactly one of `id_token` and `code`.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -8732,9 +8899,9 @@ func (c *ClientWithResponses) CreateSessionWithBodyWithResponse(ctx context.Cont
 	return ParseCreateSessionResponse(rsp)
 }
 
-// CreateSessionWithResponse Sign in with an identity token
+// CreateSessionWithResponse Sign in with an identity token or a one-time code
 //
-// Signs in with an ID token the install's identity provider issued to Murphy's client, for apps and automation that sign in with the provider themselves.
+// Signs in with an ID token the install's identity provider issued to Murphy's client, or with a one-time code from the app's sign-in or a connect code. Send exactly one of `id_token` and `code`.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -9678,6 +9845,32 @@ func ParseFinishSignInResponse(rsp *http.Response) (*FinishSignInResponse, error
 			headers.SetCookie = &value
 		}
 		response.Headers303 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseCreateConnectCodeResponse parses an HTTP response from a CreateConnectCodeWithResponse call
+func ParseCreateConnectCodeResponse(rsp *http.Response) (*CreateConnectCodeResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateConnectCodeResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest ConnectCode
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
 	}
 
 	return response, nil

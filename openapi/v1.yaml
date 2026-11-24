@@ -21,7 +21,12 @@ paths:
       parameters:
         - name: return_to
           in: query
-          description: Where to send the browser once signed in. It must be on `api`'s own origin or one of the install's CORS origins.
+          description: Where to send the browser once signed in. It must be on `api`'s own origin or one of the install's CORS origins, or be the app's `murphy://signed-in`, which receives a one-time `code` instead of a cookie.
+          schema:
+            type: string
+        - name: code_challenge
+          in: query
+          description: Required when returning to the app. The S256 PKCE challenge of a verifier only the app knows; exchanging the one-time code needs that verifier.
           schema:
             type: string
       responses:
@@ -67,7 +72,7 @@ paths:
             type: string
       responses:
         "303":
-          description: Signed in, and sent back to the `return_to` the sign-in started with. The session is in the `murphy_session` cookie.
+          description: Signed in, and sent back to the `return_to` the sign-in started with. A browser gets the session in the `murphy_session` cookie; the app gets a one-time `code` on its link to exchange with `POST /v1/auth/sessions`.
           headers:
             Location:
               schema:
@@ -90,8 +95,8 @@ paths:
   /v1/auth/sessions:
     post:
       operationId: createSession
-      summary: Sign in with an identity token
-      description: Signs in with an ID token the install's identity provider issued to Murphy's client, for apps and automation that sign in with the provider themselves.
+      summary: Sign in with an identity token or a one-time code
+      description: Signs in with an ID token the install's identity provider issued to Murphy's client, or with a one-time code from the app's sign-in or a connect code. Send exactly one of `id_token` and `code`.
       tags: [auth]
       security: []
       requestBody:
@@ -111,6 +116,21 @@ paths:
           $ref: "#/components/responses/Problem"
         "401":
           $ref: "#/components/responses/Problem"
+  /v1/auth/connect-codes:
+    post:
+      operationId: createConnectCode
+      summary: Connect the app
+      description: Creates a one-time code that signs the app in as you, valid for 45 seconds. Show its link as a QR code for the app to scan.
+      tags: [auth]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConnectCode"
   /v1/auth/session:
     get:
       operationId: getSession
@@ -1123,11 +1143,28 @@ components:
     SessionInput:
       type: object
       additionalProperties: false
-      required: [id_token]
       properties:
         id_token:
           type: string
           description: An ID token from the install's identity provider.
+        code:
+          type: string
+          description: A one-time code, from the app's sign-in or from a connect code.
+        code_verifier:
+          type: string
+          description: The PKCE verifier of the app's sign-in, needed with its code.
+    ConnectCode:
+      type: object
+      required: [code, link, expires_at]
+      properties:
+        code:
+          type: string
+        link:
+          type: string
+          description: The app's link, `murphy://connect?server=…&code=…`, to show as a QR code.
+        expires_at:
+          type: string
+          format: date-time
     Session:
       type: object
       required: [user, expires_at]

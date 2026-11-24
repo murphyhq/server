@@ -151,8 +151,8 @@ SET revoked_at = sqlc.arg(revoked_at), updated_at = sqlc.arg(updated_at)
 WHERE token_hash = sqlc.arg(token_hash) AND revoked_at IS NULL;
 
 -- name: CreateSignIn :exec
-INSERT INTO sign_ins (id, state_hash, nonce, verifier, return_to, expires_at, created_at, updated_at)
-VALUES (sqlc.arg(id), sqlc.arg(state_hash), sqlc.arg(nonce), sqlc.arg(verifier), sqlc.narg(return_to), sqlc.arg(expires_at), sqlc.arg(created_at), sqlc.arg(updated_at));
+INSERT INTO sign_ins (id, state_hash, nonce, verifier, return_to, code_challenge, expires_at, created_at, updated_at)
+VALUES (sqlc.arg(id), sqlc.arg(state_hash), sqlc.arg(nonce), sqlc.arg(verifier), sqlc.narg(return_to), sqlc.narg(code_challenge), sqlc.arg(expires_at), sqlc.arg(created_at), sqlc.arg(updated_at));
 
 -- name: UseSignIn :execrows
 UPDATE sign_ins
@@ -160,10 +160,24 @@ SET used_at = sqlc.arg(used_at), updated_at = sqlc.arg(updated_at)
 WHERE state_hash = sqlc.arg(state_hash) AND used_at IS NULL AND expires_at > sqlc.arg(now);
 
 -- name: GetSignIn :one
-SELECT id, state_hash, nonce, verifier, return_to, expires_at, used_at, created_at, updated_at
+SELECT id, state_hash, nonce, verifier, return_to, code_challenge, expires_at, used_at, created_at, updated_at
 FROM sign_ins
 WHERE state_hash = sqlc.arg(state_hash);
 
 -- name: DeleteExpiredSignIns :execrows
 DELETE FROM sign_ins
 WHERE expires_at < sqlc.arg(before);
+
+-- name: CreateOneTimeCode :exec
+INSERT INTO one_time_codes (id, code_hash, user_id, purpose, code_challenge, expires_at, created_at, updated_at)
+VALUES (sqlc.arg(id), sqlc.arg(code_hash), sqlc.arg(user_id), sqlc.arg(purpose), sqlc.narg(code_challenge), sqlc.arg(expires_at), sqlc.arg(created_at), sqlc.arg(updated_at));
+
+-- name: UseOneTimeCode :execrows
+UPDATE one_time_codes
+SET used_at = sqlc.arg(used_at), updated_at = sqlc.arg(updated_at)
+WHERE code_hash = sqlc.arg(code_hash) AND used_at IS NULL AND expires_at > sqlc.arg(now);
+
+-- name: GetOneTimeCode :one
+SELECT id, code_hash, user_id, purpose, code_challenge, expires_at, used_at, created_at, updated_at
+FROM one_time_codes
+WHERE code_hash = sqlc.arg(code_hash);

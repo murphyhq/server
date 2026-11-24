@@ -434,6 +434,63 @@ func (_c *MockAuthRepository_CreateIdentity_Call) RunAndReturn(run func(ctx cont
 	return _c
 }
 
+// CreateOneTimeCode provides a mock function for the type MockAuthRepository
+func (_mock *MockAuthRepository) CreateOneTimeCode(ctx context.Context, code *murphy.OneTimeCode) error {
+	ret := _mock.Called(ctx, code)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateOneTimeCode")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *murphy.OneTimeCode) error); ok {
+		r0 = returnFunc(ctx, code)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockAuthRepository_CreateOneTimeCode_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateOneTimeCode'
+type MockAuthRepository_CreateOneTimeCode_Call struct {
+	*mock.Call
+}
+
+// CreateOneTimeCode is a helper method to define mock.On call
+//   - ctx context.Context
+//   - code *murphy.OneTimeCode
+func (_e *MockAuthRepository_Expecter) CreateOneTimeCode(ctx any, code any) *MockAuthRepository_CreateOneTimeCode_Call {
+	return &MockAuthRepository_CreateOneTimeCode_Call{Call: _e.mock.On("CreateOneTimeCode", ctx, code)}
+}
+
+func (_c *MockAuthRepository_CreateOneTimeCode_Call) Run(run func(ctx context.Context, code *murphy.OneTimeCode)) *MockAuthRepository_CreateOneTimeCode_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *murphy.OneTimeCode
+		if args[1] != nil {
+			arg1 = args[1].(*murphy.OneTimeCode)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockAuthRepository_CreateOneTimeCode_Call) Return(err error) *MockAuthRepository_CreateOneTimeCode_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockAuthRepository_CreateOneTimeCode_Call) RunAndReturn(run func(ctx context.Context, code *murphy.OneTimeCode) error) *MockAuthRepository_CreateOneTimeCode_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CreateSession provides a mock function for the type MockAuthRepository
 func (_mock *MockAuthRepository) CreateSession(ctx context.Context, session *murphy.Session) error {
 	ret := _mock.Called(ctx, session)
@@ -892,6 +949,80 @@ func (_c *MockAuthRepository_StartSignIn_Call) Return(err error) *MockAuthReposi
 }
 
 func (_c *MockAuthRepository_StartSignIn_Call) RunAndReturn(run func(ctx context.Context, signIn *murphy.SignIn, now time.Time) error) *MockAuthRepository_StartSignIn_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// TakeOneTimeCode provides a mock function for the type MockAuthRepository
+func (_mock *MockAuthRepository) TakeOneTimeCode(ctx context.Context, codeHash []byte, now time.Time) (*murphy.OneTimeCode, error) {
+	ret := _mock.Called(ctx, codeHash, now)
+
+	if len(ret) == 0 {
+		panic("no return value specified for TakeOneTimeCode")
+	}
+
+	var r0 *murphy.OneTimeCode
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, []byte, time.Time) (*murphy.OneTimeCode, error)); ok {
+		return returnFunc(ctx, codeHash, now)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, []byte, time.Time) *murphy.OneTimeCode); ok {
+		r0 = returnFunc(ctx, codeHash, now)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*murphy.OneTimeCode)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, []byte, time.Time) error); ok {
+		r1 = returnFunc(ctx, codeHash, now)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockAuthRepository_TakeOneTimeCode_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'TakeOneTimeCode'
+type MockAuthRepository_TakeOneTimeCode_Call struct {
+	*mock.Call
+}
+
+// TakeOneTimeCode is a helper method to define mock.On call
+//   - ctx context.Context
+//   - codeHash []byte
+//   - now time.Time
+func (_e *MockAuthRepository_Expecter) TakeOneTimeCode(ctx any, codeHash any, now any) *MockAuthRepository_TakeOneTimeCode_Call {
+	return &MockAuthRepository_TakeOneTimeCode_Call{Call: _e.mock.On("TakeOneTimeCode", ctx, codeHash, now)}
+}
+
+func (_c *MockAuthRepository_TakeOneTimeCode_Call) Run(run func(ctx context.Context, codeHash []byte, now time.Time)) *MockAuthRepository_TakeOneTimeCode_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 []byte
+		if args[1] != nil {
+			arg1 = args[1].([]byte)
+		}
+		var arg2 time.Time
+		if args[2] != nil {
+			arg2 = args[2].(time.Time)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockAuthRepository_TakeOneTimeCode_Call) Return(oneTimeCode *murphy.OneTimeCode, err error) *MockAuthRepository_TakeOneTimeCode_Call {
+	_c.Call.Return(oneTimeCode, err)
+	return _c
+}
+
+func (_c *MockAuthRepository_TakeOneTimeCode_Call) RunAndReturn(run func(ctx context.Context, codeHash []byte, now time.Time) (*murphy.OneTimeCode, error)) *MockAuthRepository_TakeOneTimeCode_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -25,6 +25,9 @@ type Engine[T Tx] interface {
 	CreateSession(ctx context.Context, session *murphy.Session) error
 	GetActiveSession(ctx context.Context, tokenHash []byte, now time.Time) (*murphy.Session, error)
 	RevokeSession(ctx context.Context, tokenHash []byte, at time.Time) error
+	CreateOneTimeCode(ctx context.Context, code *murphy.OneTimeCode) error
+	UseOneTimeCode(ctx context.Context, codeHash []byte, now time.Time) (bool, error)
+	GetOneTimeCode(ctx context.Context, codeHash []byte) (*murphy.OneTimeCode, error)
 	CreateSignIn(ctx context.Context, signIn *murphy.SignIn) error
 	UseSignIn(ctx context.Context, stateHash []byte, now time.Time) (bool, error)
 	GetSignIn(ctx context.Context, stateHash []byte) (*murphy.SignIn, error)
@@ -66,6 +69,20 @@ func (r *Repository[T]) TakeSignIn(ctx context.Context, stateHash []byte, now ti
 		return nil, &murphy.NotFoundError{Entity: "sign-in"}
 	}
 	return r.GetSignIn(ctx, stateHash)
+}
+
+func (r *Repository[T]) TakeOneTimeCode(ctx context.Context, codeHash []byte, now time.Time) (_ *murphy.OneTimeCode, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	used, err := r.UseOneTimeCode(ctx, codeHash, now)
+	if err != nil {
+		return nil, err
+	}
+	if !used {
+		return nil, &murphy.NotFoundError{Entity: "one-time code"}
+	}
+	return r.GetOneTimeCode(ctx, codeHash)
 }
 
 func (r *Repository[T]) CreateUserWithIdentity(ctx context.Context, user *murphy.User, identity *murphy.Identity) (err error) {

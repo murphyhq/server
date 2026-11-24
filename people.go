@@ -112,3 +112,11 @@ func (r TeamRole) Text() string {
 func TeamRoleFromText(text string) TeamRole {
 	return enumFromText[TeamRole](TeamRole_value, "TEAM_ROLE_", text)
 }
+
+func (p OneTimeCodePurpose) Text() string {
+	return enumText(p, "ONE_TIME_CODE_PURPOSE_")
+}
+
+func OneTimeCodePurposeFromText(text string) OneTimeCodePurpose {
+	return enumFromText[OneTimeCodePurpose](OneTimeCodePurpose_value, "ONE_TIME_CODE_PURPOSE_", text)
+}

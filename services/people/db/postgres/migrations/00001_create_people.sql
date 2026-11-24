@@ -88,6 +88,7 @@ CREATE TABLE sign_ins (
   nonce text NOT NULL,
   verifier text NOT NULL,
   return_to text,
+  code_challenge text,
   expires_at timestamptz NOT NULL,
   used_at timestamptz,
   created_at timestamptz NOT NULL,
@@ -97,3 +98,21 @@ CREATE TABLE sign_ins (
 );
 
 CREATE INDEX sign_ins_expires_at_idx ON sign_ins (expires_at);
+
+CREATE TABLE one_time_codes (
+  id uuid NOT NULL,
+  code_hash bytea NOT NULL,
+  user_id uuid NOT NULL,
+  purpose text NOT NULL,
+  code_challenge text,
+  expires_at timestamptz NOT NULL,
+  used_at timestamptz,
+  created_at timestamptz NOT NULL,
+  updated_at timestamptz NOT NULL,
+  CONSTRAINT one_time_codes_pkey PRIMARY KEY (id),
+  CONSTRAINT one_time_codes_code_hash_key UNIQUE (code_hash),
+  CONSTRAINT one_time_codes_user_id_fkey FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+  CONSTRAINT one_time_codes_purpose_check CHECK (purpose IN ('app_sign_in', 'connect'))
+);
+
+CREATE INDEX one_time_codes_user_id_idx ON one_time_codes (user_id);

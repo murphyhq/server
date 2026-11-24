@@ -38,6 +38,7 @@ func Run(t *testing.T, open func(t *testing.T) Storage) {
 		now := time.Now().UTC()
 		signIn := newSignIn("state", now.Add(time.Minute))
 		signIn.ReturnTo = "http://localhost:8090/"
+		signIn.CodeChallenge = "challenge"
 		require.NoError(t, repo.StartSignIn(t.Context(), signIn, now))
 
 		first, err := repo.TakeSignIn(t.Context(), []byte("state"), now)
@@ -46,6 +47,7 @@ func Run(t *testing.T, open func(t *testing.T) Storage) {
 
 		assert.Equal(t, "verifier", first.GetVerifier())
 		assert.Equal(t, "http://localhost:8090/", first.GetReturnTo())
+		assert.Equal(t, "challenge", first.GetCodeChallenge())
 		assert.ErrorIs(t, again, murphy.ErrNotFound)
 	})
 
@@ -55,6 +57,35 @@ func Run(t *testing.T, open func(t *testing.T) Storage) {
 		require.NoError(t, repo.StartSignIn(t.Context(), newSignIn("state", now.Add(time.Minute)), now))
 
 		_, err := repo.TakeSignIn(t.Context(), []byte("state"), now.Add(2*time.Minute))
+
+		assert.ErrorIs(t, err, murphy.ErrNotFound)
+	})
+
+	t.Run("hands a one-time code out once, with its challenge", func(t *testing.T) {
+		repo := open(t)
+		user := newUser("ana@example.com")
+		now := time.Now().UTC()
+		require.NoError(t, repo.CreateUser(t.Context(), user))
+		require.NoError(t, repo.CreateOneTimeCode(t.Context(), newOneTimeCode(user, "code", "challenge", now.Add(time.Minute))))
+
+		first, err := repo.TakeOneTimeCode(t.Context(), []byte("code"), now)
+		require.NoError(t, err)
+		_, again := repo.TakeOneTimeCode(t.Context(), []byte("code"), now)
+
+		assert.Equal(t, user.GetId(), first.GetUserId())
+		assert.Equal(t, "challenge", first.GetCodeChallenge())
+		assert.Equal(t, murphy.OneTimeCodePurpose_ONE_TIME_CODE_PURPOSE_APP_SIGN_IN, first.GetPurpose())
+		assert.ErrorIs(t, again, murphy.ErrNotFound)
+	})
+
+	t.Run("never hands out an expired one-time code", func(t *testing.T) {
+		repo := open(t)
+		user := newUser("ana@example.com")
+		now := time.Now().UTC()
+		require.NoError(t, repo.CreateUser(t.Context(), user))
+		require.NoError(t, repo.CreateOneTimeCode(t.Context(), newOneTimeCode(user, "code", "", now.Add(time.Minute))))
+
+		_, err := repo.TakeOneTimeCode(t.Context(), []byte("code"), now.Add(2*time.Minute))
 
 		assert.ErrorIs(t, err, murphy.ErrNotFound)
 	})
@@ -320,4 +351,12 @@ func teamIDs(teams []*murphy.Team) []string {
 		ids[i] = team.GetId()
 	}
 	return ids
+}
+
+func newOneTimeCode(user *murphy.User, code, challenge string, expiresAt time.Time) *murphy.OneTimeCode {
+	now := murphy.Now()
+	return &murphy.OneTimeCode{
+		Id: murphy.NewID(), CodeHash: []byte(code), UserId: user.GetId(), Purpose: murphy.OneTimeCodePurpose_ONE_TIME_CODE_PURPOSE_APP_SIGN_IN,
+		CodeChallenge: challenge, ExpiresAt: timestamppb.New(expiresAt), CreatedAt: now, UpdatedAt: now,
+	}
 }
