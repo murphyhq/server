@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/murphyhq/server"
 	"github.com/murphyhq/server/internal/pagination"
@@ -35,14 +36,15 @@ type Catalog interface {
 }
 
 type Service struct {
-	repo      Repository
-	people    People
-	schedules Schedules
-	catalog   Catalog
+	repo         Repository
+	people       People
+	schedules    Schedules
+	catalog      Catalog
+	minimumDelay time.Duration
 }
 
-func New(repo Repository, people People, schedules Schedules, catalog Catalog) *Service {
-	return &Service{repo: repo, people: people, schedules: schedules, catalog: catalog}
+func New(repo Repository, people People, schedules Schedules, catalog Catalog, minimumDelay time.Duration) *Service {
+	return &Service{repo: repo, people: people, schedules: schedules, catalog: catalog, minimumDelay: minimumDelay}
 }
 
 func (s *Service) CreatePolicy(ctx context.Context, in *murphy.EscalationPolicy) (_ *murphy.EscalationPolicy, err error) {
@@ -156,7 +158,13 @@ func (s *Service) DeletePolicy(ctx context.Context, id string) (err error) {
 }
 
 func (s *Service) check(ctx context.Context, policy *murphy.EscalationPolicy) error {
-	if err := policy.Validate(); err != nil {
+	invalid := []error{policy.Validate()}
+	for i, level := range policy.GetLevels() {
+		if level.GetDelay().AsDuration() < s.minimumDelay {
+			invalid = append(invalid, &murphy.FieldError{Field: fmt.Sprintf("levels[%d].delay", i), Reason: "must be at least " + s.minimumDelay.String()})
+		}
+	}
+	if err := errors.Join(invalid...); err != nil {
 		return err
 	}
 	var userIDs, scheduleIDs []string

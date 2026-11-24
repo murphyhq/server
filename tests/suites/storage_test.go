@@ -1,6 +1,6 @@
 //go:build integration
 
-package integration
+package suites
 
 import (
 	"github.com/murphyhq/server/services/notifications"

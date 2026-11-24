@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/durationpb"
 
 	"github.com/murphyhq/server"
 	"github.com/murphyhq/server/services/notifications"
@@ -48,6 +49,7 @@ func newDomain(t *testing.T) *domain {
 		service: notifications.New(repo, policies, oncall, people),
 		repo:    repo,
 		policy: &murphy.EscalationPolicy{Id: murphy.NewID(), Version: 3, Levels: []*murphy.EscalationLevel{{
+			Delay: durationpb.New(5 * time.Minute),
 			Targets: []*murphy.EscalationTarget{
 				target(murphy.EscalationTargetType_ESCALATION_TARGET_TYPE_SCHEDULE, primary),
 				target(murphy.EscalationTargetType_ESCALATION_TARGET_TYPE_USER, bo),
@@ -143,6 +145,7 @@ func TestEachContactMethodOfEveryoneReachedGetsANotification(t *testing.T) {
 	for _, notification := range d.recorded.Notifications {
 		assert.Equal(t, murphy.NotificationReason_NOTIFICATION_REASON_PAGED, notification.GetReason())
 		assert.Equal(t, d.recorded.Page.GetId(), notification.GetPageId())
+		assert.WithinDuration(t, time.Now().Add(5*time.Minute), notification.GetDeadline().AsTime(), time.Second, "retried until the next level is due")
 	}
 	envelopes := d.envelopes(t)
 	require.Len(t, envelopes, 4)

@@ -65,7 +65,7 @@ func New(ctx context.Context, s Settings) (_ *App, err error) {
 	}
 	a.resources.Add(func() { _ = a.subscription.Close() }, a.subscription.Ping)
 
-	a.incidents = incidents.New(incidentsStorage, catalog.New(catalogStorage, nil), escalation.New(escalationStorage, nil, nil, nil))
+	a.incidents = incidents.New(incidentsStorage, catalog.New(catalogStorage, nil), escalation.New(escalationStorage, nil, nil, nil, 0))
 	a.Ready = a.resources.Checks()
 	return a, nil
 }

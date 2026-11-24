@@ -3,13 +3,9 @@ package murphy
 import (
 	"errors"
 	"fmt"
-	"time"
 )
 
-const (
-	minEscalationDelay = time.Minute
-	maxRepeatCount     = 9
-)
+const maxRepeatCount = 9
 
 func (p *EscalationPolicy) Validate() error {
 	var errs []error
@@ -22,9 +18,6 @@ func (p *EscalationPolicy) Validate() error {
 	}
 	for i, level := range p.GetLevels() {
 		field := fmt.Sprintf("levels[%d]", i)
-		if level.GetDelay().AsDuration() < minEscalationDelay {
-			errs = append(errs, invalid(field+".delay", "must be at least a minute"))
-		}
 		if len(level.GetTargets()) == 0 {
 			errs = append(errs, invalid(field+".targets", "must have at least one target"))
 		}

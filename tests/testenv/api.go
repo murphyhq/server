@@ -28,11 +28,6 @@ func Databases(t *testing.T, engine DatabaseEngine) migrateapp.Settings {
 	return databases
 }
 
-func API(t *testing.T, engine DatabaseEngine) (*client.ClientWithResponses, string) {
-	t.Helper()
-	return APIWith(t, Databases(t, engine))
-}
-
 func APIWith(t *testing.T, databases migrateapp.Settings) (*client.ClientWithResponses, string) {
 	t.Helper()
 	a, err := apiapp.New(t.Context(), apiapp.Settings{

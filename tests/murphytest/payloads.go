@@ -1,13 +1,11 @@
-//go:build integration || load
-
-package testenv
+package murphytest
 
 import (
 	"encoding/json"
 	"time"
 )
 
-type Webhook struct {
+type Payload struct {
 	Path        string
 	ContentType string
 	Body        []byte
@@ -20,12 +18,12 @@ type GroupedAlert struct {
 	Summary     string
 }
 
-func jsonWebhook(path string, body any) Webhook {
+func jsonWebhook(path string, body any) Payload {
 	data, err := json.Marshal(body)
 	if err != nil {
 		panic(err)
 	}
-	return Webhook{Path: path, ContentType: "application/json", Body: data}
+	return Payload{Path: path, ContentType: "application/json", Body: data}
 }
 
 func groupStatus(alerts []GroupedAlert) string {
@@ -37,7 +35,7 @@ func groupStatus(alerts []GroupedAlert) string {
 	return "resolved"
 }
 
-func Alertmanager(groupKey string, alerts ...GroupedAlert) Webhook {
+func Alertmanager(groupKey string, alerts ...GroupedAlert) Payload {
 	items := make([]map[string]any, len(alerts))
 	for i, alert := range alerts {
 		items[i] = map[string]any{
@@ -57,7 +55,7 @@ func Alertmanager(groupKey string, alerts ...GroupedAlert) Webhook {
 	})
 }
 
-func Grafana(groupKey string, alerts ...GroupedAlert) Webhook {
+func Grafana(groupKey string, alerts ...GroupedAlert) Payload {
 	items := make([]map[string]any, len(alerts))
 	for i, alert := range alerts {
 		items[i] = map[string]any{
@@ -81,14 +79,14 @@ func Grafana(groupKey string, alerts ...GroupedAlert) Webhook {
 	})
 }
 
-func Datadog(aggregationKey, cycleKey, transition string) Webhook {
+func Datadog(aggregationKey, cycleKey, transition string) Payload {
 	return jsonWebhook("/v1/alerts/datadog", map[string]string{
 		"alert_id": "1234", "aggregation_key": aggregationKey, "cycle_key": cycleKey, "transition": transition,
 		"title": "[Triggered] Disk almost full", "priority": "P1", "link": "https://app.datadoghq.com/event/1", "tags": "env:prod,role:db",
 	})
 }
 
-func CloudWatch(alarmArn, state string) Webhook {
+func CloudWatch(alarmArn, state string) Payload {
 	alarm, err := json.Marshal(map[string]any{
 		"AlarmName": "disk-full", "AlarmDescription": "Disk almost full", "AWSAccountId": "123456789012",
 		"NewStateValue": state, "NewStateReason": "Threshold Crossed", "StateChangeTime": time.Now().UTC().Format("2006-01-02T15:04:05.000-0700"),
@@ -100,19 +98,19 @@ func CloudWatch(alarmArn, state string) Webhook {
 	return sns(map[string]string{"Type": "Notification", "MessageId": "1", "TopicArn": "arn:aws:sns:eu-west-1:123456789012:alarms", "Message": string(alarm)})
 }
 
-func SNSSubscriptionConfirmation(subscribeURL string) Webhook {
+func SNSSubscriptionConfirmation(subscribeURL string) Payload {
 	return sns(map[string]string{"Type": "SubscriptionConfirmation", "MessageId": "1", "Token": "token", "SubscribeURL": subscribeURL})
 }
 
-func sns(message map[string]string) Webhook {
+func sns(message map[string]string) Payload {
 	data, err := json.Marshal(message)
 	if err != nil {
 		panic(err)
 	}
-	return Webhook{Path: "/v1/alerts/cloudwatch", ContentType: "text/plain; charset=UTF-8", Body: data}
+	return Payload{Path: "/v1/alerts/cloudwatch", ContentType: "text/plain; charset=UTF-8", Body: data}
 }
 
-func GoogleCloud(incidentID, state string) Webhook {
+func GoogleCloud(incidentID, state string) Payload {
 	return jsonWebhook("/v1/alerts/google-cloud", map[string]any{
 		"version": "1.2",
 		"incident": map[string]any{
@@ -124,6 +122,6 @@ func GoogleCloud(incidentID, state string) Webhook {
 	})
 }
 
-func Generic(dedupKey, status string) Webhook {
+func Generic(dedupKey, status string) Payload {
 	return jsonWebhook("/v1/alerts", map[string]string{"dedup_key": dedupKey, "status": status, "summary": dedupKey + " is " + status})
 }
