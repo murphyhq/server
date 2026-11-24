@@ -1,0 +1,163 @@
+openapi: 3.0.3
+info:
+  title: Murphy relay
+  version: v1
+  description: Delivers a Murphy install's pages to the official app as push notifications, through APNs and FCM. Pushes carry no incident data, only where the app should look.
+servers:
+  - url: http://localhost:8093
+    description: Local development
+security:
+  - installKey: []
+paths:
+  /v1/devices:
+    post:
+      operationId: registerDevice
+      summary: Register a device
+      description: Registers a phone's push token for this install and returns the handle to push to. Registering the same token again returns the same handle. Only the install that registered a device can push to it.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeviceInput"
+      responses:
+        "201":
+          description: Registered.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Device"
+        "200":
+          description: Already registered by this install.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Device"
+        "400":
+          $ref: "#/components/responses/Problem"
+  /v1/devices/{handle}:
+    delete:
+      operationId: forgetDevice
+      summary: Forget a device
+      parameters:
+        - $ref: "#/components/parameters/Handle"
+      responses:
+        "204":
+          description: Forgotten.
+        "404":
+          $ref: "#/components/responses/Problem"
+  /v1/pushes:
+    post:
+      operationId: sendPush
+      summary: Send a push
+      description: Sends a push to a device and answers once Apple or Google accepted it. A retry with the same `id` within a day isn't sent again.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PushInput"
+      responses:
+        "200":
+          description: Accepted by Apple or Google, or already sent with this `id`.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Push"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "410":
+          description: The device is gone, and the relay has forgotten it. Stop sending to this handle.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+        "502":
+          description: Apple or Google refused or didn't answer. Retry later.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+components:
+  securitySchemes:
+    installKey:
+      type: http
+      scheme: bearer
+      description: The install's key. Requests without a valid key get 401.
+  parameters:
+    Handle:
+      name: handle
+      in: path
+      required: true
+      schema:
+        type: string
+  responses:
+    Problem:
+      description: The request failed.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+  schemas:
+    DeviceInput:
+      type: object
+      additionalProperties: false
+      required: [platform, token]
+      properties:
+        platform:
+          $ref: "#/components/schemas/Platform"
+        token:
+          type: string
+          description: The push token iOS or Android gave the app.
+    Device:
+      type: object
+      required: [handle, platform]
+      properties:
+        handle:
+          type: string
+        platform:
+          $ref: "#/components/schemas/Platform"
+    Platform:
+      type: string
+      enum: [ios, android]
+    PushInput:
+      type: object
+      additionalProperties: false
+      required: [id, handle, event, server, incident_id]
+      properties:
+        id:
+          type: string
+          description: The ID of the notification this push delivers. Retries use the same ID.
+        handle:
+          type: string
+        event:
+          type: string
+          enum: [paged, acknowledged, resolved]
+        server:
+          type: string
+          description: The Murphy server the app should fetch the incident from.
+        incident_id:
+          type: string
+    Push:
+      type: object
+      required: [id, status]
+      properties:
+        id:
+          type: string
+        status:
+          type: string
+          enum: [sent, duplicate]
+          description: "`duplicate` when a push with this `id` was already sent."
+    Problem:
+      type: object
+      properties:
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
