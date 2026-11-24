@@ -156,6 +156,17 @@ func (m *Murphy) ClientWith(token string) *client.ClientWithResponses {
 	return api
 }
 
+func (m *Murphy) Raw(method, path string) *http.Response {
+	m.t.Helper()
+	request, err := http.NewRequestWithContext(m.t.Context(), method, m.apiURL+path, nil)
+	require.NoError(m.t, err)
+	request.Header.Set("Authorization", "Bearer "+m.session)
+	response, err := http.DefaultClient.Do(request)
+	require.NoError(m.t, err)
+	require.NoError(m.t, response.Body.Close())
+	return response
+}
+
 func (m *Murphy) Anonymous() *client.ClientWithResponses {
 	m.t.Helper()
 	api, err := client.NewClientWithResponses(m.apiURL)
