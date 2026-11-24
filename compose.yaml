@@ -208,6 +208,7 @@ services:
 
   seed:
     <<: *component
+    profiles: [murphy, single]
     command: ["sh", "-c", "go build -o /tmp/seed ./tests/seed && exec /tmp/seed"]
     environment:
       <<: *component-environment
@@ -220,6 +221,10 @@ services:
     depends_on:
       api:
         condition: service_healthy
+        required: false
+      single:
+        condition: service_healthy
+        required: false
       lgtm:
         condition: service_healthy
     develop: {}
@@ -311,6 +316,9 @@ services:
   single:
     image: golang:1.27.4
     profiles: [single]
+    networks:
+      default:
+        aliases: [api, ingest]
     working_dir: /src
     volumes:
       - .:/src

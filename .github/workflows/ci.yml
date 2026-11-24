@@ -75,7 +75,7 @@ jobs:
       - name: Build the single binary once, to fill the caches the stack shares
         run: docker compose --profile single run --rm --no-deps single go build ./...
       - name: Start every component in one process
-        run: docker compose --profile single up -d --wait --wait-timeout 600
+        run: docker compose --profile single up -d --wait --wait-timeout 600 --scale seed=0
       - run: go test -tags stack -count=1 ./tests/stack/...
       - if: failure()
         run: docker compose --profile single logs --no-color
