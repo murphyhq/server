@@ -134,23 +134,23 @@ func (g grafanaClient) configure(ctx context.Context, webhookURL, key string) er
 		return fmt.Errorf("create the Grafana contact point: %w", err)
 	}
 
-	if err := g.call(ctx, http.MethodPut, "/api/v1/provisioning/policies", map[string]any{"receiver": "Murphy", "group_by": []string{"alertname"}}); err != nil {
+	if err := g.call(ctx, http.MethodPut, "/api/v1/provisioning/policies", map[string]any{"receiver": "Murphy", "group_by": []string{"alertname"}, "group_wait": "5s", "group_interval": "5s"}); err != nil {
 		return fmt.Errorf("route Grafana alerts to Murphy: %w", err)
 	}
 
 	group := map[string]any{
 		"title":     "murphy",
 		"folderUid": grafanaFolder,
-		"interval":  60,
+		"interval":  10,
 		"rules": []map[string]any{
 			rule("murphy-rejected-messages", "Murphy rejected messages",
 				`sum(increase(murphy_messages_processed_total{murphy_outcome="rejected"}[5m]))`,
-				"A component rejected messages it couldn't handle; check its logs for the reason.", false),
+				"A component rejected messages it couldn't handle; check its logs for the reason.", "1m", false),
 			rule("murphy-server-errors", "Murphy server errors",
 				`sum(increase(http_server_request_duration_seconds_count{service_namespace="murphy",http_response_status_code=~"5.."}[5m]))`,
-				"api or ingest answered with 5xx errors.", false),
+				"api or ingest answered with 5xx errors.", "1m", false),
 			rule("murphy-test-alert", "Murphy test alert", `vector(1)`,
-				"Fires as soon as it's resumed, to check that Grafana pages Murphy.", true),
+				"Fires as soon as it's resumed, to check that Grafana pages Murphy.", "0s", true),
 		},
 	}
 	if err := g.call(ctx, http.MethodPut, "/api/v1/provisioning/folder/"+grafanaFolder+"/rule-groups/murphy", group); err != nil {
@@ -159,14 +159,14 @@ func (g grafanaClient) configure(ctx context.Context, webhookURL, key string) er
 	return nil
 }
 
-func rule(uid, title, expr, summary string, paused bool) map[string]any {
+func rule(uid, title, expr, summary, pending string, paused bool) map[string]any {
 	return map[string]any{
 		"uid":          uid,
 		"title":        title,
 		"folderUID":    grafanaFolder,
 		"ruleGroup":    "murphy",
 		"condition":    "C",
-		"for":          "1m",
+		"for":          pending,
 		"noDataState":  "OK",
 		"execErrState": "Error",
 		"isPaused":     paused,
