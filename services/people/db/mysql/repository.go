@@ -368,15 +368,34 @@ func (r *Repository) CreateSession(ctx context.Context, session *murphy.Session)
 	}))
 }
 
-func (r *Repository) GetActiveSession(ctx context.Context, tokenHash []byte, now time.Time) (_ *murphy.Session, err error) {
+func (r *Repository) GetActiveSession(ctx context.Context, tokenHash []byte, now time.Time) (_ *murphy.Session, _ murphy.UserRole, err error) {
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
 	row, err := r.queries.GetActiveSession(ctx, GetActiveSessionParams{TokenHash: tokenHash, Now: now})
 	if err != nil {
-		return nil, murphymysql.Error("session", err)
+		return nil, 0, murphymysql.Error("session", err)
 	}
-	return toSession(row), nil
+	session := toSession(Session{
+		ID: row.ID, UserID: row.UserID, TokenHash: row.TokenHash, Client: row.Client, ExpiresAt: row.ExpiresAt,
+		RevokedAt: row.RevokedAt, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt,
+	})
+	return session, murphy.UserRoleFromText(row.Role), nil
+}
+
+func (r *Repository) ListMembershipsOfUser(ctx context.Context, userID string) (_ []*murphy.TeamMembership, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	rows, err := r.queries.ListMembershipsOfUser(ctx, userID)
+	if err != nil {
+		return nil, murphymysql.Error("team membership", err)
+	}
+	memberships := make([]*murphy.TeamMembership, len(rows))
+	for i, row := range rows {
+		memberships[i] = toMembership(row)
+	}
+	return memberships, nil
 }
 
 func (r *Repository) RevokeSession(ctx context.Context, tokenHash []byte, at time.Time) (err error) {

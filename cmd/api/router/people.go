@@ -26,6 +26,10 @@ func (s *Server) CreateUser(ctx context.Context, request CreateUserRequestObject
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
+	if err := s.access.Admin(s.caller(ctx)); err != nil {
+		return nil, err
+	}
+
 	user, err := s.people.CreateUser(ctx, fromUserInput(request.Body))
 	if err != nil {
 		return nil, err
@@ -48,6 +52,15 @@ func (s *Server) UpdateUser(ctx context.Context, request UpdateUserRequestObject
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
+	if err := s.access.SelfOrAdmin(s.caller(ctx), request.Id); err != nil {
+		return nil, err
+	}
+	if request.Body.Status != nil {
+		if err := s.access.Admin(s.caller(ctx)); err != nil {
+			return nil, err
+		}
+	}
+
 	in := fromUserInput(request.Body)
 	in.Id = request.Id
 	user, err := s.people.UpdateUser(ctx, in)
@@ -61,6 +74,10 @@ func (s *Server) DeleteUser(ctx context.Context, request DeleteUserRequestObject
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
+	if err := s.access.Admin(s.caller(ctx)); err != nil {
+		return nil, err
+	}
+
 	if err := s.people.DeleteUser(ctx, request.Id); err != nil {
 		return nil, err
 	}
@@ -70,6 +87,10 @@ func (s *Server) DeleteUser(ctx context.Context, request DeleteUserRequestObject
 func (s *Server) ListContactMethods(ctx context.Context, request ListContactMethodsRequestObject) (_ ListContactMethodsResponseObject, err error) {
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
+
+	if err := s.access.SelfOrAdmin(s.caller(ctx), request.Id); err != nil {
+		return nil, err
+	}
 
 	methods, err := s.people.ListContactMethods(ctx, request.Id)
 	if err != nil {
@@ -85,6 +106,10 @@ func (s *Server) ListContactMethods(ctx context.Context, request ListContactMeth
 func (s *Server) CreateContactMethod(ctx context.Context, request CreateContactMethodRequestObject) (_ CreateContactMethodResponseObject, err error) {
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
+
+	if err := s.access.SelfOrAdmin(s.caller(ctx), request.Id); err != nil {
+		return nil, err
+	}
 
 	method, err := s.people.CreateContactMethod(ctx, &murphy.ContactMethod{
 		UserId:       request.Id,
@@ -106,12 +131,19 @@ func (s *Server) GetContactMethod(ctx context.Context, request GetContactMethodR
 	if err != nil {
 		return nil, err
 	}
+	if err := s.access.SelfOrAdmin(s.caller(ctx), method.GetUserId()); err != nil {
+		return nil, err
+	}
 	return GetContactMethod200JSONResponse(toContactMethod(method)), nil
 }
 
 func (s *Server) UpdateContactMethod(ctx context.Context, request UpdateContactMethodRequestObject) (_ UpdateContactMethodResponseObject, err error) {
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
+
+	if err := s.ownsContactMethod(ctx, request.Id); err != nil {
+		return nil, err
+	}
 
 	method, err := s.people.UpdateContactMethod(ctx, &murphy.ContactMethod{
 		Id:           request.Id,
@@ -128,6 +160,10 @@ func (s *Server) UpdateContactMethod(ctx context.Context, request UpdateContactM
 func (s *Server) DeleteContactMethod(ctx context.Context, request DeleteContactMethodRequestObject) (_ DeleteContactMethodResponseObject, err error) {
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
+
+	if err := s.ownsContactMethod(ctx, request.Id); err != nil {
+		return nil, err
+	}
 
 	if err := s.people.DeleteContactMethod(ctx, request.Id); err != nil {
 		return nil, err
@@ -175,4 +211,12 @@ func pushPlatform(platform murphy.PushPlatform) *PushPlatform {
 	}
 	text := PushPlatform(platform.Text())
 	return &text
+}
+
+func (s *Server) ownsContactMethod(ctx context.Context, id string) error {
+	method, err := s.people.GetContactMethod(ctx, id)
+	if err != nil {
+		return err
+	}
+	return s.access.SelfOrAdmin(s.caller(ctx), method.GetUserId())
 }

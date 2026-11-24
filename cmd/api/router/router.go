@@ -8,6 +8,7 @@ import (
 
 	"github.com/murphyhq/server/internal/httpserver"
 	"github.com/murphyhq/server/internal/idempotency"
+	"github.com/murphyhq/server/services/access"
 	"github.com/murphyhq/server/services/catalog"
 	"github.com/murphyhq/server/services/escalation"
 	"github.com/murphyhq/server/services/incidents"
@@ -23,6 +24,7 @@ type Server struct {
 	escalation    *escalation.Service
 	publicKeys    []ed25519.PublicKey
 	auth          *people.Auth
+	access        *access.Access
 	secureCookies bool
 }
 
@@ -34,6 +36,7 @@ type Services struct {
 	Escalation    *escalation.Service
 	PublicKeys    []ed25519.PublicKey
 	Auth          *people.Auth
+	Access        *access.Access
 	SecureCookies bool
 }
 
@@ -42,7 +45,7 @@ func New(services Services, keys idempotency.Store) (http.Handler, error) {
 	if err != nil {
 		return nil, fmt.Errorf("load OpenAPI spec: %w", err)
 	}
-	strict := NewStrictHandlerWithOptions(&Server{catalog: services.Catalog, incidents: services.Incidents, people: services.People, oncall: services.OnCall, escalation: services.Escalation, publicKeys: services.PublicKeys, auth: services.Auth, secureCookies: services.SecureCookies}, nil, StrictHTTPServerOptions{
+	strict := NewStrictHandlerWithOptions(&Server{catalog: services.Catalog, incidents: services.Incidents, people: services.People, oncall: services.OnCall, escalation: services.Escalation, publicKeys: services.PublicKeys, auth: services.Auth, access: services.Access, secureCookies: services.SecureCookies}, nil, StrictHTTPServerOptions{
 		RequestErrorHandlerFunc:  httpserver.BadRequest,
 		ResponseErrorHandlerFunc: httpserver.WriteError,
 	})

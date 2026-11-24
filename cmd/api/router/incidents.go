@@ -130,6 +130,10 @@ func (s *Server) AcknowledgeIncident(ctx context.Context, request AcknowledgeInc
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
+	if err := s.access.Responds(ctx, s.caller(ctx), request.Id); err != nil {
+		return nil, err
+	}
+
 	incident, err := s.incidents.Acknowledge(ctx, request.Id)
 	if err != nil {
 		return nil, err
@@ -140,6 +144,10 @@ func (s *Server) AcknowledgeIncident(ctx context.Context, request AcknowledgeInc
 func (s *Server) ResolveIncident(ctx context.Context, request ResolveIncidentRequestObject) (_ ResolveIncidentResponseObject, err error) {
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
+
+	if err := s.access.Responds(ctx, s.caller(ctx), request.Id); err != nil {
+		return nil, err
+	}
 
 	incident, err := s.incidents.Resolve(ctx, request.Id)
 	if err != nil {

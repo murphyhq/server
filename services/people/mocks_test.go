@@ -675,7 +675,7 @@ func (_c *MockAuthRepository_EndSessionsOfUser_Call) RunAndReturn(run func(ctx c
 }
 
 // GetActiveSession provides a mock function for the type MockAuthRepository
-func (_mock *MockAuthRepository) GetActiveSession(ctx context.Context, tokenHash []byte, now time.Time) (*murphy.Session, error) {
+func (_mock *MockAuthRepository) GetActiveSession(ctx context.Context, tokenHash []byte, now time.Time) (*murphy.Session, murphy.UserRole, error) {
 	ret := _mock.Called(ctx, tokenHash, now)
 
 	if len(ret) == 0 {
@@ -683,8 +683,9 @@ func (_mock *MockAuthRepository) GetActiveSession(ctx context.Context, tokenHash
 	}
 
 	var r0 *murphy.Session
-	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, []byte, time.Time) (*murphy.Session, error)); ok {
+	var r1 murphy.UserRole
+	var r2 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, []byte, time.Time) (*murphy.Session, murphy.UserRole, error)); ok {
 		return returnFunc(ctx, tokenHash, now)
 	}
 	if returnFunc, ok := ret.Get(0).(func(context.Context, []byte, time.Time) *murphy.Session); ok {
@@ -694,12 +695,17 @@ func (_mock *MockAuthRepository) GetActiveSession(ctx context.Context, tokenHash
 			r0 = ret.Get(0).(*murphy.Session)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, []byte, time.Time) error); ok {
+	if returnFunc, ok := ret.Get(1).(func(context.Context, []byte, time.Time) murphy.UserRole); ok {
 		r1 = returnFunc(ctx, tokenHash, now)
 	} else {
-		r1 = ret.Error(1)
+		r1 = ret.Get(1).(murphy.UserRole)
 	}
-	return r0, r1
+	if returnFunc, ok := ret.Get(2).(func(context.Context, []byte, time.Time) error); ok {
+		r2 = returnFunc(ctx, tokenHash, now)
+	} else {
+		r2 = ret.Error(2)
+	}
+	return r0, r1, r2
 }
 
 // MockAuthRepository_GetActiveSession_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetActiveSession'
@@ -738,12 +744,12 @@ func (_c *MockAuthRepository_GetActiveSession_Call) Run(run func(ctx context.Con
 	return _c
 }
 
-func (_c *MockAuthRepository_GetActiveSession_Call) Return(session *murphy.Session, err error) *MockAuthRepository_GetActiveSession_Call {
-	_c.Call.Return(session, err)
+func (_c *MockAuthRepository_GetActiveSession_Call) Return(session *murphy.Session, userRole murphy.UserRole, err error) *MockAuthRepository_GetActiveSession_Call {
+	_c.Call.Return(session, userRole, err)
 	return _c
 }
 
-func (_c *MockAuthRepository_GetActiveSession_Call) RunAndReturn(run func(ctx context.Context, tokenHash []byte, now time.Time) (*murphy.Session, error)) *MockAuthRepository_GetActiveSession_Call {
+func (_c *MockAuthRepository_GetActiveSession_Call) RunAndReturn(run func(ctx context.Context, tokenHash []byte, now time.Time) (*murphy.Session, murphy.UserRole, error)) *MockAuthRepository_GetActiveSession_Call {
 	_c.Call.Return(run)
 	return _c
 }

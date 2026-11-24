@@ -386,7 +386,7 @@ func (q *Queries) ExistingUsers(ctx context.Context, ids []string) ([]string, er
 }
 
 const getActiveSession = `-- name: GetActiveSession :one
-SELECT sessions.id, sessions.user_id, sessions.token_hash, sessions.client, sessions.expires_at, sessions.revoked_at, sessions.created_at, sessions.updated_at
+SELECT sessions.id, sessions.user_id, sessions.token_hash, sessions.client, sessions.expires_at, sessions.revoked_at, sessions.created_at, sessions.updated_at, users.role
 FROM sessions
 JOIN users ON users.id = sessions.user_id
 WHERE sessions.token_hash = $1 AND sessions.revoked_at IS NULL AND sessions.expires_at > $2 AND users.status = 'active'
@@ -397,9 +397,21 @@ type GetActiveSessionParams struct {
 	Now       time.Time
 }
 
-func (q *Queries) GetActiveSession(ctx context.Context, arg GetActiveSessionParams) (Session, error) {
+type GetActiveSessionRow struct {
+	ID        string
+	UserID    string
+	TokenHash []byte
+	Client    string
+	ExpiresAt time.Time
+	RevokedAt *time.Time
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	Role      string
+}
+
+func (q *Queries) GetActiveSession(ctx context.Context, arg GetActiveSessionParams) (GetActiveSessionRow, error) {
 	row := q.db.QueryRow(ctx, getActiveSession, arg.TokenHash, arg.Now)
-	var i Session
+	var i GetActiveSessionRow
 	err := row.Scan(
 		&i.ID,
 		&i.UserID,
@@ -409,6 +421,7 @@ func (q *Queries) GetActiveSession(ctx context.Context, arg GetActiveSessionPara
 		&i.RevokedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Role,
 	)
 	return i, err
 }
@@ -721,6 +734,40 @@ ORDER BY id
 
 func (q *Queries) ListMemberships(ctx context.Context, teamID string) ([]TeamMembership, error) {
 	rows, err := q.db.Query(ctx, listMemberships, teamID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []TeamMembership
+	for rows.Next() {
+		var i TeamMembership
+		if err := rows.Scan(
+			&i.ID,
+			&i.TeamID,
+			&i.UserID,
+			&i.Role,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listMembershipsOfUser = `-- name: ListMembershipsOfUser :many
+SELECT id, team_id, user_id, role, created_at, updated_at
+FROM team_memberships
+WHERE user_id = $1
+ORDER BY team_id
+`
+
+func (q *Queries) ListMembershipsOfUser(ctx context.Context, userID string) ([]TeamMembership, error) {
+	rows, err := q.db.Query(ctx, listMembershipsOfUser, userID)
 	if err != nil {
 		return nil, err
 	}

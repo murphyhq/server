@@ -9,13 +9,33 @@ import (
 
 type Team struct {
 	ID string
+	m  *Murphy
 }
 
 func (m *Murphy) Team() *Team {
 	m.t.Helper()
 	created, err := m.API.CreateTeamWithResponse(m.t.Context(), nil, client.TeamInput{Name: m.Name("team")})
 	m.created(created, err, "create a team")
-	return &Team{ID: created.JSON201.Id}
+	return &Team{ID: created.JSON201.Id, m: m}
+}
+
+func (t *Team) Add(member *Member, role client.TeamRole) {
+	t.m.t.Helper()
+	added, err := t.m.API.SetTeamMemberWithResponse(t.m.t.Context(), t.ID, member.ID, client.TeamMemberInput{Role: role})
+	t.m.ok(added, err, "add someone to the team")
+}
+
+type Member struct {
+	*User
+	API *client.ClientWithResponses
+}
+
+func (m *Murphy) Member(email string) *Member {
+	m.t.Helper()
+	api := m.ClientWith(m.SessionAs(email))
+	session, err := api.GetSessionWithResponse(m.t.Context())
+	m.ok(session, err, "read who signed in")
+	return &Member{User: &User{ID: session.JSON200.User.Id, Email: email, m: m}, API: api}
 }
 
 type User struct {

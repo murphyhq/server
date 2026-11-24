@@ -140,7 +140,7 @@ INSERT INTO sessions (id, user_id, token_hash, client, expires_at, created_at, u
 VALUES (sqlc.arg(id), sqlc.arg(user_id), sqlc.arg(token_hash), sqlc.arg(client), sqlc.arg(expires_at), sqlc.arg(created_at), sqlc.arg(updated_at));
 
 -- name: GetActiveSession :one
-SELECT sessions.id, sessions.user_id, sessions.token_hash, sessions.client, sessions.expires_at, sessions.revoked_at, sessions.created_at, sessions.updated_at
+SELECT sessions.id, sessions.user_id, sessions.token_hash, sessions.client, sessions.expires_at, sessions.revoked_at, sessions.created_at, sessions.updated_at, users.role
 FROM sessions
 JOIN users ON users.id = sessions.user_id
 WHERE sessions.token_hash = sqlc.arg(token_hash) AND sessions.revoked_at IS NULL AND sessions.expires_at > sqlc.arg(now) AND users.status = 'active';
@@ -203,3 +203,9 @@ WHERE user_id = sqlc.arg(user_id) AND revoked_at IS NULL;
 UPDATE one_time_codes
 SET used_at = sqlc.arg(used_at), updated_at = sqlc.arg(updated_at)
 WHERE user_id = sqlc.arg(user_id) AND used_at IS NULL;
+
+-- name: ListMembershipsOfUser :many
+SELECT id, team_id, user_id, role, created_at, updated_at
+FROM team_memberships
+WHERE user_id = sqlc.arg(user_id)
+ORDER BY team_id;

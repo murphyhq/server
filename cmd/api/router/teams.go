@@ -26,6 +26,10 @@ func (s *Server) CreateTeam(ctx context.Context, request CreateTeamRequestObject
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
+	if err := s.access.Admin(s.caller(ctx)); err != nil {
+		return nil, err
+	}
+
 	team, err := s.people.CreateTeam(ctx, &murphy.Team{Name: request.Body.Name})
 	if err != nil {
 		return nil, err
@@ -48,6 +52,10 @@ func (s *Server) UpdateTeam(ctx context.Context, request UpdateTeamRequestObject
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
+	if err := s.access.ManagesTeams(ctx, s.caller(ctx), request.Id); err != nil {
+		return nil, err
+	}
+
 	team, err := s.people.UpdateTeam(ctx, &murphy.Team{Id: request.Id, Name: request.Body.Name})
 	if err != nil {
 		return nil, err
@@ -58,6 +66,10 @@ func (s *Server) UpdateTeam(ctx context.Context, request UpdateTeamRequestObject
 func (s *Server) DeleteTeam(ctx context.Context, request DeleteTeamRequestObject) (_ DeleteTeamResponseObject, err error) {
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
+
+	if err := s.access.ManagesTeams(ctx, s.caller(ctx), request.Id); err != nil {
+		return nil, err
+	}
 
 	if err := s.people.DeleteTeam(ctx, request.Id); err != nil {
 		return nil, err
@@ -84,6 +96,10 @@ func (s *Server) SetTeamMember(ctx context.Context, request SetTeamMemberRequest
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
+	if err := s.access.ManagesTeams(ctx, s.caller(ctx), request.Id); err != nil {
+		return nil, err
+	}
+
 	membership, err := s.people.SetMembership(ctx, &murphy.TeamMembership{
 		TeamId: request.Id,
 		UserId: request.UserId,
@@ -98,6 +114,10 @@ func (s *Server) SetTeamMember(ctx context.Context, request SetTeamMemberRequest
 func (s *Server) RemoveTeamMember(ctx context.Context, request RemoveTeamMemberRequestObject) (_ RemoveTeamMemberResponseObject, err error) {
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
+
+	if err := s.access.ManagesTeams(ctx, s.caller(ctx), request.Id); err != nil {
+		return nil, err
+	}
 
 	if err := s.people.RemoveMembership(ctx, request.Id, request.UserId); err != nil {
 		return nil, err

@@ -20,6 +20,7 @@ type Repository interface {
 	DeleteSchedule(ctx context.Context, id string) error
 	CreateOverride(ctx context.Context, override *murphy.Override) error
 	ListOverrides(ctx context.Context, scheduleID string, endsAfter time.Time) ([]*murphy.Override, error)
+	GetOverride(ctx context.Context, id string) (*murphy.Override, error)
 	DeleteOverride(ctx context.Context, id string) error
 	ExistingSchedules(ctx context.Context, ids []string) ([]string, error)
 	GetSchedules(ctx context.Context, ids []string) ([]*murphy.Schedule, error)
@@ -192,6 +193,21 @@ func (s *Service) ListOverrides(ctx context.Context, scheduleID string, endsAfte
 		return nil, fmt.Errorf("list overrides: %w", err)
 	}
 	return overrides, nil
+}
+
+func (s *Service) GetOverride(ctx context.Context, id string) (_ *murphy.Override, err error) {
+	ctx, span := tracer.Span(ctx)
+	ctx = span.Set(ctx, telemetry.WithField("override.id", id))
+	defer span.End(&err)
+
+	if err := murphy.LookupID("override", id); err != nil {
+		return nil, err
+	}
+	override, err := s.repo.GetOverride(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("get override: %w", err)
+	}
+	return override, nil
 }
 
 func (s *Service) DeleteOverride(ctx context.Context, id string) (err error) {

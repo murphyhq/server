@@ -30,6 +30,7 @@ type Engine[T Tx] interface {
 	DeleteSchedule(ctx context.Context, id string) error
 	CreateOverride(ctx context.Context, override *murphy.Override) error
 	ListOverrides(ctx context.Context, scheduleID string, endsAfter time.Time) ([]*murphy.Override, error)
+	GetOverride(ctx context.Context, id string) (*murphy.Override, error)
 	DeleteOverride(ctx context.Context, id string) error
 	ExistingSchedules(ctx context.Context, ids []string) ([]string, error)
 	Transaction(ctx context.Context, work func(tx T) error) error

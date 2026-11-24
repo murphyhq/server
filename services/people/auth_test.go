@@ -27,6 +27,8 @@ const (
 
 type accounts struct {
 	auth       *people.Auth
+	repo       *MockAuthRepository
+	provider   *MockProvider
 	claims     *people.Claims
 	signIn     *murphy.SignIn
 	identities map[string]string
@@ -50,7 +52,9 @@ func newAccounts(t *testing.T) *accounts {
 	t.Helper()
 	repo, provider := NewMockAuthRepository(t), NewMockProvider(t)
 	a := &accounts{
-		auth:       people.NewAuth(repo, provider, people.AuthSettings{SessionDuration: time.Hour, InitialAdminEmail: initialAdmin, ReturnOrigins: []string{"https://murphy.example.com"}, PublicURL: "https://murphy.example.com", AppScheme: "murphy"}),
+		auth:       people.NewAuth(repo, provider, settings()),
+		repo:       repo,
+		provider:   provider,
 		claims:     &people.Claims{Issuer: issuer, Subject: "bo-at-the-provider", Email: "bo@example.com", EmailVerified: true, Name: "Bo", Nonce: nonce},
 		signIn:     &murphy.SignIn{StateHash: hashOf(state), Nonce: nonce, Verifier: "verifier-of-the-sign-in"},
 		identities: map[string]string{},
@@ -122,14 +126,27 @@ func newAccounts(t *testing.T) *accounts {
 		delete(a.codes, string(codeHash))
 		return code, nil
 	}).Maybe()
-	repo.EXPECT().GetActiveSession(mock.Anything, mock.Anything, mock.Anything).RunAndReturn(func(_ context.Context, tokenHash []byte, _ time.Time) (*murphy.Session, error) {
+	repo.EXPECT().GetActiveSession(mock.Anything, mock.Anything, mock.Anything).RunAndReturn(func(_ context.Context, tokenHash []byte, _ time.Time) (*murphy.Session, murphy.UserRole, error) {
 		session, ok := a.sessions[string(tokenHash)]
 		if !ok {
-			return nil, &murphy.NotFoundError{Entity: "session"}
+			return nil, 0, &murphy.NotFoundError{Entity: "session"}
 		}
-		return session, nil
+		return session, murphy.UserRole_USER_ROLE_MEMBER, nil
 	}).Maybe()
 	return a
+}
+
+func settings() people.AuthSettings {
+	return people.AuthSettings{
+		SessionDuration: time.Hour, InitialAdminEmail: initialAdmin, ReturnOrigins: []string{"https://murphy.example.com"},
+		PublicURL: "https://murphy.example.com", AppScheme: "murphy",
+	}
+}
+
+func (a *accounts) allowingOnly(domains ...string) {
+	allowed := settings()
+	allowed.AllowedEmailDomains = domains
+	a.auth = people.NewAuth(a.repo, a.provider, allowed)
 }
 
 func (a *accounts) known(email, subject string) *murphy.User {
@@ -307,16 +324,17 @@ func TestAnActiveSessionAuthenticates(t *testing.T) {
 	session := &murphy.Session{Id: murphy.NewID(), UserId: murphy.NewID(), ExpiresAt: timestamppb.New(time.Now().Add(time.Hour))}
 	a.sessions[string(hashOf("mss_token"))] = session
 
-	got, err := a.auth.Authenticate(t.Context(), "mss_token")
+	got, role, err := a.auth.Authenticate(t.Context(), "mss_token")
 
 	require.NoError(t, err)
 	assert.Equal(t, session.GetUserId(), got.GetUserId())
+	assert.Equal(t, murphy.UserRole_USER_ROLE_MEMBER, role)
 }
 
 func TestAnUnknownSessionIsRefused(t *testing.T) {
 	a := newAccounts(t)
 
-	_, err := a.auth.Authenticate(t.Context(), "mss_ended-or-never-issued")
+	_, _, err := a.auth.Authenticate(t.Context(), "mss_ended-or-never-issued")
 
 	require.ErrorIs(t, err, murphy.ErrUnauthenticated)
 }
@@ -434,4 +452,36 @@ func TestEachSessionRemembersHowItStarted(t *testing.T) {
 	assert.Equal(t, murphy.SessionClient_SESSION_CLIENT_BROWSER, browser)
 	assert.Equal(t, murphy.SessionClient_SESSION_CLIENT_TOKEN, token)
 	assert.Equal(t, murphy.SessionClient_SESSION_CLIENT_APP, a.session.GetClient())
+}
+
+func TestSomeoneNewOutsideTheAllowedDomainsCannotSignIn(t *testing.T) {
+	a := newAccounts(t)
+	a.allowingOnly("murphy.example.com")
+
+	_, err := a.auth.SignInWithIDToken(t.Context(), "id-token")
+
+	require.ErrorIs(t, err, murphy.ErrForbidden)
+	assert.Empty(t, a.created)
+	assert.Nil(t, a.session)
+}
+
+func TestSomeoneNewInAnAllowedDomainSignsIn(t *testing.T) {
+	a := newAccounts(t)
+	a.allowingOnly("murphy.example.com", "EXAMPLE.com")
+
+	_, err := a.auth.SignInWithIDToken(t.Context(), "id-token")
+
+	require.NoError(t, err)
+	assert.Len(t, a.created, 1)
+}
+
+func TestSomeoneAnAdminCreatedSignsInFromAnyDomain(t *testing.T) {
+	a := newAccounts(t)
+	a.allowingOnly("murphy.example.com")
+	bo := a.unlinked("bo@example.com")
+
+	signedIn, err := a.auth.SignInWithIDToken(t.Context(), "id-token")
+
+	require.NoError(t, err)
+	assert.Equal(t, bo.GetId(), signedIn.Session.GetUserId())
 }

@@ -79,3 +79,8 @@ SELECT id, schedule_id, user_id, starts_at, ends_at, created_at, updated_at
 FROM overrides
 WHERE schedule_id IN (sqlc.slice(schedule_ids)) AND starts_at <= sqlc.arg(at) AND ends_at > sqlc.arg(after)
 ORDER BY schedule_id, starts_at, id;
+
+-- name: GetOverride :one
+SELECT id, schedule_id, user_id, starts_at, ends_at, created_at, updated_at
+FROM overrides
+WHERE id = sqlc.arg(id);

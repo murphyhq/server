@@ -46,6 +46,7 @@ func APIWith(t *testing.T, databases migrateapp.Settings) string {
 		OIDCClientID:          "murphy",
 		OIDCClientSecret:      "murphy-local-secret",
 		SessionDuration:       time.Hour,
+		InitialAdminEmail:     "ana@murphy.test",
 	})
 	require.NoError(t, err)
 	t.Cleanup(a.Close)

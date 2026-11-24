@@ -32,6 +32,18 @@ func (e *FieldError) Is(target error) bool {
 	return target == ErrInvalid
 }
 
+type ForbiddenError struct {
+	Reason string
+}
+
+func (e *ForbiddenError) Error() string {
+	return "forbidden: " + e.Reason
+}
+
+func (e *ForbiddenError) Is(target error) bool {
+	return target == ErrForbidden
+}
+
 type NotFoundError struct {
 	Entity string
 }

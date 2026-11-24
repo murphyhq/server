@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 
@@ -56,7 +57,7 @@ type AuthRepository interface {
 	CreateIdentity(ctx context.Context, identity *murphy.Identity) error
 	CreateUserWithIdentity(ctx context.Context, user *murphy.User, identity *murphy.Identity) error
 	CreateSession(ctx context.Context, session *murphy.Session) error
-	GetActiveSession(ctx context.Context, tokenHash []byte, now time.Time) (*murphy.Session, error)
+	GetActiveSession(ctx context.Context, tokenHash []byte, now time.Time) (*murphy.Session, murphy.UserRole, error)
 	RevokeSession(ctx context.Context, tokenHash []byte, at time.Time) error
 	ClaimFirstAdmin(ctx context.Context, userID string, now time.Time) (bool, error)
 	CreateOneTimeCode(ctx context.Context, code *murphy.OneTimeCode) error
@@ -67,11 +68,12 @@ type AuthRepository interface {
 }
 
 type AuthSettings struct {
-	SessionDuration   time.Duration
-	InitialAdminEmail string
-	ReturnOrigins     []string
-	PublicURL         string
-	AppScheme         string
+	SessionDuration     time.Duration
+	InitialAdminEmail   string
+	ReturnOrigins       []string
+	PublicURL           string
+	AppScheme           string
+	AllowedEmailDomains []string
 }
 
 type Auth struct {
@@ -264,19 +266,19 @@ func (a *Auth) CreateConnectCode(ctx context.Context, userID string) (_ *Connect
 	return &ConnectCode{Code: code, Link: link, ExpiresAt: now.Add(connectDuration)}, nil
 }
 
-func (a *Auth) Authenticate(ctx context.Context, token string) (_ *murphy.Session, err error) {
+func (a *Auth) Authenticate(ctx context.Context, token string) (_ *murphy.Session, _ murphy.UserRole, err error) {
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
-	session, err := a.repo.GetActiveSession(ctx, hash(token), time.Now().UTC())
+	session, role, err := a.repo.GetActiveSession(ctx, hash(token), time.Now().UTC())
 	if errors.Is(err, murphy.ErrNotFound) {
-		return nil, murphy.ErrUnauthenticated
+		return nil, 0, murphy.ErrUnauthenticated
 	}
 	if err != nil {
-		return nil, fmt.Errorf("get session: %w", err)
+		return nil, 0, fmt.Errorf("get session: %w", err)
 	}
 	span.Set(ctx, telemetry.WithField("user.id", session.GetUserId()))
-	return session, nil
+	return session, role, nil
 }
 
 func (a *Auth) SignOut(ctx context.Context, token string) (err error) {
@@ -320,6 +322,9 @@ func (a *Auth) userFor(ctx context.Context, claims *Claims, now time.Time) (stri
 		if !errors.Is(err, murphy.ErrNotFound) {
 			return "", fmt.Errorf("find user by email: %w", err)
 		}
+	}
+	if !a.mayJoin(claims.Email) {
+		return "", &murphy.ForbiddenError{Reason: "people with this email domain can't sign in to this install"}
 	}
 	user := &murphy.User{
 		Id:        murphy.NewID(),
@@ -420,6 +425,16 @@ func (a *Auth) checkReturnTo(returnTo, codeChallenge string) error {
 		return &murphy.FieldError{Field: "return_to", Reason: "must be on an origin this install allows"}
 	}
 	return nil
+}
+
+func (a *Auth) mayJoin(email string) bool {
+	if len(a.settings.AllowedEmailDomains) == 0 {
+		return true
+	}
+	_, domain, ok := strings.Cut(email, "@")
+	return ok && slices.ContainsFunc(a.settings.AllowedEmailDomains, func(allowed string) bool {
+		return strings.EqualFold(strings.TrimPrefix(allowed, "@"), domain)
+	})
 }
 
 func validChallenge(challenge string) bool {

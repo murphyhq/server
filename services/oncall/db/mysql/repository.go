@@ -234,6 +234,21 @@ func (r *Repository) ListOverrides(ctx context.Context, scheduleID string, endsA
 	return overrides, nil
 }
 
+func (r *Repository) GetOverride(ctx context.Context, id string) (_ *murphy.Override, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	row, err := r.queries.GetOverride(ctx, id)
+	if err != nil {
+		return nil, murphymysql.Error("override", err)
+	}
+	return &murphy.Override{
+		Id: row.ID, ScheduleId: row.ScheduleID, UserId: row.UserID,
+		StartsAt: timestamppb.New(row.StartsAt), EndsAt: timestamppb.New(row.EndsAt),
+		CreatedAt: timestamppb.New(row.CreatedAt), UpdatedAt: timestamppb.New(row.UpdatedAt),
+	}, nil
+}
+
 func (r *Repository) DeleteOverride(ctx context.Context, id string) (err error) {
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
