@@ -124,6 +124,21 @@ func (r *Repository) ListContactMethods(ctx context.Context, userID string) (_ [
 	return methods, nil
 }
 
+func (r *Repository) ListContactMethodsOfUsers(ctx context.Context, userIDs []string) (_ []*murphy.ContactMethod, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	rows, err := r.queries.ListContactMethodsOfUsers(ctx, userIDs)
+	if err != nil {
+		return nil, murphypostgres.Error("contact method", err)
+	}
+	methods := make([]*murphy.ContactMethod, len(rows))
+	for i, row := range rows {
+		methods[i] = toContactMethod(row)
+	}
+	return methods, nil
+}
+
 func (r *Repository) UpdateContactMethod(ctx context.Context, method *murphy.ContactMethod) (err error) {
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)

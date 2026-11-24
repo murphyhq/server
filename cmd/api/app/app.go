@@ -15,6 +15,7 @@ import (
 	escalationdb "github.com/murphyhq/server/services/escalation/db"
 	"github.com/murphyhq/server/services/incidents"
 	incidentsdb "github.com/murphyhq/server/services/incidents/db"
+	"github.com/murphyhq/server/services/notifications/webhook"
 	"github.com/murphyhq/server/services/oncall"
 	oncalldb "github.com/murphyhq/server/services/oncall/db"
 	"github.com/murphyhq/server/services/people"
@@ -30,6 +31,7 @@ type Settings struct {
 	EscalationDatabaseURL string   `env:"ESCALATION_DATABASE_URL" required:"true"`
 	IdempotencyStoreURL   string   `env:"IDEMPOTENCY_STORE_URL" required:"true"`
 	IntegrationKeySecrets string   `env:"INTEGRATION_KEY_SECRETS" required:"true"`
+	WebhookPublicKeys     string   `env:"WEBHOOK_PUBLIC_KEYS" required:"true"`
 	CORSOrigins           []string `env:"CORS_ORIGINS" validate:"base-url"`
 }
 
@@ -88,6 +90,11 @@ func New(ctx context.Context, s Settings) (_ *App, err error) {
 		return nil, fmt.Errorf("MURPHY_INTEGRATION_KEY_SECRETS: %w", err)
 	}
 
+	publicKeys, err := webhook.ParsePublicKeys(s.WebhookPublicKeys)
+	if err != nil {
+		return nil, fmt.Errorf("MURPHY_WEBHOOK_PUBLIC_KEYS: %w", err)
+	}
+
 	catalogService := catalog.New(catalogStorage, keyring)
 	peopleService := people.New(peopleStorage)
 	oncallService := oncall.New(oncallStorage, peopleService)
@@ -98,6 +105,7 @@ func New(ctx context.Context, s Settings) (_ *App, err error) {
 		People:     peopleService,
 		OnCall:     oncallService,
 		Escalation: escalationService,
+		PublicKeys: publicKeys,
 	}, keys)
 	if err != nil {
 		return nil, err

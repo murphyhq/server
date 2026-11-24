@@ -17,5 +17,6 @@ message Envelope {
     AlertEvent alert = 10;
     IncidentEvent incident = 11;
     TimerEvent timer = 12;
+    NotificationEvent notification = 13;
   }
 }

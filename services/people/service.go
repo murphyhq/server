@@ -19,6 +19,7 @@ type Repository interface {
 	CreateContactMethod(ctx context.Context, method *murphy.ContactMethod) error
 	GetContactMethod(ctx context.Context, id string) (*murphy.ContactMethod, error)
 	ListContactMethods(ctx context.Context, userID string) ([]*murphy.ContactMethod, error)
+	ListContactMethodsOfUsers(ctx context.Context, userIDs []string) ([]*murphy.ContactMethod, error)
 	UpdateContactMethod(ctx context.Context, method *murphy.ContactMethod) error
 	DeleteContactMethod(ctx context.Context, id string) error
 	CreateTeam(ctx context.Context, team *murphy.Team) error
@@ -409,4 +410,22 @@ func (s *Service) ActiveUsers(ctx context.Context, ids []string) (_ map[string]b
 	defer span.End(&err)
 
 	return existing(ctx, ids, s.repo.ActiveUsers)
+}
+
+func (s *Service) ContactMethodsOfUsers(ctx context.Context, userIDs []string) (_ map[string][]*murphy.ContactMethod, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	byUser := map[string][]*murphy.ContactMethod{}
+	if len(userIDs) == 0 {
+		return byUser, nil
+	}
+	methods, err := s.repo.ListContactMethodsOfUsers(ctx, userIDs)
+	if err != nil {
+		return nil, fmt.Errorf("list contact methods: %w", err)
+	}
+	for _, method := range methods {
+		byUser[method.GetUserId()] = append(byUser[method.GetUserId()], method)
+	}
+	return byUser, nil
 }

@@ -20,3 +20,12 @@ packages:
       Policies: {}
       OnCall: {}
       People: {}
+  github.com/murphyhq/server/services/notifications:
+    config:
+      dir: "{{.InterfaceDir}}"
+      filename: mocks_test.go
+      pkgname: notifications_test
+      structname: "Mock{{.InterfaceName}}"
+    interfaces:
+      Provider: {}
+      Publisher: {}

@@ -32,6 +32,7 @@ type Envelope struct {
 	//	*Envelope_Alert
 	//	*Envelope_Incident
 	//	*Envelope_Timer
+	//	*Envelope_Notification
 	Event         isEnvelope_Event `protobuf_oneof:"event"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -122,6 +123,15 @@ func (x *Envelope) GetTimer() *TimerEvent {
 	return nil
 }
 
+func (x *Envelope) GetNotification() *NotificationEvent {
+	if x != nil {
+		if x, ok := x.Event.(*Envelope_Notification); ok {
+			return x.Notification
+		}
+	}
+	return nil
+}
+
 type isEnvelope_Event interface {
 	isEnvelope_Event()
 }
@@ -138,17 +148,23 @@ type Envelope_Timer struct {
 	Timer *TimerEvent `protobuf:"bytes,12,opt,name=timer,proto3,oneof"`
 }
 
+type Envelope_Notification struct {
+	Notification *NotificationEvent `protobuf:"bytes,13,opt,name=notification,proto3,oneof"`
+}
+
 func (*Envelope_Alert) isEnvelope_Event() {}
 
 func (*Envelope_Incident) isEnvelope_Event() {}
 
 func (*Envelope_Timer) isEnvelope_Event() {}
 
+func (*Envelope_Notification) isEnvelope_Event() {}
+
 var File_murphy_v1_events_proto protoreflect.FileDescriptor
 
 const file_murphy_v1_events_proto_rawDesc = "" +
 	"\n" +
-	"\x16murphy/v1/events.proto\x12\tmurphy.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15murphy/v1/alert.proto\x1a\x18murphy/v1/incident.proto\"\x83\x03\n" +
+	"\x16murphy/v1/events.proto\x12\tmurphy.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15murphy/v1/alert.proto\x1a\x18murphy/v1/incident.proto\"\xc7\x03\n" +
 	"\bEnvelope\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12;\n" +
 	"\voccurred_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
@@ -157,7 +173,8 @@ const file_murphy_v1_events_proto_rawDesc = "" +
 	"\x05alert\x18\n" +
 	" \x01(\v2\x15.murphy.v1.AlertEventH\x00R\x05alert\x126\n" +
 	"\bincident\x18\v \x01(\v2\x18.murphy.v1.IncidentEventH\x00R\bincident\x12-\n" +
-	"\x05timer\x18\f \x01(\v2\x15.murphy.v1.TimerEventH\x00R\x05timer\x1a?\n" +
+	"\x05timer\x18\f \x01(\v2\x15.murphy.v1.TimerEventH\x00R\x05timer\x12B\n" +
+	"\fnotification\x18\r \x01(\v2\x1c.murphy.v1.NotificationEventH\x00R\fnotification\x1a?\n" +
 	"\x11TraceContextEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01B\a\n" +
@@ -183,6 +200,7 @@ var file_murphy_v1_events_proto_goTypes = []any{
 	(*AlertEvent)(nil),            // 3: murphy.v1.AlertEvent
 	(*IncidentEvent)(nil),         // 4: murphy.v1.IncidentEvent
 	(*TimerEvent)(nil),            // 5: murphy.v1.TimerEvent
+	(*NotificationEvent)(nil),     // 6: murphy.v1.NotificationEvent
 }
 var file_murphy_v1_events_proto_depIdxs = []int32{
 	2, // 0: murphy.v1.Envelope.occurred_at:type_name -> google.protobuf.Timestamp
@@ -190,11 +208,12 @@ var file_murphy_v1_events_proto_depIdxs = []int32{
 	3, // 2: murphy.v1.Envelope.alert:type_name -> murphy.v1.AlertEvent
 	4, // 3: murphy.v1.Envelope.incident:type_name -> murphy.v1.IncidentEvent
 	5, // 4: murphy.v1.Envelope.timer:type_name -> murphy.v1.TimerEvent
-	5, // [5:5] is the sub-list for method output_type
-	5, // [5:5] is the sub-list for method input_type
-	5, // [5:5] is the sub-list for extension type_name
-	5, // [5:5] is the sub-list for extension extendee
-	0, // [0:5] is the sub-list for field type_name
+	6, // 5: murphy.v1.Envelope.notification:type_name -> murphy.v1.NotificationEvent
+	6, // [6:6] is the sub-list for method output_type
+	6, // [6:6] is the sub-list for method input_type
+	6, // [6:6] is the sub-list for extension type_name
+	6, // [6:6] is the sub-list for extension extendee
+	0, // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_murphy_v1_events_proto_init() }
@@ -208,6 +227,7 @@ func file_murphy_v1_events_proto_init() {
 		(*Envelope_Alert)(nil),
 		(*Envelope_Incident)(nil),
 		(*Envelope_Timer)(nil),
+		(*Envelope_Notification)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{

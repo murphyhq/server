@@ -59,7 +59,7 @@ CREATE TABLE timeline_entries (
   created_at DATETIME(6) NOT NULL,
   CONSTRAINT timeline_entries_pkey PRIMARY KEY (id),
   CONSTRAINT timeline_entries_incident_id_fkey FOREIGN KEY (incident_id) REFERENCES incidents (id) ON DELETE CASCADE,
-  CONSTRAINT timeline_entries_type_check CHECK (type IN ('triggered', 'alerted', 'acknowledged', 'resolved', 'escalated', 'escalation_skipped', 'escalation_exhausted'))
+  CONSTRAINT timeline_entries_type_check CHECK (type IN ('triggered', 'alerted', 'acknowledged', 'resolved', 'escalated', 'escalation_skipped', 'escalation_exhausted', 'notified', 'notification_failed'))
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
 
 CREATE INDEX timeline_entries_incident_id_id_idx ON timeline_entries (incident_id, id);

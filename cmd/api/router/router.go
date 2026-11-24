@@ -1,6 +1,7 @@
 package router
 
 import (
+	"crypto/ed25519"
 	"fmt"
 	"net/http"
 	"time"
@@ -20,6 +21,7 @@ type Server struct {
 	people     *people.Service
 	oncall     *oncall.Service
 	escalation *escalation.Service
+	publicKeys []ed25519.PublicKey
 }
 
 type Services struct {
@@ -28,6 +30,7 @@ type Services struct {
 	People     *people.Service
 	OnCall     *oncall.Service
 	Escalation *escalation.Service
+	PublicKeys []ed25519.PublicKey
 }
 
 func New(services Services, keys idempotency.Store) (http.Handler, error) {
@@ -35,7 +38,7 @@ func New(services Services, keys idempotency.Store) (http.Handler, error) {
 	if err != nil {
 		return nil, fmt.Errorf("load OpenAPI spec: %w", err)
 	}
-	strict := NewStrictHandlerWithOptions(&Server{catalog: services.Catalog, incidents: services.Incidents, people: services.People, oncall: services.OnCall, escalation: services.Escalation}, nil, StrictHTTPServerOptions{
+	strict := NewStrictHandlerWithOptions(&Server{catalog: services.Catalog, incidents: services.Incidents, people: services.People, oncall: services.OnCall, escalation: services.Escalation, publicKeys: services.PublicKeys}, nil, StrictHTTPServerOptions{
 		RequestErrorHandlerFunc:  httpserver.BadRequest,
 		ResponseErrorHandlerFunc: httpserver.WriteError,
 	})

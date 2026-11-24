@@ -38,6 +38,12 @@ FROM contact_methods
 WHERE user_id = sqlc.arg(user_id)
 ORDER BY id;
 
+-- name: ListContactMethodsOfUsers :many
+SELECT id, user_id, type, address, created_at, updated_at
+FROM contact_methods
+WHERE user_id IN (sqlc.slice(user_ids))
+ORDER BY user_id, id;
+
 -- name: UpdateContactMethod :execrows
 UPDATE contact_methods
 SET type = sqlc.arg(type), address = sqlc.arg(address), updated_at = sqlc.arg(updated_at)

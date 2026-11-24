@@ -339,6 +339,40 @@ func (q *Queries) ListContactMethods(ctx context.Context, userID string) ([]Cont
 	return items, nil
 }
 
+const listContactMethodsOfUsers = `-- name: ListContactMethodsOfUsers :many
+SELECT id, user_id, type, address, created_at, updated_at
+FROM contact_methods
+WHERE user_id = ANY($1::uuid[])
+ORDER BY user_id, id
+`
+
+func (q *Queries) ListContactMethodsOfUsers(ctx context.Context, userIds []string) ([]ContactMethod, error) {
+	rows, err := q.db.Query(ctx, listContactMethodsOfUsers, userIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ContactMethod
+	for rows.Next() {
+		var i ContactMethod
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.Type,
+			&i.Address,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listMemberships = `-- name: ListMemberships :many
 SELECT id, team_id, user_id, role, created_at, updated_at
 FROM team_memberships

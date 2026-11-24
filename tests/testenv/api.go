@@ -42,6 +42,7 @@ func APIWith(t *testing.T, databases migrateapp.Settings) (*client.ClientWithRes
 		EscalationDatabaseURL: databases.EscalationDatabaseURL,
 		IdempotencyStoreURL:   RedisURL(),
 		IntegrationKeySecrets: IntegrationKeySecrets,
+		WebhookPublicKeys:     WebhookPublicKey,
 	})
 	require.NoError(t, err)
 	t.Cleanup(a.Close)

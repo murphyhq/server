@@ -63,6 +63,19 @@ func (s *Server) GetIncident(ctx context.Context, request GetIncidentRequestObje
 			}
 			entries[i].Escalation = out
 		}
+		if notification := entry.GetNotification(); notification != nil {
+			out := &TimelineNotification{Reason: TimelineNotificationReason(notification.GetReason().Text()), User: ref(notification.GetUserId())}
+			if id := notification.GetContactMethodId(); id != "" {
+				method := ref(id)
+				out.ContactMethod = &method
+				channel := ContactMethodType(notification.GetChannel().Text())
+				out.Channel = &channel
+			}
+			if failure := notification.GetFailure(); failure != "" {
+				out.Failure = &failure
+			}
+			entries[i].Notification = out
+		}
 	}
 	return GetIncident200JSONResponse{
 		Id:         out.Id,

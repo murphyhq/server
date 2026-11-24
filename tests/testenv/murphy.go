@@ -50,7 +50,11 @@ func Murphy(t *testing.T, broker brokertest.Environment, engine DatabaseEngine) 
 		})
 	})
 	run(t, func(ctx context.Context) (runner, error) {
-		return notifierapp.New(ctx, notifierapp.Settings{EventsSubscriptionURL: endpoints.Subscriptions["notifier"]})
+		return notifierapp.New(ctx, notifierapp.Settings{
+			EventsSubscriptionURL: endpoints.Subscriptions["notifier"],
+			EventsTopicURL:        endpoints.Topic,
+			WebhookSigningKeys:    WebhookSigningKey,
+		})
 	})
 	return Stack{API: api, IngestURL: ingest, Databases: databases}
 }

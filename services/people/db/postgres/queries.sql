@@ -38,6 +38,12 @@ FROM contact_methods
 WHERE user_id = @user_id
 ORDER BY id;
 
+-- name: ListContactMethodsOfUsers :many
+SELECT id, user_id, type, address, created_at, updated_at
+FROM contact_methods
+WHERE user_id = ANY(@user_ids::uuid[])
+ORDER BY user_id, id;
+
 -- name: UpdateContactMethod :execrows
 UPDATE contact_methods
 SET type = @type, address = @address, updated_at = @updated_at
