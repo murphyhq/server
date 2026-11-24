@@ -45,9 +45,9 @@ LIMIT @max_rows;
 INSERT INTO alerts (id, incident_id, integration_id, service_id, dedup_key, status, summary, labels, received_at, created_at, source, instance, annotations)
 VALUES (@id, @incident_id, @integration_id, @service_id, @dedup_key, @status, @summary, @labels, @received_at, @created_at, @source, @instance, @annotations);
 
--- name: CreateTimelineEntry :exec
+-- name: CreateTimelineEntries :exec
 INSERT INTO timeline_entries (id, incident_id, type, summary, details, created_at)
-VALUES (@id, @incident_id, @type, @summary, @details, @created_at);
+SELECT unnest(@ids::uuid[]), unnest(@incident_ids::uuid[]), unnest(@types::text[]), unnest(@summaries::text[]), unnest(@details::bytea[]), unnest(@created_ats::timestamptz[]);
 
 -- name: ListTimeline :many
 SELECT id, details
@@ -102,4 +102,9 @@ SELECT unnest(@ids::uuid[]), unnest(@incident_ids::uuid[]), unnest(@kinds::text[
 
 -- name: CreatePages :exec
 INSERT INTO incident_pages (id, incident_id, user_id, created_at)
-SELECT unnest(@ids::uuid[]), @incident_id::uuid, unnest(@user_ids::uuid[]), @created_at::timestamptz;
+SELECT unnest(@ids::uuid[]), unnest(@incident_ids::uuid[]), unnest(@user_ids::uuid[]), @created_at::timestamptz;
+
+-- name: PolicyOfIncident :one
+SELECT i.escalation_policy_id, EXISTS (SELECT 1 FROM incident_pages AS p WHERE p.incident_id = i.id AND p.user_id = @user_id) AS paged
+FROM incidents AS i
+WHERE i.id = @id;

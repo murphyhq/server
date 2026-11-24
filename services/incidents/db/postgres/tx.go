@@ -116,22 +116,27 @@ func (t *Tx) CreateAlert(ctx context.Context, alert *murphy.Alert, incidentID st
 	}))
 }
 
-func (t *Tx) CreateTimelineEntry(ctx context.Context, entry *murphy.TimelineEntry) (err error) {
+func (t *Tx) CreateTimelineEntries(ctx context.Context, entries []*murphy.TimelineEntry) (err error) {
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
-	details, err := proto.Marshal(entry)
-	if err != nil {
-		return fmt.Errorf("encode timeline entry: %w", err)
+	if len(entries) == 0 {
+		return nil
 	}
-	return murphypostgres.Error("timeline entry", t.queries.CreateTimelineEntry(ctx, CreateTimelineEntryParams{
-		ID:         entry.GetId(),
-		IncidentID: entry.GetIncidentId(),
-		Type:       entry.GetType().Text(),
-		Summary:    entry.GetSummary(),
-		Details:    details,
-		CreatedAt:  entry.GetAt().AsTime(),
-	}))
+	var params CreateTimelineEntriesParams
+	for _, entry := range entries {
+		details, err := proto.Marshal(entry)
+		if err != nil {
+			return fmt.Errorf("encode timeline entry: %w", err)
+		}
+		params.Ids = append(params.Ids, entry.GetId())
+		params.IncidentIds = append(params.IncidentIds, entry.GetIncidentId())
+		params.Types = append(params.Types, entry.GetType().Text())
+		params.Summaries = append(params.Summaries, entry.GetSummary())
+		params.Details = append(params.Details, details)
+		params.CreatedAts = append(params.CreatedAts, entry.GetAt().AsTime())
+	}
+	return murphypostgres.Error("timeline entry", t.queries.CreateTimelineEntries(ctx, params))
 }
 
 func (t *Tx) CreateScheduledMessages(ctx context.Context, messages []*incidents.ScheduledMessage, at time.Time) (err error) {
@@ -184,16 +189,20 @@ func (t *Tx) ClaimMessages(ctx context.Context, ids []string, until time.Time) (
 	return murphypostgres.Error("scheduled message", t.queries.ClaimMessages(ctx, ClaimMessagesParams{ClaimedUntil: &until, Ids: ids}))
 }
 
-func (t *Tx) CreatePages(ctx context.Context, incidentID string, userIDs []string, at time.Time) (err error) {
+func (t *Tx) CreatePages(ctx context.Context, entries []*murphy.TimelineEntry, at time.Time) (err error) {
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
-	if len(userIDs) == 0 {
+	params := CreatePagesParams{CreatedAt: at}
+	for _, entry := range entries {
+		for _, page := range entry.GetEscalation().GetPaged() {
+			params.Ids = append(params.Ids, murphy.NewID())
+			params.IncidentIds = append(params.IncidentIds, entry.GetIncidentId())
+			params.UserIds = append(params.UserIds, page.GetUserId())
+		}
+	}
+	if len(params.Ids) == 0 {
 		return nil
 	}
-	ids := make([]string, len(userIDs))
-	for i := range userIDs {
-		ids[i] = murphy.NewID()
-	}
-	return murphypostgres.Error("page", t.queries.CreatePages(ctx, CreatePagesParams{Ids: ids, IncidentID: incidentID, UserIds: userIDs, CreatedAt: at}))
+	return murphypostgres.Error("page", t.queries.CreatePages(ctx, params))
 }

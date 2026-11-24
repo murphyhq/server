@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/murphyhq/server"
@@ -15,6 +17,9 @@ import (
 type Repository interface {
 	CreateSchedule(ctx context.Context, schedule *murphy.Schedule) error
 	GetSchedule(ctx context.Context, id string) (*murphy.Schedule, error)
+	GetScheduleRecord(ctx context.Context, id string) (*murphy.Schedule, error)
+	TeamsOfSchedule(ctx context.Context, id string) ([]string, error)
+	SchedulesOfUsers(ctx context.Context, userIDs []string, at time.Time, before string, limit int) ([]string, error)
 	ListSchedules(ctx context.Context, teamID string, before string, limit int) ([]*murphy.Schedule, error)
 	UpdateSchedule(ctx context.Context, schedule *murphy.Schedule) error
 	DeleteSchedule(ctx context.Context, id string) error
@@ -106,7 +111,10 @@ func (s *Service) UpdateSchedule(ctx context.Context, in *murphy.Schedule) (_ *m
 	ctx = span.Set(ctx, telemetry.WithField("schedule.id", in.GetId()))
 	defer span.End(&err)
 
-	current, err := s.GetSchedule(ctx, in.GetId())
+	if err := murphy.LookupID("schedule", in.GetId()); err != nil {
+		return nil, err
+	}
+	current, err := s.repo.GetScheduleRecord(ctx, in.GetId())
 	if err != nil {
 		return nil, err
 	}
@@ -313,4 +321,82 @@ func (s *Service) WhoIsOnCall(ctx context.Context, scheduleIDs []string, at time
 		}
 	}
 	return onCallBy, nil
+}
+
+func (s *Service) TeamsOfSchedule(ctx context.Context, id string) (_ []string, err error) {
+	ctx, span := tracer.Span(ctx)
+	ctx = span.Set(ctx, telemetry.WithField("schedule.id", id))
+	defer span.End(&err)
+
+	if err := murphy.LookupID("schedule", id); err != nil {
+		return nil, err
+	}
+	return s.repo.TeamsOfSchedule(ctx, id)
+}
+
+type OnCallNow struct {
+	Schedule *murphy.Schedule
+	UserID   string
+}
+
+func (s *Service) ListOnCall(ctx context.Context, userIDs []string, at time.Time, page pagination.Page) (_ []OnCallNow, _ string, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	window, err := pagination.Resolve(page)
+	if err != nil {
+		return nil, "", err
+	}
+	for _, id := range userIDs {
+		if err := murphy.LookupID("user", id); err != nil {
+			return nil, "", err
+		}
+	}
+	schedules, err := s.candidates(ctx, userIDs, at, window)
+	if err != nil {
+		return nil, "", err
+	}
+	schedules, next := pagination.Trim(schedules, window)
+	if len(schedules) == 0 {
+		return nil, next, nil
+	}
+	ids := make([]string, len(schedules))
+	for i, schedule := range schedules {
+		ids[i] = schedule.GetId()
+	}
+	overrides, err := s.repo.ListOverridesAt(ctx, ids, at)
+	if err != nil {
+		return nil, "", fmt.Errorf("list overrides: %w", err)
+	}
+	var found []OnCallNow
+	for _, schedule := range schedules {
+		user := onCall(schedule, at, overrides[schedule.GetId()])
+		if len(userIDs) == 0 || slices.Contains(userIDs, user) {
+			found = append(found, OnCallNow{Schedule: schedule, UserID: user})
+		}
+	}
+	return found, next, nil
+}
+
+func (s *Service) candidates(ctx context.Context, userIDs []string, at time.Time, window pagination.Window) ([]*murphy.Schedule, error) {
+	if len(userIDs) == 0 {
+		schedules, err := s.repo.ListSchedules(ctx, "", window.Before, window.Rows())
+		if err != nil {
+			return nil, fmt.Errorf("list schedules: %w", err)
+		}
+		return schedules, nil
+	}
+	ids, err := s.repo.SchedulesOfUsers(ctx, userIDs, at, window.Before, window.Rows())
+	if err != nil {
+		return nil, fmt.Errorf("find the people's schedules: %w", err)
+	}
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	schedules, err := s.repo.GetSchedules(ctx, ids)
+	if err != nil {
+		return nil, fmt.Errorf("get schedules: %w", err)
+	}
+	slices.SortFunc(schedules, func(a, b *murphy.Schedule) int { return strings.Compare(b.GetId(), a.GetId()) })
+	return schedules, nil
 }

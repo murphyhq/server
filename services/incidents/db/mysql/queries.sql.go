@@ -125,32 +125,6 @@ func (q *Queries) CreateIncident(ctx context.Context, arg CreateIncidentParams) 
 	)
 }
 
-const createTimelineEntry = `-- name: CreateTimelineEntry :exec
-INSERT INTO timeline_entries (id, incident_id, type, summary, details, created_at)
-VALUES (?, ?, ?, ?, ?, ?)
-`
-
-type CreateTimelineEntryParams struct {
-	ID         string
-	IncidentID string
-	Type       string
-	Summary    string
-	Details    []byte
-	CreatedAt  time.Time
-}
-
-func (q *Queries) CreateTimelineEntry(ctx context.Context, arg CreateTimelineEntryParams) error {
-	_, err := q.db.ExecContext(ctx, createTimelineEntry,
-		arg.ID,
-		arg.IncidentID,
-		arg.Type,
-		arg.Summary,
-		arg.Details,
-		arg.CreatedAt,
-	)
-	return err
-}
-
 const deleteMessages = `-- name: DeleteMessages :exec
 DELETE FROM scheduled_messages
 WHERE id IN (/*SLICE:ids*/?)
@@ -585,6 +559,29 @@ func (q *Queries) OpenInstances(ctx context.Context, incidentID *string) ([]*str
 		return nil, err
 	}
 	return items, nil
+}
+
+const policyOfIncident = `-- name: PolicyOfIncident :one
+SELECT i.escalation_policy_id, EXISTS (SELECT 1 FROM incident_pages AS p WHERE p.incident_id = i.id AND p.user_id = ?) AS paged
+FROM incidents AS i
+WHERE i.id = ?
+`
+
+type PolicyOfIncidentParams struct {
+	UserID string
+	ID     string
+}
+
+type PolicyOfIncidentRow struct {
+	EscalationPolicyID string
+	Paged              bool
+}
+
+func (q *Queries) PolicyOfIncident(ctx context.Context, arg PolicyOfIncidentParams) (PolicyOfIncidentRow, error) {
+	row := q.db.QueryRowContext(ctx, policyOfIncident, arg.UserID, arg.ID)
+	var i PolicyOfIncidentRow
+	err := row.Scan(&i.EscalationPolicyID, &i.Paged)
+	return i, err
 }
 
 const purgeHandledMessages = `-- name: PurgeHandledMessages :execrows

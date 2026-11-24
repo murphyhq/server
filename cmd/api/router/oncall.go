@@ -191,3 +191,28 @@ func toOverride(override *murphy.Override, n *names) Override {
 		CreatedAt: override.GetCreatedAt().AsTime(),
 	}
 }
+
+func (s *Server) ListOnCall(ctx context.Context, request ListOnCallRequestObject) (_ ListOnCallResponseObject, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	at := time.Now().UTC()
+	if request.Params.At != nil {
+		at = *request.Params.At
+	}
+	found, next, err := s.oncall.ListOnCall(ctx, all(request.Params.UserId), at, page(request.Params.Limit, request.Params.Cursor))
+	if err != nil {
+		return nil, err
+	}
+	n := newNames()
+	items := make([]ScheduleOnCall, len(found))
+	for i, onCall := range found {
+		n.knowSchedule(onCall.Schedule.GetId(), onCall.Schedule.GetName())
+		items[i] = ScheduleOnCall{Schedule: n.schedule(onCall.Schedule.GetId()), At: at}
+		if onCall.UserID != "" {
+			user := n.user(onCall.UserID)
+			items[i].User = &user
+		}
+	}
+	return ListOnCall200JSONResponse{Items: items, NextCursor: next}, s.name(ctx, n)
+}

@@ -96,3 +96,21 @@ ORDER BY schedule_id, starts_at, id;
 SELECT id, schedule_id, user_id, starts_at, ends_at, created_at, updated_at
 FROM overrides
 WHERE id = @id;
+
+-- name: TeamsOfSchedule :many
+SELECT s.id, st.team_id
+FROM schedules AS s
+LEFT JOIN schedule_teams AS st ON st.schedule_id = s.id
+WHERE s.id = @id;
+
+-- name: SchedulesOfUsers :many
+SELECT l.schedule_id
+FROM layer_participants AS p
+JOIN layers AS l ON l.id = p.layer_id
+WHERE p.user_id = ANY(@user_ids::uuid[]) AND l.schedule_id < @before
+UNION
+SELECT o.schedule_id
+FROM overrides AS o
+WHERE o.user_id = ANY(@user_ids::uuid[]) AND o.starts_at <= @at AND o.ends_at > @at AND o.schedule_id < @before
+ORDER BY schedule_id DESC
+LIMIT @max_rows;

@@ -1183,6 +1183,39 @@ paths:
           $ref: "#/components/responses/Problem"
         "404":
           $ref: "#/components/responses/Problem"
+  /v1/on-call:
+    get:
+      operationId: listOnCall
+      summary: Find who is on call across schedules
+      description: Who is on call at a moment for each schedule, newest schedule first, computed from each schedule's layers and overrides.
+      tags: [on-call]
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+        - name: user_id
+          in: query
+          description: Only schedules where one of these people is on call. A page can then hold fewer items than the limit; keep following `next_cursor`.
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              type: string
+        - name: at
+          in: query
+          description: The moment to ask about; now by default.
+          schema:
+            type: string
+            format: date-time
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OnCallPage"
+        "400":
+          $ref: "#/components/responses/Problem"
   /v1/escalation-policies:
     get:
       operationId: listEscalationPolicies
@@ -2046,6 +2079,30 @@ components:
           allOf:
             - $ref: "#/components/schemas/Reference"
           description: Absent when nobody is on call.
+    ScheduleOnCall:
+      type: object
+      required: [schedule, at]
+      properties:
+        schedule:
+          $ref: "#/components/schemas/Reference"
+        at:
+          type: string
+          format: date-time
+        user:
+          allOf:
+            - $ref: "#/components/schemas/Reference"
+          description: Absent when nobody is on call.
+    OnCallPage:
+      type: object
+      required: [items, next_cursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ScheduleOnCall"
+        next_cursor:
+          type: string
+          description: Empty on the last page.
     EscalationTargetType:
       type: string
       enum: [user, schedule]

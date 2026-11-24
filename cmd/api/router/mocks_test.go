@@ -219,12 +219,12 @@ func (_m *MockPolicyOwners) EXPECT() *MockPolicyOwners_Expecter {
 	return &MockPolicyOwners_Expecter{mock: &_m.Mock}
 }
 
-// GetPolicy provides a mock function for the type MockPolicyOwners
-func (_mock *MockPolicyOwners) GetPolicy(ctx context.Context, id string) (*murphy.EscalationPolicy, error) {
+// GetPolicyRecord provides a mock function for the type MockPolicyOwners
+func (_mock *MockPolicyOwners) GetPolicyRecord(ctx context.Context, id string) (*murphy.EscalationPolicy, error) {
 	ret := _mock.Called(ctx, id)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetPolicy")
+		panic("no return value specified for GetPolicyRecord")
 	}
 
 	var r0 *murphy.EscalationPolicy
@@ -247,19 +247,19 @@ func (_mock *MockPolicyOwners) GetPolicy(ctx context.Context, id string) (*murph
 	return r0, r1
 }
 
-// MockPolicyOwners_GetPolicy_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetPolicy'
-type MockPolicyOwners_GetPolicy_Call struct {
+// MockPolicyOwners_GetPolicyRecord_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetPolicyRecord'
+type MockPolicyOwners_GetPolicyRecord_Call struct {
 	*mock.Call
 }
 
-// GetPolicy is a helper method to define mock.On call
+// GetPolicyRecord is a helper method to define mock.On call
 //   - ctx context.Context
 //   - id string
-func (_e *MockPolicyOwners_Expecter) GetPolicy(ctx any, id any) *MockPolicyOwners_GetPolicy_Call {
-	return &MockPolicyOwners_GetPolicy_Call{Call: _e.mock.On("GetPolicy", ctx, id)}
+func (_e *MockPolicyOwners_Expecter) GetPolicyRecord(ctx any, id any) *MockPolicyOwners_GetPolicyRecord_Call {
+	return &MockPolicyOwners_GetPolicyRecord_Call{Call: _e.mock.On("GetPolicyRecord", ctx, id)}
 }
 
-func (_c *MockPolicyOwners_GetPolicy_Call) Run(run func(ctx context.Context, id string)) *MockPolicyOwners_GetPolicy_Call {
+func (_c *MockPolicyOwners_GetPolicyRecord_Call) Run(run func(ctx context.Context, id string)) *MockPolicyOwners_GetPolicyRecord_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -277,12 +277,12 @@ func (_c *MockPolicyOwners_GetPolicy_Call) Run(run func(ctx context.Context, id 
 	return _c
 }
 
-func (_c *MockPolicyOwners_GetPolicy_Call) Return(escalationPolicy *murphy.EscalationPolicy, err error) *MockPolicyOwners_GetPolicy_Call {
+func (_c *MockPolicyOwners_GetPolicyRecord_Call) Return(escalationPolicy *murphy.EscalationPolicy, err error) *MockPolicyOwners_GetPolicyRecord_Call {
 	_c.Call.Return(escalationPolicy, err)
 	return _c
 }
 
-func (_c *MockPolicyOwners_GetPolicy_Call) RunAndReturn(run func(ctx context.Context, id string) (*murphy.EscalationPolicy, error)) *MockPolicyOwners_GetPolicy_Call {
+func (_c *MockPolicyOwners_GetPolicyRecord_Call) RunAndReturn(run func(ctx context.Context, id string) (*murphy.EscalationPolicy, error)) *MockPolicyOwners_GetPolicyRecord_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -323,47 +323,55 @@ func (_m *MockServiceOwners) EXPECT() *MockServiceOwners_Expecter {
 	return &MockServiceOwners_Expecter{mock: &_m.Mock}
 }
 
-// GetIntegration provides a mock function for the type MockServiceOwners
-func (_mock *MockServiceOwners) GetIntegration(ctx context.Context, id string) (*murphy.Integration, error) {
-	ret := _mock.Called(ctx, id)
+// GetIntegrationAndService provides a mock function for the type MockServiceOwners
+func (_mock *MockServiceOwners) GetIntegrationAndService(ctx context.Context, integrationID string) (*murphy.Integration, *murphy.Service, error) {
+	ret := _mock.Called(ctx, integrationID)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetIntegration")
+		panic("no return value specified for GetIntegrationAndService")
 	}
 
 	var r0 *murphy.Integration
-	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (*murphy.Integration, error)); ok {
-		return returnFunc(ctx, id)
+	var r1 *murphy.Service
+	var r2 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (*murphy.Integration, *murphy.Service, error)); ok {
+		return returnFunc(ctx, integrationID)
 	}
 	if returnFunc, ok := ret.Get(0).(func(context.Context, string) *murphy.Integration); ok {
-		r0 = returnFunc(ctx, id)
+		r0 = returnFunc(ctx, integrationID)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*murphy.Integration)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = returnFunc(ctx, id)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string) *murphy.Service); ok {
+		r1 = returnFunc(ctx, integrationID)
 	} else {
-		r1 = ret.Error(1)
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(*murphy.Service)
+		}
 	}
-	return r0, r1
+	if returnFunc, ok := ret.Get(2).(func(context.Context, string) error); ok {
+		r2 = returnFunc(ctx, integrationID)
+	} else {
+		r2 = ret.Error(2)
+	}
+	return r0, r1, r2
 }
 
-// MockServiceOwners_GetIntegration_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetIntegration'
-type MockServiceOwners_GetIntegration_Call struct {
+// MockServiceOwners_GetIntegrationAndService_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetIntegrationAndService'
+type MockServiceOwners_GetIntegrationAndService_Call struct {
 	*mock.Call
 }
 
-// GetIntegration is a helper method to define mock.On call
+// GetIntegrationAndService is a helper method to define mock.On call
 //   - ctx context.Context
-//   - id string
-func (_e *MockServiceOwners_Expecter) GetIntegration(ctx any, id any) *MockServiceOwners_GetIntegration_Call {
-	return &MockServiceOwners_GetIntegration_Call{Call: _e.mock.On("GetIntegration", ctx, id)}
+//   - integrationID string
+func (_e *MockServiceOwners_Expecter) GetIntegrationAndService(ctx any, integrationID any) *MockServiceOwners_GetIntegrationAndService_Call {
+	return &MockServiceOwners_GetIntegrationAndService_Call{Call: _e.mock.On("GetIntegrationAndService", ctx, integrationID)}
 }
 
-func (_c *MockServiceOwners_GetIntegration_Call) Run(run func(ctx context.Context, id string)) *MockServiceOwners_GetIntegration_Call {
+func (_c *MockServiceOwners_GetIntegrationAndService_Call) Run(run func(ctx context.Context, integrationID string)) *MockServiceOwners_GetIntegrationAndService_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -381,12 +389,12 @@ func (_c *MockServiceOwners_GetIntegration_Call) Run(run func(ctx context.Contex
 	return _c
 }
 
-func (_c *MockServiceOwners_GetIntegration_Call) Return(integration *murphy.Integration, err error) *MockServiceOwners_GetIntegration_Call {
-	_c.Call.Return(integration, err)
+func (_c *MockServiceOwners_GetIntegrationAndService_Call) Return(integration *murphy.Integration, service *murphy.Service, err error) *MockServiceOwners_GetIntegrationAndService_Call {
+	_c.Call.Return(integration, service, err)
 	return _c
 }
 
-func (_c *MockServiceOwners_GetIntegration_Call) RunAndReturn(run func(ctx context.Context, id string) (*murphy.Integration, error)) *MockServiceOwners_GetIntegration_Call {
+func (_c *MockServiceOwners_GetIntegrationAndService_Call) RunAndReturn(run func(ctx context.Context, integrationID string) (*murphy.Integration, *murphy.Service, error)) *MockServiceOwners_GetIntegrationAndService_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -563,24 +571,24 @@ func (_c *MockScheduleOwners_GetOverride_Call) RunAndReturn(run func(ctx context
 	return _c
 }
 
-// GetSchedule provides a mock function for the type MockScheduleOwners
-func (_mock *MockScheduleOwners) GetSchedule(ctx context.Context, id string) (*murphy.Schedule, error) {
+// TeamsOfSchedule provides a mock function for the type MockScheduleOwners
+func (_mock *MockScheduleOwners) TeamsOfSchedule(ctx context.Context, id string) ([]string, error) {
 	ret := _mock.Called(ctx, id)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetSchedule")
+		panic("no return value specified for TeamsOfSchedule")
 	}
 
-	var r0 *murphy.Schedule
+	var r0 []string
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (*murphy.Schedule, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) ([]string, error)); ok {
 		return returnFunc(ctx, id)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) *murphy.Schedule); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) []string); ok {
 		r0 = returnFunc(ctx, id)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*murphy.Schedule)
+			r0 = ret.Get(0).([]string)
 		}
 	}
 	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
@@ -591,19 +599,19 @@ func (_mock *MockScheduleOwners) GetSchedule(ctx context.Context, id string) (*m
 	return r0, r1
 }
 
-// MockScheduleOwners_GetSchedule_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetSchedule'
-type MockScheduleOwners_GetSchedule_Call struct {
+// MockScheduleOwners_TeamsOfSchedule_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'TeamsOfSchedule'
+type MockScheduleOwners_TeamsOfSchedule_Call struct {
 	*mock.Call
 }
 
-// GetSchedule is a helper method to define mock.On call
+// TeamsOfSchedule is a helper method to define mock.On call
 //   - ctx context.Context
 //   - id string
-func (_e *MockScheduleOwners_Expecter) GetSchedule(ctx any, id any) *MockScheduleOwners_GetSchedule_Call {
-	return &MockScheduleOwners_GetSchedule_Call{Call: _e.mock.On("GetSchedule", ctx, id)}
+func (_e *MockScheduleOwners_Expecter) TeamsOfSchedule(ctx any, id any) *MockScheduleOwners_TeamsOfSchedule_Call {
+	return &MockScheduleOwners_TeamsOfSchedule_Call{Call: _e.mock.On("TeamsOfSchedule", ctx, id)}
 }
 
-func (_c *MockScheduleOwners_GetSchedule_Call) Run(run func(ctx context.Context, id string)) *MockScheduleOwners_GetSchedule_Call {
+func (_c *MockScheduleOwners_TeamsOfSchedule_Call) Run(run func(ctx context.Context, id string)) *MockScheduleOwners_TeamsOfSchedule_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -621,12 +629,12 @@ func (_c *MockScheduleOwners_GetSchedule_Call) Run(run func(ctx context.Context,
 	return _c
 }
 
-func (_c *MockScheduleOwners_GetSchedule_Call) Return(schedule *murphy.Schedule, err error) *MockScheduleOwners_GetSchedule_Call {
-	_c.Call.Return(schedule, err)
+func (_c *MockScheduleOwners_TeamsOfSchedule_Call) Return(strings []string, err error) *MockScheduleOwners_TeamsOfSchedule_Call {
+	_c.Call.Return(strings, err)
 	return _c
 }
 
-func (_c *MockScheduleOwners_GetSchedule_Call) RunAndReturn(run func(ctx context.Context, id string) (*murphy.Schedule, error)) *MockScheduleOwners_GetSchedule_Call {
+func (_c *MockScheduleOwners_TeamsOfSchedule_Call) RunAndReturn(run func(ctx context.Context, id string) ([]string, error)) *MockScheduleOwners_TeamsOfSchedule_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -667,55 +675,52 @@ func (_m *MockIncidentResponders) EXPECT() *MockIncidentResponders_Expecter {
 	return &MockIncidentResponders_Expecter{mock: &_m.Mock}
 }
 
-// GetIncident provides a mock function for the type MockIncidentResponders
-func (_mock *MockIncidentResponders) GetIncident(ctx context.Context, id string) (*murphy.Incident, []*murphy.TimelineEntry, error) {
-	ret := _mock.Called(ctx, id)
+// PolicyOfIncident provides a mock function for the type MockIncidentResponders
+func (_mock *MockIncidentResponders) PolicyOfIncident(ctx context.Context, id string, userID string) (string, bool, error) {
+	ret := _mock.Called(ctx, id, userID)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetIncident")
+		panic("no return value specified for PolicyOfIncident")
 	}
 
-	var r0 *murphy.Incident
-	var r1 []*murphy.TimelineEntry
+	var r0 string
+	var r1 bool
 	var r2 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (*murphy.Incident, []*murphy.TimelineEntry, error)); ok {
-		return returnFunc(ctx, id)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) (string, bool, error)); ok {
+		return returnFunc(ctx, id, userID)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) *murphy.Incident); ok {
-		r0 = returnFunc(ctx, id)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) string); ok {
+		r0 = returnFunc(ctx, id, userID)
 	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*murphy.Incident)
-		}
+		r0 = ret.Get(0).(string)
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, string) []*murphy.TimelineEntry); ok {
-		r1 = returnFunc(ctx, id)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, string) bool); ok {
+		r1 = returnFunc(ctx, id, userID)
 	} else {
-		if ret.Get(1) != nil {
-			r1 = ret.Get(1).([]*murphy.TimelineEntry)
-		}
+		r1 = ret.Get(1).(bool)
 	}
-	if returnFunc, ok := ret.Get(2).(func(context.Context, string) error); ok {
-		r2 = returnFunc(ctx, id)
+	if returnFunc, ok := ret.Get(2).(func(context.Context, string, string) error); ok {
+		r2 = returnFunc(ctx, id, userID)
 	} else {
 		r2 = ret.Error(2)
 	}
 	return r0, r1, r2
 }
 
-// MockIncidentResponders_GetIncident_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetIncident'
-type MockIncidentResponders_GetIncident_Call struct {
+// MockIncidentResponders_PolicyOfIncident_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PolicyOfIncident'
+type MockIncidentResponders_PolicyOfIncident_Call struct {
 	*mock.Call
 }
 
-// GetIncident is a helper method to define mock.On call
+// PolicyOfIncident is a helper method to define mock.On call
 //   - ctx context.Context
 //   - id string
-func (_e *MockIncidentResponders_Expecter) GetIncident(ctx any, id any) *MockIncidentResponders_GetIncident_Call {
-	return &MockIncidentResponders_GetIncident_Call{Call: _e.mock.On("GetIncident", ctx, id)}
+//   - userID string
+func (_e *MockIncidentResponders_Expecter) PolicyOfIncident(ctx any, id any, userID any) *MockIncidentResponders_PolicyOfIncident_Call {
+	return &MockIncidentResponders_PolicyOfIncident_Call{Call: _e.mock.On("PolicyOfIncident", ctx, id, userID)}
 }
 
-func (_c *MockIncidentResponders_GetIncident_Call) Run(run func(ctx context.Context, id string)) *MockIncidentResponders_GetIncident_Call {
+func (_c *MockIncidentResponders_PolicyOfIncident_Call) Run(run func(ctx context.Context, id string, userID string)) *MockIncidentResponders_PolicyOfIncident_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -725,20 +730,25 @@ func (_c *MockIncidentResponders_GetIncident_Call) Run(run func(ctx context.Cont
 		if args[1] != nil {
 			arg1 = args[1].(string)
 		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
 }
 
-func (_c *MockIncidentResponders_GetIncident_Call) Return(incident *murphy.Incident, timelineEntrys []*murphy.TimelineEntry, err error) *MockIncidentResponders_GetIncident_Call {
-	_c.Call.Return(incident, timelineEntrys, err)
+func (_c *MockIncidentResponders_PolicyOfIncident_Call) Return(policyID string, paged bool, err error) *MockIncidentResponders_PolicyOfIncident_Call {
+	_c.Call.Return(policyID, paged, err)
 	return _c
 }
 
-func (_c *MockIncidentResponders_GetIncident_Call) RunAndReturn(run func(ctx context.Context, id string) (*murphy.Incident, []*murphy.TimelineEntry, error)) *MockIncidentResponders_GetIncident_Call {
+func (_c *MockIncidentResponders_PolicyOfIncident_Call) RunAndReturn(run func(ctx context.Context, id string, userID string) (string, bool, error)) *MockIncidentResponders_PolicyOfIncident_Call {
 	_c.Call.Return(run)
 	return _c
 }

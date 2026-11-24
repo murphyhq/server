@@ -144,6 +144,52 @@ func Run(t *testing.T, open func(t *testing.T) oncall.Repository) {
 		assert.Empty(t, overrides[second.GetId()])
 	})
 
+	t.Run("tells a schedule's teams, and whether it exists at all", func(t *testing.T) {
+		repo := open(t)
+		payments, platform := murphy.NewID(), murphy.NewID()
+		shared := newSchedule("shared", []string{payments, platform}, layer("l", time.Hour, murphy.NewID()))
+		orphan := newSchedule("orphan", nil, layer("l", time.Hour, murphy.NewID()))
+		require.NoError(t, repo.CreateSchedule(t.Context(), shared))
+		require.NoError(t, repo.CreateSchedule(t.Context(), orphan))
+
+		teams, err := repo.TeamsOfSchedule(t.Context(), shared.GetId())
+		require.NoError(t, err)
+		none, err := repo.TeamsOfSchedule(t.Context(), orphan.GetId())
+		require.NoError(t, err)
+		_, missing := repo.TeamsOfSchedule(t.Context(), murphy.NewID())
+
+		assert.ElementsMatch(t, []string{payments, platform}, teams)
+		assert.Empty(t, none)
+		assert.ErrorIs(t, missing, murphy.ErrNotFound)
+	})
+
+	t.Run("finds the schedules people take turns in or cover right now, newest first", func(t *testing.T) {
+		repo := open(t)
+		ana, bo := murphy.NewID(), murphy.NewID()
+		rotation := newSchedule("rotation", nil, layer("l", time.Hour, ana))
+		covered := newSchedule("covered", nil, layer("l", time.Hour, murphy.NewID()))
+		later := newSchedule("later", nil, layer("l", time.Hour, murphy.NewID()))
+		other := newSchedule("other", nil, layer("l", time.Hour, murphy.NewID()))
+		for _, schedule := range []*murphy.Schedule{rotation, covered, later, other} {
+			require.NoError(t, repo.CreateSchedule(t.Context(), schedule))
+		}
+		now := time.Now()
+		cover := newOverride(covered, now.Add(-time.Hour), now.Add(time.Hour))
+		cover.UserId = bo
+		future := newOverride(later, now.Add(time.Hour), now.Add(2*time.Hour))
+		future.UserId = bo
+		require.NoError(t, repo.CreateOverride(t.Context(), cover))
+		require.NoError(t, repo.CreateOverride(t.Context(), future))
+
+		got, err := repo.SchedulesOfUsers(t.Context(), []string{ana, bo}, now, maxID, 10)
+		require.NoError(t, err)
+		page, err := repo.SchedulesOfUsers(t.Context(), []string{ana, bo}, now, covered.GetId(), 10)
+		require.NoError(t, err)
+
+		assert.Equal(t, []string{covered.GetId(), rotation.GetId()}, got)
+		assert.Equal(t, []string{rotation.GetId()}, page)
+	})
+
 	t.Run("names many schedules in one call", func(t *testing.T) {
 		repo := open(t)
 		first := newSchedule("first", nil, layer("l", time.Hour, murphy.NewID()))

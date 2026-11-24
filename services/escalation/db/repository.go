@@ -147,3 +147,11 @@ func (r *Repository[T]) complete(ctx context.Context, policies []*murphy.Escalat
 	}
 	return nil
 }
+
+func (r *Repository[T]) GetPolicyRecord(ctx context.Context, id string) (_ *murphy.EscalationPolicy, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	policy, _, err := r.GetPolicyRow(ctx, id)
+	return policy, err
+}

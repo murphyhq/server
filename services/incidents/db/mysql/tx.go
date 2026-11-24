@@ -121,22 +121,19 @@ func (t *Tx) CreateAlert(ctx context.Context, alert *murphy.Alert, incidentID st
 	}))
 }
 
-func (t *Tx) CreateTimelineEntry(ctx context.Context, entry *murphy.TimelineEntry) (err error) {
+func (t *Tx) CreateTimelineEntries(ctx context.Context, entries []*murphy.TimelineEntry) (err error) {
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
-	details, err := proto.Marshal(entry)
-	if err != nil {
-		return fmt.Errorf("encode timeline entry: %w", err)
+	rows := murphymysql.Rows{Name: "CreateTimelineEntries", Table: "timeline_entries", Columns: []string{"id", "incident_id", "type", "summary", "details", "created_at"}}
+	for _, entry := range entries {
+		details, err := proto.Marshal(entry)
+		if err != nil {
+			return fmt.Errorf("encode timeline entry: %w", err)
+		}
+		rows.Values = append(rows.Values, []any{entry.GetId(), entry.GetIncidentId(), entry.GetType().Text(), entry.GetSummary(), details, entry.GetAt().AsTime()})
 	}
-	return murphymysql.Error("timeline entry", t.queries.CreateTimelineEntry(ctx, CreateTimelineEntryParams{
-		ID:         entry.GetId(),
-		IncidentID: entry.GetIncidentId(),
-		Type:       entry.GetType().Text(),
-		Summary:    entry.GetSummary(),
-		Details:    details,
-		CreatedAt:  entry.GetAt().AsTime(),
-	}))
+	return murphymysql.Error("timeline entry", murphymysql.Insert(ctx, t.tx, rows))
 }
 
 func (t *Tx) CreateScheduledMessages(ctx context.Context, messages []*incidents.ScheduledMessage, at time.Time) (err error) {
@@ -182,13 +179,15 @@ func (t *Tx) ClaimMessages(ctx context.Context, ids []string, until time.Time) (
 	return murphymysql.Error("scheduled message", t.queries.ClaimMessages(ctx, ClaimMessagesParams{ClaimedUntil: &until, Ids: ids}))
 }
 
-func (t *Tx) CreatePages(ctx context.Context, incidentID string, userIDs []string, at time.Time) (err error) {
+func (t *Tx) CreatePages(ctx context.Context, entries []*murphy.TimelineEntry, at time.Time) (err error) {
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
 	rows := murphymysql.Rows{Name: "CreatePages", Table: "incident_pages", Columns: []string{"id", "incident_id", "user_id", "created_at"}}
-	for _, userID := range userIDs {
-		rows.Values = append(rows.Values, []any{murphy.NewID(), incidentID, userID, at})
+	for _, entry := range entries {
+		for _, page := range entry.GetEscalation().GetPaged() {
+			rows.Values = append(rows.Values, []any{murphy.NewID(), entry.GetIncidentId(), page.GetUserId(), at})
+		}
 	}
 	return murphymysql.Error("page", murphymysql.Insert(ctx, t.tx, rows))
 }

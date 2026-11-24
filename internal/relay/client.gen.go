@@ -79,6 +79,9 @@ type Problem struct {
 	Detail *string `json:"detail,omitempty"`
 	Status *int    `json:"status,omitempty"`
 	Title  *string `json:"title,omitempty"`
+
+	// TraceId The trace of this request, to find it in your tracing backend.
+	TraceId *string `json:"trace_id,omitempty"`
 }
 
 // Push defines model for Push.
@@ -106,6 +109,9 @@ type PushInput struct {
 
 	// Token The push token iOS or Android gave the app.
 	Token string `json:"token"`
+
+	// Traceparent The W3C trace context of the notification's trace. The relay sends it to the phone so the app can continue the trace.
+	Traceparent *string `json:"traceparent,omitempty"`
 }
 
 // PushInputEvent defines model for PushInput.Event.

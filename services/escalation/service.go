@@ -15,6 +15,7 @@ import (
 type Repository interface {
 	CreatePolicy(ctx context.Context, policy *murphy.EscalationPolicy) error
 	GetPolicy(ctx context.Context, id string) (*murphy.EscalationPolicy, error)
+	GetPolicyRecord(ctx context.Context, id string) (*murphy.EscalationPolicy, error)
 	ListPolicies(ctx context.Context, teamID string, before string, limit int) ([]*murphy.EscalationPolicy, error)
 	UpdatePolicy(ctx context.Context, policy *murphy.EscalationPolicy) error
 	DeletePolicy(ctx context.Context, id string) error
@@ -115,7 +116,7 @@ func (s *Service) UpdatePolicy(ctx context.Context, in *murphy.EscalationPolicy)
 	ctx = span.Set(ctx, telemetry.WithField("escalation_policy.id", in.GetId()))
 	defer span.End(&err)
 
-	current, err := s.GetPolicy(ctx, in.GetId())
+	current, err := s.GetPolicyRecord(ctx, in.GetId())
 	if err != nil {
 		return nil, err
 	}
@@ -267,4 +268,15 @@ func (s *Service) PoliciesOfTeams(ctx context.Context, teamIDs []string) (_ map[
 		}
 	}
 	return s.repo.PoliciesOfTeams(ctx, teamIDs)
+}
+
+func (s *Service) GetPolicyRecord(ctx context.Context, id string) (_ *murphy.EscalationPolicy, err error) {
+	ctx, span := tracer.Span(ctx)
+	ctx = span.Set(ctx, telemetry.WithField("escalation_policy.id", id))
+	defer span.End(&err)
+
+	if err := murphy.LookupID("escalation policy", id); err != nil {
+		return nil, err
+	}
+	return s.repo.GetPolicyRecord(ctx, id)
 }

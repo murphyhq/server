@@ -19,6 +19,7 @@ type Repository interface {
 	FindOpenIncident(ctx context.Context, serviceID, dedupKey string) (*murphy.Incident, error)
 	Record(ctx context.Context, change *Change) (recorded bool, err error)
 	GetIncident(ctx context.Context, id string) (*murphy.Incident, error)
+	PolicyOfIncident(ctx context.Context, id, userID string) (policyID string, paged bool, err error)
 	ListIncidents(ctx context.Context, filter Filter, before string, limit int) ([]*murphy.Incident, error)
 	ListTimeline(ctx context.Context, incidentID string) ([]*murphy.TimelineEntry, error)
 	LatestFiringAt(ctx context.Context, incidentID string) (time.Time, error)
@@ -426,4 +427,15 @@ func (s *Service) MessagesSent(ctx context.Context, ids []string) (err error) {
 		return fmt.Errorf("delete sent messages: %w", err)
 	}
 	return nil
+}
+
+func (s *Service) PolicyOfIncident(ctx context.Context, id, userID string) (policyID string, paged bool, err error) {
+	ctx, span := tracer.Span(ctx)
+	ctx = span.Set(ctx, telemetry.WithField("incident.id", id))
+	defer span.End(&err)
+
+	if err := murphy.LookupID("incident", id); err != nil {
+		return "", false, err
+	}
+	return s.repo.PolicyOfIncident(ctx, id, userID)
 }

@@ -27,14 +27,18 @@ func (p *Pushes) Send(ctx context.Context, notification *murphy.Notification) (e
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
-	response, err := p.client.SendPush(ctx, relay.SendPushJSONRequestBody{
+	body := relay.SendPushJSONRequestBody{
 		Id:         notification.GetId(),
 		Platform:   relay.Platform(notification.GetContactMethod().GetPushPlatform().Text()),
 		Token:      notification.GetContactMethod().GetAddress(),
 		Event:      eventOf(notification.GetReason()),
 		Server:     p.server,
 		IncidentId: notification.GetIncident().GetId(),
-	})
+	}
+	if traceparent := tracer.Inject(ctx)["traceparent"]; traceparent != "" {
+		body.Traceparent = &traceparent
+	}
+	response, err := p.client.SendPush(ctx, body)
 	if err != nil {
 		return fmt.Errorf("couldn't reach the push relay: %w", err)
 	}

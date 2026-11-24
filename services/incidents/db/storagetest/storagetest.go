@@ -322,6 +322,29 @@ func Run(t *testing.T, open func(t *testing.T) incidents.Repository) {
 		assert.Empty(t, openedLater)
 	})
 
+	t.Run("tells an incident's policy and whether someone was paged for it", func(t *testing.T) {
+		repo := open(t)
+		outcome := opened(murphy.NewID(), "disk-full")
+		ana := murphy.NewID()
+		outcome.Decision.Timeline = append(outcome.Decision.Timeline, &murphy.TimelineEntry{
+			Id: murphy.NewID(), IncidentId: outcome.IncidentID, Type: murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_ESCALATED, Summary: "level 1", At: murphy.Now(),
+			Escalation: &murphy.TimelineEscalation{Level: 1, Round: 1, Paged: []*murphy.TimelinePage{{UserId: ana, Via: &murphy.EscalationTarget{Type: murphy.EscalationTargetType_ESCALATION_TARGET_TYPE_USER, Id: ana}}}},
+		})
+		_, err := repo.Record(t.Context(), outcome)
+		require.NoError(t, err)
+
+		policy, anaPaged, err := repo.PolicyOfIncident(t.Context(), outcome.IncidentID, ana)
+		require.NoError(t, err)
+		_, boPaged, err := repo.PolicyOfIncident(t.Context(), outcome.IncidentID, murphy.NewID())
+		require.NoError(t, err)
+		_, _, missing := repo.PolicyOfIncident(t.Context(), murphy.NewID(), ana)
+
+		assert.Equal(t, outcome.Decision.Incident.GetEscalationPolicyId(), policy)
+		assert.True(t, anaPaged)
+		assert.False(t, boPaged)
+		assert.ErrorIs(t, missing, murphy.ErrNotFound)
+	})
+
 	t.Run("tells when the latest firing alert arrived", func(t *testing.T) {
 		repo := open(t)
 		outcome := opened(murphy.NewID(), "disk-full")
