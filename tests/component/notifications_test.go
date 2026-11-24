@@ -4,6 +4,7 @@ package component
 
 import (
 	"context"
+	"net/netip"
 	"slices"
 	"testing"
 	"time"
@@ -98,7 +99,7 @@ func TestARedeliveredEscalationPagesOnce(t *testing.T) {
 func TestANotifierCrashSendsTheWebhookAgainWithTheSameID(t *testing.T) {
 	keys, err := webhook.ParseSigningKeys(testenv.WebhookSigningKey)
 	require.NoError(t, err)
-	provider := webhook.New(keys)
+	provider := webhook.New(keys, []netip.Prefix{netip.MustParsePrefix("127.0.0.0/8"), netip.MustParsePrefix("::1/128")})
 	crashes := map[string]func(t *testing.T, sender *notifications.Sender, created *murphy.Envelope){
 		"after sending, before announcing": func(t *testing.T, _ *notifications.Sender, created *murphy.Envelope) {
 			require.NoError(t, provider.Send(t.Context(), created.GetNotification().GetCurrent()))

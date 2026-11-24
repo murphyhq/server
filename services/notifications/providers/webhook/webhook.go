@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/netip"
 	"time"
 
 	"github.com/murphyhq/server"
@@ -25,8 +26,8 @@ type Webhooks struct {
 
 var _ notifications.Provider = (*Webhooks)(nil)
 
-func New(keys []ed25519.PrivateKey) *Webhooks {
-	client := httpclient.New(Timeout)
+func New(keys []ed25519.PrivateKey, allowed []netip.Prefix) *Webhooks {
+	client := httpclient.Restricted(Timeout, allowed)
 	client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
 	return &Webhooks{client: client, keys: keys}
 }
@@ -52,6 +53,9 @@ func (w *Webhooks) Send(ctx context.Context, notification *murphy.Notification) 
 
 	response, err := w.client.Do(request)
 	if err != nil {
+		if errors.Is(err, httpclient.ErrForbiddenAddress) {
+			return &notifications.RefusedError{Reason: "the webhook's address is on a network Murphy isn't allowed to reach"}
+		}
 		if errors.Is(err, context.DeadlineExceeded) || isTimeout(err) {
 			return fmt.Errorf("the receiver didn't answer within %s", Timeout)
 		}
