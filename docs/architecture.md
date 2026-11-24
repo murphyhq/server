@@ -51,6 +51,7 @@ flowchart LR
   api --> kv
   engine --> db
   scheduler --> db
+  notifier --> db
 
   classDef outside fill:#f3f4f6,stroke:#9ca3af,color:#1f2937
   classDef component fill:#e0ecff,stroke:#3b6fb6,color:#13294b
@@ -79,15 +80,17 @@ The management API, described by an OpenAPI spec and used by people and automati
 
 ### Engine
 
-Decides what happens to an incident when a message arrives; no other component changes incidents in response to messages. An alert opens or updates an incident; the version of the escalation policy the incident follows and the on-call schedules decide who to page; and `engine` stores the change together with the messages it causes. It also takes in what comes back: the outcome of each notification, and delivery updates and replies from providers. It handles every message exactly once, even when the broker delivers it twice.
+Decides what happens to an incident when a message arrives; no other component changes incidents in response to messages. An alert opens or updates an incident, and the version of the escalation policy the incident follows decides which targets each level pages and when the next level is due. `engine` stores each change together with the messages it causes. It learns from `notifier` whom a level reached, and when a level reached nobody it moves on to the next one at once. It also records what comes back on the incident's timeline: the outcome of each notification, and delivery updates and replies from providers. It handles every message exactly once, even when the broker delivers it twice.
 
 ### Scheduler
 
-Turns stored messages into published ones. Every message that decides whether someone is paged is saved as a scheduled message in its domain's database, in the same transaction as the change that caused it. `scheduler` publishes each one when it is due, timers at their time and everything else right away, and deletes it once the broker confirms. A change and its messages are therefore never separated: a crash or a broker outage delays a message, and loses none. A due timer is published as `TimerExpired`, and `engine` decides what it means.
+Turns stored messages into published ones. Every message that decides whether someone is paged is saved as a scheduled message in its domain's database, in the same transaction as the change that caused it; `scheduler` reads them from every domain that has them, today incidents and notifications. `scheduler` publishes each one when it is due, timers at their time and everything else right away, and deletes it once the broker confirms. A change and its messages are therefore never separated: a crash or a broker outage delays a message, and loses none. A due timer is published as `TimerExpired`, and `engine` decides what it means.
 
 ### Notifier
 
-Sends notifications through providers: webhooks, email, chat, SMS and voice. It publishes the outcome of every notification as `NotificationSent` or `NotificationFailed`, and the provider's later delivery update arrives through `ingest`. Each notification arrives with its destination, so `notifier` only makes outbound calls and doesn't use the database: notifications already queued still go out when the database is unavailable.
+Owns notifications: whom a page reaches, and how. When an incident escalates, `notifier` resolves the level's targets to people through their on-call schedules, looks up their contact methods, and stores a page with one notification per contact method, together with the messages they cause. When an incident is acknowledged or resolved, it notifies everyone its pages reached.
+
+Sending is a step of its own that doesn't use the database. `notifier` sends each notification through its provider (webhooks, email, chat, SMS and voice) and publishes the outcome as `NotificationSent` or `NotificationFailed`, which it then records on the notification. Notifications already handed to the broker therefore still go out when the database is unavailable. The provider's later delivery update arrives through `ingest`.
 
 Webhooks follow [Standard Webhooks](https://www.standardwebhooks.com) and are described by [`openapi/webhooks/v1.yaml`](../openapi/webhooks/v1.yaml). `notifier` signs each one with Murphy's Ed25519 private key, which is part of its configuration and never leaves it. Receivers check the signature with the public key the API serves, and hold no secret of their own. While the key is being replaced, `notifier` signs with both the old and the new key, so receivers switch at their own pace.
 
@@ -123,41 +126,49 @@ sequenceDiagram
   M->>I: webhook
   I-->>E: AlertReceived
   I->>M: 202
-  E->>D: open incident, store its events, notifications and first timer (one transaction)
-  S->>D: claim due messages
+  E->>D: open the incident at level 1, store IncidentEscalated and the next level's timer (one transaction)
+  S-->>N: IncidentEscalated (level 1 and its targets)
+  N->>D: resolve the targets to people and contact methods, store the page and its notifications (one transaction)
+  S-->>E: PageCreated
+  E->>D: add who was paged to the incident timeline
   S-->>N: NotificationCreated
-  S->>D: delete sent messages
   N->>P: send
   alt accepted
     N-->>E: NotificationSent
   else failed
     N-->>E: NotificationFailed
   end
-  E->>D: add to incident timeline
+  E->>D: add to the incident timeline
+  N->>D: record the outcome on the notification
   opt the provider reports delivery
     P->>I: delivery callback
     I-->>E: NotificationDelivered
-    E->>D: add to incident timeline
+    E->>D: add to the incident timeline
   end
 ```
+
+`scheduler` publishes every message stored in the database, and deletes it once the broker confirms; the diagrams show that as a single arrow from `scheduler`.
 
 ### Escalation
 
 ```mermaid
 sequenceDiagram
   participant S as scheduler
-  participant D as database
   participant E as engine
+  participant D as database
   participant N as notifier
-  S->>D: claim due messages
   S-->>E: TimerExpired
-  S->>D: delete sent messages
   E->>D: incident still unacknowledged?
   alt unacknowledged
-    E->>D: store the next step's notifications, events and timer (one transaction)
-    S->>D: claim due messages
-    S-->>N: NotificationCreated (next step)
-    S->>D: delete sent messages
+    E->>D: move to the next level, store IncidentEscalated and the following timer (one transaction)
+    S-->>N: IncidentEscalated (next level and its targets)
+    N->>D: resolve the targets, store the page and its notifications (one transaction)
+    S-->>E: PageCreated
+    alt the level reached nobody
+      E->>D: move to the next level at once, store IncidentEscalated (one transaction)
+    else someone was reached
+      E->>D: add who was paged to the incident timeline
+    end
   else acknowledged or resolved
     E->>E: ignore
   end
@@ -173,12 +184,14 @@ sequenceDiagram
   participant S as scheduler
   participant N as notifier
   C->>A: acknowledge incident
-  A->>D: update incident, cancel its timers, store IncidentAcknowledged and the notifications it causes (one transaction)
+  A->>D: update incident, cancel its timers, store IncidentAcknowledged (one transaction)
   A->>C: 200
-  S->>D: claim due messages
+  S-->>N: IncidentAcknowledged
+  N->>D: find everyone the incident's pages reached, store a notification per contact method (one transaction)
   S-->>N: NotificationCreated (acknowledged)
-  S->>D: delete sent messages
 ```
+
+Resolving an incident works the same way, with `IncidentResolved`.
 
 ### Acknowledgement from a notification
 
@@ -193,8 +206,7 @@ sequenceDiagram
   P->>I: reply callback
   I-->>E: NotificationReplied
   I->>P: 200
-  E->>D: the reply acknowledges: update incident, cancel its timers, store IncidentAcknowledged and the notifications it causes (one transaction)
-  S->>D: claim due messages
-  S-->>N: NotificationCreated (acknowledged)
-  S->>D: delete sent messages
+  E->>D: the reply acknowledges: update incident, cancel its timers, store IncidentAcknowledged (one transaction)
+  S-->>N: IncidentAcknowledged
+  N->>D: find everyone the incident's pages reached, store a notification per contact method (one transaction)
 ```
