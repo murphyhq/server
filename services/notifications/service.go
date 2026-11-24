@@ -3,6 +3,7 @@ package notifications
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sync"
 	"time"
 
@@ -137,7 +138,7 @@ func (s *Service) reach(ctx context.Context, page *murphy.Page, level *murphy.Es
 			candidates[i] = onCall[target.GetId()]
 		}
 	}
-	active, err := s.people.ActiveUsers(ctx, candidates)
+	active, err := s.people.ActiveUsers(ctx, slices.DeleteFunc(slices.Clone(candidates), func(user string) bool { return user == "" }))
 	if err != nil {
 		return fmt.Errorf("find active users: %w", err)
 	}

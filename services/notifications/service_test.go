@@ -73,6 +73,7 @@ func newDomain(t *testing.T) *domain {
 		return found, nil
 	}).Maybe()
 	people.EXPECT().ActiveUsers(mock.Anything, mock.Anything).RunAndReturn(func(_ context.Context, ids []string) (map[string]bool, error) {
+		assert.NotContains(t, ids, "", "only real user IDs are looked up")
 		found := map[string]bool{}
 		for _, id := range ids {
 			found[id] = d.active[id]
