@@ -49,6 +49,8 @@ func WriteError(w http.ResponseWriter, r *http.Request, err error) {
 		WriteProblem(w, r, http.StatusNotFound, detail)
 	case errors.Is(err, murphy.ErrConflict):
 		WriteProblem(w, r, http.StatusConflict, "conflicts with an existing resource")
+	case errors.Is(err, murphy.ErrUnauthenticated):
+		WriteProblem(w, r, http.StatusUnauthorized, "sign in first")
 	default:
 		logger.Error(r.Context(), "request failed", telemetry.WithError(err))
 		WriteProblem(w, r, http.StatusInternalServerError, "")

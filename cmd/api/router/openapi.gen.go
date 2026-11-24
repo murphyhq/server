@@ -23,6 +23,11 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+const (
+	SessionScopes       sessionContextKey       = "session.Scopes"
+	SessionCookieScopes sessionCookieContextKey = "sessionCookie.Scopes"
+)
+
 // Defines values for ContactMethodType.
 const (
 	Email   ContactMethodType = "email"
@@ -248,6 +253,24 @@ func (e Urgency) Valid() bool {
 	case High:
 		return true
 	case Low:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for UserRole.
+const (
+	Admin  UserRole = "admin"
+	Member UserRole = "member"
+)
+
+// Valid indicates whether the value is a known member of the UserRole enum.
+func (e UserRole) Valid() bool {
+	switch e {
+	case Admin:
+		return true
+	case Member:
 		return true
 	default:
 		return false
@@ -625,6 +648,26 @@ type ServicePage struct {
 // ServiceStatus defines model for ServiceStatus.
 type ServiceStatus string
 
+// Session defines model for Session.
+type Session struct {
+	ExpiresAt time.Time `json:"expires_at"`
+	User      User      `json:"user"`
+}
+
+// SessionInput defines model for SessionInput.
+type SessionInput struct {
+	// IdToken An ID token from the install's identity provider.
+	IdToken string `json:"id_token"`
+}
+
+// SessionToken defines model for SessionToken.
+type SessionToken struct {
+	Session Session `json:"session"`
+
+	// Token Send it as a bearer token. It is shown only once.
+	Token string `json:"token"`
+}
+
 // SigningKey defines model for SigningKey.
 type SigningKey struct {
 	// PublicKey The Ed25519 public key, as `whpk_` followed by its base64 encoding.
@@ -735,16 +778,22 @@ type Urgency string
 
 // User defines model for User.
 type User struct {
-	CreatedAt time.Time  `json:"created_at"`
-	Email     string     `json:"email"`
-	Id        string     `json:"id"`
-	Name      string     `json:"name"`
-	Status    UserStatus `json:"status"`
+	CreatedAt time.Time `json:"created_at"`
+	Email     string    `json:"email"`
+	Id        string    `json:"id"`
+	Name      string    `json:"name"`
+
+	// Role Admins manage the whole install. The first admin is whoever signs in with the install's initial admin email.
+	Role   UserRole   `json:"role"`
+	Status UserStatus `json:"status"`
 
 	// TimeZone IANA time zone, as in Europe/Malta.
 	TimeZone  string    `json:"time_zone"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
+
+// UserRole Admins manage the whole install. The first admin is whoever signs in with the install's initial admin email.
+type UserRole string
 
 // UserInput defines model for UserInput.
 type UserInput struct {
@@ -778,6 +827,20 @@ type IdempotencyKey = string
 
 // Limit defines model for Limit.
 type Limit = int
+
+// sessionContextKey is the context key for session security scheme
+type sessionContextKey string
+
+// sessionCookieContextKey is the context key for sessionCookie security scheme
+type sessionCookieContextKey string
+
+// FinishSignInParams defines parameters for FinishSignIn.
+type FinishSignInParams struct {
+	Code             *string `form:"code,omitempty" json:"code,omitempty"`
+	State            *string `form:"state,omitempty" json:"state,omitempty"`
+	Error            *string `form:"error,omitempty" json:"error,omitempty"`
+	ErrorDescription *string `form:"error_description,omitempty" json:"error_description,omitempty"`
+}
 
 // ListEscalationPoliciesParams defines parameters for ListEscalationPolicies.
 type ListEscalationPoliciesParams struct {
@@ -932,6 +995,9 @@ type CreateContactMethodParams struct {
 	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
 
+// CreateSessionJSONRequestBody defines body for CreateSession for application/json ContentType.
+type CreateSessionJSONRequestBody = SessionInput
+
 // UpdateContactMethodJSONRequestBody defines body for UpdateContactMethod for application/json ContentType.
 type UpdateContactMethodJSONRequestBody = ContactMethodInput
 
@@ -982,6 +1048,21 @@ type CreateContactMethodJSONRequestBody = ContactMethodInput
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// FinishSignIn Finish signing in
+	// (GET /v1/auth/callback)
+	FinishSignIn(w http.ResponseWriter, r *http.Request, params FinishSignInParams)
+	// SignOut Sign out
+	// (DELETE /v1/auth/session)
+	SignOut(w http.ResponseWriter, r *http.Request)
+	// GetSession Get the current session
+	// (GET /v1/auth/session)
+	GetSession(w http.ResponseWriter, r *http.Request)
+	// CreateSession Sign in with an identity token
+	// (POST /v1/auth/sessions)
+	CreateSession(w http.ResponseWriter, r *http.Request)
+	// SignIn Sign in through the identity provider
+	// (GET /v1/auth/sign-in)
+	SignIn(w http.ResponseWriter, r *http.Request)
 	// DeleteContactMethod Delete a contact method
 	// (DELETE /v1/contact-methods/{id})
 	DeleteContactMethod(w http.ResponseWriter, r *http.Request, id ID)
@@ -1140,6 +1221,150 @@ type ServerInterfaceWrapper struct {
 
 type MiddlewareFunc func(http.Handler) http.Handler
 
+// FinishSignIn operation middleware
+func (siw *ServerInterfaceWrapper) FinishSignIn(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params FinishSignInParams
+
+	// ------------- Optional query parameter "code" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "code", r.URL.Query(), &params.Code, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "code"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "code", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "state" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "state", r.URL.Query(), &params.State, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "state"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "state", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "error" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "error", r.URL.Query(), &params.Error, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "error"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "error", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "error_description" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "error_description", r.URL.Query(), &params.ErrorDescription, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "error_description"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "error_description", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.FinishSignIn(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SignOut operation middleware
+func (siw *ServerInterfaceWrapper) SignOut(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionScopes, []string{})
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SignOut(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetSession operation middleware
+func (siw *ServerInterfaceWrapper) GetSession(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionScopes, []string{})
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetSession(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateSession operation middleware
+func (siw *ServerInterfaceWrapper) CreateSession(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateSession(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SignIn operation middleware
+func (siw *ServerInterfaceWrapper) SignIn(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SignIn(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // DeleteContactMethod operation middleware
 func (siw *ServerInterfaceWrapper) DeleteContactMethod(w http.ResponseWriter, r *http.Request) {
 
@@ -1154,6 +1379,14 @@ func (siw *ServerInterfaceWrapper) DeleteContactMethod(w http.ResponseWriter, r 
 		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
 		return
 	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionScopes, []string{})
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.DeleteContactMethod(w, r, id)
@@ -1181,6 +1414,14 @@ func (siw *ServerInterfaceWrapper) GetContactMethod(w http.ResponseWriter, r *ht
 		return
 	}
 
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionScopes, []string{})
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetContactMethod(w, r, id)
 	}))
@@ -1207,6 +1448,14 @@ func (siw *ServerInterfaceWrapper) UpdateContactMethod(w http.ResponseWriter, r 
 		return
 	}
 
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionScopes, []string{})
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdateContactMethod(w, r, id)
 	}))
@@ -1223,6 +1472,14 @@ func (siw *ServerInterfaceWrapper) ListEscalationPolicies(w http.ResponseWriter,
 
 	var err error
 	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionScopes, []string{})
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
 
 	// Parameter object where we will unmarshal all parameters from the context
 	var params ListEscalationPoliciesParams
@@ -1283,6 +1540,14 @@ func (siw *ServerInterfaceWrapper) CreateEscalationPolicy(w http.ResponseWriter,
 	var err error
 	_ = err
 
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionScopes, []string{})
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
 	// Parameter object where we will unmarshal all parameters from the context
 	var params CreateEscalationPolicyParams
 
@@ -1333,6 +1598,14 @@ func (siw *ServerInterfaceWrapper) DeleteEscalationPolicy(w http.ResponseWriter,
 		return
 	}
 
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionScopes, []string{})
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.DeleteEscalationPolicy(w, r, id)
 	}))
@@ -1359,6 +1632,14 @@ func (siw *ServerInterfaceWrapper) GetEscalationPolicy(w http.ResponseWriter, r 
 		return
 	}
 
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionScopes, []string{})
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetEscalationPolicy(w, r, id)
 	}))
@@ -1384,6 +1665,14 @@ func (siw *ServerInterfaceWrapper) UpdateEscalationPolicy(w http.ResponseWriter,
 		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
 		return
 	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionScopes, []string{})
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdateEscalationPolicy(w, r, id)
@@ -1420,6 +1709,14 @@ func (siw *ServerInterfaceWrapper) GetEscalationPolicyVersion(w http.ResponseWri
 		return
 	}
 
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionScopes, []string{})
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetEscalationPolicyVersion(w, r, id, version)
 	}))
@@ -1436,6 +1733,14 @@ func (siw *ServerInterfaceWrapper) ListIncidents(w http.ResponseWriter, r *http.
 
 	var err error
 	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionScopes, []string{})
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
 
 	// Parameter object where we will unmarshal all parameters from the context
 	var params ListIncidentsParams
@@ -1518,6 +1823,14 @@ func (siw *ServerInterfaceWrapper) GetIncident(w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionScopes, []string{})
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetIncident(w, r, id)
 	}))
@@ -1543,6 +1856,14 @@ func (siw *ServerInterfaceWrapper) AcknowledgeIncident(w http.ResponseWriter, r 
 		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
 		return
 	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionScopes, []string{})
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
 
 	// Parameter object where we will unmarshal all parameters from the context
 	var params AcknowledgeIncidentParams
@@ -1594,6 +1915,14 @@ func (siw *ServerInterfaceWrapper) ResolveIncident(w http.ResponseWriter, r *htt
 		return
 	}
 
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionScopes, []string{})
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
 	// Parameter object where we will unmarshal all parameters from the context
 	var params ResolveIncidentParams
 
@@ -1644,6 +1973,14 @@ func (siw *ServerInterfaceWrapper) DeleteIntegration(w http.ResponseWriter, r *h
 		return
 	}
 
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionScopes, []string{})
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.DeleteIntegration(w, r, id)
 	}))
@@ -1669,6 +2006,14 @@ func (siw *ServerInterfaceWrapper) GetIntegration(w http.ResponseWriter, r *http
 		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
 		return
 	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionScopes, []string{})
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetIntegration(w, r, id)
@@ -1696,6 +2041,14 @@ func (siw *ServerInterfaceWrapper) UpdateIntegration(w http.ResponseWriter, r *h
 		return
 	}
 
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionScopes, []string{})
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdateIntegration(w, r, id)
 	}))
@@ -1721,6 +2074,14 @@ func (siw *ServerInterfaceWrapper) RotateIntegrationKey(w http.ResponseWriter, r
 		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
 		return
 	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionScopes, []string{})
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
 
 	// Parameter object where we will unmarshal all parameters from the context
 	var params RotateIntegrationKeyParams
@@ -1772,6 +2133,14 @@ func (siw *ServerInterfaceWrapper) DeleteOverride(w http.ResponseWriter, r *http
 		return
 	}
 
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionScopes, []string{})
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.DeleteOverride(w, r, id)
 	}))
@@ -1788,6 +2157,14 @@ func (siw *ServerInterfaceWrapper) ListSchedules(w http.ResponseWriter, r *http.
 
 	var err error
 	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionScopes, []string{})
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
 
 	// Parameter object where we will unmarshal all parameters from the context
 	var params ListSchedulesParams
@@ -1848,6 +2225,14 @@ func (siw *ServerInterfaceWrapper) CreateSchedule(w http.ResponseWriter, r *http
 	var err error
 	_ = err
 
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionScopes, []string{})
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
 	// Parameter object where we will unmarshal all parameters from the context
 	var params CreateScheduleParams
 
@@ -1898,6 +2283,14 @@ func (siw *ServerInterfaceWrapper) DeleteSchedule(w http.ResponseWriter, r *http
 		return
 	}
 
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionScopes, []string{})
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.DeleteSchedule(w, r, id)
 	}))
@@ -1923,6 +2316,14 @@ func (siw *ServerInterfaceWrapper) GetSchedule(w http.ResponseWriter, r *http.Re
 		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
 		return
 	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionScopes, []string{})
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetSchedule(w, r, id)
@@ -1950,6 +2351,14 @@ func (siw *ServerInterfaceWrapper) UpdateSchedule(w http.ResponseWriter, r *http
 		return
 	}
 
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionScopes, []string{})
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdateSchedule(w, r, id)
 	}))
@@ -1975,6 +2384,14 @@ func (siw *ServerInterfaceWrapper) GetOnCall(w http.ResponseWriter, r *http.Requ
 		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
 		return
 	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionScopes, []string{})
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
 
 	// Parameter object where we will unmarshal all parameters from the context
 	var params GetOnCallParams
@@ -2018,6 +2435,14 @@ func (siw *ServerInterfaceWrapper) ListOverrides(w http.ResponseWriter, r *http.
 		return
 	}
 
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionScopes, []string{})
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
 	// Parameter object where we will unmarshal all parameters from the context
 	var params ListOverridesParams
 
@@ -2060,6 +2485,14 @@ func (siw *ServerInterfaceWrapper) CreateOverride(w http.ResponseWriter, r *http
 		return
 	}
 
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionScopes, []string{})
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
 	// Parameter object where we will unmarshal all parameters from the context
 	var params CreateOverrideParams
 
@@ -2100,6 +2533,14 @@ func (siw *ServerInterfaceWrapper) ListServices(w http.ResponseWriter, r *http.R
 
 	var err error
 	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionScopes, []string{})
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
 
 	// Parameter object where we will unmarshal all parameters from the context
 	var params ListServicesParams
@@ -2146,6 +2587,14 @@ func (siw *ServerInterfaceWrapper) CreateService(w http.ResponseWriter, r *http.
 
 	var err error
 	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionScopes, []string{})
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
 
 	// Parameter object where we will unmarshal all parameters from the context
 	var params CreateServiceParams
@@ -2197,6 +2646,14 @@ func (siw *ServerInterfaceWrapper) DeleteService(w http.ResponseWriter, r *http.
 		return
 	}
 
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionScopes, []string{})
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.DeleteService(w, r, id)
 	}))
@@ -2222,6 +2679,14 @@ func (siw *ServerInterfaceWrapper) GetService(w http.ResponseWriter, r *http.Req
 		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
 		return
 	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionScopes, []string{})
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetService(w, r, id)
@@ -2249,6 +2714,14 @@ func (siw *ServerInterfaceWrapper) UpdateService(w http.ResponseWriter, r *http.
 		return
 	}
 
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionScopes, []string{})
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdateService(w, r, id)
 	}))
@@ -2274,6 +2747,14 @@ func (siw *ServerInterfaceWrapper) ListIntegrations(w http.ResponseWriter, r *ht
 		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
 		return
 	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionScopes, []string{})
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
 
 	// Parameter object where we will unmarshal all parameters from the context
 	var params ListIntegrationsParams
@@ -2330,6 +2811,14 @@ func (siw *ServerInterfaceWrapper) CreateIntegration(w http.ResponseWriter, r *h
 		return
 	}
 
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionScopes, []string{})
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
 	// Parameter object where we will unmarshal all parameters from the context
 	var params CreateIntegrationParams
 
@@ -2385,6 +2874,14 @@ func (siw *ServerInterfaceWrapper) ListTeams(w http.ResponseWriter, r *http.Requ
 	var err error
 	_ = err
 
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionScopes, []string{})
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
 	// Parameter object where we will unmarshal all parameters from the context
 	var params ListTeamsParams
 
@@ -2430,6 +2927,14 @@ func (siw *ServerInterfaceWrapper) CreateTeam(w http.ResponseWriter, r *http.Req
 
 	var err error
 	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionScopes, []string{})
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
 
 	// Parameter object where we will unmarshal all parameters from the context
 	var params CreateTeamParams
@@ -2481,6 +2986,14 @@ func (siw *ServerInterfaceWrapper) DeleteTeam(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionScopes, []string{})
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.DeleteTeam(w, r, id)
 	}))
@@ -2506,6 +3019,14 @@ func (siw *ServerInterfaceWrapper) GetTeam(w http.ResponseWriter, r *http.Reques
 		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
 		return
 	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionScopes, []string{})
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetTeam(w, r, id)
@@ -2533,6 +3054,14 @@ func (siw *ServerInterfaceWrapper) UpdateTeam(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionScopes, []string{})
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdateTeam(w, r, id)
 	}))
@@ -2558,6 +3087,14 @@ func (siw *ServerInterfaceWrapper) ListTeamMembers(w http.ResponseWriter, r *htt
 		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
 		return
 	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionScopes, []string{})
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListTeamMembers(w, r, id)
@@ -2594,6 +3131,14 @@ func (siw *ServerInterfaceWrapper) RemoveTeamMember(w http.ResponseWriter, r *ht
 		return
 	}
 
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionScopes, []string{})
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.RemoveTeamMember(w, r, id, userId)
 	}))
@@ -2629,6 +3174,14 @@ func (siw *ServerInterfaceWrapper) SetTeamMember(w http.ResponseWriter, r *http.
 		return
 	}
 
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionScopes, []string{})
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.SetTeamMember(w, r, id, userId)
 	}))
@@ -2645,6 +3198,14 @@ func (siw *ServerInterfaceWrapper) ListUsers(w http.ResponseWriter, r *http.Requ
 
 	var err error
 	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionScopes, []string{})
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
 
 	// Parameter object where we will unmarshal all parameters from the context
 	var params ListUsersParams
@@ -2691,6 +3252,14 @@ func (siw *ServerInterfaceWrapper) CreateUser(w http.ResponseWriter, r *http.Req
 
 	var err error
 	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionScopes, []string{})
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
 
 	// Parameter object where we will unmarshal all parameters from the context
 	var params CreateUserParams
@@ -2742,6 +3311,14 @@ func (siw *ServerInterfaceWrapper) DeleteUser(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionScopes, []string{})
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.DeleteUser(w, r, id)
 	}))
@@ -2767,6 +3344,14 @@ func (siw *ServerInterfaceWrapper) GetUser(w http.ResponseWriter, r *http.Reques
 		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
 		return
 	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionScopes, []string{})
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetUser(w, r, id)
@@ -2794,6 +3379,14 @@ func (siw *ServerInterfaceWrapper) UpdateUser(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionScopes, []string{})
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdateUser(w, r, id)
 	}))
@@ -2820,6 +3413,14 @@ func (siw *ServerInterfaceWrapper) ListContactMethods(w http.ResponseWriter, r *
 		return
 	}
 
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionScopes, []string{})
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListContactMethods(w, r, id)
 	}))
@@ -2845,6 +3446,14 @@ func (siw *ServerInterfaceWrapper) CreateContactMethod(w http.ResponseWriter, r 
 		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
 		return
 	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, SessionScopes, []string{})
+
+	ctx = context.WithValue(ctx, SessionCookieScopes, []string{})
+
+	r = r.WithContext(ctx)
 
 	// Parameter object where we will unmarshal all parameters from the context
 	var params CreateContactMethodParams
@@ -3001,6 +3610,11 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 		ErrorHandlerFunc:   options.ErrorHandlerFunc,
 	}
 
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/auth/sign-in", wrapper.SignIn)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/auth/callback", wrapper.FinishSignIn)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/auth/sessions", wrapper.CreateSession)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/v1/auth/session", wrapper.SignOut)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/auth/session", wrapper.GetSession)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/services", wrapper.ListServices)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/services", wrapper.CreateService)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/v1/services/{id}", wrapper.DeleteService)
@@ -3055,6 +3669,173 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 }
 
 type ProblemApplicationProblemPlusJSONResponse Problem
+
+type FinishSignInRequestObject struct {
+	Params FinishSignInParams
+}
+
+type FinishSignInResponseObject interface {
+	VisitFinishSignInResponse(w http.ResponseWriter) error
+}
+
+type FinishSignIn200ResponseHeaders struct {
+	SetCookie *string
+}
+
+type FinishSignIn200JSONResponse struct {
+	Body    Session
+	Headers FinishSignIn200ResponseHeaders
+}
+
+func (response FinishSignIn200JSONResponse) VisitFinishSignInResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type FinishSignIn401ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response FinishSignIn401ApplicationProblemPlusJSONResponse) VisitFinishSignInResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SignOutRequestObject struct {
+}
+
+type SignOutResponseObject interface {
+	VisitSignOutResponse(w http.ResponseWriter) error
+}
+
+type SignOut204ResponseHeaders struct {
+	SetCookie *string
+}
+
+type SignOut204Response struct {
+	Headers SignOut204ResponseHeaders
+}
+
+func (response SignOut204Response) VisitSignOutResponse(w http.ResponseWriter) error {
+	if response.Headers.SetCookie != nil {
+		w.Header().Set("Set-Cookie", fmt.Sprint(*response.Headers.SetCookie))
+	}
+	w.WriteHeader(204)
+	return nil
+}
+
+type GetSessionRequestObject struct {
+}
+
+type GetSessionResponseObject interface {
+	VisitGetSessionResponse(w http.ResponseWriter) error
+}
+
+type GetSession200JSONResponse Session
+
+func (response GetSession200JSONResponse) VisitGetSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateSessionRequestObject struct {
+	Body *CreateSessionJSONRequestBody
+}
+
+type CreateSessionResponseObject interface {
+	VisitCreateSessionResponse(w http.ResponseWriter) error
+}
+
+type CreateSession201JSONResponse SessionToken
+
+func (response CreateSession201JSONResponse) VisitCreateSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateSession400ApplicationProblemPlusJSONResponse struct {
+	ProblemApplicationProblemPlusJSONResponse
+}
+
+func (response CreateSession400ApplicationProblemPlusJSONResponse) VisitCreateSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateSession401ApplicationProblemPlusJSONResponse Problem
+
+func (response CreateSession401ApplicationProblemPlusJSONResponse) VisitCreateSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SignInRequestObject struct {
+}
+
+type SignInResponseObject interface {
+	VisitSignInResponse(w http.ResponseWriter) error
+}
+
+type SignIn302ResponseHeaders struct {
+	Location *string
+}
+
+type SignIn302Response struct {
+	Headers SignIn302ResponseHeaders
+}
+
+func (response SignIn302Response) VisitSignInResponse(w http.ResponseWriter) error {
+	if response.Headers.Location != nil {
+		w.Header().Set("Location", fmt.Sprint(*response.Headers.Location))
+	}
+	w.WriteHeader(302)
+	return nil
+}
 
 type DeleteContactMethodRequestObject struct {
 	Id ID `json:"id"`
@@ -5409,6 +6190,21 @@ func (response CreateContactMethod422ApplicationProblemPlusJSONResponse) VisitCr
 
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
+	// FinishSignIn Finish signing in
+	// (GET /v1/auth/callback)
+	FinishSignIn(ctx context.Context, request FinishSignInRequestObject) (FinishSignInResponseObject, error)
+	// SignOut Sign out
+	// (DELETE /v1/auth/session)
+	SignOut(ctx context.Context, request SignOutRequestObject) (SignOutResponseObject, error)
+	// GetSession Get the current session
+	// (GET /v1/auth/session)
+	GetSession(ctx context.Context, request GetSessionRequestObject) (GetSessionResponseObject, error)
+	// CreateSession Sign in with an identity token
+	// (POST /v1/auth/sessions)
+	CreateSession(ctx context.Context, request CreateSessionRequestObject) (CreateSessionResponseObject, error)
+	// SignIn Sign in through the identity provider
+	// (GET /v1/auth/sign-in)
+	SignIn(ctx context.Context, request SignInRequestObject) (SignInResponseObject, error)
 	// DeleteContactMethod Delete a contact method
 	// (DELETE /v1/contact-methods/{id})
 	DeleteContactMethod(ctx context.Context, request DeleteContactMethodRequestObject) (DeleteContactMethodResponseObject, error)
@@ -5595,6 +6391,135 @@ type strictHandler struct {
 	ssi         StrictServerInterface
 	middlewares []StrictMiddlewareFunc
 	options     StrictHTTPServerOptions
+}
+
+// FinishSignIn operation middleware
+func (sh *strictHandler) FinishSignIn(w http.ResponseWriter, r *http.Request, params FinishSignInParams) {
+	var request FinishSignInRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.FinishSignIn(ctx, request.(FinishSignInRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "FinishSignIn")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(FinishSignInResponseObject); ok {
+		if err := validResponse.VisitFinishSignInResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SignOut operation middleware
+func (sh *strictHandler) SignOut(w http.ResponseWriter, r *http.Request) {
+	var request SignOutRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SignOut(ctx, request.(SignOutRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SignOut")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SignOutResponseObject); ok {
+		if err := validResponse.VisitSignOutResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetSession operation middleware
+func (sh *strictHandler) GetSession(w http.ResponseWriter, r *http.Request) {
+	var request GetSessionRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetSession(ctx, request.(GetSessionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetSession")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetSessionResponseObject); ok {
+		if err := validResponse.VisitGetSessionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateSession operation middleware
+func (sh *strictHandler) CreateSession(w http.ResponseWriter, r *http.Request) {
+	var request CreateSessionRequestObject
+
+	var body CreateSessionJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateSession(ctx, request.(CreateSessionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateSession")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateSessionResponseObject); ok {
+		if err := validResponse.VisitCreateSessionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SignIn operation middleware
+func (sh *strictHandler) SignIn(w http.ResponseWriter, r *http.Request) {
+	var request SignInRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SignIn(ctx, request.(SignInRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SignIn")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SignInResponseObject); ok {
+		if err := validResponse.VisitSignInResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
 }
 
 // DeleteContactMethod operation middleware
@@ -6998,90 +7923,103 @@ func (sh *strictHandler) CreateContactMethod(w http.ResponseWriter, r *http.Requ
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"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",
+	"nyue26b/56enuRqQMSHP/7z480J5sv83AA==",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

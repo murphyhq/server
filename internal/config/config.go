@@ -116,6 +116,7 @@ func parse(v reflect.Value, raw string) error {
 
 var rules = map[string]func(string) error{
 	"base-url": baseURL,
+	"http-url": httpURL,
 }
 
 func validate(v reflect.Value, rule string) error {
@@ -135,6 +136,14 @@ func validate(v reflect.Value, rule string) error {
 		return nil
 	}
 	return check(v.String())
+}
+
+func httpURL(raw string) error {
+	u, err := url.Parse(raw)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || u.User != nil {
+		return errors.New("not a URL of the form scheme://host[:port][/path]")
+	}
+	return nil
 }
 
 func baseURL(raw string) error {

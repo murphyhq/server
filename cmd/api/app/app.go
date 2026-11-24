@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/murphyhq/server/cmd/api/router"
@@ -21,6 +22,7 @@ import (
 	oncalldb "github.com/murphyhq/server/services/oncall/db"
 	"github.com/murphyhq/server/services/people"
 	peopledb "github.com/murphyhq/server/services/people/db"
+	"github.com/murphyhq/server/services/people/providers/oidc"
 )
 
 type Settings struct {
@@ -35,6 +37,13 @@ type Settings struct {
 	WebhookPublicKeys      string        `env:"WEBHOOK_PUBLIC_KEYS" required:"true"`
 	EscalationMinimumDelay time.Duration `env:"ESCALATION_MINIMUM_DELAY" default:"1m"`
 	CORSOrigins            []string      `env:"CORS_ORIGINS" validate:"base-url"`
+	PublicURL              string        `env:"PUBLIC_URL" required:"true" validate:"base-url"`
+	OIDCIssuer             string        `env:"OIDC_ISSUER" required:"true" validate:"http-url"`
+	OIDCBackchannelURL     string        `env:"OIDC_BACKCHANNEL_URL" validate:"http-url"`
+	OIDCClientID           string        `env:"OIDC_CLIENT_ID" required:"true"`
+	OIDCClientSecret       string        `env:"OIDC_CLIENT_SECRET" required:"true"`
+	SessionDuration        time.Duration `env:"SESSION_DURATION" default:"720h"`
+	InitialAdminEmail      string        `env:"INITIAL_ADMIN_EMAIL"`
 }
 
 type App struct {
@@ -99,15 +108,24 @@ func New(ctx context.Context, s Settings) (_ *App, err error) {
 
 	catalogService := catalog.New(catalogStorage, keyring)
 	peopleService := people.New(peopleStorage)
+	auth := people.NewAuth(peopleStorage, oidc.New(oidc.Config{
+		Issuer:         s.OIDCIssuer,
+		BackchannelURL: s.OIDCBackchannelURL,
+		ClientID:       s.OIDCClientID,
+		ClientSecret:   s.OIDCClientSecret,
+		RedirectURL:    s.PublicURL + "/v1/auth/callback",
+	}), s.SessionDuration, s.InitialAdminEmail)
 	oncallService := oncall.New(oncallStorage, peopleService)
 	escalationService := escalation.New(escalationStorage, peopleService, oncallService, catalogService, s.EscalationMinimumDelay)
 	a.Handler, err = router.New(router.Services{
-		Catalog:    catalogService,
-		Incidents:  incidents.New(incidentsStorage, catalogService, escalationService),
-		People:     peopleService,
-		OnCall:     oncallService,
-		Escalation: escalationService,
-		PublicKeys: publicKeys,
+		Catalog:       catalogService,
+		Incidents:     incidents.New(incidentsStorage, catalogService, escalationService),
+		People:        peopleService,
+		OnCall:        oncallService,
+		Escalation:    escalationService,
+		PublicKeys:    publicKeys,
+		Auth:          auth,
+		SecureCookies: strings.HasPrefix(s.PublicURL, "https://"),
 	}, keys)
 	if err != nil {
 		return nil, err

@@ -1,0 +1,46 @@
+package mysql
+
+import (
+	"context"
+	"time"
+
+	"github.com/murphyhq/server"
+	murphymysql "github.com/murphyhq/server/internal/mysql"
+	"github.com/murphyhq/server/internal/tracer"
+)
+
+type Tx struct {
+	queries *Queries
+}
+
+func (t *Tx) CreateUser(ctx context.Context, user *murphy.User) (err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	return murphymysql.Error("user", t.queries.CreateUser(ctx, CreateUserParams{
+		ID: user.GetId(), Name: user.GetName(), Email: user.GetEmail(), TimeZone: user.GetTimeZone(),
+		Status: user.GetStatus().Text(), Role: user.GetRole().Text(), CreatedAt: user.GetCreatedAt().AsTime(), UpdatedAt: user.GetUpdatedAt().AsTime(),
+	}))
+}
+
+func (t *Tx) CreateIdentity(ctx context.Context, identity *murphy.Identity) (err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	return insertIdentity(ctx, t.queries, identity)
+}
+
+func (t *Tx) AdminExists(ctx context.Context) (_ bool, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	return t.queries.AdminExists(ctx)
+}
+
+func (t *Tx) SetUserRole(ctx context.Context, id string, role murphy.UserRole, at time.Time) (err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	rows, err := t.queries.SetUserRole(ctx, SetUserRoleParams{ID: id, Role: role.Text(), UpdatedAt: at})
+	return murphymysql.Changed("user", rows, err)
+}

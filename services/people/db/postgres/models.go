@@ -17,6 +17,36 @@ type ContactMethod struct {
 	UpdatedAt time.Time
 }
 
+type Identity struct {
+	ID        string
+	UserID    string
+	Issuer    string
+	Subject   string
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+type Session struct {
+	ID        string
+	UserID    string
+	TokenHash []byte
+	ExpiresAt time.Time
+	RevokedAt *time.Time
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+type SignIn struct {
+	ID        string
+	StateHash []byte
+	Nonce     string
+	Verifier  string
+	ExpiresAt time.Time
+	UsedAt    *time.Time
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
 type Team struct {
 	ID        string
 	Name      string
@@ -39,6 +69,7 @@ type User struct {
 	Email     string
 	TimeZone  string
 	Status    string
+	Role      string
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }

@@ -5,11 +5,13 @@ CREATE TABLE users (
   email text NOT NULL,
   time_zone text NOT NULL,
   status text NOT NULL,
+  role text NOT NULL,
   created_at timestamptz NOT NULL,
   updated_at timestamptz NOT NULL,
   CONSTRAINT users_pkey PRIMARY KEY (id),
   CONSTRAINT users_email_key UNIQUE (email),
-  CONSTRAINT users_status_check CHECK (status IN ('active', 'deactivated'))
+  CONSTRAINT users_status_check CHECK (status IN ('active', 'deactivated')),
+  CONSTRAINT users_role_check CHECK (role IN ('admin', 'member'))
 );
 
 CREATE TABLE contact_methods (
@@ -50,3 +52,47 @@ CREATE TABLE team_memberships (
 );
 
 CREATE INDEX team_memberships_user_id_idx ON team_memberships (user_id);
+
+CREATE TABLE identities (
+  id uuid NOT NULL,
+  user_id uuid NOT NULL,
+  issuer text NOT NULL,
+  subject text NOT NULL,
+  created_at timestamptz NOT NULL,
+  updated_at timestamptz NOT NULL,
+  CONSTRAINT identities_pkey PRIMARY KEY (id),
+  CONSTRAINT identities_issuer_subject_key UNIQUE (issuer, subject),
+  CONSTRAINT identities_user_id_fkey FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+);
+
+CREATE INDEX identities_user_id_idx ON identities (user_id);
+
+CREATE TABLE sessions (
+  id uuid NOT NULL,
+  user_id uuid NOT NULL,
+  token_hash bytea NOT NULL,
+  expires_at timestamptz NOT NULL,
+  revoked_at timestamptz,
+  created_at timestamptz NOT NULL,
+  updated_at timestamptz NOT NULL,
+  CONSTRAINT sessions_pkey PRIMARY KEY (id),
+  CONSTRAINT sessions_token_hash_key UNIQUE (token_hash),
+  CONSTRAINT sessions_user_id_fkey FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+);
+
+CREATE INDEX sessions_user_id_idx ON sessions (user_id);
+
+CREATE TABLE sign_ins (
+  id uuid NOT NULL,
+  state_hash bytea NOT NULL,
+  nonce text NOT NULL,
+  verifier text NOT NULL,
+  expires_at timestamptz NOT NULL,
+  used_at timestamptz,
+  created_at timestamptz NOT NULL,
+  updated_at timestamptz NOT NULL,
+  CONSTRAINT sign_ins_pkey PRIMARY KEY (id),
+  CONSTRAINT sign_ins_state_hash_key UNIQUE (state_hash)
+);
+
+CREATE INDEX sign_ins_expires_at_idx ON sign_ins (expires_at);

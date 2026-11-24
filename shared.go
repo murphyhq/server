@@ -14,6 +14,8 @@ var (
 	ErrNotFound = errors.New("not found")
 	ErrInvalid  = errors.New("invalid")
 	ErrConflict = errors.New("conflict")
+
+	ErrUnauthenticated = errors.New("unauthenticated")
 )
 
 type FieldError struct {

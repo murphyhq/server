@@ -31,6 +31,7 @@ func TestTheAPIAnswersReadsQuickly(t *testing.T) {
 	targeter := func(target *vegeta.Target) error {
 		target.Method = http.MethodGet
 		target.URL = m.APIURL() + reads[hits.Add(1)%uint64(len(reads))]
+		target.Header = http.Header{"Authorization": {"Bearer " + m.Session()}}
 		return nil
 	}
 

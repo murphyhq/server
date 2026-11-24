@@ -22,7 +22,6 @@ import (
 	"github.com/murphyhq/server/services/oncall"
 	oncalldb "github.com/murphyhq/server/services/oncall/db"
 	oncallstoragetest "github.com/murphyhq/server/services/oncall/db/storagetest"
-	"github.com/murphyhq/server/services/people"
 	peopledb "github.com/murphyhq/server/services/people/db"
 	peoplestoragetest "github.com/murphyhq/server/services/people/db/storagetest"
 	"github.com/murphyhq/server/tests/testenv"
@@ -52,7 +51,7 @@ func TestIncidentsStorage(t *testing.T) {
 
 func TestPeopleStorage(t *testing.T) {
 	testenv.EachDatabase(t, func(t *testing.T, engine testenv.DatabaseEngine) {
-		peoplestoragetest.Run(t, func(t *testing.T) people.Repository {
+		peoplestoragetest.Run(t, func(t *testing.T) peoplestoragetest.Storage {
 			storage, err := peopledb.Open(t.Context(), testenv.Databases(t, engine).PeopleDatabaseURL)
 			require.NoError(t, err)
 			t.Cleanup(storage.Close)

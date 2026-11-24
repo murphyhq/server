@@ -36,6 +36,17 @@ func (q *Queries) ActiveUsers(ctx context.Context, ids []string) ([]string, erro
 	return items, nil
 }
 
+const adminExists = `-- name: AdminExists :one
+SELECT EXISTS (SELECT 1 FROM users WHERE role = 'admin' AND status = 'active')
+`
+
+func (q *Queries) AdminExists(ctx context.Context) (bool, error) {
+	row := q.db.QueryRow(ctx, adminExists)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const createContactMethod = `-- name: CreateContactMethod :exec
 INSERT INTO contact_methods (id, user_id, type, address, created_at, updated_at)
 VALUES ($1, $2, $3, $4, $5, $6)
@@ -56,6 +67,86 @@ func (q *Queries) CreateContactMethod(ctx context.Context, arg CreateContactMeth
 		arg.UserID,
 		arg.Type,
 		arg.Address,
+		arg.CreatedAt,
+		arg.UpdatedAt,
+	)
+	return err
+}
+
+const createIdentity = `-- name: CreateIdentity :exec
+INSERT INTO identities (id, user_id, issuer, subject, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6)
+`
+
+type CreateIdentityParams struct {
+	ID        string
+	UserID    string
+	Issuer    string
+	Subject   string
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+func (q *Queries) CreateIdentity(ctx context.Context, arg CreateIdentityParams) error {
+	_, err := q.db.Exec(ctx, createIdentity,
+		arg.ID,
+		arg.UserID,
+		arg.Issuer,
+		arg.Subject,
+		arg.CreatedAt,
+		arg.UpdatedAt,
+	)
+	return err
+}
+
+const createSession = `-- name: CreateSession :exec
+INSERT INTO sessions (id, user_id, token_hash, expires_at, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6)
+`
+
+type CreateSessionParams struct {
+	ID        string
+	UserID    string
+	TokenHash []byte
+	ExpiresAt time.Time
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) error {
+	_, err := q.db.Exec(ctx, createSession,
+		arg.ID,
+		arg.UserID,
+		arg.TokenHash,
+		arg.ExpiresAt,
+		arg.CreatedAt,
+		arg.UpdatedAt,
+	)
+	return err
+}
+
+const createSignIn = `-- name: CreateSignIn :exec
+INSERT INTO sign_ins (id, state_hash, nonce, verifier, expires_at, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+`
+
+type CreateSignInParams struct {
+	ID        string
+	StateHash []byte
+	Nonce     string
+	Verifier  string
+	ExpiresAt time.Time
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+func (q *Queries) CreateSignIn(ctx context.Context, arg CreateSignInParams) error {
+	_, err := q.db.Exec(ctx, createSignIn,
+		arg.ID,
+		arg.StateHash,
+		arg.Nonce,
+		arg.Verifier,
+		arg.ExpiresAt,
 		arg.CreatedAt,
 		arg.UpdatedAt,
 	)
@@ -85,8 +176,8 @@ func (q *Queries) CreateTeam(ctx context.Context, arg CreateTeamParams) error {
 }
 
 const createUser = `-- name: CreateUser :exec
-INSERT INTO users (id, name, email, time_zone, status, created_at, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
+INSERT INTO users (id, name, email, time_zone, status, role, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 `
 
 type CreateUserParams struct {
@@ -95,6 +186,7 @@ type CreateUserParams struct {
 	Email     string
 	TimeZone  string
 	Status    string
+	Role      string
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }
@@ -106,6 +198,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) error {
 		arg.Email,
 		arg.TimeZone,
 		arg.Status,
+		arg.Role,
 		arg.CreatedAt,
 		arg.UpdatedAt,
 	)
@@ -119,6 +212,19 @@ WHERE id = $1
 
 func (q *Queries) DeleteContactMethod(ctx context.Context, id string) (int64, error) {
 	result, err := q.db.Exec(ctx, deleteContactMethod, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deleteExpiredSignIns = `-- name: DeleteExpiredSignIns :execrows
+DELETE FROM sign_ins
+WHERE expires_at < $1
+`
+
+func (q *Queries) DeleteExpiredSignIns(ctx context.Context, before time.Time) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteExpiredSignIns, before)
 	if err != nil {
 		return 0, err
 	}
@@ -221,6 +327,33 @@ func (q *Queries) ExistingUsers(ctx context.Context, ids []string) ([]string, er
 	return items, nil
 }
 
+const getActiveSession = `-- name: GetActiveSession :one
+SELECT sessions.id, sessions.user_id, sessions.token_hash, sessions.expires_at, sessions.revoked_at, sessions.created_at, sessions.updated_at
+FROM sessions
+JOIN users ON users.id = sessions.user_id
+WHERE sessions.token_hash = $1 AND sessions.revoked_at IS NULL AND sessions.expires_at > $2 AND users.status = 'active'
+`
+
+type GetActiveSessionParams struct {
+	TokenHash []byte
+	Now       time.Time
+}
+
+func (q *Queries) GetActiveSession(ctx context.Context, arg GetActiveSessionParams) (Session, error) {
+	row := q.db.QueryRow(ctx, getActiveSession, arg.TokenHash, arg.Now)
+	var i Session
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.TokenHash,
+		&i.ExpiresAt,
+		&i.RevokedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getContactMethod = `-- name: GetContactMethod :one
 SELECT id, user_id, type, address, created_at, updated_at
 FROM contact_methods
@@ -235,6 +368,31 @@ func (q *Queries) GetContactMethod(ctx context.Context, id string) (ContactMetho
 		&i.UserID,
 		&i.Type,
 		&i.Address,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getIdentity = `-- name: GetIdentity :one
+SELECT id, user_id, issuer, subject, created_at, updated_at
+FROM identities
+WHERE issuer = $1 AND subject = $2
+`
+
+type GetIdentityParams struct {
+	Issuer  string
+	Subject string
+}
+
+func (q *Queries) GetIdentity(ctx context.Context, arg GetIdentityParams) (Identity, error) {
+	row := q.db.QueryRow(ctx, getIdentity, arg.Issuer, arg.Subject)
+	var i Identity
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Issuer,
+		&i.Subject,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -266,6 +424,28 @@ func (q *Queries) GetMembership(ctx context.Context, arg GetMembershipParams) (T
 	return i, err
 }
 
+const getSignIn = `-- name: GetSignIn :one
+SELECT id, state_hash, nonce, verifier, expires_at, used_at, created_at, updated_at
+FROM sign_ins
+WHERE state_hash = $1
+`
+
+func (q *Queries) GetSignIn(ctx context.Context, stateHash []byte) (SignIn, error) {
+	row := q.db.QueryRow(ctx, getSignIn, stateHash)
+	var i SignIn
+	err := row.Scan(
+		&i.ID,
+		&i.StateHash,
+		&i.Nonce,
+		&i.Verifier,
+		&i.ExpiresAt,
+		&i.UsedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getTeam = `-- name: GetTeam :one
 SELECT id, name, created_at, updated_at
 FROM teams
@@ -285,7 +465,7 @@ func (q *Queries) GetTeam(ctx context.Context, id string) (Team, error) {
 }
 
 const getUser = `-- name: GetUser :one
-SELECT id, name, email, time_zone, status, created_at, updated_at
+SELECT id, name, email, time_zone, status, role, created_at, updated_at
 FROM users
 WHERE id = $1
 `
@@ -299,6 +479,29 @@ func (q *Queries) GetUser(ctx context.Context, id string) (User, error) {
 		&i.Email,
 		&i.TimeZone,
 		&i.Status,
+		&i.Role,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getUserByEmail = `-- name: GetUserByEmail :one
+SELECT id, name, email, time_zone, status, role, created_at, updated_at
+FROM users
+WHERE email = $1
+`
+
+func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
+	row := q.db.QueryRow(ctx, getUserByEmail, email)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Email,
+		&i.TimeZone,
+		&i.Status,
+		&i.Role,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -446,7 +649,7 @@ func (q *Queries) ListTeams(ctx context.Context, arg ListTeamsParams) ([]Team, e
 }
 
 const listUsers = `-- name: ListUsers :many
-SELECT id, name, email, time_zone, status, created_at, updated_at
+SELECT id, name, email, time_zone, status, role, created_at, updated_at
 FROM users
 WHERE id < $1
 ORDER BY id DESC
@@ -473,6 +676,7 @@ func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, e
 			&i.Email,
 			&i.TimeZone,
 			&i.Status,
+			&i.Role,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -484,6 +688,26 @@ func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, e
 		return nil, err
 	}
 	return items, nil
+}
+
+const revokeSession = `-- name: RevokeSession :execrows
+UPDATE sessions
+SET revoked_at = $1, updated_at = $2
+WHERE token_hash = $3 AND revoked_at IS NULL
+`
+
+type RevokeSessionParams struct {
+	RevokedAt *time.Time
+	UpdatedAt time.Time
+	TokenHash []byte
+}
+
+func (q *Queries) RevokeSession(ctx context.Context, arg RevokeSessionParams) (int64, error) {
+	result, err := q.db.Exec(ctx, revokeSession, arg.RevokedAt, arg.UpdatedAt, arg.TokenHash)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const setMembership = `-- name: SetMembership :exec
@@ -512,6 +736,26 @@ func (q *Queries) SetMembership(ctx context.Context, arg SetMembershipParams) er
 		arg.UpdatedAt,
 	)
 	return err
+}
+
+const setUserRole = `-- name: SetUserRole :execrows
+UPDATE users
+SET role = $1, updated_at = $2
+WHERE id = $3
+`
+
+type SetUserRoleParams struct {
+	Role      string
+	UpdatedAt time.Time
+	ID        string
+}
+
+func (q *Queries) SetUserRole(ctx context.Context, arg SetUserRoleParams) (int64, error) {
+	result, err := q.db.Exec(ctx, setUserRole, arg.Role, arg.UpdatedAt, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const updateContactMethod = `-- name: UpdateContactMethod :execrows
@@ -583,6 +827,32 @@ func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (int64, 
 		arg.Status,
 		arg.UpdatedAt,
 		arg.ID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const useSignIn = `-- name: UseSignIn :execrows
+UPDATE sign_ins
+SET used_at = $1, updated_at = $2
+WHERE state_hash = $3 AND used_at IS NULL AND expires_at > $4
+`
+
+type UseSignInParams struct {
+	UsedAt    *time.Time
+	UpdatedAt time.Time
+	StateHash []byte
+	Now       time.Time
+}
+
+func (q *Queries) UseSignIn(ctx context.Context, arg UseSignInParams) (int64, error) {
+	result, err := q.db.Exec(ctx, useSignIn,
+		arg.UsedAt,
+		arg.UpdatedAt,
+		arg.StateHash,
+		arg.Now,
 	)
 	if err != nil {
 		return 0, err

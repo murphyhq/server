@@ -31,3 +31,12 @@ packages:
       Policies: {}
       OnCall: {}
       People: {}
+  github.com/murphyhq/server/services/people:
+    config:
+      dir: "{{.InterfaceDir}}"
+      filename: mocks_test.go
+      pkgname: people_test
+      structname: "Mock{{.InterfaceName}}"
+    interfaces:
+      AuthRepository: {}
+      Provider: {}

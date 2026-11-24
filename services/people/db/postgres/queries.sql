@@ -1,14 +1,14 @@
 -- name: CreateUser :exec
-INSERT INTO users (id, name, email, time_zone, status, created_at, updated_at)
-VALUES (@id, @name, @email, @time_zone, @status, @created_at, @updated_at);
+INSERT INTO users (id, name, email, time_zone, status, role, created_at, updated_at)
+VALUES (@id, @name, @email, @time_zone, @status, @role, @created_at, @updated_at);
 
 -- name: GetUser :one
-SELECT id, name, email, time_zone, status, created_at, updated_at
+SELECT id, name, email, time_zone, status, role, created_at, updated_at
 FROM users
 WHERE id = @id;
 
 -- name: ListUsers :many
-SELECT id, name, email, time_zone, status, created_at, updated_at
+SELECT id, name, email, time_zone, status, role, created_at, updated_at
 FROM users
 WHERE id < @before
 ORDER BY id DESC
@@ -113,3 +113,58 @@ WHERE id = ANY(@ids::uuid[]);
 SELECT id
 FROM users
 WHERE id = ANY(@ids::uuid[]) AND status = 'active';
+
+-- name: GetUserByEmail :one
+SELECT id, name, email, time_zone, status, role, created_at, updated_at
+FROM users
+WHERE email = @email;
+
+-- name: AdminExists :one
+SELECT EXISTS (SELECT 1 FROM users WHERE role = 'admin' AND status = 'active');
+
+-- name: SetUserRole :execrows
+UPDATE users
+SET role = @role, updated_at = @updated_at
+WHERE id = @id;
+
+-- name: CreateIdentity :exec
+INSERT INTO identities (id, user_id, issuer, subject, created_at, updated_at)
+VALUES (@id, @user_id, @issuer, @subject, @created_at, @updated_at);
+
+-- name: GetIdentity :one
+SELECT id, user_id, issuer, subject, created_at, updated_at
+FROM identities
+WHERE issuer = @issuer AND subject = @subject;
+
+-- name: CreateSession :exec
+INSERT INTO sessions (id, user_id, token_hash, expires_at, created_at, updated_at)
+VALUES (@id, @user_id, @token_hash, @expires_at, @created_at, @updated_at);
+
+-- name: GetActiveSession :one
+SELECT sessions.id, sessions.user_id, sessions.token_hash, sessions.expires_at, sessions.revoked_at, sessions.created_at, sessions.updated_at
+FROM sessions
+JOIN users ON users.id = sessions.user_id
+WHERE sessions.token_hash = @token_hash AND sessions.revoked_at IS NULL AND sessions.expires_at > @now AND users.status = 'active';
+
+-- name: RevokeSession :execrows
+UPDATE sessions
+SET revoked_at = @revoked_at, updated_at = @updated_at
+WHERE token_hash = @token_hash AND revoked_at IS NULL;
+
+-- name: CreateSignIn :exec
+INSERT INTO sign_ins (id, state_hash, nonce, verifier, expires_at, created_at, updated_at)
+VALUES (@id, @state_hash, @nonce, @verifier, @expires_at, @created_at, @updated_at);
+
+-- name: UseSignIn :execrows
+UPDATE sign_ins
+SET used_at = @used_at, updated_at = @updated_at
+WHERE state_hash = @state_hash AND used_at IS NULL AND expires_at > @now;
+
+-- name: GetSignIn :one
+SELECT id, state_hash, nonce, verifier, expires_at, used_at, created_at, updated_at
+FROM sign_ins
+WHERE state_hash = @state_hash;
+
+-- name: DeleteExpiredSignIns :execrows
+DELETE FROM sign_ins
+WHERE expires_at < @before;

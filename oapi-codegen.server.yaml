@@ -5,3 +5,5 @@ generate:
   strict-server: true
   models: true
   embedded-spec: true
+compatibility:
+  enable-auth-scopes-on-context: true

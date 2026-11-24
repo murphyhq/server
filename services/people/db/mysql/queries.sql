@@ -1,14 +1,14 @@
 -- name: CreateUser :exec
-INSERT INTO users (id, name, email, time_zone, status, created_at, updated_at)
-VALUES (sqlc.arg(id), sqlc.arg(name), sqlc.arg(email), sqlc.arg(time_zone), sqlc.arg(status), sqlc.arg(created_at), sqlc.arg(updated_at));
+INSERT INTO users (id, name, email, time_zone, status, role, created_at, updated_at)
+VALUES (sqlc.arg(id), sqlc.arg(name), sqlc.arg(email), sqlc.arg(time_zone), sqlc.arg(status), sqlc.arg(role), sqlc.arg(created_at), sqlc.arg(updated_at));
 
 -- name: GetUser :one
-SELECT id, name, email, time_zone, status, created_at, updated_at
+SELECT id, name, email, time_zone, status, role, created_at, updated_at
 FROM users
 WHERE id = sqlc.arg(id);
 
 -- name: ListUsers :many
-SELECT id, name, email, time_zone, status, created_at, updated_at
+SELECT id, name, email, time_zone, status, role, created_at, updated_at
 FROM users
 WHERE id < sqlc.arg(before)
 ORDER BY id DESC
@@ -112,3 +112,58 @@ WHERE id IN (sqlc.slice(ids));
 SELECT id
 FROM users
 WHERE id IN (sqlc.slice(ids)) AND status = 'active';
+
+-- name: GetUserByEmail :one
+SELECT id, name, email, time_zone, status, role, created_at, updated_at
+FROM users
+WHERE email = sqlc.arg(email);
+
+-- name: AdminExists :one
+SELECT EXISTS (SELECT 1 FROM users WHERE role = 'admin' AND status = 'active');
+
+-- name: SetUserRole :execrows
+UPDATE users
+SET role = sqlc.arg(role), updated_at = sqlc.arg(updated_at)
+WHERE id = sqlc.arg(id);
+
+-- name: CreateIdentity :exec
+INSERT INTO identities (id, user_id, issuer, subject, created_at, updated_at)
+VALUES (sqlc.arg(id), sqlc.arg(user_id), sqlc.arg(issuer), sqlc.arg(subject), sqlc.arg(created_at), sqlc.arg(updated_at));
+
+-- name: GetIdentity :one
+SELECT id, user_id, issuer, subject, created_at, updated_at
+FROM identities
+WHERE issuer = sqlc.arg(issuer) AND subject = sqlc.arg(subject);
+
+-- name: CreateSession :exec
+INSERT INTO sessions (id, user_id, token_hash, expires_at, created_at, updated_at)
+VALUES (sqlc.arg(id), sqlc.arg(user_id), sqlc.arg(token_hash), sqlc.arg(expires_at), sqlc.arg(created_at), sqlc.arg(updated_at));
+
+-- name: GetActiveSession :one
+SELECT sessions.id, sessions.user_id, sessions.token_hash, sessions.expires_at, sessions.revoked_at, sessions.created_at, sessions.updated_at
+FROM sessions
+JOIN users ON users.id = sessions.user_id
+WHERE sessions.token_hash = sqlc.arg(token_hash) AND sessions.revoked_at IS NULL AND sessions.expires_at > sqlc.arg(now) AND users.status = 'active';
+
+-- name: RevokeSession :execrows
+UPDATE sessions
+SET revoked_at = sqlc.arg(revoked_at), updated_at = sqlc.arg(updated_at)
+WHERE token_hash = sqlc.arg(token_hash) AND revoked_at IS NULL;
+
+-- name: CreateSignIn :exec
+INSERT INTO sign_ins (id, state_hash, nonce, verifier, expires_at, created_at, updated_at)
+VALUES (sqlc.arg(id), sqlc.arg(state_hash), sqlc.arg(nonce), sqlc.arg(verifier), sqlc.arg(expires_at), sqlc.arg(created_at), sqlc.arg(updated_at));
+
+-- name: UseSignIn :execrows
+UPDATE sign_ins
+SET used_at = sqlc.arg(used_at), updated_at = sqlc.arg(updated_at)
+WHERE state_hash = sqlc.arg(state_hash) AND used_at IS NULL AND expires_at > sqlc.arg(now);
+
+-- name: GetSignIn :one
+SELECT id, state_hash, nonce, verifier, expires_at, used_at, created_at, updated_at
+FROM sign_ins
+WHERE state_hash = sqlc.arg(state_hash);
+
+-- name: DeleteExpiredSignIns :execrows
+DELETE FROM sign_ins
+WHERE expires_at < sqlc.arg(before);

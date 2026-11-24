@@ -5,10 +5,10 @@ package testenv
 import (
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/murphyhq/server/client"
 	apiapp "github.com/murphyhq/server/cmd/api/app"
 	migrateapp "github.com/murphyhq/server/cmd/migrate/app"
 	"github.com/murphyhq/server/internal/httpserver"
@@ -28,8 +28,10 @@ func Databases(t *testing.T, engine DatabaseEngine) migrateapp.Settings {
 	return databases
 }
 
-func APIWith(t *testing.T, databases migrateapp.Settings) (*client.ClientWithResponses, string) {
+func APIWith(t *testing.T, databases migrateapp.Settings) string {
 	t.Helper()
+	server := httptest.NewUnstartedServer(nil)
+	publicURL := "http://" + server.Listener.Addr().String()
 	a, err := apiapp.New(t.Context(), apiapp.Settings{
 		CatalogDatabaseURL:    databases.CatalogDatabaseURL,
 		IncidentsDatabaseURL:  databases.IncidentsDatabaseURL,
@@ -39,14 +41,17 @@ func APIWith(t *testing.T, databases migrateapp.Settings) (*client.ClientWithRes
 		IdempotencyStoreURL:   RedisURL(),
 		IntegrationKeySecrets: IntegrationKeySecrets,
 		WebhookPublicKeys:     WebhookPublicKey,
+		PublicURL:             publicURL,
+		OIDCIssuer:            IdentityProviderURL(),
+		OIDCClientID:          "murphy",
+		OIDCClientSecret:      "murphy-local-secret",
+		SessionDuration:       time.Hour,
 	})
 	require.NoError(t, err)
 	t.Cleanup(a.Close)
 
-	server := httptest.NewServer(httpserver.Handler(a.Handler))
+	server.Config.Handler = httpserver.Handler(a.Handler)
+	server.Start()
 	t.Cleanup(server.Close)
-
-	api, err := client.NewClientWithResponses(server.URL)
-	require.NoError(t, err)
-	return api, server.URL
+	return publicURL
 }

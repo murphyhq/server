@@ -32,8 +32,7 @@ var brokers = map[string]func(t *testing.T) brokertest.Environment{
 
 func murphyOn(t *testing.T, databases migrateapp.Settings) *murphytest.Murphy {
 	t.Helper()
-	_, api := testenv.APIWith(t, databases)
-	return murphytest.New(t, murphytest.At(api, ""))
+	return murphytest.New(t, murphytest.At(testenv.APIWith(t, databases), ""))
 }
 
 func incidentsOn(t *testing.T, databases migrateapp.Settings) (*incidents.Service, incidentsdb.Storage) {

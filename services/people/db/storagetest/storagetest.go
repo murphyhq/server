@@ -2,9 +2,11 @@ package storagetest
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/murphyhq/server"
 	"github.com/murphyhq/server/services/people"
@@ -12,7 +14,12 @@ import (
 
 const maxID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
 
-func Run(t *testing.T, open func(t *testing.T) people.Repository) {
+type Storage interface {
+	people.Repository
+	people.AuthRepository
+}
+
+func Run(t *testing.T, open func(t *testing.T) Storage) {
 	t.Run("stores and reads back a user", func(t *testing.T) {
 		repo := open(t)
 		user := newUser("ana@example.com")
@@ -24,6 +31,112 @@ func Run(t *testing.T, open func(t *testing.T) people.Repository) {
 		assert.Equal(t, user.GetEmail(), got.GetEmail())
 		assert.Equal(t, user.GetTimeZone(), got.GetTimeZone())
 		assert.Equal(t, user.GetStatus(), got.GetStatus())
+	})
+
+	t.Run("hands a sign-in out once", func(t *testing.T) {
+		repo := open(t)
+		now := time.Now().UTC()
+		require.NoError(t, repo.StartSignIn(t.Context(), newSignIn("state", now.Add(time.Minute)), now))
+
+		first, err := repo.TakeSignIn(t.Context(), []byte("state"), now)
+		require.NoError(t, err)
+		_, again := repo.TakeSignIn(t.Context(), []byte("state"), now)
+
+		assert.Equal(t, "verifier", first.GetVerifier())
+		assert.ErrorIs(t, again, murphy.ErrNotFound)
+	})
+
+	t.Run("never hands out an expired sign-in", func(t *testing.T) {
+		repo := open(t)
+		now := time.Now().UTC()
+		require.NoError(t, repo.StartSignIn(t.Context(), newSignIn("state", now.Add(time.Minute)), now))
+
+		_, err := repo.TakeSignIn(t.Context(), []byte("state"), now.Add(2*time.Minute))
+
+		assert.ErrorIs(t, err, murphy.ErrNotFound)
+	})
+
+	t.Run("finds a person by their identity at the provider", func(t *testing.T) {
+		repo := open(t)
+		user := newUser("ana@example.com")
+		require.NoError(t, repo.CreateUserWithIdentity(t.Context(), user, newIdentity(user, "ana-at-the-provider")))
+
+		got, err := repo.GetIdentity(t.Context(), "https://id.example.com", "ana-at-the-provider")
+
+		require.NoError(t, err)
+		assert.Equal(t, user.GetId(), got.GetUserId())
+	})
+
+	t.Run("creates a user only together with their identity", func(t *testing.T) {
+		repo := open(t)
+		ana, bo := newUser("ana@example.com"), newUser("bo@example.com")
+		require.NoError(t, repo.CreateUserWithIdentity(t.Context(), ana, newIdentity(ana, "taken")))
+
+		err := repo.CreateUserWithIdentity(t.Context(), bo, newIdentity(bo, "taken"))
+		_, lookup := repo.GetUserByEmail(t.Context(), "bo@example.com")
+
+		assert.ErrorIs(t, err, murphy.ErrConflict)
+		assert.ErrorIs(t, lookup, murphy.ErrNotFound, "the user is not created without the identity")
+	})
+
+	t.Run("a session works until it is revoked", func(t *testing.T) {
+		repo := open(t)
+		user := newUser("ana@example.com")
+		now := time.Now().UTC()
+		require.NoError(t, repo.CreateUser(t.Context(), user))
+		require.NoError(t, repo.CreateSession(t.Context(), newSession(user, "token", now.Add(time.Hour))))
+
+		active, err := repo.GetActiveSession(t.Context(), []byte("token"), now)
+		require.NoError(t, err)
+		require.NoError(t, repo.RevokeSession(t.Context(), []byte("token"), now))
+		_, revoked := repo.GetActiveSession(t.Context(), []byte("token"), now)
+
+		assert.Equal(t, user.GetId(), active.GetUserId())
+		assert.ErrorIs(t, revoked, murphy.ErrNotFound)
+	})
+
+	t.Run("a session stops working when it expires", func(t *testing.T) {
+		repo := open(t)
+		user := newUser("ana@example.com")
+		now := time.Now().UTC()
+		require.NoError(t, repo.CreateUser(t.Context(), user))
+		require.NoError(t, repo.CreateSession(t.Context(), newSession(user, "token", now.Add(time.Hour))))
+
+		_, err := repo.GetActiveSession(t.Context(), []byte("token"), now.Add(2*time.Hour))
+
+		assert.ErrorIs(t, err, murphy.ErrNotFound)
+	})
+
+	t.Run("a session stops working when its user is deactivated", func(t *testing.T) {
+		repo := open(t)
+		user := newUser("ana@example.com")
+		now := time.Now().UTC()
+		require.NoError(t, repo.CreateUser(t.Context(), user))
+		require.NoError(t, repo.CreateSession(t.Context(), newSession(user, "token", now.Add(time.Hour))))
+		user.Status = murphy.UserStatus_USER_STATUS_DEACTIVATED
+		require.NoError(t, repo.UpdateUser(t.Context(), user))
+
+		_, err := repo.GetActiveSession(t.Context(), []byte("token"), now)
+
+		assert.ErrorIs(t, err, murphy.ErrNotFound)
+	})
+
+	t.Run("the first admin is claimed once", func(t *testing.T) {
+		repo := open(t)
+		ana, bo := newUser("ana@example.com"), newUser("bo@example.com")
+		require.NoError(t, repo.CreateUser(t.Context(), ana))
+		require.NoError(t, repo.CreateUser(t.Context(), bo))
+
+		first, err := repo.ClaimFirstAdmin(t.Context(), ana.GetId(), time.Now().UTC())
+		require.NoError(t, err)
+		second, err := repo.ClaimFirstAdmin(t.Context(), bo.GetId(), time.Now().UTC())
+		require.NoError(t, err)
+		admin, err := repo.GetUser(t.Context(), ana.GetId())
+		require.NoError(t, err)
+
+		assert.True(t, first)
+		assert.False(t, second)
+		assert.Equal(t, murphy.UserRole_USER_ROLE_ADMIN, admin.GetRole())
 	})
 
 	t.Run("refuses a second user with the same email", func(t *testing.T) {
@@ -161,8 +274,26 @@ func newUser(email string) *murphy.User {
 	now := murphy.Now()
 	return &murphy.User{
 		Id: murphy.NewID(), Name: email, Email: email, TimeZone: "Europe/Malta",
-		Status: murphy.UserStatus_USER_STATUS_ACTIVE, CreatedAt: now, UpdatedAt: now,
+		Status: murphy.UserStatus_USER_STATUS_ACTIVE, Role: murphy.UserRole_USER_ROLE_MEMBER, CreatedAt: now, UpdatedAt: now,
 	}
+}
+
+func newSignIn(state string, expiresAt time.Time) *murphy.SignIn {
+	now := murphy.Now()
+	return &murphy.SignIn{
+		Id: murphy.NewID(), StateHash: []byte(state), Nonce: "nonce", Verifier: "verifier",
+		ExpiresAt: timestamppb.New(expiresAt), CreatedAt: now, UpdatedAt: now,
+	}
+}
+
+func newIdentity(user *murphy.User, subject string) *murphy.Identity {
+	now := murphy.Now()
+	return &murphy.Identity{Id: murphy.NewID(), UserId: user.GetId(), Issuer: "https://id.example.com", Subject: subject, CreatedAt: now, UpdatedAt: now}
+}
+
+func newSession(user *murphy.User, token string, expiresAt time.Time) *murphy.Session {
+	now := murphy.Now()
+	return &murphy.Session{Id: murphy.NewID(), UserId: user.GetId(), TokenHash: []byte(token), ExpiresAt: timestamppb.New(expiresAt), CreatedAt: now, UpdatedAt: now}
 }
 
 func newContactMethod(user *murphy.User, kind murphy.ContactMethodType) *murphy.ContactMethod {
