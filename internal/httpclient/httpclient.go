@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
-	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/murphyhq/server/internal/telemetry"
 )
@@ -15,7 +14,18 @@ func New(timeout time.Duration) *http.Client {
 }
 
 func Instrument(transport http.RoundTripper) http.RoundTripper {
-	return otelhttp.NewTransport(transport, otelhttp.WithMetricAttributesFn(func(r *http.Request) []attribute.KeyValue {
-		return telemetry.ComponentAttributes(r.Context())
-	}))
+	return labeled{next: otelhttp.NewTransport(transport)}
+}
+
+type labeled struct {
+	next http.RoundTripper
+}
+
+func (l labeled) RoundTrip(r *http.Request) (*http.Response, error) {
+	if component := telemetry.ComponentAttributes(r.Context()); len(component) > 0 {
+		labeler := &otelhttp.Labeler{}
+		labeler.Add(component...)
+		r = r.WithContext(otelhttp.ContextWithClientLabeler(r.Context(), labeler))
+	}
+	return l.next.RoundTrip(r)
 }
