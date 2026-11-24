@@ -13,7 +13,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/murphyhq/server/services/notifications/webhook"
+	"github.com/murphyhq/server/services/notifications/providers/webhook"
 )
 
 type ReceivedWebhook struct {

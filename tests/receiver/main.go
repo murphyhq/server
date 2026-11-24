@@ -16,7 +16,7 @@ import (
 	"github.com/murphyhq/server/internal/lifecycle"
 	"github.com/murphyhq/server/internal/logger"
 	"github.com/murphyhq/server/internal/telemetry"
-	"github.com/murphyhq/server/services/notifications/webhook"
+	"github.com/murphyhq/server/services/notifications/providers/webhook"
 )
 
 const kept = 100

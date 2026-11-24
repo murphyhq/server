@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/murphyhq/server/internal/tracer"
-	"github.com/murphyhq/server/services/notifications/webhook"
+	"github.com/murphyhq/server/services/notifications/providers/webhook"
 )
 
 func (s *Server) GetSigningKeys(ctx context.Context, _ GetSigningKeysRequestObject) (_ GetSigningKeysResponseObject, err error) {

@@ -14,7 +14,7 @@ import (
 	escalationdb "github.com/murphyhq/server/services/escalation/db"
 	"github.com/murphyhq/server/services/notifications"
 	notificationsdb "github.com/murphyhq/server/services/notifications/db"
-	"github.com/murphyhq/server/services/notifications/webhook"
+	"github.com/murphyhq/server/services/notifications/providers/webhook"
 	"github.com/murphyhq/server/services/oncall"
 	oncalldb "github.com/murphyhq/server/services/oncall/db"
 	"github.com/murphyhq/server/services/people"

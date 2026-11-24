@@ -1,5 +1,5 @@
 package: webhook
-output: services/notifications/webhook/openapi.gen.go
+output: services/notifications/providers/webhook/openapi.gen.go
 generate:
   models: true
 output-options:
