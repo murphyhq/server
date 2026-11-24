@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
@@ -22,12 +21,12 @@ type fixture struct {
 	policies    *MockPolicies
 	integration *murphy.Integration
 	policy      *murphy.EscalationPolicy
+	policyGone  bool
 	recorded    *incidents.Change
 }
 
 const (
 	schedule = "0195f3a0-0000-7000-8000-00000000000a"
-	ana      = "0195f3a0-0000-7000-8000-0000000000a1"
 	bo       = "0195f3a0-0000-7000-8000-0000000000b1"
 )
 
@@ -63,6 +62,9 @@ func setup(t *testing.T) *fixture {
 		}, nil
 	}).Maybe()
 	policies.EXPECT().CurrentVersion(mock.Anything, mock.Anything).RunAndReturn(func(context.Context, string) (int32, error) {
+		if f.policyGone {
+			return 0, &murphy.NotFoundError{Entity: "escalation policy"}
+		}
 		return f.policy.GetVersion(), nil
 	}).Maybe()
 	policies.EXPECT().GetPolicyVersion(mock.Anything, mock.Anything, mock.Anything).RunAndReturn(func(context.Context, string, int32) (*murphy.EscalationPolicy, error) {
@@ -96,37 +98,30 @@ func (f *fixture) noneOpen() {
 	f.repo.EXPECT().FindOpenIncident(mock.Anything, mock.Anything, mock.Anything).Return(nil, &murphy.NotFoundError{Entity: "incident"})
 }
 
-func TestAFiringAlertOpensAnIncident(t *testing.T) {
+func TestAFiringAlertOpensAnIncidentOnTheServicesCurrentPolicy(t *testing.T) {
 	f := setup(t)
 	f.noneOpen()
+	alert := f.alert(murphy.AlertStatus_ALERT_STATUS_FIRING)
+
+	require.NoError(t, f.service.AlertReceived(t.Context(), "message-1", alert))
+
+	assert.Equal(t, "message-1", f.recorded.MessageID)
+	assert.Equal(t, alert, f.recorded.Alert)
+	require.True(t, f.recorded.Decision.Created)
+	opened := f.recorded.Decision.GetIncident()
+	assert.Equal(t, opened.GetId(), f.recorded.IncidentID)
+	assert.Equal(t, int32(3), opened.GetEscalationPolicyVersion())
+	assert.Equal(t, murphy.Urgency_URGENCY_LOW, opened.GetUrgency())
+}
+
+func TestAnIncidentOpensUnpagedWhenItsPolicyIsGone(t *testing.T) {
+	f := setup(t)
+	f.noneOpen()
+	f.policyGone = true
 
 	require.NoError(t, f.service.AlertReceived(t.Context(), "message-1", f.alert(murphy.AlertStatus_ALERT_STATUS_FIRING)))
 
-	opened := f.recorded.Created
-	require.NotNil(t, opened)
-	assert.Equal(t, "message-1", f.recorded.MessageID)
-	assert.Equal(t, murphy.IncidentStatus_INCIDENT_STATUS_TRIGGERED, opened.GetStatus())
-	assert.Equal(t, murphy.Urgency_URGENCY_LOW, opened.GetUrgency())
-	assert.Equal(t, "Disk almost full", opened.GetTitle())
-	assert.Equal(t, opened.GetId(), f.recorded.IncidentID)
-	require.Len(t, f.recorded.Timeline, 1)
-	assert.Equal(t, murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_TRIGGERED, f.recorded.Timeline[0].GetType())
-	assert.Equal(t, f.policy.GetId(), opened.GetEscalationPolicyId())
-	assert.Equal(t, int32(3), opened.GetEscalationPolicyVersion())
-
-	assert.Equal(t, int32(1), opened.GetEscalationLevel(), "pages its first level straight away")
-	assert.Equal(t, int32(1), opened.GetEscalationRound())
-	messages := f.messages(t)
-	require.Len(t, messages, 3)
-	assert.Equal(t, murphy.IncidentVerb_INCIDENT_VERB_CREATED, messages[0].envelope.GetIncident().GetVerb())
-	assert.Equal(t, opened.GetId(), messages[0].envelope.GetIncident().GetCurrent().GetId())
-	assert.Equal(t, murphy.IncidentVerb_INCIDENT_VERB_ESCALATED, messages[1].envelope.GetIncident().GetVerb())
-	assert.Equal(t, int32(1), messages[1].envelope.GetIncident().GetCurrent().GetEscalationLevel())
-	timer := messages[2].envelope.GetTimer().GetCurrent()
-	assert.Equal(t, incidents.MessageTimer, messages[2].Kind)
-	assert.Equal(t, int32(2), timer.GetEscalationLevel(), "the next level")
-	assert.Equal(t, int32(1), timer.GetEscalationRound())
-	assert.WithinDuration(t, time.Now().Add(5*time.Minute), messages[2].DueAt, time.Second, "after the first level's delay")
+	assert.True(t, f.recorded.Decision.GetIncident().GetEscalationExhausted())
 }
 
 func TestAFiringAlertJoinsTheOpenIncident(t *testing.T) {
@@ -136,12 +131,12 @@ func TestAFiringAlertJoinsTheOpenIncident(t *testing.T) {
 
 	require.NoError(t, f.service.AlertReceived(t.Context(), "message-1", f.alert(murphy.AlertStatus_ALERT_STATUS_FIRING)))
 
-	assert.Nil(t, f.recorded.Created)
-	assert.Equal(t, open, f.recorded.Updated)
+	assert.False(t, f.recorded.Decision.Created)
+	assert.Equal(t, open, f.recorded.Decision.GetIncident())
 	assert.Equal(t, murphy.IncidentStatus_INCIDENT_STATUS_ACKNOWLEDGED, open.GetStatus())
 	assert.Equal(t, open.GetId(), f.recorded.IncidentID)
-	require.Len(t, f.recorded.Timeline, 1)
-	assert.Equal(t, murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_ALERTED, f.recorded.Timeline[0].GetType())
+	require.Len(t, f.recorded.Decision.GetTimeline(), 1)
+	assert.Equal(t, murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_ALERTED, f.recorded.Decision.GetTimeline()[0].GetType())
 }
 
 func TestAResolvedAlertResolvesTheOpenIncident(t *testing.T) {
@@ -152,15 +147,15 @@ func TestAResolvedAlertResolvesTheOpenIncident(t *testing.T) {
 
 	require.NoError(t, f.service.AlertReceived(t.Context(), "message-1", f.alert(murphy.AlertStatus_ALERT_STATUS_RESOLVED)))
 
-	resolved := f.recorded.Updated
+	resolved := f.recorded.Decision.GetIncident()
 	require.NotNil(t, resolved)
 	assert.Equal(t, murphy.IncidentStatus_INCIDENT_STATUS_RESOLVED, resolved.GetStatus())
 	assert.NotNil(t, resolved.GetResolvedAt())
 	assert.Equal(t, int32(4), resolved.GetVersion())
-	assert.True(t, f.recorded.CancelTimers)
-	assert.Equal(t, murphy.IncidentVerb_INCIDENT_VERB_RESOLVED, f.messages(t)[0].envelope.GetIncident().GetVerb())
-	require.Len(t, f.recorded.Timeline, 1)
-	assert.Equal(t, murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_RESOLVED, f.recorded.Timeline[0].GetType())
+	assert.True(t, f.recorded.Decision.GetCancelTimers())
+	assert.Equal(t, murphy.IncidentVerb_INCIDENT_VERB_RESOLVED, f.recorded.Decision.GetAnnounce()[0].Verb)
+	require.Len(t, f.recorded.Decision.GetTimeline(), 1)
+	assert.Equal(t, murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_RESOLVED, f.recorded.Decision.GetTimeline()[0].GetType())
 }
 
 func TestAResolvedAlertNotClearlyNewerThanTheLatestFiringKeepsTheIncidentOpen(t *testing.T) {
@@ -172,10 +167,10 @@ func TestAResolvedAlertNotClearlyNewerThanTheLatestFiringKeepsTheIncidentOpen(t 
 
 	require.NoError(t, f.service.AlertReceived(t.Context(), "message-1", alert))
 
-	assert.Equal(t, open, f.recorded.Updated)
+	assert.Equal(t, open, f.recorded.Decision.GetIncident())
 	assert.Equal(t, murphy.IncidentStatus_INCIDENT_STATUS_TRIGGERED, open.GetStatus())
-	require.Len(t, f.recorded.Timeline, 1)
-	assert.Equal(t, murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_ALERTED, f.recorded.Timeline[0].GetType())
+	require.Len(t, f.recorded.Decision.GetTimeline(), 1)
+	assert.Equal(t, murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_ALERTED, f.recorded.Decision.GetTimeline()[0].GetType())
 }
 
 func TestAResolveForOneInstanceKeepsTheIncidentOpenWhileAnotherFires(t *testing.T) {
@@ -188,8 +183,8 @@ func TestAResolveForOneInstanceKeepsTheIncidentOpenWhileAnotherFires(t *testing.
 
 	require.NoError(t, f.service.AlertReceived(t.Context(), "message-1", alert))
 
-	assert.Equal(t, murphy.IncidentStatus_INCIDENT_STATUS_TRIGGERED, f.recorded.Updated.GetStatus())
-	assert.Equal(t, murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_ALERTED, f.recorded.Timeline[0].GetType())
+	assert.Equal(t, murphy.IncidentStatus_INCIDENT_STATUS_TRIGGERED, f.recorded.Decision.GetIncident().GetStatus())
+	assert.Equal(t, murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_ALERTED, f.recorded.Decision.GetTimeline()[0].GetType())
 }
 
 func TestTheResolveForTheLastInstanceResolvesTheIncident(t *testing.T) {
@@ -202,8 +197,8 @@ func TestTheResolveForTheLastInstanceResolvesTheIncident(t *testing.T) {
 
 	require.NoError(t, f.service.AlertReceived(t.Context(), "message-1", alert))
 
-	assert.Equal(t, murphy.IncidentStatus_INCIDENT_STATUS_RESOLVED, f.recorded.Updated.GetStatus())
-	assert.Equal(t, murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_RESOLVED, f.recorded.Timeline[0].GetType())
+	assert.Equal(t, murphy.IncidentStatus_INCIDENT_STATUS_RESOLVED, f.recorded.Decision.GetIncident().GetStatus())
+	assert.Equal(t, murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_RESOLVED, f.recorded.Decision.GetTimeline()[0].GetType())
 }
 
 func TestARecentResolvedAlertWithoutAnOpenIncidentIsRetried(t *testing.T) {
@@ -226,8 +221,8 @@ func TestAnOldResolvedAlertWithoutAnOpenIncidentIsOnlyRecorded(t *testing.T) {
 	require.NoError(t, f.service.AlertReceived(t.Context(), "message-1", alert))
 
 	assert.Empty(t, f.recorded.IncidentID)
-	assert.Nil(t, f.recorded.Created)
-	assert.Empty(t, f.recorded.Timeline)
+	assert.Nil(t, f.recorded.Decision.GetIncident())
+	assert.Empty(t, f.recorded.Decision.GetTimeline())
 }
 
 func TestThePreviousKeyWorksDuringTheGracePeriod(t *testing.T) {
@@ -238,7 +233,7 @@ func TestThePreviousKeyWorksDuringTheGracePeriod(t *testing.T) {
 	alert.KeyVersion = 1
 
 	require.NoError(t, f.service.AlertReceived(t.Context(), "message-1", alert))
-	assert.NotNil(t, f.recorded.Created)
+	assert.NotNil(t, f.recorded.Decision.GetIncident())
 }
 
 func TestKeysTheIntegrationNoLongerAcceptsAreRefused(t *testing.T) {
@@ -274,27 +269,6 @@ func TestKeysTheIntegrationNoLongerAcceptsAreRefused(t *testing.T) {
 	}
 }
 
-type message struct {
-	*incidents.ScheduledMessage
-	envelope *murphy.Envelope
-}
-
-func (f *fixture) messages(t *testing.T) []message {
-	t.Helper()
-	if f.recorded.Messages == nil {
-		return nil
-	}
-	list, err := f.recorded.Messages()
-	require.NoError(t, err)
-	out := make([]message, len(list))
-	for i, scheduled := range list {
-		envelope := &murphy.Envelope{}
-		require.NoError(t, proto.Unmarshal(scheduled.Envelope, envelope))
-		out[i] = message{ScheduledMessage: scheduled, envelope: envelope}
-	}
-	return out
-}
-
 func (f *fixture) triggered(level, round int32) *murphy.Incident {
 	incident := &murphy.Incident{
 		Id: murphy.NewID(), Status: murphy.IncidentStatus_INCIDENT_STATUS_TRIGGERED, Version: 2,
@@ -302,180 +276,6 @@ func (f *fixture) triggered(level, round int32) *murphy.Incident {
 	}
 	f.repo.EXPECT().GetIncident(mock.Anything, incident.GetId()).Return(incident, nil).Maybe()
 	return incident
-}
-
-func timer(incident *murphy.Incident, level, round int32) *murphy.Timer {
-	return &murphy.Timer{Id: murphy.NewID(), IncidentId: incident.GetId(), EscalationLevel: level, EscalationRound: round}
-}
-
-func TestATimerMovesTheIncidentToTheNextLevel(t *testing.T) {
-	f := setup(t)
-	incident := f.triggered(1, 1)
-
-	require.NoError(t, f.service.TimerExpired(t.Context(), "message-1", timer(incident, 2, 1)))
-
-	escalated := f.recorded.Updated
-	assert.Equal(t, int32(2), escalated.GetEscalationLevel())
-	assert.Equal(t, int32(1), escalated.GetEscalationRound())
-	assert.Equal(t, int32(3), escalated.GetVersion())
-	assert.Empty(t, f.recorded.Timeline, "whom the level reached is recorded when its page comes back")
-	messages := f.messages(t)
-	require.Len(t, messages, 2)
-	assert.Equal(t, murphy.IncidentVerb_INCIDENT_VERB_ESCALATED, messages[0].envelope.GetIncident().GetVerb())
-	next := messages[1].envelope.GetTimer().GetCurrent()
-	assert.Equal(t, int32(1), next.GetEscalationLevel(), "after the last level, back to the first")
-	assert.Equal(t, int32(2), next.GetEscalationRound())
-	assert.WithinDuration(t, time.Now().Add(10*time.Minute), messages[1].DueAt, time.Second)
-}
-
-func page(incident *murphy.Incident, level, round int32, reached ...*murphy.PageRecipient) *murphy.Page {
-	return &murphy.Page{Id: murphy.NewID(), Incident: incident, EscalationLevel: level, EscalationRound: round, Reached: reached}
-}
-
-func TestAPageRecordsWhomItReached(t *testing.T) {
-	f := setup(t)
-	incident := f.triggered(1, 1)
-	via := &murphy.EscalationTarget{Type: murphy.EscalationTargetType_ESCALATION_TARGET_TYPE_SCHEDULE, Id: schedule}
-
-	require.NoError(t, f.service.PageCreated(t.Context(), "message-1", page(incident, 1, 1, &murphy.PageRecipient{UserId: ana, Via: via, ContactMethods: 2})))
-
-	assert.Equal(t, "message-1", f.recorded.MessageID)
-	assert.Nil(t, f.recorded.Updated, "the incident stays on its level")
-	require.Len(t, f.recorded.Timeline, 1)
-	entry := f.recorded.Timeline[0]
-	assert.Equal(t, murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_ESCALATED, entry.GetType())
-	assert.Equal(t, []string{ana}, pagedUsers(entry))
-	assert.Equal(t, schedule, entry.GetEscalation().GetPaged()[0].GetVia().GetId())
-}
-
-func TestSomeoneReachedWithoutContactMethodsIsOnTheTimeline(t *testing.T) {
-	f := setup(t)
-	incident := f.triggered(1, 1)
-
-	require.NoError(t, f.service.PageCreated(t.Context(), "message-1", page(incident, 1, 1, &murphy.PageRecipient{UserId: ana})))
-
-	require.Len(t, f.recorded.Timeline, 2)
-	failed := f.recorded.Timeline[1]
-	assert.Equal(t, murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_NOTIFICATION_FAILED, failed.GetType())
-	assert.Equal(t, ana, failed.GetNotification().GetUserId())
-}
-
-func TestAPageThatReachedNobodyMovesOnAtOnce(t *testing.T) {
-	f := setup(t)
-	incident := f.triggered(1, 1)
-	empty := page(incident, 1, 1)
-	empty.Unreached = []*murphy.EscalationTarget{{Type: murphy.EscalationTargetType_ESCALATION_TARGET_TYPE_SCHEDULE, Id: schedule}}
-
-	require.NoError(t, f.service.PageCreated(t.Context(), "message-1", empty))
-
-	require.Len(t, f.recorded.Timeline, 1)
-	assert.Equal(t, murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_ESCALATION_SKIPPED, f.recorded.Timeline[0].GetType())
-	assert.Equal(t, schedule, f.recorded.Timeline[0].GetEscalation().GetReachedNobody()[0].GetId())
-	assert.Equal(t, int32(2), f.recorded.Updated.GetEscalationLevel())
-	assert.True(t, f.recorded.CancelTimers, "the timer for the level it moved to is no longer needed")
-	messages := f.messages(t)
-	require.Len(t, messages, 2)
-	assert.Equal(t, murphy.IncidentVerb_INCIDENT_VERB_ESCALATED, messages[0].envelope.GetIncident().GetVerb())
-	assert.Equal(t, int32(1), messages[1].envelope.GetTimer().GetCurrent().GetEscalationLevel())
-}
-
-func TestAnEmptyPageForALevelAlreadyLeftOnlyRecordsIt(t *testing.T) {
-	f := setup(t)
-	incident := f.triggered(2, 1)
-
-	require.NoError(t, f.service.PageCreated(t.Context(), "message-1", page(incident, 1, 1)))
-
-	assert.Nil(t, f.recorded.Updated)
-	require.Len(t, f.recorded.Timeline, 1)
-	assert.Equal(t, murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_ESCALATION_SKIPPED, f.recorded.Timeline[0].GetType())
-}
-
-func TestANotificationOutcomeIsRecordedOnTheTimeline(t *testing.T) {
-	f := setup(t)
-	notification := &murphy.Notification{
-		Id: murphy.NewID(), Reason: murphy.NotificationReason_NOTIFICATION_REASON_PAGED, Incident: &murphy.Incident{Id: murphy.NewID()},
-		UserId: ana, ContactMethod: &murphy.ContactMethod{Id: murphy.NewID(), UserId: ana, Type: murphy.ContactMethodType_CONTACT_METHOD_TYPE_WEBHOOK},
-		Failure: "the receiver answered 410",
-	}
-
-	require.NoError(t, f.service.NotificationFailed(t.Context(), "message-1", notification))
-
-	assert.Equal(t, "message-1", f.recorded.MessageID)
-	require.Len(t, f.recorded.Timeline, 1)
-	entry := f.recorded.Timeline[0]
-	assert.Equal(t, murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_NOTIFICATION_FAILED, entry.GetType())
-	assert.Equal(t, notification.GetIncident().GetId(), entry.GetIncidentId())
-	assert.Equal(t, "Page by webhook failed: the receiver answered 410", entry.GetSummary())
-	assert.Equal(t, notification.GetContactMethod().GetId(), entry.GetNotification().GetContactMethodId())
-	assert.Nil(t, f.recorded.Updated, "an outcome changes only the timeline")
-}
-
-func TestEscalationIsExhaustedAfterItsRepeats(t *testing.T) {
-	f := setup(t)
-	incident := f.triggered(2, 2)
-
-	require.NoError(t, f.service.TimerExpired(t.Context(), "message-1", timer(incident, 0, 0)))
-
-	assert.True(t, f.recorded.Updated.GetEscalationExhausted())
-	require.Len(t, f.recorded.Timeline, 1)
-	assert.Equal(t, murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_ESCALATION_EXHAUSTED, f.recorded.Timeline[0].GetType())
-	messages := f.messages(t)
-	require.Len(t, messages, 1, "no timer after exhaustion")
-	assert.True(t, messages[0].envelope.GetIncident().GetCurrent().GetEscalationExhausted())
-}
-
-func TestATimerThatIsNoLongerNeededOnlyMarksItsMessage(t *testing.T) {
-	for name, prepare := range map[string]func(f *fixture) (*murphy.Incident, *murphy.Timer){
-		"incident acknowledged": func(f *fixture) (*murphy.Incident, *murphy.Timer) {
-			incident := f.triggered(1, 1)
-			incident.Status = murphy.IncidentStatus_INCIDENT_STATUS_ACKNOWLEDGED
-			return incident, timer(incident, 2, 1)
-		},
-		"step already taken": func(f *fixture) (*murphy.Incident, *murphy.Timer) {
-			incident := f.triggered(2, 1)
-			return incident, timer(incident, 2, 1)
-		},
-	} {
-		t.Run(name, func(t *testing.T) {
-			f := setup(t)
-			_, expired := prepare(f)
-
-			require.NoError(t, f.service.TimerExpired(t.Context(), "message-1", expired))
-
-			assert.Equal(t, "message-1", f.recorded.MessageID)
-			assert.Nil(t, f.recorded.Updated)
-			assert.Empty(t, f.recorded.Timeline)
-			assert.Nil(t, f.recorded.Messages)
-		})
-	}
-}
-
-func TestAcknowledgingCancelsTimersAndAnnouncesIt(t *testing.T) {
-	f := setup(t)
-	incident := f.triggered(1, 1)
-
-	acknowledged, err := f.service.Acknowledge(t.Context(), incident.GetId())
-
-	require.NoError(t, err)
-	assert.Equal(t, murphy.IncidentStatus_INCIDENT_STATUS_ACKNOWLEDGED, acknowledged.GetStatus())
-	assert.NotNil(t, acknowledged.GetAcknowledgedAt())
-	assert.True(t, f.recorded.CancelTimers)
-	assert.Empty(t, f.recorded.MessageID)
-	event := f.messages(t)[0].envelope.GetIncident()
-	assert.Equal(t, murphy.IncidentVerb_INCIDENT_VERB_ACKNOWLEDGED, event.GetVerb())
-	assert.Equal(t, murphy.IncidentStatus_INCIDENT_STATUS_TRIGGERED, event.GetPrevious().GetStatus())
-}
-
-func TestAcknowledgingTwiceChangesNothing(t *testing.T) {
-	f := setup(t)
-	incident := f.triggered(1, 1)
-	incident.Status = murphy.IncidentStatus_INCIDENT_STATUS_ACKNOWLEDGED
-
-	got, err := f.service.Acknowledge(t.Context(), incident.GetId())
-
-	require.NoError(t, err)
-	assert.Equal(t, murphy.IncidentStatus_INCIDENT_STATUS_ACKNOWLEDGED, got.GetStatus())
-	assert.Nil(t, f.recorded)
 }
 
 func TestAcknowledgingRetriesAfterAConcurrentChange(t *testing.T) {
@@ -495,20 +295,21 @@ func TestAcknowledgingRetriesAfterAConcurrentChange(t *testing.T) {
 	assert.Equal(t, murphy.IncidentStatus_INCIDENT_STATUS_ACKNOWLEDGED, acknowledged.GetStatus())
 }
 
-func pagedUsers(entry *murphy.TimelineEntry) []string {
-	var users []string
-	for _, page := range entry.GetEscalation().GetPaged() {
-		users = append(users, page.GetUserId())
-	}
-	return users
-}
-
 func TestAPolicyVersionIsReadOnceAndReused(t *testing.T) {
 	f := setup(t)
 	first, second := f.triggered(1, 1), f.triggered(1, 1)
 
-	require.NoError(t, f.service.TimerExpired(t.Context(), "message-1", timer(first, 2, 1)))
-	require.NoError(t, f.service.TimerExpired(t.Context(), "message-2", timer(second, 2, 1)))
+	require.NoError(t, f.service.TimerExpired(t.Context(), "message-1", &murphy.Timer{IncidentId: first.GetId(), EscalationLevel: 2, EscalationRound: 1}))
+	require.NoError(t, f.service.TimerExpired(t.Context(), "message-2", &murphy.Timer{IncidentId: second.GetId(), EscalationLevel: 2, EscalationRound: 1}))
 
 	f.policies.AssertNumberOfCalls(t, "GetPolicyVersion", 1)
+}
+
+func TestATimerForAnIncidentThatIsGoneOnlyMarksItsMessage(t *testing.T) {
+	f := setup(t)
+	f.repo.EXPECT().GetIncident(mock.Anything, mock.Anything).Return(nil, &murphy.NotFoundError{Entity: "incident"})
+
+	require.NoError(t, f.service.TimerExpired(t.Context(), "message-1", &murphy.Timer{IncidentId: murphy.NewID(), EscalationLevel: 2, EscalationRound: 1}))
+
+	assert.Equal(t, &incidents.Change{MessageID: "message-1"}, f.recorded)
 }

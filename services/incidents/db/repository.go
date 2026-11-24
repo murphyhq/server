@@ -2,7 +2,10 @@ package db
 
 import (
 	"context"
+	"fmt"
 	"time"
+
+	"google.golang.org/protobuf/proto"
 
 	"github.com/murphyhq/server"
 	"github.com/murphyhq/server/internal/tracer"
@@ -47,6 +50,7 @@ func (r *Repository[T]) Record(ctx context.Context, change *incidents.Change) (r
 	defer span.End(&err)
 
 	now := time.Now().UTC()
+	decision := change.Decision
 	err = r.Transaction(ctx, func(tx T) error {
 		if change.MessageID != "" {
 			first, err := tx.MarkHandled(ctx, change.MessageID, now)
@@ -54,13 +58,13 @@ func (r *Repository[T]) Record(ctx context.Context, change *incidents.Change) (r
 				return err
 			}
 		}
-		if incident := change.Created; incident != nil {
-			if err := tx.CreateIncident(ctx, incident); err != nil {
+		if decision.GetIncident() != nil && decision.Created {
+			if err := tx.CreateIncident(ctx, decision.Incident); err != nil {
 				return err
 			}
 		}
-		if incident := change.Updated; incident != nil {
-			if err := tx.UpdateIncident(ctx, incident); err != nil {
+		if decision.GetIncident() != nil && !decision.Created {
+			if err := tx.UpdateIncident(ctx, decision.Incident); err != nil {
 				return err
 			}
 		}
@@ -69,29 +73,59 @@ func (r *Repository[T]) Record(ctx context.Context, change *incidents.Change) (r
 				return err
 			}
 		}
-		if change.CancelTimers {
+		if decision.GetCancelTimers() {
 			if err := tx.DeleteTimers(ctx, change.IncidentID); err != nil {
 				return err
 			}
 		}
-		for _, entry := range change.Timeline {
+		for _, entry := range decision.GetTimeline() {
 			if err := tx.CreateTimelineEntry(ctx, entry); err != nil {
 				return err
 			}
 		}
-		if change.Messages != nil {
-			messages, err := change.Messages()
-			if err != nil {
-				return err
-			}
-			if err := tx.CreateScheduledMessages(ctx, messages, now); err != nil {
-				return err
-			}
+		messages, err := scheduledMessages(ctx, decision)
+		if err != nil {
+			return err
+		}
+		if err := tx.CreateScheduledMessages(ctx, messages, now); err != nil {
+			return err
 		}
 		recorded = true
 		return nil
 	})
 	return recorded, err
+}
+
+func scheduledMessages(ctx context.Context, decision *murphy.IncidentDecision) ([]*incidents.ScheduledMessage, error) {
+	var messages []*incidents.ScheduledMessage
+	for _, announcement := range decision.GetAnnounce() {
+		event, err := scheduled(ctx, decision.Incident.GetId(), incidents.MessageEvent, decision.Incident.GetUpdatedAt().AsTime(), &murphy.Envelope{
+			Event: &murphy.Envelope_Incident{Incident: &murphy.IncidentEvent{Verb: announcement.Verb, Previous: announcement.Previous, Current: proto.CloneOf(decision.Incident)}},
+		})
+		if err != nil {
+			return nil, err
+		}
+		messages = append(messages, event)
+	}
+	if timer := decision.GetNextTimer(); timer != nil {
+		expired, err := scheduled(ctx, timer.GetIncidentId(), incidents.MessageTimer, timer.GetDueAt().AsTime(), &murphy.Envelope{
+			Event: &murphy.Envelope_Timer{Timer: &murphy.TimerEvent{Verb: murphy.TimerVerb_TIMER_VERB_EXPIRED, Current: timer}},
+		})
+		if err != nil {
+			return nil, err
+		}
+		messages = append(messages, expired)
+	}
+	return messages, nil
+}
+
+func scheduled(ctx context.Context, incidentID string, kind incidents.MessageKind, due time.Time, envelope *murphy.Envelope) (*incidents.ScheduledMessage, error) {
+	envelope.Id, envelope.OccurredAt, envelope.TraceContext = murphy.NewID(), murphy.Now(), tracer.Inject(ctx)
+	data, err := proto.Marshal(envelope)
+	if err != nil {
+		return nil, fmt.Errorf("encode message: %w", err)
+	}
+	return &incidents.ScheduledMessage{ID: envelope.GetId(), IncidentID: incidentID, Kind: kind, DueAt: due, Envelope: data}, nil
 }
 
 func (r *Repository[T]) ClaimDueMessages(ctx context.Context, now time.Time, limit int, lease time.Duration) (_ []*incidents.ScheduledMessage, err error) {

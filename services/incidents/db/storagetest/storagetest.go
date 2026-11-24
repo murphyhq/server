@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/murphyhq/server"
@@ -21,10 +22,10 @@ func Run(t *testing.T, open func(t *testing.T) incidents.Repository) {
 
 		require.NoError(t, err)
 		assert.True(t, recorded)
-		assert.Positive(t, outcome.Created.GetNumber())
+		assert.Positive(t, outcome.Decision.Incident.GetNumber())
 		got, err := repo.GetIncident(t.Context(), outcome.IncidentID)
 		require.NoError(t, err)
-		assert.Equal(t, outcome.Created.GetNumber(), got.GetNumber())
+		assert.Equal(t, outcome.Decision.Incident.GetNumber(), got.GetNumber())
 		assert.Equal(t, murphy.IncidentStatus_INCIDENT_STATUS_TRIGGERED, got.GetStatus())
 		assert.Equal(t, int32(1), got.GetVersion())
 		timeline, err := repo.ListTimeline(t.Context(), outcome.IncidentID)
@@ -41,7 +42,7 @@ func Run(t *testing.T, open func(t *testing.T) incidents.Repository) {
 		_, err = repo.Record(t.Context(), second)
 		require.NoError(t, err)
 
-		assert.Greater(t, second.Created.GetNumber(), first.Created.GetNumber())
+		assert.Greater(t, second.Decision.Incident.GetNumber(), first.Decision.Incident.GetNumber())
 	})
 
 	t.Run("remembers which policy version an incident follows", func(t *testing.T) {
@@ -53,7 +54,7 @@ func Run(t *testing.T, open func(t *testing.T) incidents.Repository) {
 		got, err := repo.GetIncident(t.Context(), outcome.IncidentID)
 
 		require.NoError(t, err)
-		assert.Equal(t, outcome.Created.GetEscalationPolicyId(), got.GetEscalationPolicyId())
+		assert.Equal(t, outcome.Decision.Incident.GetEscalationPolicyId(), got.GetEscalationPolicyId())
 		assert.Equal(t, int32(3), got.GetEscalationPolicyVersion())
 	})
 
@@ -64,10 +65,10 @@ func Run(t *testing.T, open func(t *testing.T) incidents.Repository) {
 		require.NoError(t, err)
 
 		ana, bo := murphy.NewID(), murphy.NewID()
-		escalated := joined(outcome.Created, murphy.NewID())
+		escalated := joined(outcome.Decision.Incident, murphy.NewID())
 		escalated.Alert = nil
-		escalated.Updated.EscalationLevel, escalated.Updated.EscalationRound = 2, 1
-		escalated.Timeline = []*murphy.TimelineEntry{{
+		escalated.Decision.Incident.EscalationLevel, escalated.Decision.Incident.EscalationRound = 2, 1
+		escalated.Decision.Timeline = []*murphy.TimelineEntry{{
 			Id: murphy.NewID(), IncidentId: outcome.IncidentID, Type: murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_ESCALATED,
 			Summary: "level 2", Escalation: &murphy.TimelineEscalation{Level: 2, Round: 1, Paged: []*murphy.TimelinePage{
 				{UserId: bo, Via: &murphy.EscalationTarget{Type: murphy.EscalationTargetType_ESCALATION_TARGET_TYPE_USER, Id: bo}},
@@ -99,10 +100,10 @@ func Run(t *testing.T, open func(t *testing.T) incidents.Repository) {
 		_, err := repo.Record(t.Context(), outcome)
 		require.NoError(t, err)
 
-		acknowledged := joined(outcome.Created, "")
+		acknowledged := joined(outcome.Decision.Incident, "")
 		acknowledged.Alert = nil
-		acknowledged.Updated.Status = murphy.IncidentStatus_INCIDENT_STATUS_ACKNOWLEDGED
-		acknowledged.Updated.AcknowledgedAt = murphy.Now()
+		acknowledged.Decision.Incident.Status = murphy.IncidentStatus_INCIDENT_STATUS_ACKNOWLEDGED
+		acknowledged.Decision.Incident.AcknowledgedAt = murphy.Now()
 		recorded, err := repo.Record(t.Context(), acknowledged)
 
 		require.NoError(t, err)
@@ -117,17 +118,18 @@ func Run(t *testing.T, open func(t *testing.T) incidents.Repository) {
 		repo := open(t)
 		outcome := opened(murphy.NewID(), "disk-full")
 		now := time.Now().UTC()
-		event, later := message(outcome.IncidentID, incidents.MessageEvent, now), message(outcome.IncidentID, incidents.MessageTimer, now.Add(time.Hour))
-		outcome.Messages = messages(event, later)
+		outcome.Decision.NextTimer = timer(outcome.IncidentID, now.Add(time.Hour))
 		_, err := repo.Record(t.Context(), outcome)
 		require.NoError(t, err)
 
 		claimed, err := repo.ClaimDueMessages(t.Context(), now.Add(time.Second), 10, time.Minute)
 		require.NoError(t, err)
-		require.Len(t, claimed, 1)
-		assert.Equal(t, event.ID, claimed[0].ID)
-		assert.Equal(t, event.Envelope, claimed[0].Envelope)
+		require.Len(t, claimed, 1, "the announcement is due now, the timer later")
 		assert.Equal(t, incidents.MessageEvent, claimed[0].Kind)
+		announced := &murphy.Envelope{}
+		require.NoError(t, proto.Unmarshal(claimed[0].Envelope, announced))
+		assert.Equal(t, murphy.IncidentVerb_INCIDENT_VERB_CREATED, announced.GetIncident().GetVerb())
+		assert.Positive(t, announced.GetIncident().GetCurrent().GetNumber(), "the announcement carries the number the insert gave")
 
 		again, err := repo.ClaimDueMessages(t.Context(), now.Add(2*time.Second), 10, time.Minute)
 		require.NoError(t, err)
@@ -136,35 +138,38 @@ func Run(t *testing.T, open func(t *testing.T) incidents.Repository) {
 		expired, err := repo.ClaimDueMessages(t.Context(), now.Add(2*time.Minute), 10, time.Minute)
 		require.NoError(t, err)
 		require.Len(t, expired, 1)
-		assert.Equal(t, event.ID, expired[0].ID)
+		assert.Equal(t, claimed[0].ID, expired[0].ID)
 
-		require.NoError(t, repo.DeleteMessages(t.Context(), []string{event.ID}))
-		gone, err := repo.ClaimDueMessages(t.Context(), now.Add(5*time.Minute), 10, time.Minute)
+		require.NoError(t, repo.DeleteMessages(t.Context(), []string{claimed[0].ID}))
+		later, err := repo.ClaimDueMessages(t.Context(), now.Add(2*time.Hour), 10, time.Minute)
 		require.NoError(t, err)
-		assert.Empty(t, gone)
+		require.Len(t, later, 1)
+		assert.Equal(t, incidents.MessageTimer, later[0].Kind)
 	})
 
 	t.Run("cancelling timers keeps the incident's events", func(t *testing.T) {
 		repo := open(t)
 		outcome := opened(murphy.NewID(), "disk-full")
 		now := time.Now().UTC()
-		outcome.Messages = messages(message(outcome.IncidentID, incidents.MessageTimer, now))
+		outcome.Decision.NextTimer = timer(outcome.IncidentID, now)
 		_, err := repo.Record(t.Context(), outcome)
 		require.NoError(t, err)
 
-		acknowledged := joined(outcome.Created, "")
+		acknowledged := joined(outcome.Decision.Incident, "")
 		acknowledged.Alert = nil
-		acknowledged.Updated.Status = murphy.IncidentStatus_INCIDENT_STATUS_ACKNOWLEDGED
-		acknowledged.CancelTimers = true
-		event := message(outcome.IncidentID, incidents.MessageEvent, now)
-		acknowledged.Messages = messages(event)
+		acknowledged.Decision.Incident.Status = murphy.IncidentStatus_INCIDENT_STATUS_ACKNOWLEDGED
+		acknowledged.Decision.CancelTimers = true
+		acknowledged.Decision.Announce = []murphy.Announcement{{Verb: murphy.IncidentVerb_INCIDENT_VERB_ACKNOWLEDGED}}
 		_, err = repo.Record(t.Context(), acknowledged)
 		require.NoError(t, err)
 
 		claimed, err := repo.ClaimDueMessages(t.Context(), now.Add(time.Second), 10, time.Minute)
 		require.NoError(t, err)
-		require.Len(t, claimed, 1)
-		assert.Equal(t, event.ID, claimed[0].ID)
+		kinds := make([]incidents.MessageKind, len(claimed))
+		for i, message := range claimed {
+			kinds[i] = message.Kind
+		}
+		assert.Equal(t, []incidents.MessageKind{incidents.MessageEvent, incidents.MessageEvent}, kinds)
 	})
 
 	t.Run("records a message only once", func(t *testing.T) {
@@ -173,7 +178,7 @@ func Run(t *testing.T, open func(t *testing.T) incidents.Repository) {
 		_, err := repo.Record(t.Context(), outcome)
 		require.NoError(t, err)
 
-		again := joined(outcome.Created, outcome.MessageID)
+		again := joined(outcome.Decision.Incident, outcome.MessageID)
 		recorded, err := repo.Record(t.Context(), again)
 
 		require.NoError(t, err)
@@ -189,7 +194,7 @@ func Run(t *testing.T, open func(t *testing.T) incidents.Repository) {
 		_, err := repo.Record(t.Context(), first)
 		require.NoError(t, err)
 
-		second := opened(first.Created.GetServiceId(), "disk-full")
+		second := opened(first.Decision.Incident.GetServiceId(), "disk-full")
 		_, err = repo.Record(t.Context(), second)
 
 		assert.ErrorIs(t, err, murphy.ErrConflict)
@@ -200,10 +205,10 @@ func Run(t *testing.T, open func(t *testing.T) incidents.Repository) {
 		first := opened(murphy.NewID(), "disk-full")
 		_, err := repo.Record(t.Context(), first)
 		require.NoError(t, err)
-		_, err = repo.Record(t.Context(), resolved(first.Created))
+		_, err = repo.Record(t.Context(), resolved(first.Decision.Incident))
 		require.NoError(t, err)
 
-		_, err = repo.Record(t.Context(), opened(first.Created.GetServiceId(), "disk-full"))
+		_, err = repo.Record(t.Context(), opened(first.Decision.Incident.GetServiceId(), "disk-full"))
 
 		assert.NoError(t, err)
 	})
@@ -213,11 +218,11 @@ func Run(t *testing.T, open func(t *testing.T) incidents.Repository) {
 		outcome := opened(murphy.NewID(), "disk-full")
 		_, err := repo.Record(t.Context(), outcome)
 		require.NoError(t, err)
-		_, err = repo.Record(t.Context(), joined(outcome.Created, murphy.NewID()))
+		_, err = repo.Record(t.Context(), joined(outcome.Decision.Incident, murphy.NewID()))
 		require.NoError(t, err)
 
-		stale := resolved(outcome.Created)
-		stale.Updated.Version = 1
+		stale := resolved(outcome.Decision.Incident)
+		stale.Decision.Incident.Version = 1
 		_, err = repo.Record(t.Context(), stale)
 
 		assert.ErrorIs(t, err, murphy.ErrConflict)
@@ -236,7 +241,7 @@ func Run(t *testing.T, open func(t *testing.T) incidents.Repository) {
 	t.Run("finds only the open incident for a key", func(t *testing.T) {
 		repo := open(t)
 		outcome := opened(murphy.NewID(), "disk-full")
-		serviceID := outcome.Created.GetServiceId()
+		serviceID := outcome.Decision.Incident.GetServiceId()
 		_, err := repo.FindOpenIncident(t.Context(), serviceID, "disk-full")
 		assert.ErrorIs(t, err, murphy.ErrNotFound)
 
@@ -259,7 +264,7 @@ func Run(t *testing.T, open func(t *testing.T) incidents.Repository) {
 		require.NoError(t, err)
 		_, err = repo.Record(t.Context(), second)
 		require.NoError(t, err)
-		_, err = repo.Record(t.Context(), resolved(first.Created))
+		_, err = repo.Record(t.Context(), resolved(first.Decision.Incident))
 		require.NoError(t, err)
 
 		all, err := repo.ListIncidents(t.Context(), incidents.Filter{}, maxID, 10)
@@ -270,7 +275,7 @@ func Run(t *testing.T, open func(t *testing.T) incidents.Repository) {
 		require.NoError(t, err)
 		assert.Equal(t, []string{second.IncidentID}, ids(open))
 
-		ofService, err := repo.ListIncidents(t.Context(), incidents.Filter{ServiceIDs: []string{first.Created.GetServiceId()}}, maxID, 10)
+		ofService, err := repo.ListIncidents(t.Context(), incidents.Filter{ServiceIDs: []string{first.Decision.Incident.GetServiceId()}}, maxID, 10)
 		require.NoError(t, err)
 		assert.Equal(t, []string{first.IncidentID}, ids(ofService))
 
@@ -284,7 +289,7 @@ func Run(t *testing.T, open func(t *testing.T) incidents.Repository) {
 		outcome := opened(murphy.NewID(), "disk-full")
 		_, err := repo.Record(t.Context(), outcome)
 		require.NoError(t, err)
-		later := joined(outcome.Created, murphy.NewID())
+		later := joined(outcome.Decision.Incident, murphy.NewID())
 		later.Alert.ReceivedAt = timestamppb.New(outcome.Alert.GetReceivedAt().AsTime().Add(time.Minute))
 		_, err = repo.Record(t.Context(), later)
 		require.NoError(t, err)
@@ -339,8 +344,12 @@ func opened(serviceID, dedupKey string) *incidents.Change {
 		EscalationPolicyId: murphy.NewID(), EscalationPolicyVersion: 3,
 	}
 	return &incidents.Change{
-		MessageID: murphy.NewID(), Alert: a, IncidentID: incident.GetId(), Created: incident,
-		Timeline: []*murphy.TimelineEntry{entry(incident.GetId(), murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_TRIGGERED, a)},
+		MessageID: murphy.NewID(), Alert: a, IncidentID: incident.GetId(),
+		Decision: &murphy.IncidentDecision{
+			Incident: incident, Created: true,
+			Announce: []murphy.Announcement{{Verb: murphy.IncidentVerb_INCIDENT_VERB_CREATED}},
+			Timeline: []*murphy.TimelineEntry{entry(incident.GetId(), murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_TRIGGERED, a)},
+		},
 	}
 }
 
@@ -354,16 +363,19 @@ func joined(incident *murphy.Incident, messageID string) *incidents.Change {
 		EscalationLevel: incident.GetEscalationLevel(), EscalationRound: incident.GetEscalationRound(),
 	}
 	return &incidents.Change{
-		MessageID: messageID, Alert: a, IncidentID: incident.GetId(), Updated: updated,
-		Timeline: []*murphy.TimelineEntry{entry(incident.GetId(), murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_ALERTED, a)},
+		MessageID: messageID, Alert: a, IncidentID: incident.GetId(),
+		Decision: &murphy.IncidentDecision{
+			Incident: updated,
+			Timeline: []*murphy.TimelineEntry{entry(incident.GetId(), murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_ALERTED, a)},
+		},
 	}
 }
 
 func resolved(incident *murphy.Incident) *incidents.Change {
 	outcome := joined(incident, murphy.NewID())
 	outcome.Alert.Status = murphy.AlertStatus_ALERT_STATUS_RESOLVED
-	outcome.Updated.Resolve(murphy.Now())
-	outcome.Timeline[0].Type = murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_RESOLVED
+	outcome.Decision.Incident.Status, outcome.Decision.Incident.ResolvedAt = murphy.IncidentStatus_INCIDENT_STATUS_RESOLVED, murphy.Now()
+	outcome.Decision.Timeline[0].Type = murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_RESOLVED
 	return outcome
 }
 
@@ -375,10 +387,6 @@ func ids(list []*murphy.Incident) []string {
 	return out
 }
 
-func message(incidentID string, kind incidents.MessageKind, due time.Time) *incidents.ScheduledMessage {
-	return &incidents.ScheduledMessage{ID: murphy.NewID(), IncidentID: incidentID, Kind: kind, DueAt: due, Envelope: []byte("envelope " + murphy.NewID())}
-}
-
-func messages(list ...*incidents.ScheduledMessage) func() ([]*incidents.ScheduledMessage, error) {
-	return func() ([]*incidents.ScheduledMessage, error) { return list, nil }
+func timer(incidentID string, due time.Time) *murphy.Timer {
+	return &murphy.Timer{Id: murphy.NewID(), IncidentId: incidentID, EscalationLevel: 2, EscalationRound: 1, DueAt: timestamppb.New(due)}
 }
