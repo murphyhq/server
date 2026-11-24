@@ -293,16 +293,16 @@ services:
       MURPHY_WEBHOOK_SIGNING_KEYS: *webhook-signing-keys
 
   webhook-receiver:
-    <<: *component
-    command: ["sh", "-c", "go build -o /tmp/receiver ./tests/receiver && exec /tmp/receiver"]
-    environment:
-      <<: *component-environment
-      MURPHY_RECEIVER_PUBLIC_KEYS: *webhook-public-keys
+    image: wiremock/wiremock:3.9.1
+    command: ["--disable-banner"]
     ports:
       - "8092:8080"
-    depends_on:
-      lgtm:
-        condition: service_started
+    volumes:
+      - ./tests/provision/local/wiremock/mappings:/home/wiremock/mappings:ro
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/__admin/health"]
+      interval: 5s
+      retries: 10
 
   api-docs:
     image: nginx:1.27-alpine

@@ -141,23 +141,26 @@ Every kind of failure Murphy guards against is tested, without changing the code
 | Kind | Where | Runs against |
 |---|---|---|
 | Unit | `*_test.go` next to the code | the code under test, with generated mocks of its interfaces |
-| Shared suites | next to each interface | every implementation of that interface, against the real service |
-| Integration | `tests/integration/` | one component's handlers, served in-process, against real infrastructure |
-| End-to-end | `tests/e2e/` | the whole system from `compose.yaml` (`--profile murphy`), as an API client |
-| Load | `tests/load/` | all components, under generated traffic |
+| Shared suites | next to each interface, run from `tests/suites/` | every implementation of that interface, against the real service |
+| Component | `tests/component/` | a component's real services, in-process, against real infrastructure: crashes between steps, redelivery, and what only shows from inside (messages published, logs) |
+| Stack | `tests/stack/` | the whole system from `compose.yaml` (`--profile murphy`), as an API client |
+| Load | `tests/load/` | the whole system, under generated traffic |
 
-1. Tests MUST get their infrastructure from `compose.yaml`, locally and in CI, so they always run against the same versions and settings as development. `tests/testenv/` MUST provide what tests need on top of it: a throwaway database per test, stub notification providers (they record what was sent, fail on demand and send callbacks), and traffic generators that send alerts in each monitoring tool's format.
+1. Tests MUST get their infrastructure from `compose.yaml`, locally and in CI, so they always run against the same versions and settings as development. `tests/murphytest/` MUST provide what stack and load tests need: builders that create unique data through the API, senders of alerts in each monitoring tool's format, waits on what Murphy records, and a webhook receiver (WireMock) that records what it got and fails on demand. `tests/testenv/` MUST provide what the in-process tiers need: a throwaway database per test, brokers, and the components' apps.
 2. Tests MUST change behaviour only through configuration. Components MUST NOT contain test-only code paths.
-3. Interfaces MUST be mocked with generated mocks. Tests MUST check outcomes (what was returned, what reached a dependency), not restate how the code is implemented.
+3. Interfaces MUST be mocked with generated mocks, and only in unit tests; every other kind runs real components. Tests MUST check outcomes (what was returned, what reached a dependency), not restate how the code is implemented.
 4. Tests MUST use `testify`: `require` for anything the rest of the test depends on, `assert` for the checks themselves.
-5. Every consumer MUST have tests for a crash between each step of its delivery handling.
-6. `tests/seed/` MUST give a fresh local stack realistic data, created only through the API and safe to run again. Every domain MUST add its data there in the PR that adds the domain.
-7. `go test ./...` MUST run the unit tests without Docker or network access. Tests under `tests/` MUST use the `integration` build tag, except end-to-end tests, which use `e2e`, and load tests, which use `load`.
-8. Every load test MUST state its thresholds and fail when a run breaks them. Load tests MUST run the same scenarios in every traffic profile, MUST keep their results as reports, and MUST run in CI after every merge to `main`.
+5. Tests MUST be fast, isolated, repeatable and self-validating. A test MUST read as setup, one action and expectations, with no conditionals: searching, waiting and plumbing belong in `tests/murphytest/` or `tests/testenv/`, under names that say what they check.
+6. Stack tests share one running stack, so each MUST create its own data and read only what it created.
+7. Every consumer MUST have tests for a crash between each step of its delivery handling.
+8. `tests/seed/` MUST give a fresh local stack realistic data, created only through the API and safe to run again. Every domain MUST add its data there in the PR that adds the domain.
+9. `go test ./...` MUST run the unit tests without Docker or network access. Tests under `tests/` MUST use the `integration` build tag, except stack tests, which use `stack`, and load tests, which use `load`.
+10. Every load test MUST state its thresholds and fail when a run breaks them. Load tests MUST run the same scenarios in every traffic profile, MUST keep their results as reports, and MUST run in CI after every merge to `main`.
+11. CI MUST run the stack tests on PostgreSQL and NATS for every pull request, and on every database and broker after every merge to `main`.
 
 ## Code
 
-1. Code MUST use the standard library first: no web framework, no ORM, and no dependency for what a few lines of code can do. Tests are the one exception: they use `testify`, and load tests generate traffic with `vegeta`.
+1. Code MUST use the standard library first: no web framework, no ORM, and no dependency for what a few lines of code can do. Tests are the one exception: they use `testify`, talk to WireMock with its `go-wiremock` client, and load tests generate traffic with `vegeta`.
 2. `context.Context` MUST be the first parameter of anything that does I/O.
 3. Errors MUST be wrapped with what was being done.
 4. Secrets MUST NOT appear in logs or errors.

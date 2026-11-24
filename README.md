@@ -33,7 +33,7 @@ Requires Docker.
 | `docker compose --profile murphy watch` | the same, restarting components when the code changes |
 | `docker compose up` | the services only, to run a component yourself |
 
-The API is at http://localhost:8080, described by [`openapi/v1.yaml`](openapi/v1.yaml), and a fresh stack is seeded with example data. Monitoring tools send alerts to `ingest` at http://localhost:8081, described by [`openapi/ingest/v1.yaml`](openapi/ingest/v1.yaml). Webhooks Murphy sends are described by [`openapi/webhooks/v1.yaml`](openapi/webhooks/v1.yaml); seeded people get one pointing at a local receiver, which lists the latest webhooks it got, and whether their signatures check out, at http://localhost:8092. Logs, traces and metrics are in Grafana at http://localhost:3000 (Explore → Loki, Tempo or Prometheus), with linked dashboards under Dashboards → Murphy:
+The API is at http://localhost:8080, described by [`openapi/v1.yaml`](openapi/v1.yaml), and a fresh stack is seeded with example data. Monitoring tools send alerts to `ingest` at http://localhost:8081, described by [`openapi/ingest/v1.yaml`](openapi/ingest/v1.yaml). Webhooks Murphy sends are described by [`openapi/webhooks/v1.yaml`](openapi/webhooks/v1.yaml); seeded people get one pointing at a local WireMock receiver at http://localhost:8092, which shows what it got at http://localhost:8092/__admin/requests. Logs, traces and metrics are in Grafana at http://localhost:3000 (Explore → Loki, Tempo or Prometheus), with linked dashboards under Dashboards → Murphy:
 
 - **Overview** follows an alert through each stage: intake, the queue, the engine, the scheduler and the notifier.
 - **api**, **ingest**, **engine**, **scheduler** and **notifier** each show what that component does (requests, messages or scheduled messages), the database behind it, its runtime and its container.
@@ -49,16 +49,16 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 go run ./cmd/api
 
 Each component reports its health at `http://localhost:9000/healthz` and `/readyz`.
 
-Integration tests run against the services from `docker compose up`:
+Integration tests, the shared suites and the component tests, run against the services from `docker compose up`:
 
 ```
 go test -tags integration ./...
 ```
 
-End-to-end tests run against the whole stack from `docker compose --profile murphy up`:
+Stack tests run against the whole stack from `docker compose --profile murphy up`. Set `COMPOSE_FILE=compose.yaml:compose.mysql.yaml` or `:compose.sqs.yaml` to run the stack on MySQL or on SNS with SQS:
 
 ```
-go test -tags e2e ./tests/e2e/...
+go test -tags stack ./tests/stack/...
 ```
 
 Load tests run against the same stack. `MURPHY_LOAD_PROFILE` picks the traffic, and CI runs every profile after every merge:

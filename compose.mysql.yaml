@@ -1,0 +1,31 @@
+services:
+  api:
+    environment:
+      MURPHY_CATALOG_DATABASE_URL: mysql://murphy:murphy@mysql:3306/catalog
+      MURPHY_INCIDENTS_DATABASE_URL: mysql://murphy:murphy@mysql:3306/incidents
+      MURPHY_PEOPLE_DATABASE_URL: mysql://murphy:murphy@mysql:3306/people
+      MURPHY_ONCALL_DATABASE_URL: mysql://murphy:murphy@mysql:3306/oncall
+      MURPHY_ESCALATION_DATABASE_URL: mysql://murphy:murphy@mysql:3306/escalation
+  engine:
+    environment:
+      MURPHY_CATALOG_DATABASE_URL: mysql://murphy:murphy@mysql:3306/catalog
+      MURPHY_INCIDENTS_DATABASE_URL: mysql://murphy:murphy@mysql:3306/incidents?pool_max_conns=16
+      MURPHY_ESCALATION_DATABASE_URL: mysql://murphy:murphy@mysql:3306/escalation
+  scheduler:
+    environment:
+      MURPHY_INCIDENTS_DATABASE_URL: mysql://murphy:murphy@mysql:3306/incidents
+      MURPHY_NOTIFICATIONS_DATABASE_URL: mysql://murphy:murphy@mysql:3306/notifications
+  notifier:
+    environment:
+      MURPHY_NOTIFICATIONS_DATABASE_URL: mysql://murphy:murphy@mysql:3306/notifications
+      MURPHY_PEOPLE_DATABASE_URL: mysql://murphy:murphy@mysql:3306/people
+      MURPHY_ONCALL_DATABASE_URL: mysql://murphy:murphy@mysql:3306/oncall
+      MURPHY_ESCALATION_DATABASE_URL: mysql://murphy:murphy@mysql:3306/escalation
+  migrate:
+    environment:
+      MURPHY_CATALOG_DATABASE_URL: mysql://murphy:murphy@mysql:3306/catalog
+      MURPHY_INCIDENTS_DATABASE_URL: mysql://murphy:murphy@mysql:3306/incidents
+      MURPHY_PEOPLE_DATABASE_URL: mysql://murphy:murphy@mysql:3306/people
+      MURPHY_ONCALL_DATABASE_URL: mysql://murphy:murphy@mysql:3306/oncall
+      MURPHY_ESCALATION_DATABASE_URL: mysql://murphy:murphy@mysql:3306/escalation
+      MURPHY_NOTIFICATIONS_DATABASE_URL: mysql://murphy:murphy@mysql:3306/notifications
