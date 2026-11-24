@@ -81,6 +81,9 @@ components:
           description: The Murphy server the app should fetch the incident from.
         incident_id:
           type: string
+        traceparent:
+          type: string
+          description: The W3C trace context of the notification's trace. The relay sends it to the phone so the app can continue the trace.
     Push:
       type: object
       required: [id, status]
@@ -100,3 +103,6 @@ components:
           type: integer
         detail:
           type: string
+        trace_id:
+          type: string
+          description: The trace of this request, to find it in your tracing backend.

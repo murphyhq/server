@@ -50,10 +50,6 @@ WHERE incident_id = sqlc.arg(incident_id) AND status = 'firing'
 ORDER BY received_at DESC
 LIMIT 1;
 
--- name: CreateTimelineEntry :exec
-INSERT INTO timeline_entries (id, incident_id, type, summary, details, created_at)
-VALUES (sqlc.arg(id), sqlc.arg(incident_id), sqlc.arg(type), sqlc.arg(summary), sqlc.arg(details), sqlc.arg(created_at));
-
 -- name: ListTimeline :many
 SELECT id, details
 FROM timeline_entries
@@ -92,3 +88,8 @@ WHERE id IN (sqlc.slice(ids));
 -- name: DeleteMessages :exec
 DELETE FROM scheduled_messages
 WHERE id IN (sqlc.slice(ids));
+
+-- name: PolicyOfIncident :one
+SELECT i.escalation_policy_id, EXISTS (SELECT 1 FROM incident_pages AS p WHERE p.incident_id = i.id AND p.user_id = sqlc.arg(user_id)) AS paged
+FROM incidents AS i
+WHERE i.id = sqlc.arg(id);

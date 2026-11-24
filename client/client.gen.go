@@ -576,6 +576,14 @@ type OnCall struct {
 	User *Reference `json:"user,omitempty"`
 }
 
+// OnCallPage defines model for OnCallPage.
+type OnCallPage struct {
+	Items []ScheduleOnCall `json:"items"`
+
+	// NextCursor Empty on the last page.
+	NextCursor string `json:"next_cursor"`
+}
+
 // Override defines model for Override.
 type Override struct {
 	CreatedAt time.Time `json:"created_at"`
@@ -664,6 +672,17 @@ type ScheduleInput struct {
 
 	// TimeZone IANA time zone; UTC by default.
 	TimeZone *string `json:"time_zone,omitempty"`
+}
+
+// ScheduleOnCall defines model for ScheduleOnCall.
+type ScheduleOnCall struct {
+	At time.Time `json:"at"`
+
+	// Schedule Points at another resource.
+	Schedule Reference `json:"schedule"`
+
+	// User Absent when nobody is on call.
+	User *Reference `json:"user,omitempty"`
 }
 
 // SchedulePage defines model for SchedulePage.
@@ -1021,6 +1040,21 @@ type ResolveIncidentParams struct {
 type RotateIntegrationKeyParams struct {
 	// IdempotencyKey Makes retries safe. A retry with the same key and request returns the original response for 24 hours; the same key with a different request is rejected with 422, and a retry while the first request is still running gets 409.
 	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// ListOnCallParams defines parameters for ListOnCall.
+type ListOnCallParams struct {
+	// Limit Items per page, 50 by default and at most 100.
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Cursor The next_cursor of the previous page.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// UserId Only schedules where one of these people is on call. A page can then hold fewer items than the limit; keep following `next_cursor`.
+	UserId *[]string `form:"user_id,omitempty" json:"user_id,omitempty"`
+
+	// At The moment to ask about; now by default.
+	At *time.Time `form:"at,omitempty" json:"at,omitempty"`
 }
 
 // ListSchedulesParams defines parameters for ListSchedules.
@@ -1448,6 +1482,13 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /v1/integrations/{id}/key (the `RotateIntegrationKey` operationId).
 	RotateIntegrationKey(ctx context.Context, id ID, params *RotateIntegrationKeyParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListOnCall Find who is on call across schedules
+	//
+	// Who is on call at a moment for each schedule, newest schedule first, computed from each schedule's layers and overrides.
+	//
+	// Corresponds with GET /v1/on-call (the `ListOnCall` operationId).
+	ListOnCall(ctx context.Context, params *ListOnCallParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DeleteOverride Delete an override
 	//
@@ -2233,6 +2274,23 @@ func (c *Client) UpdateIntegration(ctx context.Context, id ID, body UpdateIntegr
 // Corresponds with POST /v1/integrations/{id}/key (the `RotateIntegrationKey` operationId).
 func (c *Client) RotateIntegrationKey(ctx context.Context, id ID, params *RotateIntegrationKeyParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewRotateIntegrationKeyRequest(c.Server, id, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListOnCall Find who is on call across schedules
+//
+// Who is on call at a moment for each schedule, newest schedule first, computed from each schedule's layers and overrides.
+//
+// Corresponds with GET /v1/on-call (the `ListOnCall` operationId).
+func (c *Client) ListOnCall(ctx context.Context, params *ListOnCallParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListOnCallRequest(c.Server, params)
 	if err != nil {
 		return nil, err
 	}
@@ -4273,6 +4331,96 @@ func NewRotateIntegrationKeyRequest(server string, id ID, params *RotateIntegrat
 	return req, nil
 }
 
+// NewListOnCallRequest constructs an http.Request for the ListOnCall method
+func NewListOnCallRequest(server string, params *ListOnCallParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/on-call")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Cursor != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "cursor", *params.Cursor, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.UserId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "user_id", *params.UserId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "array", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.At != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "at", *params.At, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewDeleteOverrideRequest constructs an http.Request for the DeleteOverride method
 func NewDeleteOverrideRequest(server string, id ID) (*http.Request, error) {
 	var err error
@@ -6187,6 +6335,15 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with POST /v1/integrations/{id}/key (the `RotateIntegrationKey` operationId).
 	RotateIntegrationKeyWithResponse(ctx context.Context, id ID, params *RotateIntegrationKeyParams, reqEditors ...RequestEditorFn) (*RotateIntegrationKeyResponse, error)
 
+	// ListOnCallWithResponse Find who is on call across schedules
+	//
+	// Who is on call at a moment for each schedule, newest schedule first, computed from each schedule's layers and overrides.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /v1/on-call (the `ListOnCall` operationId).
+	ListOnCallWithResponse(ctx context.Context, params *ListOnCallParams, reqEditors ...RequestEditorFn) (*ListOnCallResponse, error)
+
 	// DeleteOverrideWithResponse Delete an override
 	//
 	// Returns a wrapper object for the known response body format(s).
@@ -7809,6 +7966,54 @@ func (r RotateIntegrationKeyResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r RotateIntegrationKeyResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ListOnCallResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *OnCallPage
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *Problem
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListOnCallResponse) GetJSON200() *OnCallPage {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r ListOnCallResponse) GetApplicationproblemJSON400() *Problem {
+	return r.ApplicationproblemJSON400
+}
+
+// GetBody returns the raw response body bytes
+func (r ListOnCallResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListOnCallResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListOnCallResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListOnCallResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -10007,6 +10212,21 @@ func (c *ClientWithResponses) RotateIntegrationKeyWithResponse(ctx context.Conte
 	return ParseRotateIntegrationKeyResponse(rsp)
 }
 
+// ListOnCallWithResponse Find who is on call across schedules
+//
+// Who is on call at a moment for each schedule, newest schedule first, computed from each schedule's layers and overrides.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /v1/on-call (the `ListOnCall` operationId).
+func (c *ClientWithResponses) ListOnCallWithResponse(ctx context.Context, params *ListOnCallParams, reqEditors ...RequestEditorFn) (*ListOnCallResponse, error) {
+	rsp, err := c.ListOnCall(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListOnCallResponse(rsp)
+}
+
 // DeleteOverrideWithResponse Delete an override
 //
 // Returns a wrapper object for the known response body format(s).
@@ -11565,6 +11785,39 @@ func ParseRotateIntegrationKeyResponse(rsp *http.Response) (*RotateIntegrationKe
 			return nil, err
 		}
 		response.ApplicationproblemJSON422 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListOnCallResponse parses an HTTP response from a ListOnCallWithResponse call
+func ParseListOnCallResponse(rsp *http.Response) (*ListOnCallResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListOnCallResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest OnCallPage
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
 
 	}
 

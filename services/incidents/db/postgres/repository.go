@@ -173,3 +173,14 @@ func texts[T interface{ Text() string }](values []T) []string {
 	}
 	return out
 }
+
+func (r *Repository) PolicyOfIncident(ctx context.Context, id, userID string) (_ string, paged bool, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	row, err := r.queries.PolicyOfIncident(ctx, PolicyOfIncidentParams{ID: id, UserID: userID})
+	if err != nil {
+		return "", false, murphypostgres.Error("incident", err)
+	}
+	return row.EscalationPolicyID, row.Paged, nil
+}

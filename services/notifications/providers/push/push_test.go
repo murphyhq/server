@@ -5,11 +5,15 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/murphyhq/server"
@@ -56,6 +60,24 @@ func TestAPushCarriesTheEventTheServerAndTheIncidentOnly(t *testing.T) {
 		"id": "notification-1", "platform": "ios", "token": "apns-token", "event": "paged", "server": "https://murphy.example.com",
 		"incident_id": "incident-1", "authorization": "Bearer mik_install-key",
 	}, answer.received, "no incident title or other incident data")
+}
+
+func TestAPushCarriesTheTraceToThePhone(t *testing.T) {
+	previousProvider, previousPropagator := otel.GetTracerProvider(), otel.GetTextMapPropagator()
+	otel.SetTracerProvider(sdktrace.NewTracerProvider())
+	otel.SetTextMapPropagator(propagation.TraceContext{})
+	t.Cleanup(func() {
+		otel.SetTracerProvider(previousProvider)
+		otel.SetTextMapPropagator(previousPropagator)
+	})
+	ctx, span := otel.Tracer("push_test").Start(t.Context(), "page")
+	defer span.End()
+	answer := &relayAnswer{status: http.StatusOK}
+
+	err := pushesThrough(t, answer).Send(ctx, notification(murphy.NotificationReason_NOTIFICATION_REASON_PAGED))
+
+	require.NoError(t, err)
+	assert.True(t, strings.HasPrefix(answer.received["traceparent"], "00-"+span.SpanContext().TraceID().String()+"-"), "the phone continues the page's trace")
 }
 
 func TestAnAcknowledgementIsPushedAsOne(t *testing.T) {

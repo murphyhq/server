@@ -532,6 +532,108 @@ func (q *Queries) ScheduleNames(ctx context.Context, ids []string) ([]ScheduleNa
 	return items, nil
 }
 
+const schedulesOfUsers = `-- name: SchedulesOfUsers :many
+SELECT l.schedule_id
+FROM layer_participants AS p
+JOIN layers AS l ON l.id = p.layer_id
+WHERE p.user_id IN (/*SLICE:participants*/?) AND l.schedule_id < ?
+UNION
+SELECT o.schedule_id
+FROM overrides AS o
+WHERE o.user_id IN (/*SLICE:covering*/?) AND o.starts_at <= ? AND o.ends_at > ? AND o.schedule_id < ?
+ORDER BY schedule_id DESC
+LIMIT ?
+`
+
+type SchedulesOfUsersParams struct {
+	Participants []string
+	Before       string
+	Covering     []string
+	At           time.Time
+	Limit        int32
+}
+
+func (q *Queries) SchedulesOfUsers(ctx context.Context, arg SchedulesOfUsersParams) ([]string, error) {
+	query := schedulesOfUsers
+	var queryParams []interface{}
+	if len(arg.Participants) > 0 {
+		for _, v := range arg.Participants {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:participants*/?", strings.Repeat(",?", len(arg.Participants))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:participants*/?", "NULL", 1)
+	}
+	queryParams = append(queryParams, arg.Before)
+	if len(arg.Covering) > 0 {
+		for _, v := range arg.Covering {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:covering*/?", strings.Repeat(",?", len(arg.Covering))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:covering*/?", "NULL", 1)
+	}
+	queryParams = append(queryParams, arg.At)
+	queryParams = append(queryParams, arg.At)
+	queryParams = append(queryParams, arg.Before)
+	queryParams = append(queryParams, arg.Limit)
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var schedule_id string
+		if err := rows.Scan(&schedule_id); err != nil {
+			return nil, err
+		}
+		items = append(items, schedule_id)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const teamsOfSchedule = `-- name: TeamsOfSchedule :many
+SELECT s.id, st.team_id
+FROM schedules AS s
+LEFT JOIN schedule_teams AS st ON st.schedule_id = s.id
+WHERE s.id = ?
+`
+
+type TeamsOfScheduleRow struct {
+	ID     string
+	TeamID *string
+}
+
+func (q *Queries) TeamsOfSchedule(ctx context.Context, id string) ([]TeamsOfScheduleRow, error) {
+	rows, err := q.db.QueryContext(ctx, teamsOfSchedule, id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []TeamsOfScheduleRow
+	for rows.Next() {
+		var i TeamsOfScheduleRow
+		if err := rows.Scan(&i.ID, &i.TeamID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateSchedule = `-- name: UpdateSchedule :execrows
 UPDATE schedules
 SET name = ?, time_zone = ?, updated_at = ?

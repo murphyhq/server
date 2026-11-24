@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 
@@ -33,9 +34,10 @@ const (
 var notFound = &murphy.NotFoundError{Entity: "thing"}
 
 type install struct {
-	access *access
-	roles  map[string]map[string]murphy.TeamRole
-	paged  []string
+	access      *access
+	roles       map[string]map[string]murphy.TeamRole
+	paged       []string
+	roleLookups int
 }
 
 func newInstall(t *testing.T) *install {
@@ -47,35 +49,31 @@ func newInstall(t *testing.T) *install {
 	}
 	people.EXPECT().TeamRolesOf(mock.Anything, broken).Return(nil, errors.New("the database is down")).Maybe()
 	people.EXPECT().TeamRolesOf(mock.Anything, mock.Anything).RunAndReturn(func(_ context.Context, userID string) (map[string]murphy.TeamRole, error) {
+		i.roleLookups++
 		return i.roles[userID], nil
 	}).Maybe()
 	people.EXPECT().GetContactMethod(mock.Anything, "bo-webhook").Return(&murphy.ContactMethod{Id: "bo-webhook", UserId: "bo"}, nil).Maybe()
 	people.EXPECT().GetContactMethod(mock.Anything, "cy-webhook").Return(&murphy.ContactMethod{Id: "cy-webhook", UserId: "cy"}, nil).Maybe()
 	people.EXPECT().GetContactMethod(mock.Anything, missing).Return(nil, notFound).Maybe()
-	policies.EXPECT().GetPolicy(mock.Anything, policy).Return(&murphy.EscalationPolicy{Id: policy, TeamId: payments}, nil).Maybe()
-	policies.EXPECT().GetPolicy(mock.Anything, missing).Return(nil, notFound).Maybe()
+	policies.EXPECT().GetPolicyRecord(mock.Anything, policy).Return(&murphy.EscalationPolicy{Id: policy, TeamId: payments}, nil).Maybe()
+	policies.EXPECT().GetPolicyRecord(mock.Anything, missing).Return(nil, notFound).Maybe()
 	services.EXPECT().GetService(mock.Anything, service).Return(&murphy.Service{Id: service, EscalationPolicyId: policy}, nil).Maybe()
 	services.EXPECT().GetService(mock.Anything, "service-of-a-missing-policy").Return(&murphy.Service{EscalationPolicyId: missing}, nil).Maybe()
 	services.EXPECT().GetService(mock.Anything, missing).Return(nil, notFound).Maybe()
-	services.EXPECT().GetIntegration(mock.Anything, integration).Return(&murphy.Integration{Id: integration, ServiceId: service}, nil).Maybe()
-	services.EXPECT().GetIntegration(mock.Anything, "integration-of-a-missing-service").Return(&murphy.Integration{ServiceId: missing}, nil).Maybe()
-	services.EXPECT().GetIntegration(mock.Anything, missing).Return(nil, notFound).Maybe()
-	schedules.EXPECT().GetSchedule(mock.Anything, shared).Return(&murphy.Schedule{Id: shared, TeamIds: []string{payments, platform}}, nil).Maybe()
-	schedules.EXPECT().GetSchedule(mock.Anything, orphan).Return(&murphy.Schedule{Id: orphan}, nil).Maybe()
-	schedules.EXPECT().GetSchedule(mock.Anything, missing).Return(nil, notFound).Maybe()
+	services.EXPECT().GetIntegrationAndService(mock.Anything, integration).Return(&murphy.Integration{Id: integration, ServiceId: service}, &murphy.Service{Id: service, EscalationPolicyId: policy}, nil).Maybe()
+	services.EXPECT().GetIntegrationAndService(mock.Anything, "integration-of-a-missing-policy").Return(&murphy.Integration{ServiceId: service}, &murphy.Service{EscalationPolicyId: missing}, nil).Maybe()
+	services.EXPECT().GetIntegrationAndService(mock.Anything, missing).Return(nil, nil, notFound).Maybe()
+	schedules.EXPECT().TeamsOfSchedule(mock.Anything, shared).Return([]string{payments, platform}, nil).Maybe()
+	schedules.EXPECT().TeamsOfSchedule(mock.Anything, orphan).Return(nil, nil).Maybe()
+	schedules.EXPECT().TeamsOfSchedule(mock.Anything, missing).Return(nil, notFound).Maybe()
 	schedules.EXPECT().GetOverride(mock.Anything, override).Return(&murphy.Override{Id: override, ScheduleId: shared}, nil).Maybe()
 	schedules.EXPECT().GetOverride(mock.Anything, "override-of-a-missing-schedule").Return(&murphy.Override{ScheduleId: missing}, nil).Maybe()
 	schedules.EXPECT().GetOverride(mock.Anything, missing).Return(nil, notFound).Maybe()
-	incidents.EXPECT().GetIncident(mock.Anything, incident).RunAndReturn(func(context.Context, string) (*murphy.Incident, []*murphy.TimelineEntry, error) {
-		pages := make([]*murphy.TimelinePage, len(i.paged))
-		for n, user := range i.paged {
-			pages[n] = &murphy.TimelinePage{UserId: user}
-		}
-		timeline := []*murphy.TimelineEntry{{Escalation: &murphy.TimelineEscalation{Level: 1, Paged: pages}}}
-		return &murphy.Incident{Id: incident, EscalationPolicyId: policy}, timeline, nil
+	incidents.EXPECT().PolicyOfIncident(mock.Anything, incident, mock.Anything).RunAndReturn(func(_ context.Context, _, userID string) (string, bool, error) {
+		return policy, slices.Contains(i.paged, userID), nil
 	}).Maybe()
-	incidents.EXPECT().GetIncident(mock.Anything, "incident-of-a-missing-policy").Return(&murphy.Incident{EscalationPolicyId: missing}, nil, nil).Maybe()
-	incidents.EXPECT().GetIncident(mock.Anything, missing).Return(nil, nil, notFound).Maybe()
+	incidents.EXPECT().PolicyOfIncident(mock.Anything, "incident-of-a-missing-policy", mock.Anything).Return(missing, false, nil).Maybe()
+	incidents.EXPECT().PolicyOfIncident(mock.Anything, missing, mock.Anything).Return("", false, notFound).Maybe()
 	return i
 }
 
@@ -251,6 +249,16 @@ func TestCreatingForATeamYouManageIsAllowed(t *testing.T) {
 	assert.Equal(t, http.StatusNoContent, got)
 }
 
+func TestTeamRolesAreReadOncePerRequest(t *testing.T) {
+	i := newInstall(t)
+	bo := i.member("bo", payments, murphy.TeamRole_TEAM_ROLE_MANAGER)
+
+	got := i.send(t, asMember(bo).to(http.MethodPut, "/v1/escalation-policies/{id}", "/v1/escalation-policies/"+policy).with(`{"team": {"id": "team-payments"}}`))
+
+	assert.Equal(t, http.StatusNoContent, got)
+	assert.Equal(t, 1, i.roleLookups, "the policy's team and the body's team are checked against the same roles")
+}
+
 func TestChangingYourselfIsAllowed(t *testing.T) {
 	i := newInstall(t)
 
@@ -278,7 +286,7 @@ func TestChangingSomeoneElseIsRefused(t *testing.T) {
 func TestYourOwnSessionsAreAlwaysYours(t *testing.T) {
 	i := newInstall(t)
 
-	err := i.access.allows(t.Context(), "bo", "sessions:own", nil)
+	err := i.access.allows(t.Context(), i.access.caller(t.Context(), "bo"), "sessions:own", nil)
 
 	assert.NoError(t, err)
 }
@@ -286,7 +294,7 @@ func TestYourOwnSessionsAreAlwaysYours(t *testing.T) {
 func TestMembersDontSetUpTheInstall(t *testing.T) {
 	i := newInstall(t)
 
-	err := i.access.allows(t.Context(), i.member("bo", payments, murphy.TeamRole_TEAM_ROLE_MANAGER), "install:manage", nil)
+	err := i.access.allows(t.Context(), i.access.caller(t.Context(), i.member("bo", payments, murphy.TeamRole_TEAM_ROLE_MANAGER)), "install:manage", nil)
 
 	assert.ErrorIs(t, err, murphy.ErrForbidden)
 }
@@ -294,7 +302,7 @@ func TestMembersDontSetUpTheInstall(t *testing.T) {
 func TestYourOwnContactMethodsAreYours(t *testing.T) {
 	i := newInstall(t)
 
-	err := i.access.allows(t.Context(), "bo", "contact-methods:own", []string{"bo-webhook"})
+	err := i.access.allows(t.Context(), i.access.caller(t.Context(), "bo"), "contact-methods:own", []string{"bo-webhook"})
 
 	assert.NoError(t, err)
 }
@@ -302,7 +310,7 @@ func TestYourOwnContactMethodsAreYours(t *testing.T) {
 func TestNobodyChangesSomeoneElsesContactMethods(t *testing.T) {
 	i := newInstall(t)
 
-	err := i.access.allows(t.Context(), "bo", "contact-methods:own", []string{"cy-webhook"})
+	err := i.access.allows(t.Context(), i.access.caller(t.Context(), "bo"), "contact-methods:own", []string{"cy-webhook"})
 
 	assert.ErrorIs(t, err, murphy.ErrForbidden)
 }
@@ -310,7 +318,7 @@ func TestNobodyChangesSomeoneElsesContactMethods(t *testing.T) {
 func TestAMissingContactMethodIsNotFound(t *testing.T) {
 	i := newInstall(t)
 
-	err := i.access.allows(t.Context(), "bo", "contact-methods:own", []string{missing})
+	err := i.access.allows(t.Context(), i.access.caller(t.Context(), "bo"), "contact-methods:own", []string{missing})
 
 	assert.ErrorIs(t, err, murphy.ErrNotFound)
 }
@@ -318,7 +326,7 @@ func TestAMissingContactMethodIsNotFound(t *testing.T) {
 func TestATeamsManagerManagesTheTeam(t *testing.T) {
 	i := newInstall(t)
 
-	err := i.access.allows(t.Context(), i.member("bo", payments, murphy.TeamRole_TEAM_ROLE_MANAGER), "teams:manage", []string{payments})
+	err := i.access.allows(t.Context(), i.access.caller(t.Context(), i.member("bo", payments, murphy.TeamRole_TEAM_ROLE_MANAGER)), "teams:manage", []string{payments})
 
 	assert.NoError(t, err)
 }
@@ -326,7 +334,7 @@ func TestATeamsManagerManagesTheTeam(t *testing.T) {
 func TestATeamsResponderDoesntManageTheTeam(t *testing.T) {
 	i := newInstall(t)
 
-	err := i.access.allows(t.Context(), i.member("bo", payments, murphy.TeamRole_TEAM_ROLE_RESPONDER), "teams:manage", []string{payments})
+	err := i.access.allows(t.Context(), i.access.caller(t.Context(), i.member("bo", payments, murphy.TeamRole_TEAM_ROLE_RESPONDER)), "teams:manage", []string{payments})
 
 	assert.ErrorIs(t, err, murphy.ErrForbidden)
 }
@@ -334,7 +342,7 @@ func TestATeamsResponderDoesntManageTheTeam(t *testing.T) {
 func TestATeamsManagerManagesItsPolicies(t *testing.T) {
 	i := newInstall(t)
 
-	err := i.access.allows(t.Context(), i.member("bo", payments, murphy.TeamRole_TEAM_ROLE_MANAGER), "policies:manage", []string{policy})
+	err := i.access.allows(t.Context(), i.access.caller(t.Context(), i.member("bo", payments, murphy.TeamRole_TEAM_ROLE_MANAGER)), "policies:manage", []string{policy})
 
 	assert.NoError(t, err)
 }
@@ -342,7 +350,7 @@ func TestATeamsManagerManagesItsPolicies(t *testing.T) {
 func TestAnotherTeamsManagerDoesntManageThePolicy(t *testing.T) {
 	i := newInstall(t)
 
-	err := i.access.allows(t.Context(), i.member("cy", platform, murphy.TeamRole_TEAM_ROLE_MANAGER), "policies:manage", []string{policy})
+	err := i.access.allows(t.Context(), i.access.caller(t.Context(), i.member("cy", platform, murphy.TeamRole_TEAM_ROLE_MANAGER)), "policies:manage", []string{policy})
 
 	assert.ErrorIs(t, err, murphy.ErrForbidden)
 }
@@ -350,7 +358,7 @@ func TestAnotherTeamsManagerDoesntManageThePolicy(t *testing.T) {
 func TestAMissingPolicyIsNotFound(t *testing.T) {
 	i := newInstall(t)
 
-	err := i.access.allows(t.Context(), "bo", "policies:manage", []string{missing})
+	err := i.access.allows(t.Context(), i.access.caller(t.Context(), "bo"), "policies:manage", []string{missing})
 
 	assert.ErrorIs(t, err, murphy.ErrNotFound)
 }
@@ -358,7 +366,7 @@ func TestAMissingPolicyIsNotFound(t *testing.T) {
 func TestATeamsManagerManagesItsServices(t *testing.T) {
 	i := newInstall(t)
 
-	err := i.access.allows(t.Context(), i.member("bo", payments, murphy.TeamRole_TEAM_ROLE_MANAGER), "services:manage", []string{service})
+	err := i.access.allows(t.Context(), i.access.caller(t.Context(), i.member("bo", payments, murphy.TeamRole_TEAM_ROLE_MANAGER)), "services:manage", []string{service})
 
 	assert.NoError(t, err)
 }
@@ -366,7 +374,7 @@ func TestATeamsManagerManagesItsServices(t *testing.T) {
 func TestATeamsResponderDoesntManageItsServices(t *testing.T) {
 	i := newInstall(t)
 
-	err := i.access.allows(t.Context(), i.member("bo", payments, murphy.TeamRole_TEAM_ROLE_RESPONDER), "services:manage", []string{service})
+	err := i.access.allows(t.Context(), i.access.caller(t.Context(), i.member("bo", payments, murphy.TeamRole_TEAM_ROLE_RESPONDER)), "services:manage", []string{service})
 
 	assert.ErrorIs(t, err, murphy.ErrForbidden)
 }
@@ -374,7 +382,7 @@ func TestATeamsResponderDoesntManageItsServices(t *testing.T) {
 func TestAServiceWhosePolicyIsMissingIsNotFound(t *testing.T) {
 	i := newInstall(t)
 
-	err := i.access.allows(t.Context(), "bo", "services:manage", []string{"service-of-a-missing-policy"})
+	err := i.access.allows(t.Context(), i.access.caller(t.Context(), "bo"), "services:manage", []string{"service-of-a-missing-policy"})
 
 	assert.ErrorIs(t, err, murphy.ErrNotFound)
 }
@@ -382,7 +390,7 @@ func TestAServiceWhosePolicyIsMissingIsNotFound(t *testing.T) {
 func TestATeamsManagerManagesItsIntegrations(t *testing.T) {
 	i := newInstall(t)
 
-	err := i.access.allows(t.Context(), i.member("bo", payments, murphy.TeamRole_TEAM_ROLE_MANAGER), "integrations:manage", []string{integration})
+	err := i.access.allows(t.Context(), i.access.caller(t.Context(), i.member("bo", payments, murphy.TeamRole_TEAM_ROLE_MANAGER)), "integrations:manage", []string{integration})
 
 	assert.NoError(t, err)
 }
@@ -390,7 +398,7 @@ func TestATeamsManagerManagesItsIntegrations(t *testing.T) {
 func TestAnotherTeamsManagerDoesntManageTheIntegration(t *testing.T) {
 	i := newInstall(t)
 
-	err := i.access.allows(t.Context(), i.member("cy", platform, murphy.TeamRole_TEAM_ROLE_MANAGER), "integrations:manage", []string{integration})
+	err := i.access.allows(t.Context(), i.access.caller(t.Context(), i.member("cy", platform, murphy.TeamRole_TEAM_ROLE_MANAGER)), "integrations:manage", []string{integration})
 
 	assert.ErrorIs(t, err, murphy.ErrForbidden)
 }
@@ -398,15 +406,15 @@ func TestAnotherTeamsManagerDoesntManageTheIntegration(t *testing.T) {
 func TestAMissingIntegrationIsNotFound(t *testing.T) {
 	i := newInstall(t)
 
-	err := i.access.allows(t.Context(), "bo", "integrations:manage", []string{missing})
+	err := i.access.allows(t.Context(), i.access.caller(t.Context(), "bo"), "integrations:manage", []string{missing})
 
 	assert.ErrorIs(t, err, murphy.ErrNotFound)
 }
 
-func TestAnIntegrationWhoseServiceIsMissingIsNotFound(t *testing.T) {
+func TestAnIntegrationWhosePolicyIsMissingIsNotFound(t *testing.T) {
 	i := newInstall(t)
 
-	err := i.access.allows(t.Context(), "bo", "integrations:manage", []string{"integration-of-a-missing-service"})
+	err := i.access.allows(t.Context(), i.access.caller(t.Context(), "bo"), "integrations:manage", []string{"integration-of-a-missing-policy"})
 
 	assert.ErrorIs(t, err, murphy.ErrNotFound)
 }
@@ -414,7 +422,7 @@ func TestAnIntegrationWhoseServiceIsMissingIsNotFound(t *testing.T) {
 func TestASharedScheduleIsManagedFromAnyOfItsTeams(t *testing.T) {
 	i := newInstall(t)
 
-	err := i.access.allows(t.Context(), i.member("cy", platform, murphy.TeamRole_TEAM_ROLE_MANAGER), "schedules:manage", []string{shared})
+	err := i.access.allows(t.Context(), i.access.caller(t.Context(), i.member("cy", platform, murphy.TeamRole_TEAM_ROLE_MANAGER)), "schedules:manage", []string{shared})
 
 	assert.NoError(t, err)
 }
@@ -422,7 +430,7 @@ func TestASharedScheduleIsManagedFromAnyOfItsTeams(t *testing.T) {
 func TestAScheduleWithoutTeamsIsManagedByAdminsOnly(t *testing.T) {
 	i := newInstall(t)
 
-	err := i.access.allows(t.Context(), i.member("bo", payments, murphy.TeamRole_TEAM_ROLE_MANAGER), "schedules:manage", []string{orphan})
+	err := i.access.allows(t.Context(), i.access.caller(t.Context(), i.member("bo", payments, murphy.TeamRole_TEAM_ROLE_MANAGER)), "schedules:manage", []string{orphan})
 
 	assert.ErrorIs(t, err, murphy.ErrForbidden)
 }
@@ -430,7 +438,7 @@ func TestAScheduleWithoutTeamsIsManagedByAdminsOnly(t *testing.T) {
 func TestAMissingScheduleIsNotFound(t *testing.T) {
 	i := newInstall(t)
 
-	err := i.access.allows(t.Context(), "bo", "schedules:manage", []string{missing})
+	err := i.access.allows(t.Context(), i.access.caller(t.Context(), "bo"), "schedules:manage", []string{missing})
 
 	assert.ErrorIs(t, err, murphy.ErrNotFound)
 }
@@ -438,7 +446,7 @@ func TestAMissingScheduleIsNotFound(t *testing.T) {
 func TestAScheduleManagerManagesItsOverrides(t *testing.T) {
 	i := newInstall(t)
 
-	err := i.access.allows(t.Context(), i.member("cy", platform, murphy.TeamRole_TEAM_ROLE_MANAGER), "overrides:manage", []string{override})
+	err := i.access.allows(t.Context(), i.access.caller(t.Context(), i.member("cy", platform, murphy.TeamRole_TEAM_ROLE_MANAGER)), "overrides:manage", []string{override})
 
 	assert.NoError(t, err)
 }
@@ -446,7 +454,7 @@ func TestAScheduleManagerManagesItsOverrides(t *testing.T) {
 func TestAResponderDoesntManageOverrides(t *testing.T) {
 	i := newInstall(t)
 
-	err := i.access.allows(t.Context(), i.member("cy", platform, murphy.TeamRole_TEAM_ROLE_RESPONDER), "overrides:manage", []string{override})
+	err := i.access.allows(t.Context(), i.access.caller(t.Context(), i.member("cy", platform, murphy.TeamRole_TEAM_ROLE_RESPONDER)), "overrides:manage", []string{override})
 
 	assert.ErrorIs(t, err, murphy.ErrForbidden)
 }
@@ -454,7 +462,7 @@ func TestAResponderDoesntManageOverrides(t *testing.T) {
 func TestAMissingOverrideIsNotFound(t *testing.T) {
 	i := newInstall(t)
 
-	err := i.access.allows(t.Context(), "bo", "overrides:manage", []string{missing})
+	err := i.access.allows(t.Context(), i.access.caller(t.Context(), "bo"), "overrides:manage", []string{missing})
 
 	assert.ErrorIs(t, err, murphy.ErrNotFound)
 }
@@ -462,7 +470,7 @@ func TestAMissingOverrideIsNotFound(t *testing.T) {
 func TestAnOverrideWhoseScheduleIsMissingIsNotFound(t *testing.T) {
 	i := newInstall(t)
 
-	err := i.access.allows(t.Context(), "bo", "overrides:manage", []string{"override-of-a-missing-schedule"})
+	err := i.access.allows(t.Context(), i.access.caller(t.Context(), "bo"), "overrides:manage", []string{"override-of-a-missing-schedule"})
 
 	assert.ErrorIs(t, err, murphy.ErrNotFound)
 }
@@ -470,7 +478,7 @@ func TestAnOverrideWhoseScheduleIsMissingIsNotFound(t *testing.T) {
 func TestTheOwningTeamsRespondersRespond(t *testing.T) {
 	i := newInstall(t)
 
-	err := i.access.allows(t.Context(), i.member("bo", payments, murphy.TeamRole_TEAM_ROLE_RESPONDER), "incidents:respond", []string{incident})
+	err := i.access.allows(t.Context(), i.access.caller(t.Context(), i.member("bo", payments, murphy.TeamRole_TEAM_ROLE_RESPONDER)), "incidents:respond", []string{incident})
 
 	assert.NoError(t, err)
 }
@@ -478,7 +486,7 @@ func TestTheOwningTeamsRespondersRespond(t *testing.T) {
 func TestTheOwningTeamsManagersRespond(t *testing.T) {
 	i := newInstall(t)
 
-	err := i.access.allows(t.Context(), i.member("bo", payments, murphy.TeamRole_TEAM_ROLE_MANAGER), "incidents:respond", []string{incident})
+	err := i.access.allows(t.Context(), i.access.caller(t.Context(), i.member("bo", payments, murphy.TeamRole_TEAM_ROLE_MANAGER)), "incidents:respond", []string{incident})
 
 	assert.NoError(t, err)
 }
@@ -486,7 +494,7 @@ func TestTheOwningTeamsManagersRespond(t *testing.T) {
 func TestObserversOnlyWatch(t *testing.T) {
 	i := newInstall(t)
 
-	err := i.access.allows(t.Context(), i.member("bo", payments, murphy.TeamRole_TEAM_ROLE_OBSERVER), "incidents:respond", []string{incident})
+	err := i.access.allows(t.Context(), i.access.caller(t.Context(), i.member("bo", payments, murphy.TeamRole_TEAM_ROLE_OBSERVER)), "incidents:respond", []string{incident})
 
 	assert.ErrorIs(t, err, murphy.ErrForbidden)
 }
@@ -495,7 +503,7 @@ func TestSomeonePagedDirectlyRespondsFromOutsideTheTeam(t *testing.T) {
 	i := newInstall(t)
 	i.paged = []string{"cy"}
 
-	err := i.access.allows(t.Context(), i.member("cy", platform, murphy.TeamRole_TEAM_ROLE_OBSERVER), "incidents:respond", []string{incident})
+	err := i.access.allows(t.Context(), i.access.caller(t.Context(), i.member("cy", platform, murphy.TeamRole_TEAM_ROLE_OBSERVER)), "incidents:respond", []string{incident})
 
 	assert.NoError(t, err)
 }
@@ -503,7 +511,7 @@ func TestSomeonePagedDirectlyRespondsFromOutsideTheTeam(t *testing.T) {
 func TestAMissingIncidentIsNotFound(t *testing.T) {
 	i := newInstall(t)
 
-	err := i.access.allows(t.Context(), "bo", "incidents:respond", []string{missing})
+	err := i.access.allows(t.Context(), i.access.caller(t.Context(), "bo"), "incidents:respond", []string{missing})
 
 	assert.ErrorIs(t, err, murphy.ErrNotFound)
 }
@@ -511,7 +519,7 @@ func TestAMissingIncidentIsNotFound(t *testing.T) {
 func TestAnIncidentWhosePolicyIsMissingIsNotFound(t *testing.T) {
 	i := newInstall(t)
 
-	err := i.access.allows(t.Context(), "bo", "incidents:respond", []string{"incident-of-a-missing-policy"})
+	err := i.access.allows(t.Context(), i.access.caller(t.Context(), "bo"), "incidents:respond", []string{"incident-of-a-missing-policy"})
 
 	assert.ErrorIs(t, err, murphy.ErrNotFound)
 }
@@ -519,7 +527,7 @@ func TestAnIncidentWhosePolicyIsMissingIsNotFound(t *testing.T) {
 func TestRolesThatFailToLoadAreAnErrorNotARefusal(t *testing.T) {
 	i := newInstall(t)
 
-	err := i.access.allows(t.Context(), broken, "teams:manage", []string{payments})
+	err := i.access.allows(t.Context(), i.access.caller(t.Context(), broken), "teams:manage", []string{payments})
 
 	require.Error(t, err)
 	assert.NotErrorIs(t, err, murphy.ErrForbidden)

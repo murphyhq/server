@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"slices"
 	"strings"
+	"sync"
 
 	"github.com/getkin/kin-openapi/openapi3"
 
@@ -22,27 +23,27 @@ type TeamRoles interface {
 }
 
 type PolicyOwners interface {
-	GetPolicy(ctx context.Context, id string) (*murphy.EscalationPolicy, error)
+	GetPolicyRecord(ctx context.Context, id string) (*murphy.EscalationPolicy, error)
 }
 
 type ServiceOwners interface {
 	GetService(ctx context.Context, id string) (*murphy.Service, error)
-	GetIntegration(ctx context.Context, id string) (*murphy.Integration, error)
+	GetIntegrationAndService(ctx context.Context, integrationID string) (*murphy.Integration, *murphy.Service, error)
 }
 
 type ScheduleOwners interface {
-	GetSchedule(ctx context.Context, id string) (*murphy.Schedule, error)
+	TeamsOfSchedule(ctx context.Context, id string) ([]string, error)
 	GetOverride(ctx context.Context, id string) (*murphy.Override, error)
 }
 
 type IncidentResponders interface {
-	GetIncident(ctx context.Context, id string) (*murphy.Incident, []*murphy.TimelineEntry, error)
+	PolicyOfIncident(ctx context.Context, id, userID string) (policyID string, paged bool, err error)
 }
 
 type rule struct {
 	adminOnly bool
 	anyone    bool
-	check     func(a *access, ctx context.Context, userID, id string) error
+	check     func(a *access, ctx context.Context, c caller, id string) error
 	owner     func(a *access, ctx context.Context, id string) ([]string, error)
 }
 
@@ -74,6 +75,17 @@ type access struct {
 	incidents IncidentResponders
 }
 
+type caller struct {
+	id    string
+	roles func() (map[string]murphy.TeamRole, error)
+}
+
+func (a *access) caller(ctx context.Context, userID string) caller {
+	return caller{id: userID, roles: sync.OnceValues(func() (map[string]murphy.TeamRole, error) {
+		return a.people.TeamRolesOf(ctx, userID)
+	})}
+}
+
 func requireAccess(a *access) MiddlewareFunc {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -88,12 +100,13 @@ func requireAccess(a *access) MiddlewareFunc {
 				httpserver.WriteProblem(w, r, http.StatusBadRequest, "the request body is not valid JSON")
 				return
 			}
+			c := a.caller(r.Context(), current.session.GetUserId())
 			for _, g := range grants {
 				ids, applies := g.resource.in(r, body)
 				if !applies {
 					continue
 				}
-				if err := a.allows(r.Context(), current.session.GetUserId(), g.scope, ids); err != nil {
+				if err := a.allows(r.Context(), c, g.scope, ids); err != nil {
 					httpserver.WriteError(w, r, err)
 					return
 				}
@@ -103,7 +116,7 @@ func requireAccess(a *access) MiddlewareFunc {
 	}
 }
 
-func (a *access) allows(ctx context.Context, userID, scope string, ids []string) error {
+func (a *access) allows(ctx context.Context, c caller, scope string, ids []string) error {
 	rule := rules[scope]
 	switch {
 	case rule.anyone:
@@ -111,7 +124,7 @@ func (a *access) allows(ctx context.Context, userID, scope string, ids []string)
 	case rule.adminOnly:
 		return &murphy.ForbiddenError{Reason: "only admins can do this"}
 	case rule.check != nil:
-		return rule.check(a, ctx, userID, ids[0])
+		return rule.check(a, ctx, c, ids[0])
 	}
 	var teams []string
 	for _, id := range ids {
@@ -121,42 +134,42 @@ func (a *access) allows(ctx context.Context, userID, scope string, ids []string)
 		}
 		teams = append(teams, owners...)
 	}
-	return a.hasRoleIn(ctx, userID, teams, "only the team's managers can do this", murphy.TeamRole_TEAM_ROLE_MANAGER)
+	return hasRoleIn(c, teams, "only the team's managers can do this", murphy.TeamRole_TEAM_ROLE_MANAGER)
 }
 
-func (a *access) isSelf(_ context.Context, userID, id string) error {
-	if id == userID {
+func (a *access) isSelf(_ context.Context, c caller, id string) error {
+	if id == c.id {
 		return nil
 	}
 	return &murphy.ForbiddenError{Reason: "only admins can do this for someone else"}
 }
 
-func (a *access) ownsContactMethod(ctx context.Context, userID, id string) error {
+func (a *access) ownsContactMethod(ctx context.Context, c caller, id string) error {
 	method, err := a.people.GetContactMethod(ctx, id)
 	if err != nil {
 		return err
 	}
-	return a.isSelf(ctx, userID, method.GetUserId())
+	return a.isSelf(ctx, c, method.GetUserId())
 }
 
-func (a *access) respondsTo(ctx context.Context, userID, id string) error {
-	incident, timeline, err := a.incidents.GetIncident(ctx, id)
+func (a *access) respondsTo(ctx context.Context, c caller, id string) error {
+	policyID, paged, err := a.incidents.PolicyOfIncident(ctx, id, c.id)
 	if err != nil {
 		return err
 	}
-	if wasPaged(timeline, userID) {
+	if paged {
 		return nil
 	}
-	teams, err := a.teamOfPolicy(ctx, incident.GetEscalationPolicyId())
+	teams, err := a.teamOfPolicy(ctx, policyID)
 	if err != nil {
 		return err
 	}
-	return a.hasRoleIn(ctx, userID, teams, "only the owning team's responders and managers, and people paged for it, can respond to this incident",
+	return hasRoleIn(c, teams, "only the owning team's responders and managers, and people paged for it, can respond to this incident",
 		murphy.TeamRole_TEAM_ROLE_RESPONDER, murphy.TeamRole_TEAM_ROLE_MANAGER)
 }
 
-func (a *access) hasRoleIn(ctx context.Context, userID string, teams []string, refusal string, allowed ...murphy.TeamRole) error {
-	roles, err := a.people.TeamRolesOf(ctx, userID)
+func hasRoleIn(c caller, teams []string, refusal string, allowed ...murphy.TeamRole) error {
+	roles, err := c.roles()
 	if err != nil {
 		return fmt.Errorf("check team roles: %w", err)
 	}
@@ -166,23 +179,12 @@ func (a *access) hasRoleIn(ctx context.Context, userID string, teams []string, r
 	return &murphy.ForbiddenError{Reason: refusal}
 }
 
-func wasPaged(timeline []*murphy.TimelineEntry, userID string) bool {
-	for _, entry := range timeline {
-		for _, page := range entry.GetEscalation().GetPaged() {
-			if page.GetUserId() == userID {
-				return true
-			}
-		}
-	}
-	return false
-}
-
 func (a *access) theTeam(_ context.Context, id string) ([]string, error) {
 	return []string{id}, nil
 }
 
 func (a *access) teamOfPolicy(ctx context.Context, id string) ([]string, error) {
-	policy, err := a.policies.GetPolicy(ctx, id)
+	policy, err := a.policies.GetPolicyRecord(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -198,19 +200,15 @@ func (a *access) teamOfService(ctx context.Context, id string) ([]string, error)
 }
 
 func (a *access) teamOfIntegration(ctx context.Context, id string) ([]string, error) {
-	integration, err := a.services.GetIntegration(ctx, id)
+	_, service, err := a.services.GetIntegrationAndService(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	return a.teamOfService(ctx, integration.GetServiceId())
+	return a.teamOfPolicy(ctx, service.GetEscalationPolicyId())
 }
 
 func (a *access) teamsOfSchedule(ctx context.Context, id string) ([]string, error) {
-	schedule, err := a.schedules.GetSchedule(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-	return schedule.GetTeamIds(), nil
+	return a.schedules.TeamsOfSchedule(ctx, id)
 }
 
 func (a *access) teamsOfOverride(ctx context.Context, id string) ([]string, error) {

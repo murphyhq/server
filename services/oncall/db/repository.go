@@ -33,6 +33,8 @@ type Engine[T Tx] interface {
 	GetOverride(ctx context.Context, id string) (*murphy.Override, error)
 	DeleteOverride(ctx context.Context, id string) error
 	ScheduleNames(ctx context.Context, ids []string) (map[string]string, error)
+	TeamsOfSchedule(ctx context.Context, id string) ([]string, error)
+	SchedulesOfUsers(ctx context.Context, userIDs []string, at time.Time, before string, limit int) ([]string, error)
 	Transaction(ctx context.Context, work func(tx T) error) error
 	Migrate(ctx context.Context) error
 	Ping(ctx context.Context) error
@@ -162,4 +164,11 @@ func (r *Repository[T]) GetSchedules(ctx context.Context, ids []string) (_ []*mu
 		return nil, err
 	}
 	return schedules, nil
+}
+
+func (r *Repository[T]) GetScheduleRecord(ctx context.Context, id string) (_ *murphy.Schedule, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	return r.GetScheduleRow(ctx, id)
 }

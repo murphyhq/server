@@ -17,8 +17,8 @@ type Tx interface {
 	CreateIncident(ctx context.Context, incident *murphy.Incident) error
 	UpdateIncident(ctx context.Context, incident *murphy.Incident) error
 	CreateAlert(ctx context.Context, alert *murphy.Alert, incidentID string) error
-	CreateTimelineEntry(ctx context.Context, entry *murphy.TimelineEntry) error
-	CreatePages(ctx context.Context, incidentID string, userIDs []string, at time.Time) error
+	CreateTimelineEntries(ctx context.Context, entries []*murphy.TimelineEntry) error
+	CreatePages(ctx context.Context, entries []*murphy.TimelineEntry, at time.Time) error
 	DeleteTimers(ctx context.Context, incidentID string) error
 	CreateScheduledMessages(ctx context.Context, messages []*incidents.ScheduledMessage, at time.Time) error
 	LockDueMessages(ctx context.Context, now time.Time, limit int) ([]*incidents.ScheduledMessage, error)
@@ -30,6 +30,7 @@ type Engine[T Tx] interface {
 	GetIncident(ctx context.Context, id string) (*murphy.Incident, error)
 	ListIncidents(ctx context.Context, filter incidents.Filter, before string, limit int) ([]*murphy.Incident, error)
 	ListTimeline(ctx context.Context, incidentID string) ([]*murphy.TimelineEntry, error)
+	PolicyOfIncident(ctx context.Context, id, userID string) (policyID string, paged bool, err error)
 	LatestFiringAt(ctx context.Context, incidentID string) (time.Time, error)
 	OpenInstances(ctx context.Context, incidentID string) ([]string, error)
 	PurgeHandledMessages(ctx context.Context, before time.Time) (int64, error)
@@ -79,13 +80,11 @@ func (r *Repository[T]) Record(ctx context.Context, change *incidents.Change) (r
 				return err
 			}
 		}
-		for _, entry := range decision.GetTimeline() {
-			if err := tx.CreateTimelineEntry(ctx, entry); err != nil {
-				return err
-			}
-			if err := tx.CreatePages(ctx, entry.GetIncidentId(), pagedUsers(entry), now); err != nil {
-				return err
-			}
+		if err := tx.CreateTimelineEntries(ctx, decision.GetTimeline()); err != nil {
+			return err
+		}
+		if err := tx.CreatePages(ctx, decision.GetTimeline(), now); err != nil {
+			return err
 		}
 		messages, err := scheduledMessages(ctx, decision)
 		if err != nil {
@@ -98,14 +97,6 @@ func (r *Repository[T]) Record(ctx context.Context, change *incidents.Change) (r
 		return nil
 	})
 	return recorded, err
-}
-
-func pagedUsers(entry *murphy.TimelineEntry) []string {
-	var users []string
-	for _, page := range entry.GetEscalation().GetPaged() {
-		users = append(users, page.GetUserId())
-	}
-	return users
 }
 
 func scheduledMessages(ctx context.Context, decision *incidents.Decision) ([]*incidents.ScheduledMessage, error) {

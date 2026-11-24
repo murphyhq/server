@@ -117,20 +117,20 @@ func (q *Queries) CreateIncident(ctx context.Context, arg CreateIncidentParams) 
 
 const createPages = `-- name: CreatePages :exec
 INSERT INTO incident_pages (id, incident_id, user_id, created_at)
-SELECT unnest($1::uuid[]), $2::uuid, unnest($3::uuid[]), $4::timestamptz
+SELECT unnest($1::uuid[]), unnest($2::uuid[]), unnest($3::uuid[]), $4::timestamptz
 `
 
 type CreatePagesParams struct {
-	Ids        []string
-	IncidentID string
-	UserIds    []string
-	CreatedAt  time.Time
+	Ids         []string
+	IncidentIds []string
+	UserIds     []string
+	CreatedAt   time.Time
 }
 
 func (q *Queries) CreatePages(ctx context.Context, arg CreatePagesParams) error {
 	_, err := q.db.Exec(ctx, createPages,
 		arg.Ids,
-		arg.IncidentID,
+		arg.IncidentIds,
 		arg.UserIds,
 		arg.CreatedAt,
 	)
@@ -163,28 +163,28 @@ func (q *Queries) CreateScheduledMessages(ctx context.Context, arg CreateSchedul
 	return err
 }
 
-const createTimelineEntry = `-- name: CreateTimelineEntry :exec
+const createTimelineEntries = `-- name: CreateTimelineEntries :exec
 INSERT INTO timeline_entries (id, incident_id, type, summary, details, created_at)
-VALUES ($1, $2, $3, $4, $5, $6)
+SELECT unnest($1::uuid[]), unnest($2::uuid[]), unnest($3::text[]), unnest($4::text[]), unnest($5::bytea[]), unnest($6::timestamptz[])
 `
 
-type CreateTimelineEntryParams struct {
-	ID         string
-	IncidentID string
-	Type       string
-	Summary    string
-	Details    []byte
-	CreatedAt  time.Time
+type CreateTimelineEntriesParams struct {
+	Ids         []string
+	IncidentIds []string
+	Types       []string
+	Summaries   []string
+	Details     [][]byte
+	CreatedAts  []time.Time
 }
 
-func (q *Queries) CreateTimelineEntry(ctx context.Context, arg CreateTimelineEntryParams) error {
-	_, err := q.db.Exec(ctx, createTimelineEntry,
-		arg.ID,
-		arg.IncidentID,
-		arg.Type,
-		arg.Summary,
+func (q *Queries) CreateTimelineEntries(ctx context.Context, arg CreateTimelineEntriesParams) error {
+	_, err := q.db.Exec(ctx, createTimelineEntries,
+		arg.Ids,
+		arg.IncidentIds,
+		arg.Types,
+		arg.Summaries,
 		arg.Details,
-		arg.CreatedAt,
+		arg.CreatedAts,
 	)
 	return err
 }
@@ -492,6 +492,29 @@ func (q *Queries) OpenInstances(ctx context.Context, incidentID *string) ([]stri
 		return nil, err
 	}
 	return items, nil
+}
+
+const policyOfIncident = `-- name: PolicyOfIncident :one
+SELECT i.escalation_policy_id, EXISTS (SELECT 1 FROM incident_pages AS p WHERE p.incident_id = i.id AND p.user_id = $1) AS paged
+FROM incidents AS i
+WHERE i.id = $2
+`
+
+type PolicyOfIncidentParams struct {
+	UserID string
+	ID     string
+}
+
+type PolicyOfIncidentRow struct {
+	EscalationPolicyID string
+	Paged              bool
+}
+
+func (q *Queries) PolicyOfIncident(ctx context.Context, arg PolicyOfIncidentParams) (PolicyOfIncidentRow, error) {
+	row := q.db.QueryRow(ctx, policyOfIncident, arg.UserID, arg.ID)
+	var i PolicyOfIncidentRow
+	err := row.Scan(&i.EscalationPolicyID, &i.Paged)
+	return i, err
 }
 
 const purgeHandledMessages = `-- name: PurgeHandledMessages :execrows

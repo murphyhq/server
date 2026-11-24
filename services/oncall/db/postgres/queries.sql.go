@@ -514,6 +514,83 @@ func (q *Queries) ScheduleNames(ctx context.Context, ids []string) ([]ScheduleNa
 	return items, nil
 }
 
+const schedulesOfUsers = `-- name: SchedulesOfUsers :many
+SELECT l.schedule_id
+FROM layer_participants AS p
+JOIN layers AS l ON l.id = p.layer_id
+WHERE p.user_id = ANY($2::uuid[]) AND l.schedule_id < $3
+UNION
+SELECT o.schedule_id
+FROM overrides AS o
+WHERE o.user_id = ANY($2::uuid[]) AND o.starts_at <= $4 AND o.ends_at > $4 AND o.schedule_id < $3
+ORDER BY schedule_id DESC
+LIMIT $1
+`
+
+type SchedulesOfUsersParams struct {
+	MaxRows int32
+	UserIds []string
+	Before  string
+	At      time.Time
+}
+
+func (q *Queries) SchedulesOfUsers(ctx context.Context, arg SchedulesOfUsersParams) ([]string, error) {
+	rows, err := q.db.Query(ctx, schedulesOfUsers,
+		arg.MaxRows,
+		arg.UserIds,
+		arg.Before,
+		arg.At,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var schedule_id string
+		if err := rows.Scan(&schedule_id); err != nil {
+			return nil, err
+		}
+		items = append(items, schedule_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const teamsOfSchedule = `-- name: TeamsOfSchedule :many
+SELECT s.id, st.team_id
+FROM schedules AS s
+LEFT JOIN schedule_teams AS st ON st.schedule_id = s.id
+WHERE s.id = $1
+`
+
+type TeamsOfScheduleRow struct {
+	ID     string
+	TeamID *string
+}
+
+func (q *Queries) TeamsOfSchedule(ctx context.Context, id string) ([]TeamsOfScheduleRow, error) {
+	rows, err := q.db.Query(ctx, teamsOfSchedule, id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []TeamsOfScheduleRow
+	for rows.Next() {
+		var i TeamsOfScheduleRow
+		if err := rows.Scan(&i.ID, &i.TeamID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateSchedule = `-- name: UpdateSchedule :execrows
 UPDATE schedules
 SET name = $1, time_zone = $2, updated_at = $3

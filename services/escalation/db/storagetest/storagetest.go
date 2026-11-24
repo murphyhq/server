@@ -96,6 +96,23 @@ func Run(t *testing.T, open func(t *testing.T) escalation.Repository) {
 		assert.ErrorIs(t, repo.UpdatePolicy(t.Context(), policy), murphy.ErrConflict)
 	})
 
+	t.Run("reads a policy's own record without its levels", func(t *testing.T) {
+		repo := open(t)
+		team := murphy.NewID()
+		policy := newPolicy("payments", team, level(time.Minute, target(murphy.EscalationTargetType_ESCALATION_TARGET_TYPE_USER, murphy.NewID())))
+		require.NoError(t, repo.CreatePolicy(t.Context(), policy))
+
+		got, err := repo.GetPolicyRecord(t.Context(), policy.GetId())
+		require.NoError(t, err)
+		require.NoError(t, repo.DeletePolicy(t.Context(), policy.GetId()))
+		_, deleted := repo.GetPolicyRecord(t.Context(), policy.GetId())
+
+		assert.Equal(t, team, got.GetTeamId())
+		assert.Equal(t, int32(1), got.GetVersion())
+		assert.Empty(t, got.GetLevels())
+		assert.ErrorIs(t, deleted, murphy.ErrNotFound)
+	})
+
 	t.Run("deleting a policy hides it and keeps its versions", func(t *testing.T) {
 		repo := open(t)
 		team := murphy.NewID()

@@ -317,3 +317,34 @@ func (r *Repository) ListOverridesAt(ctx context.Context, scheduleIDs []string, 
 	}
 	return overrides, nil
 }
+
+func (r *Repository) TeamsOfSchedule(ctx context.Context, id string) (_ []string, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	rows, err := r.queries.TeamsOfSchedule(ctx, id)
+	if err != nil {
+		return nil, murphypostgres.Error("schedule", err)
+	}
+	if len(rows) == 0 {
+		return nil, &murphy.NotFoundError{Entity: "schedule"}
+	}
+	var teams []string
+	for _, row := range rows {
+		if row.TeamID != nil {
+			teams = append(teams, *row.TeamID)
+		}
+	}
+	return teams, nil
+}
+
+func (r *Repository) SchedulesOfUsers(ctx context.Context, userIDs []string, at time.Time, before string, limit int) (_ []string, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	ids, err := r.queries.SchedulesOfUsers(ctx, SchedulesOfUsersParams{UserIds: userIDs, At: at.UTC(), Before: before, MaxRows: int32(limit)})
+	if err != nil {
+		return nil, murphypostgres.Error("schedule", err)
+	}
+	return ids, nil
+}

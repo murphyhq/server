@@ -114,3 +114,18 @@ func TestCreatesAreIdempotent(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusUnprocessableEntity, different.StatusCode(), "the same key with another request is refused")
 }
+
+func TestWhoIsOnCallAcrossSchedulesInOneRequest(t *testing.T) {
+	m := murphytest.New(t)
+	ana, bo := m.User(), m.User()
+	rotation := m.Schedule(m.Team(), ana, bo)
+	people := []string{ana.ID, bo.ID}
+
+	got, err := m.API.ListOnCallWithResponse(t.Context(), &client.ListOnCallParams{UserId: &people})
+
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, got.StatusCode())
+	require.Len(t, got.JSON200.Items, 1, "Bo takes turns there but isn't on call now")
+	assert.Equal(t, client.Reference{Id: rotation.ID, Name: &rotation.Name}, got.JSON200.Items[0].Schedule)
+	assert.Equal(t, new(ana.Reference()), got.JSON200.Items[0].User)
+}
