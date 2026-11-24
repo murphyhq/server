@@ -347,84 +347,6 @@ func (q *Queries) DiscardOneTimeCodesOfUser(ctx context.Context, arg DiscardOneT
 	return result.RowsAffected()
 }
 
-const existingTeams = `-- name: ExistingTeams :many
-SELECT id
-FROM teams
-WHERE id IN (/*SLICE:ids*/?)
-`
-
-func (q *Queries) ExistingTeams(ctx context.Context, ids []string) ([]string, error) {
-	query := existingTeams
-	var queryParams []interface{}
-	if len(ids) > 0 {
-		for _, v := range ids {
-			queryParams = append(queryParams, v)
-		}
-		query = strings.Replace(query, "/*SLICE:ids*/?", strings.Repeat(",?", len(ids))[1:], 1)
-	} else {
-		query = strings.Replace(query, "/*SLICE:ids*/?", "NULL", 1)
-	}
-	rows, err := q.db.QueryContext(ctx, query, queryParams...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []string
-	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err != nil {
-			return nil, err
-		}
-		items = append(items, id)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const existingUsers = `-- name: ExistingUsers :many
-SELECT id
-FROM users
-WHERE id IN (/*SLICE:ids*/?)
-`
-
-func (q *Queries) ExistingUsers(ctx context.Context, ids []string) ([]string, error) {
-	query := existingUsers
-	var queryParams []interface{}
-	if len(ids) > 0 {
-		for _, v := range ids {
-			queryParams = append(queryParams, v)
-		}
-		query = strings.Replace(query, "/*SLICE:ids*/?", strings.Repeat(",?", len(ids))[1:], 1)
-	} else {
-		query = strings.Replace(query, "/*SLICE:ids*/?", "NULL", 1)
-	}
-	rows, err := q.db.QueryContext(ctx, query, queryParams...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []string
-	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err != nil {
-			return nil, err
-		}
-		items = append(items, id)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const getActiveSession = `-- name: GetActiveSession :one
 SELECT sessions.id, sessions.user_id, sessions.token_hash, sessions.client, sessions.expires_at, sessions.revoked_at, sessions.created_at, sessions.updated_at, users.role
 FROM sessions
@@ -1057,6 +979,50 @@ func (q *Queries) SetUserRole(ctx context.Context, arg SetUserRoleParams) (int64
 	return result.RowsAffected()
 }
 
+const teamNames = `-- name: TeamNames :many
+SELECT id, name
+FROM teams
+WHERE id IN (/*SLICE:ids*/?)
+`
+
+type TeamNamesRow struct {
+	ID   string
+	Name string
+}
+
+func (q *Queries) TeamNames(ctx context.Context, ids []string) ([]TeamNamesRow, error) {
+	query := teamNames
+	var queryParams []interface{}
+	if len(ids) > 0 {
+		for _, v := range ids {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:ids*/?", strings.Repeat(",?", len(ids))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:ids*/?", "NULL", 1)
+	}
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []TeamNamesRow
+	for rows.Next() {
+		var i TeamNamesRow
+		if err := rows.Scan(&i.ID, &i.Name); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateContactMethod = `-- name: UpdateContactMethod :execrows
 UPDATE contact_methods
 SET type = ?, address = ?, updated_at = ?
@@ -1183,4 +1149,48 @@ func (q *Queries) UseSignIn(ctx context.Context, arg UseSignInParams) (int64, er
 		return 0, err
 	}
 	return result.RowsAffected()
+}
+
+const userNames = `-- name: UserNames :many
+SELECT id, name
+FROM users
+WHERE id IN (/*SLICE:ids*/?)
+`
+
+type UserNamesRow struct {
+	ID   string
+	Name string
+}
+
+func (q *Queries) UserNames(ctx context.Context, ids []string) ([]UserNamesRow, error) {
+	query := userNames
+	var queryParams []interface{}
+	if len(ids) > 0 {
+		for _, v := range ids {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:ids*/?", strings.Repeat(",?", len(ids))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:ids*/?", "NULL", 1)
+	}
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []UserNamesRow
+	for rows.Next() {
+		var i UserNamesRow
+		if err := rows.Scan(&i.ID, &i.Name); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }

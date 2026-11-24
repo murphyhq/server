@@ -333,58 +333,6 @@ func (q *Queries) DiscardOneTimeCodesOfUser(ctx context.Context, arg DiscardOneT
 	return result.RowsAffected(), nil
 }
 
-const existingTeams = `-- name: ExistingTeams :many
-SELECT id
-FROM teams
-WHERE id = ANY($1::uuid[])
-`
-
-func (q *Queries) ExistingTeams(ctx context.Context, ids []string) ([]string, error) {
-	rows, err := q.db.Query(ctx, existingTeams, ids)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []string
-	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err != nil {
-			return nil, err
-		}
-		items = append(items, id)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const existingUsers = `-- name: ExistingUsers :many
-SELECT id
-FROM users
-WHERE id = ANY($1::uuid[])
-`
-
-func (q *Queries) ExistingUsers(ctx context.Context, ids []string) ([]string, error) {
-	rows, err := q.db.Query(ctx, existingUsers, ids)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []string
-	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err != nil {
-			return nil, err
-		}
-		items = append(items, id)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const getActiveSession = `-- name: GetActiveSession :one
 SELECT sessions.id, sessions.user_id, sessions.token_hash, sessions.client, sessions.expires_at, sessions.revoked_at, sessions.created_at, sessions.updated_at, users.role
 FROM sessions
@@ -987,6 +935,37 @@ func (q *Queries) SetUserRole(ctx context.Context, arg SetUserRoleParams) (int64
 	return result.RowsAffected(), nil
 }
 
+const teamNames = `-- name: TeamNames :many
+SELECT id, name
+FROM teams
+WHERE id = ANY($1::uuid[])
+`
+
+type TeamNamesRow struct {
+	ID   string
+	Name string
+}
+
+func (q *Queries) TeamNames(ctx context.Context, ids []string) ([]TeamNamesRow, error) {
+	rows, err := q.db.Query(ctx, teamNames, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []TeamNamesRow
+	for rows.Next() {
+		var i TeamNamesRow
+		if err := rows.Scan(&i.ID, &i.Name); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateContactMethod = `-- name: UpdateContactMethod :execrows
 UPDATE contact_methods
 SET type = $1, address = $2, updated_at = $3
@@ -1113,4 +1092,35 @@ func (q *Queries) UseSignIn(ctx context.Context, arg UseSignInParams) (int64, er
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const userNames = `-- name: UserNames :many
+SELECT id, name
+FROM users
+WHERE id = ANY($1::uuid[])
+`
+
+type UserNamesRow struct {
+	ID   string
+	Name string
+}
+
+func (q *Queries) UserNames(ctx context.Context, ids []string) ([]UserNamesRow, error) {
+	rows, err := q.db.Query(ctx, userNames, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []UserNamesRow
+	for rows.Next() {
+		var i UserNamesRow
+		if err := rows.Scan(&i.ID, &i.Name); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }

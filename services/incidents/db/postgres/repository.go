@@ -64,11 +64,17 @@ func (r *Repository) ListIncidents(ctx context.Context, filter incidents.Filter,
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
-	texts := make([]string, len(filter.Statuses))
-	for i, status := range filter.Statuses {
-		texts[i] = status.Text()
-	}
-	rows, err := r.queries.ListIncidents(ctx, ListIncidentsParams{Before: before, Statuses: texts, ServiceIds: filter.ServiceIDs, MaxRows: int32(limit)})
+	rows, err := r.queries.ListIncidents(ctx, ListIncidentsParams{
+		Before:              before,
+		Statuses:            texts(filter.Statuses),
+		ServiceIds:          filter.ServiceIDs,
+		EscalationPolicyIds: filter.PolicyIDs,
+		Urgencies:           texts(filter.Urgencies),
+		PagedUserIds:        filter.PagedUserIDs,
+		CreatedAfter:        filter.CreatedAfter,
+		CreatedBefore:       filter.CreatedBefore,
+		MaxRows:             int32(limit),
+	})
 	if err != nil {
 		return nil, murphypostgres.Error("incident", err)
 	}
@@ -158,4 +164,12 @@ func (r *Repository) DeleteMessages(ctx context.Context, ids []string) (err erro
 		return nil
 	}
 	return murphypostgres.Error("scheduled message", r.queries.DeleteMessages(ctx, ids))
+}
+
+func texts[T interface{ Text() string }](values []T) []string {
+	out := make([]string, len(values))
+	for i, value := range values {
+		out[i] = value.Text()
+	}
+	return out
 }

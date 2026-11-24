@@ -269,15 +269,19 @@ func (r *Repository) DeleteOverride(ctx context.Context, id string) (err error) 
 	return murphypostgres.Changed("override", rows, err)
 }
 
-func (r *Repository) ExistingSchedules(ctx context.Context, ids []string) (_ []string, err error) {
+func (r *Repository) ScheduleNames(ctx context.Context, ids []string) (_ map[string]string, err error) {
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
-	existing, err := r.queries.ExistingSchedules(ctx, ids)
+	rows, err := r.queries.ScheduleNames(ctx, ids)
 	if err != nil {
 		return nil, murphypostgres.Error("schedule", err)
 	}
-	return existing, nil
+	names := make(map[string]string, len(rows))
+	for _, row := range rows {
+		names[row.ID] = row.Name
+	}
+	return names, nil
 }
 
 func (r *Repository) GetScheduleRows(ctx context.Context, ids []string) (_ []*murphy.Schedule, err error) {

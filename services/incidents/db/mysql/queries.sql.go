@@ -306,20 +306,33 @@ func (q *Queries) LatestFiringAt(ctx context.Context, incidentID *string) (time.
 const listIncidents = `-- name: ListIncidents :many
 SELECT id, number, service_id, dedup_key, title, status, urgency, version, created_at, updated_at, resolved_at, escalation_policy_id, escalation_policy_version, escalation_level, escalation_round, escalation_exhausted, acknowledged_at
 FROM incidents
-WHERE id < ?
+WHERE incidents.id < ?
   AND (? OR status IN (/*SLICE:statuses*/?))
   AND (? OR service_id IN (/*SLICE:service_ids*/?))
+  AND (? OR escalation_policy_id IN (/*SLICE:escalation_policy_ids*/?))
+  AND (? OR urgency IN (/*SLICE:urgencies*/?))
+  AND (? OR incidents.id IN (SELECT p.incident_id FROM incident_pages AS p WHERE p.user_id IN (/*SLICE:paged_user_ids*/?)))
+  AND (? IS NULL OR incidents.created_at > ?)
+  AND (? IS NULL OR incidents.created_at < ?)
 ORDER BY id DESC
 LIMIT ?
 `
 
 type ListIncidentsParams struct {
-	Before     string
-	AnyStatus  interface{}
-	Statuses   []string
-	AnyService interface{}
-	ServiceIds []string
-	Limit      int32
+	Before              string
+	AnyStatus           interface{}
+	Statuses            []string
+	AnyService          interface{}
+	ServiceIds          []string
+	AnyPolicy           interface{}
+	EscalationPolicyIds []string
+	AnyUrgency          interface{}
+	Urgencies           []string
+	AnyonePaged         interface{}
+	PagedUserIds        []string
+	CreatedAfter        *time.Time
+	CreatedBefore       *time.Time
+	Limit               int32
 }
 
 type ListIncidentsRow struct {
@@ -364,6 +377,37 @@ func (q *Queries) ListIncidents(ctx context.Context, arg ListIncidentsParams) ([
 	} else {
 		query = strings.Replace(query, "/*SLICE:service_ids*/?", "NULL", 1)
 	}
+	queryParams = append(queryParams, arg.AnyPolicy)
+	if len(arg.EscalationPolicyIds) > 0 {
+		for _, v := range arg.EscalationPolicyIds {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:escalation_policy_ids*/?", strings.Repeat(",?", len(arg.EscalationPolicyIds))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:escalation_policy_ids*/?", "NULL", 1)
+	}
+	queryParams = append(queryParams, arg.AnyUrgency)
+	if len(arg.Urgencies) > 0 {
+		for _, v := range arg.Urgencies {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:urgencies*/?", strings.Repeat(",?", len(arg.Urgencies))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:urgencies*/?", "NULL", 1)
+	}
+	queryParams = append(queryParams, arg.AnyonePaged)
+	if len(arg.PagedUserIds) > 0 {
+		for _, v := range arg.PagedUserIds {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:paged_user_ids*/?", strings.Repeat(",?", len(arg.PagedUserIds))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:paged_user_ids*/?", "NULL", 1)
+	}
+	queryParams = append(queryParams, arg.CreatedAfter)
+	queryParams = append(queryParams, arg.CreatedAfter)
+	queryParams = append(queryParams, arg.CreatedBefore)
+	queryParams = append(queryParams, arg.CreatedBefore)
 	queryParams = append(queryParams, arg.Limit)
 	rows, err := q.db.QueryContext(ctx, query, queryParams...)
 	if err != nil {

@@ -91,7 +91,7 @@ func TestSchedulesFilterByTeam(t *testing.T) {
 	require.Equal(t, http.StatusOK, page.StatusCode())
 	require.Len(t, page.JSON200.Items, 1)
 	assert.Equal(t, shared, page.JSON200.Items[0].Id)
-	assert.ElementsMatch(t, references(platform.ID, payments.ID), page.JSON200.Items[0].Teams)
+	assert.ElementsMatch(t, []client.Reference{platform.Reference(), payments.Reference()}, page.JSON200.Items[0].Teams)
 }
 
 func TestCreatesAreIdempotent(t *testing.T) {

@@ -411,7 +411,10 @@ type EscalationPolicyPage struct {
 
 // EscalationTarget defines model for EscalationTarget.
 type EscalationTarget struct {
-	Id   string               `json:"id"`
+	Id string `json:"id"`
+
+	// Name The user's or schedule's current name, in responses to reads; empty once it is deleted. Ignored in requests.
+	Name *string              `json:"name,omitempty"`
 	Type EscalationTargetType `json:"type"`
 }
 
@@ -604,8 +607,11 @@ type Page struct {
 
 // PolicyVersionReference Points at one version of an escalation policy.
 type PolicyVersionReference struct {
-	Id      string `json:"id"`
-	Version int32  `json:"version"`
+	Id string `json:"id"`
+
+	// Name The policy's current name, in responses to reads; empty once the policy is deleted.
+	Name    *string `json:"name,omitempty"`
+	Version int32   `json:"version"`
 }
 
 // Problem defines model for Problem.
@@ -624,6 +630,9 @@ type PushPlatform string
 // Reference Points at another resource.
 type Reference struct {
 	Id string `json:"id"`
+
+	// Name The resource's current name, for resources that have one, in responses to reads; empty once the resource is deleted. Ignored in requests.
+	Name *string `json:"name,omitempty"`
 }
 
 // Schedule defines model for Schedule.
@@ -804,6 +813,9 @@ type TeamRole string
 
 // TimelineEntry defines model for TimelineEntry.
 type TimelineEntry struct {
+	// Actor Points at another resource.
+	Actor *Reference `json:"actor,omitempty"`
+
 	// Alert Points at another resource.
 	Alert      *Reference          `json:"alert,omitempty"`
 	At         time.Time           `json:"at"`
@@ -970,6 +982,21 @@ type ListIncidentsParams struct {
 
 	// ServiceId Only incidents of one of these services.
 	ServiceId *[]string `form:"service_id,omitempty" json:"service_id,omitempty"`
+
+	// TeamId Only incidents owned by one of these teams, through their escalation policies.
+	TeamId *[]string `form:"team_id,omitempty" json:"team_id,omitempty"`
+
+	// PagedUserId Only incidents that paged one of these people.
+	PagedUserId *[]string `form:"paged_user_id,omitempty" json:"paged_user_id,omitempty"`
+
+	// Urgency Only incidents with one of these urgencies.
+	Urgency *[]Urgency `form:"urgency,omitempty" json:"urgency,omitempty"`
+
+	// CreatedAfter Only incidents opened after this time.
+	CreatedAfter *time.Time `form:"created_after,omitempty" json:"created_after,omitempty"`
+
+	// CreatedBefore Only incidents opened before this time.
+	CreatedBefore *time.Time `form:"created_before,omitempty" json:"created_before,omitempty"`
 }
 
 // AcknowledgeIncidentParams defines parameters for AcknowledgeIncident.
@@ -1687,6 +1714,11 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /v1/users/{id}/contact-methods (the `CreateContactMethod` operationId).
 	CreateContactMethod(ctx context.Context, id ID, params *CreateContactMethodParams, body CreateContactMethodJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListUserMemberships List the teams a user belongs to
+	//
+	// Corresponds with GET /v1/users/{id}/memberships (the `ListUserMemberships` operationId).
+	ListUserMemberships(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// EndUserSessions End all of a user's sessions
 	//
@@ -2917,6 +2949,21 @@ func (c *Client) CreateContactMethod(ctx context.Context, id ID, params *CreateC
 	return c.Client.Do(req)
 }
 
+// ListUserMemberships List the teams a user belongs to
+//
+// Corresponds with GET /v1/users/{id}/memberships (the `ListUserMemberships` operationId).
+func (c *Client) ListUserMemberships(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListUserMembershipsRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // EndUserSessions End all of a user's sessions
 //
 // Ends all the user's sessions at once and discards their unused one-time codes, without deactivating them. Only admins may do this.
@@ -3841,6 +3888,66 @@ func NewListIncidentsRequest(server string, params *ListIncidentsParams) (*http.
 		if params.ServiceId != nil {
 
 			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "service_id", *params.ServiceId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "array", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.TeamId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "team_id", *params.TeamId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "array", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.PagedUserId != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "paged_user_id", *params.PagedUserId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "array", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Urgency != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "urgency", *params.Urgency, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "array", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.CreatedAfter != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "created_after", *params.CreatedAfter, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.CreatedBefore != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "created_before", *params.CreatedBefore, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: "date-time"}); err != nil {
 				return nil, err
 			} else {
 				for _, qp := range strings.Split(queryFrag, "&") {
@@ -5721,6 +5828,40 @@ func NewCreateContactMethodRequestWithBody(server string, id ID, params *CreateC
 	return req, nil
 }
 
+// NewListUserMembershipsRequest constructs an http.Request for the ListUserMemberships method
+func NewListUserMembershipsRequest(server string, id ID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/users/%s/memberships", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewEndUserSessionsRequest constructs an http.Request for the EndUserSessions method
 func NewEndUserSessionsRequest(server string, id ID) (*http.Request, error) {
 	var err error
@@ -6351,6 +6492,13 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /v1/users/{id}/contact-methods (the `CreateContactMethod` operationId).
 	CreateContactMethodWithResponse(ctx context.Context, id ID, params *CreateContactMethodParams, body CreateContactMethodJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateContactMethodResponse, error)
+
+	// ListUserMembershipsWithResponse List the teams a user belongs to
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /v1/users/{id}/memberships (the `ListUserMemberships` operationId).
+	ListUserMembershipsWithResponse(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*ListUserMembershipsResponse, error)
 
 	// EndUserSessionsWithResponse End all of a user's sessions
 	//
@@ -9330,6 +9478,54 @@ func (r CreateContactMethodResponse) ContentType() string {
 	return ""
 }
 
+type ListUserMembershipsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *TeamMembershipList
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *Problem
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListUserMembershipsResponse) GetJSON200() *TeamMembershipList {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r ListUserMembershipsResponse) GetApplicationproblemJSON404() *Problem {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r ListUserMembershipsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListUserMembershipsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListUserMembershipsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListUserMembershipsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type EndUserSessionsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -10379,6 +10575,19 @@ func (c *ClientWithResponses) CreateContactMethodWithResponse(ctx context.Contex
 		return nil, err
 	}
 	return ParseCreateContactMethodResponse(rsp)
+}
+
+// ListUserMembershipsWithResponse List the teams a user belongs to
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /v1/users/{id}/memberships (the `ListUserMemberships` operationId).
+func (c *ClientWithResponses) ListUserMembershipsWithResponse(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*ListUserMembershipsResponse, error) {
+	rsp, err := c.ListUserMemberships(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListUserMembershipsResponse(rsp)
 }
 
 // EndUserSessionsWithResponse End all of a user's sessions
@@ -12557,6 +12766,39 @@ func ParseCreateContactMethodResponse(rsp *http.Response) (*CreateContactMethodR
 			return nil, err
 		}
 		response.ApplicationproblemJSON422 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListUserMembershipsResponse parses an HTTP response from a ListUserMembershipsWithResponse call
+func ParseListUserMembershipsResponse(rsp *http.Response) (*ListUserMembershipsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListUserMembershipsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest TeamMembershipList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
 
 	}
 

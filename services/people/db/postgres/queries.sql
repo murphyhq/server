@@ -99,13 +99,13 @@ ORDER BY id;
 DELETE FROM team_memberships
 WHERE team_id = @team_id AND user_id = @user_id;
 
--- name: ExistingUsers :many
-SELECT id
+-- name: UserNames :many
+SELECT id, name
 FROM users
 WHERE id = ANY(@ids::uuid[]);
 
--- name: ExistingTeams :many
-SELECT id
+-- name: TeamNames :many
+SELECT id, name
 FROM teams
 WHERE id = ANY(@ids::uuid[]);
 

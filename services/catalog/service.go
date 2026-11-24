@@ -24,6 +24,7 @@ type Repository interface {
 	RotateIntegrationKey(ctx context.Context, id string, previousValidUntil, updatedAt time.Time) (*murphy.Integration, error)
 	DeleteIntegration(ctx context.Context, id string) error
 	PolicyInUse(ctx context.Context, policyID string) (bool, error)
+	ServiceNames(ctx context.Context, ids []string) (map[string]string, error)
 	GetIntegrationAndService(ctx context.Context, integrationID string) (*murphy.Integration, *murphy.Service, error)
 }
 
@@ -204,24 +205,25 @@ func (s *Service) GetIntegration(ctx context.Context, id string) (_ *murphy.Inte
 	return integration, nil
 }
 
-func (s *Service) ListIntegrations(ctx context.Context, serviceID string, page pagination.Page) (_ []*murphy.Integration, _ string, err error) {
+func (s *Service) ListIntegrations(ctx context.Context, serviceID string, page pagination.Page) (_ *murphy.Service, _ []*murphy.Integration, _ string, err error) {
 	ctx, span := tracer.Span(ctx)
 	ctx = span.Set(ctx, telemetry.WithField("service.id", serviceID))
 	defer span.End(&err)
 
 	window, err := pagination.Resolve(page)
 	if err != nil {
-		return nil, "", err
+		return nil, nil, "", err
 	}
-	if _, err := s.GetService(ctx, serviceID); err != nil {
-		return nil, "", err
+	service, err := s.GetService(ctx, serviceID)
+	if err != nil {
+		return nil, nil, "", err
 	}
 	integrations, err := s.repo.ListIntegrations(ctx, serviceID, window.Before, window.Rows())
 	if err != nil {
-		return nil, "", fmt.Errorf("list integrations: %w", err)
+		return nil, nil, "", fmt.Errorf("list integrations: %w", err)
 	}
 	items, next := pagination.Trim(integrations, window)
-	return items, next, nil
+	return service, items, next, nil
 }
 
 func (s *Service) UpdateIntegration(ctx context.Context, in *murphy.Integration) (_ *murphy.Integration, err error) {
@@ -277,6 +279,16 @@ func (s *Service) PolicyInUse(ctx context.Context, policyID string) (_ bool, err
 		return false, fmt.Errorf("check services using the escalation policy: %w", err)
 	}
 	return inUse, nil
+}
+
+func (s *Service) ServiceNames(ctx context.Context, ids []string) (_ map[string]string, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	if len(ids) == 0 {
+		return map[string]string{}, nil
+	}
+	return s.repo.ServiceNames(ctx, ids)
 }
 
 func (s *Service) GetIntegrationAndService(ctx context.Context, integrationID string) (_ *murphy.Integration, _ *murphy.Service, err error) {

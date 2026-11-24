@@ -299,6 +299,37 @@ func (q *Queries) RotateIntegrationKey(ctx context.Context, arg RotateIntegratio
 	return result.RowsAffected(), nil
 }
 
+const serviceNames = `-- name: ServiceNames :many
+SELECT id, name
+FROM services
+WHERE id = ANY($1::uuid[])
+`
+
+type ServiceNamesRow struct {
+	ID   string
+	Name string
+}
+
+func (q *Queries) ServiceNames(ctx context.Context, ids []string) ([]ServiceNamesRow, error) {
+	rows, err := q.db.Query(ctx, serviceNames, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ServiceNamesRow
+	for rows.Next() {
+		var i ServiceNamesRow
+		if err := rows.Scan(&i.ID, &i.Name); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateIntegration = `-- name: UpdateIntegration :execrows
 UPDATE integrations
 SET name = $1, status = $2, updated_at = $3

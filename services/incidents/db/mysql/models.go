@@ -51,6 +51,13 @@ type Incident struct {
 	OpenServiceID           *string
 }
 
+type IncidentPage struct {
+	ID         string
+	IncidentID string
+	UserID     string
+	CreatedAt  time.Time
+}
+
 type ScheduledMessage struct {
 	ID           string
 	IncidentID   string

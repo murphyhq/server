@@ -76,8 +76,8 @@ ORDER BY starts_at, id;
 DELETE FROM overrides
 WHERE id = @id;
 
--- name: ExistingSchedules :many
-SELECT id
+-- name: ScheduleNames :many
+SELECT id, name
 FROM schedules
 WHERE id = ANY(@ids::uuid[]);
 

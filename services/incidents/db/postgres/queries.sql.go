@@ -115,6 +115,28 @@ func (q *Queries) CreateIncident(ctx context.Context, arg CreateIncidentParams) 
 	return number, err
 }
 
+const createPages = `-- name: CreatePages :exec
+INSERT INTO incident_pages (id, incident_id, user_id, created_at)
+SELECT unnest($1::uuid[]), $2::uuid, unnest($3::uuid[]), $4::timestamptz
+`
+
+type CreatePagesParams struct {
+	Ids        []string
+	IncidentID string
+	UserIds    []string
+	CreatedAt  time.Time
+}
+
+func (q *Queries) CreatePages(ctx context.Context, arg CreatePagesParams) error {
+	_, err := q.db.Exec(ctx, createPages,
+		arg.Ids,
+		arg.IncidentID,
+		arg.UserIds,
+		arg.CreatedAt,
+	)
+	return err
+}
+
 const createScheduledMessages = `-- name: CreateScheduledMessages :exec
 INSERT INTO scheduled_messages (id, incident_id, kind, due_at, envelope, created_at)
 SELECT unnest($1::uuid[]), unnest($2::uuid[]), unnest($3::text[]), unnest($4::timestamptz[]), unnest($5::bytea[]), $6::timestamptz
@@ -270,18 +292,28 @@ func (q *Queries) LatestFiringAt(ctx context.Context, incidentID *string) (time.
 const listIncidents = `-- name: ListIncidents :many
 SELECT id, number, service_id, dedup_key, title, status, urgency, version, created_at, updated_at, resolved_at, escalation_policy_id, escalation_policy_version, escalation_level, escalation_round, escalation_exhausted, acknowledged_at
 FROM incidents
-WHERE id < $1
+WHERE incidents.id < $1
   AND (cardinality($2::text[]) = 0 OR status = ANY($2::text[]))
   AND (coalesce(cardinality($3::uuid[]), 0) = 0 OR service_id = ANY($3::uuid[]))
+  AND (coalesce(cardinality($4::uuid[]), 0) = 0 OR escalation_policy_id = ANY($4::uuid[]))
+  AND (cardinality($5::text[]) = 0 OR urgency = ANY($5::text[]))
+  AND (coalesce(cardinality($6::uuid[]), 0) = 0 OR incidents.id IN (SELECT p.incident_id FROM incident_pages AS p WHERE p.user_id = ANY($6::uuid[])))
+  AND ($7::timestamptz IS NULL OR incidents.created_at > $7::timestamptz)
+  AND ($8::timestamptz IS NULL OR incidents.created_at < $8::timestamptz)
 ORDER BY id DESC
-LIMIT $4
+LIMIT $9
 `
 
 type ListIncidentsParams struct {
-	Before     string
-	Statuses   []string
-	ServiceIds []string
-	MaxRows    int32
+	Before              string
+	Statuses            []string
+	ServiceIds          []string
+	EscalationPolicyIds []string
+	Urgencies           []string
+	PagedUserIds        []string
+	CreatedAfter        *time.Time
+	CreatedBefore       *time.Time
+	MaxRows             int32
 }
 
 func (q *Queries) ListIncidents(ctx context.Context, arg ListIncidentsParams) ([]Incident, error) {
@@ -289,6 +321,11 @@ func (q *Queries) ListIncidents(ctx context.Context, arg ListIncidentsParams) ([
 		arg.Before,
 		arg.Statuses,
 		arg.ServiceIds,
+		arg.EscalationPolicyIds,
+		arg.Urgencies,
+		arg.PagedUserIds,
+		arg.CreatedAfter,
+		arg.CreatedBefore,
 		arg.MaxRows,
 	)
 	if err != nil {

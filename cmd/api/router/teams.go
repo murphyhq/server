@@ -69,15 +69,17 @@ func (s *Server) ListTeamMembers(ctx context.Context, request ListTeamMembersReq
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
-	memberships, err := s.people.ListMemberships(ctx, request.Id)
+	n := newNames()
+	team, memberships, err := s.people.ListMemberships(ctx, request.Id)
 	if err != nil {
 		return nil, err
 	}
+	n.knowTeam(team)
 	items := make([]TeamMembership, len(memberships))
 	for i, membership := range memberships {
-		items[i] = toMembership(membership)
+		items[i] = toMembership(membership, n)
 	}
-	return ListTeamMembers200JSONResponse{Items: items}, nil
+	return ListTeamMembers200JSONResponse{Items: items}, s.name(ctx, n)
 }
 
 func (s *Server) SetTeamMember(ctx context.Context, request SetTeamMemberRequestObject) (_ SetTeamMemberResponseObject, err error) {
@@ -92,7 +94,7 @@ func (s *Server) SetTeamMember(ctx context.Context, request SetTeamMemberRequest
 	if err != nil {
 		return nil, err
 	}
-	return SetTeamMember200JSONResponse(toMembership(membership)), nil
+	return SetTeamMember200JSONResponse(toMembership(membership, nil)), nil
 }
 
 func (s *Server) RemoveTeamMember(ctx context.Context, request RemoveTeamMemberRequestObject) (_ RemoveTeamMemberResponseObject, err error) {
@@ -109,12 +111,29 @@ func toTeam(team *murphy.Team) Team {
 	return Team{Id: team.GetId(), Name: team.GetName(), CreatedAt: team.GetCreatedAt().AsTime(), UpdatedAt: team.GetUpdatedAt().AsTime()}
 }
 
-func toMembership(membership *murphy.TeamMembership) TeamMembership {
+func toMembership(membership *murphy.TeamMembership, n *names) TeamMembership {
 	return TeamMembership{
-		Team:      ref(membership.GetTeamId()),
-		User:      ref(membership.GetUserId()),
+		Team:      n.team(membership.GetTeamId()),
+		User:      n.user(membership.GetUserId()),
 		Role:      TeamRole(membership.GetRole().Text()),
 		CreatedAt: membership.GetCreatedAt().AsTime(),
 		UpdatedAt: membership.GetUpdatedAt().AsTime(),
 	}
+}
+
+func (s *Server) ListUserMemberships(ctx context.Context, request ListUserMembershipsRequestObject) (_ ListUserMembershipsResponseObject, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	user, memberships, err := s.people.ListMembershipsOfUser(ctx, request.Id)
+	if err != nil {
+		return nil, err
+	}
+	n := newNames()
+	n.knowUser(user)
+	items := make([]TeamMembership, len(memberships))
+	for i, membership := range memberships {
+		items[i] = toMembership(membership, n)
+	}
+	return ListUserMemberships200JSONResponse{Items: items}, s.name(ctx, n)
 }

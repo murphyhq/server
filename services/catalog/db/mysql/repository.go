@@ -239,3 +239,18 @@ func (r *Repository) GetIntegrationAndService(ctx context.Context, integrationID
 	}
 	return toIntegration(row.Integration), toService(row.Service), nil
 }
+
+func (r *Repository) ServiceNames(ctx context.Context, ids []string) (_ map[string]string, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	rows, err := r.queries.ServiceNames(ctx, ids)
+	if err != nil {
+		return nil, murphymysql.Error("service", err)
+	}
+	names := make(map[string]string, len(rows))
+	for _, row := range rows {
+		names[row.ID] = row.Name
+	}
+	return names, nil
+}

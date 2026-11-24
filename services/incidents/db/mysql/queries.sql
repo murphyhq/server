@@ -28,9 +28,14 @@ WHERE id = sqlc.arg(id);
 -- name: ListIncidents :many
 SELECT id, number, service_id, dedup_key, title, status, urgency, version, created_at, updated_at, resolved_at, escalation_policy_id, escalation_policy_version, escalation_level, escalation_round, escalation_exhausted, acknowledged_at
 FROM incidents
-WHERE id < sqlc.arg(before)
+WHERE incidents.id < sqlc.arg(before)
   AND (sqlc.arg(any_status) OR status IN (sqlc.slice(statuses)))
   AND (sqlc.arg(any_service) OR service_id IN (sqlc.slice(service_ids)))
+  AND (sqlc.arg(any_policy) OR escalation_policy_id IN (sqlc.slice(escalation_policy_ids)))
+  AND (sqlc.arg(any_urgency) OR urgency IN (sqlc.slice(urgencies)))
+  AND (sqlc.arg(anyone_paged) OR incidents.id IN (SELECT p.incident_id FROM incident_pages AS p WHERE p.user_id IN (sqlc.slice(paged_user_ids))))
+  AND (sqlc.narg(created_after) IS NULL OR incidents.created_at > sqlc.narg(created_after))
+  AND (sqlc.narg(created_before) IS NULL OR incidents.created_at < sqlc.narg(created_before))
 ORDER BY id DESC
 LIMIT ?;
 

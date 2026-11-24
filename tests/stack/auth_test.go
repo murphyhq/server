@@ -382,3 +382,20 @@ func TestAPolicyCannotBeCreatedForATeamYouDontManage(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusForbidden, got.StatusCode())
 }
+
+func TestAPersonsTeamsAreListedWithTheirRoles(t *testing.T) {
+	m := murphytest.New(t)
+	bo := m.Member(murphytest.Bo)
+	cy := m.User()
+	payments := m.Team()
+	payments.Add(&murphytest.Member{User: cy}, client.Responder)
+
+	got, err := bo.API.ListUserMembershipsWithResponse(t.Context(), cy.ID)
+
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, got.StatusCode())
+	require.Len(t, got.JSON200.Items, 1)
+	assert.Equal(t, payments.Reference(), got.JSON200.Items[0].Team)
+	assert.Equal(t, cy.Reference(), got.JSON200.Items[0].User)
+	assert.Equal(t, client.Responder, got.JSON200.Items[0].Role)
+}

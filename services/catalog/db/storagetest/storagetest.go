@@ -102,6 +102,18 @@ func Run(t *testing.T, open func(t *testing.T) catalog.Repository) {
 		assert.False(t, unused)
 	})
 
+	t.Run("names many services in one call", func(t *testing.T) {
+		repo := open(t)
+		checkout, payments := newService("checkout-api"), newService("payments-api")
+		require.NoError(t, repo.CreateService(t.Context(), checkout))
+		require.NoError(t, repo.CreateService(t.Context(), payments))
+
+		got, err := repo.ServiceNames(t.Context(), []string{payments.GetId(), murphy.NewID(), checkout.GetId()})
+
+		require.NoError(t, err)
+		assert.Equal(t, map[string]string{checkout.GetId(): "checkout-api", payments.GetId(): "payments-api"}, got)
+	})
+
 	t.Run("reports missing services and integrations", func(t *testing.T) {
 		repo := open(t)
 		_, err := repo.GetService(t.Context(), murphy.NewID())

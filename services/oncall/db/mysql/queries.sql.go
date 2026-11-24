@@ -109,45 +109,6 @@ func (q *Queries) DeleteScheduleTeams(ctx context.Context, scheduleID string) er
 	return err
 }
 
-const existingSchedules = `-- name: ExistingSchedules :many
-SELECT id
-FROM schedules
-WHERE id IN (/*SLICE:ids*/?)
-`
-
-func (q *Queries) ExistingSchedules(ctx context.Context, ids []string) ([]string, error) {
-	query := existingSchedules
-	var queryParams []interface{}
-	if len(ids) > 0 {
-		for _, v := range ids {
-			queryParams = append(queryParams, v)
-		}
-		query = strings.Replace(query, "/*SLICE:ids*/?", strings.Repeat(",?", len(ids))[1:], 1)
-	} else {
-		query = strings.Replace(query, "/*SLICE:ids*/?", "NULL", 1)
-	}
-	rows, err := q.db.QueryContext(ctx, query, queryParams...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []string
-	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err != nil {
-			return nil, err
-		}
-		items = append(items, id)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const getOverride = `-- name: GetOverride :one
 SELECT id, schedule_id, user_id, starts_at, ends_at, created_at, updated_at
 FROM overrides
@@ -514,6 +475,50 @@ func (q *Queries) ListSchedules(ctx context.Context, arg ListSchedulesParams) ([
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const scheduleNames = `-- name: ScheduleNames :many
+SELECT id, name
+FROM schedules
+WHERE id IN (/*SLICE:ids*/?)
+`
+
+type ScheduleNamesRow struct {
+	ID   string
+	Name string
+}
+
+func (q *Queries) ScheduleNames(ctx context.Context, ids []string) ([]ScheduleNamesRow, error) {
+	query := scheduleNames
+	var queryParams []interface{}
+	if len(ids) > 0 {
+		for _, v := range ids {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:ids*/?", strings.Repeat(",?", len(ids))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:ids*/?", "NULL", 1)
+	}
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ScheduleNamesRow
+	for rows.Next() {
+		var i ScheduleNamesRow
+		if err := rows.Scan(&i.ID, &i.Name); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

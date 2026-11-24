@@ -90,7 +90,7 @@ func RecordPage(incident *murphy.Incident, page *murphy.Page, policy *murphy.Esc
 	return decision
 }
 
-func AcknowledgeIncident(incident *murphy.Incident, now *timestamppb.Timestamp) *Decision {
+func AcknowledgeIncident(incident *murphy.Incident, actorID string, now *timestamppb.Timestamp) *Decision {
 	if incident.GetStatus() != murphy.IncidentStatus_INCIDENT_STATUS_TRIGGERED {
 		return nil
 	}
@@ -98,11 +98,13 @@ func AcknowledgeIncident(incident *murphy.Incident, now *timestamppb.Timestamp) 
 	incident.Status, incident.AcknowledgedAt = murphy.IncidentStatus_INCIDENT_STATUS_ACKNOWLEDGED, now
 	decision.Announce = []Announcement{{Verb: murphy.IncidentVerb_INCIDENT_VERB_ACKNOWLEDGED, Previous: previous}}
 	decision.CancelTimers = true
-	decision.Timeline = []*murphy.TimelineEntry{note(incident, murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_ACKNOWLEDGED, "Acknowledged through the API", now)}
+	acknowledged := note(incident, murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_ACKNOWLEDGED, "Acknowledged through the API", now)
+	acknowledged.ActorUserId = actorID
+	decision.Timeline = []*murphy.TimelineEntry{acknowledged}
 	return decision
 }
 
-func ResolveIncident(incident *murphy.Incident, now *timestamppb.Timestamp) *Decision {
+func ResolveIncident(incident *murphy.Incident, actorID string, now *timestamppb.Timestamp) *Decision {
 	if !incident.Open() {
 		return nil
 	}
@@ -110,7 +112,9 @@ func ResolveIncident(incident *murphy.Incident, now *timestamppb.Timestamp) *Dec
 	incident.Status, incident.ResolvedAt = murphy.IncidentStatus_INCIDENT_STATUS_RESOLVED, now
 	decision.Announce = []Announcement{{Verb: murphy.IncidentVerb_INCIDENT_VERB_RESOLVED, Previous: previous}}
 	decision.CancelTimers = true
-	decision.Timeline = []*murphy.TimelineEntry{note(incident, murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_RESOLVED, "Resolved through the API", now)}
+	resolved := note(incident, murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_RESOLVED, "Resolved through the API", now)
+	resolved.ActorUserId = actorID
+	decision.Timeline = []*murphy.TimelineEntry{resolved}
 	return decision
 }
 

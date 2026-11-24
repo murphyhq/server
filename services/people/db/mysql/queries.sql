@@ -98,13 +98,13 @@ ORDER BY id;
 DELETE FROM team_memberships
 WHERE team_id = sqlc.arg(team_id) AND user_id = sqlc.arg(user_id);
 
--- name: ExistingUsers :many
-SELECT id
+-- name: UserNames :many
+SELECT id, name
 FROM users
 WHERE id IN (sqlc.slice(ids));
 
--- name: ExistingTeams :many
-SELECT id
+-- name: TeamNames :many
+SELECT id, name
 FROM teams
 WHERE id IN (sqlc.slice(ids));
 

@@ -191,7 +191,7 @@ func TestAnEmptyPageForALevelAlreadyLeftOnlyRecordsIt(t *testing.T) {
 }
 
 func TestAcknowledgingCancelsTimersAndAnnouncesIt(t *testing.T) {
-	decision := incidents.AcknowledgeIncident(incidentAt(1, 1), murphy.Now())
+	decision := incidents.AcknowledgeIncident(incidentAt(1, 1), ana, murphy.Now())
 
 	assert.Equal(t, murphy.IncidentStatus_INCIDENT_STATUS_ACKNOWLEDGED, decision.Incident.GetStatus())
 	assert.NotNil(t, decision.Incident.GetAcknowledgedAt())
@@ -206,8 +206,16 @@ func TestAcknowledgingOrResolvingTwiceDecidesNothing(t *testing.T) {
 	resolved := incidentAt(1, 1)
 	resolved.Status = murphy.IncidentStatus_INCIDENT_STATUS_RESOLVED
 
-	assert.Nil(t, incidents.AcknowledgeIncident(acknowledged, murphy.Now()))
-	assert.Nil(t, incidents.ResolveIncident(resolved, murphy.Now()))
+	assert.Nil(t, incidents.AcknowledgeIncident(acknowledged, ana, murphy.Now()))
+	assert.Nil(t, incidents.ResolveIncident(resolved, ana, murphy.Now()))
+}
+
+func TestWhoAcknowledgesOrResolvesGoesOnTheTimeline(t *testing.T) {
+	acknowledged := incidents.AcknowledgeIncident(incidentAt(1, 1), ana, murphy.Now())
+	resolved := incidents.ResolveIncident(incidentAt(1, 1), ana, murphy.Now())
+
+	assert.Equal(t, ana, acknowledged.Timeline[0].GetActorUserId())
+	assert.Equal(t, ana, resolved.Timeline[0].GetActorUserId())
 }
 
 func TestANotificationOutcomeGoesOnTheTimeline(t *testing.T) {

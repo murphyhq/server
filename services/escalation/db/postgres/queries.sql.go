@@ -343,6 +343,68 @@ func (q *Queries) ListPolicies(ctx context.Context, arg ListPoliciesParams) ([]L
 	return items, nil
 }
 
+const policiesOfTeams = `-- name: PoliciesOfTeams :many
+SELECT id, name
+FROM escalation_policies
+WHERE team_id = ANY($1::uuid[])
+`
+
+type PoliciesOfTeamsRow struct {
+	ID   string
+	Name string
+}
+
+func (q *Queries) PoliciesOfTeams(ctx context.Context, teamIds []string) ([]PoliciesOfTeamsRow, error) {
+	rows, err := q.db.Query(ctx, policiesOfTeams, teamIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []PoliciesOfTeamsRow
+	for rows.Next() {
+		var i PoliciesOfTeamsRow
+		if err := rows.Scan(&i.ID, &i.Name); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const policyNames = `-- name: PolicyNames :many
+SELECT id, name
+FROM escalation_policies
+WHERE id = ANY($1::uuid[])
+`
+
+type PolicyNamesRow struct {
+	ID   string
+	Name string
+}
+
+func (q *Queries) PolicyNames(ctx context.Context, ids []string) ([]PolicyNamesRow, error) {
+	rows, err := q.db.Query(ctx, policyNames, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []PolicyNamesRow
+	for rows.Next() {
+		var i PolicyNamesRow
+		if err := rows.Scan(&i.ID, &i.Name); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updatePolicy = `-- name: UpdatePolicy :execrows
 UPDATE escalation_policies
 SET name = $1, team_id = $2, version = $3, updated_at = $4

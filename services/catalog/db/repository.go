@@ -26,6 +26,7 @@ type Engine[T Tx] interface {
 	UpdateIntegration(ctx context.Context, integration *murphy.Integration) error
 	DeleteIntegration(ctx context.Context, id string) error
 	PolicyInUse(ctx context.Context, policyID string) (bool, error)
+	ServiceNames(ctx context.Context, ids []string) (map[string]string, error)
 	GetIntegrationAndService(ctx context.Context, integrationID string) (*murphy.Integration, *murphy.Service, error)
 	Transaction(ctx context.Context, work func(tx T) error) error
 	Migrate(ctx context.Context) error

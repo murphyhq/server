@@ -144,17 +144,17 @@ func Run(t *testing.T, open func(t *testing.T) oncall.Repository) {
 		assert.Empty(t, overrides[second.GetId()])
 	})
 
-	t.Run("finds which of many schedules exist in one call", func(t *testing.T) {
+	t.Run("names many schedules in one call", func(t *testing.T) {
 		repo := open(t)
 		first := newSchedule("first", nil, layer("l", time.Hour, murphy.NewID()))
 		second := newSchedule("second", nil, layer("l", time.Hour, murphy.NewID()))
 		require.NoError(t, repo.CreateSchedule(t.Context(), first))
 		require.NoError(t, repo.CreateSchedule(t.Context(), second))
 
-		got, err := repo.ExistingSchedules(t.Context(), []string{second.GetId(), murphy.NewID(), first.GetId()})
+		got, err := repo.ScheduleNames(t.Context(), []string{second.GetId(), murphy.NewID(), first.GetId()})
 
 		require.NoError(t, err)
-		assert.ElementsMatch(t, []string{first.GetId(), second.GetId()}, got)
+		assert.Equal(t, map[string]string{first.GetId(): "first", second.GetId(): "second"}, got)
 	})
 
 	t.Run("reports missing schedules and overrides", func(t *testing.T) {

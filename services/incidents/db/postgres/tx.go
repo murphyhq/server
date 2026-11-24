@@ -183,3 +183,17 @@ func (t *Tx) ClaimMessages(ctx context.Context, ids []string, until time.Time) (
 	until = until.UTC()
 	return murphypostgres.Error("scheduled message", t.queries.ClaimMessages(ctx, ClaimMessagesParams{ClaimedUntil: &until, Ids: ids}))
 }
+
+func (t *Tx) CreatePages(ctx context.Context, incidentID string, userIDs []string, at time.Time) (err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	if len(userIDs) == 0 {
+		return nil
+	}
+	ids := make([]string, len(userIDs))
+	for i := range userIDs {
+		ids[i] = murphy.NewID()
+	}
+	return murphypostgres.Error("page", t.queries.CreatePages(ctx, CreatePagesParams{Ids: ids, IncidentID: incidentID, UserIds: userIDs, CreatedAt: at}))
+}

@@ -30,9 +30,14 @@ WHERE id = @id;
 -- name: ListIncidents :many
 SELECT id, number, service_id, dedup_key, title, status, urgency, version, created_at, updated_at, resolved_at, escalation_policy_id, escalation_policy_version, escalation_level, escalation_round, escalation_exhausted, acknowledged_at
 FROM incidents
-WHERE id < @before
+WHERE incidents.id < @before
   AND (cardinality(@statuses::text[]) = 0 OR status = ANY(@statuses::text[]))
   AND (coalesce(cardinality(@service_ids::uuid[]), 0) = 0 OR service_id = ANY(@service_ids::uuid[]))
+  AND (coalesce(cardinality(@escalation_policy_ids::uuid[]), 0) = 0 OR escalation_policy_id = ANY(@escalation_policy_ids::uuid[]))
+  AND (cardinality(@urgencies::text[]) = 0 OR urgency = ANY(@urgencies::text[]))
+  AND (coalesce(cardinality(@paged_user_ids::uuid[]), 0) = 0 OR incidents.id IN (SELECT p.incident_id FROM incident_pages AS p WHERE p.user_id = ANY(@paged_user_ids::uuid[])))
+  AND (sqlc.narg(created_after)::timestamptz IS NULL OR incidents.created_at > sqlc.narg(created_after)::timestamptz)
+  AND (sqlc.narg(created_before)::timestamptz IS NULL OR incidents.created_at < sqlc.narg(created_before)::timestamptz)
 ORDER BY id DESC
 LIMIT @max_rows;
 
@@ -94,3 +99,7 @@ WHERE id = ANY(@ids::uuid[]);
 -- name: CreateScheduledMessages :exec
 INSERT INTO scheduled_messages (id, incident_id, kind, due_at, envelope, created_at)
 SELECT unnest(@ids::uuid[]), unnest(@incident_ids::uuid[]), unnest(@kinds::text[]), unnest(@due_ats::timestamptz[]), unnest(@envelopes::bytea[]), @created_at::timestamptz;
+
+-- name: CreatePages :exec
+INSERT INTO incident_pages (id, incident_id, user_id, created_at)
+SELECT unnest(@ids::uuid[]), @incident_id::uuid, unnest(@user_ids::uuid[]), @created_at::timestamptz;

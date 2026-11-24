@@ -18,6 +18,7 @@ type Tx interface {
 	UpdateIncident(ctx context.Context, incident *murphy.Incident) error
 	CreateAlert(ctx context.Context, alert *murphy.Alert, incidentID string) error
 	CreateTimelineEntry(ctx context.Context, entry *murphy.TimelineEntry) error
+	CreatePages(ctx context.Context, incidentID string, userIDs []string, at time.Time) error
 	DeleteTimers(ctx context.Context, incidentID string) error
 	CreateScheduledMessages(ctx context.Context, messages []*incidents.ScheduledMessage, at time.Time) error
 	LockDueMessages(ctx context.Context, now time.Time, limit int) ([]*incidents.ScheduledMessage, error)
@@ -82,6 +83,9 @@ func (r *Repository[T]) Record(ctx context.Context, change *incidents.Change) (r
 			if err := tx.CreateTimelineEntry(ctx, entry); err != nil {
 				return err
 			}
+			if err := tx.CreatePages(ctx, entry.GetIncidentId(), pagedUsers(entry), now); err != nil {
+				return err
+			}
 		}
 		messages, err := scheduledMessages(ctx, decision)
 		if err != nil {
@@ -94,6 +98,14 @@ func (r *Repository[T]) Record(ctx context.Context, change *incidents.Change) (r
 		return nil
 	})
 	return recorded, err
+}
+
+func pagedUsers(entry *murphy.TimelineEntry) []string {
+	var users []string
+	for _, page := range entry.GetEscalation().GetPaged() {
+		users = append(users, page.GetUserId())
+	}
+	return users
 }
 
 func scheduledMessages(ctx context.Context, decision *incidents.Decision) ([]*incidents.ScheduledMessage, error) {

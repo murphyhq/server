@@ -61,3 +61,13 @@ SELECT unnest(@ids::uuid[]), unnest(@level_ids::uuid[]), unnest(@positions::inte
 SELECT version
 FROM escalation_policies
 WHERE id = @id AND deleted_at IS NULL;
+
+-- name: PolicyNames :many
+SELECT id, name
+FROM escalation_policies
+WHERE id = ANY(@ids::uuid[]);
+
+-- name: PoliciesOfTeams :many
+SELECT id, name
+FROM escalation_policies
+WHERE team_id = ANY(@team_ids::uuid[]);

@@ -284,6 +284,44 @@ func Run(t *testing.T, open func(t *testing.T) incidents.Repository) {
 		assert.Equal(t, []string{first.IncidentID}, ids(page))
 	})
 
+	t.Run("lists incidents by policy, urgency, person paged and when they opened", func(t *testing.T) {
+		repo := open(t)
+		quiet, paging := opened(murphy.NewID(), "a"), opened(murphy.NewID(), "b")
+		quiet.Decision.Incident.Urgency = murphy.Urgency_URGENCY_LOW
+		ana := murphy.NewID()
+		page := &murphy.TimelinePage{UserId: ana, Via: &murphy.EscalationTarget{Type: murphy.EscalationTargetType_ESCALATION_TARGET_TYPE_USER, Id: ana}}
+		paging.Decision.Timeline = append(paging.Decision.Timeline, &murphy.TimelineEntry{
+			Id: murphy.NewID(), IncidentId: paging.IncidentID, Type: murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_ESCALATED,
+			Summary: "level 1", Escalation: &murphy.TimelineEscalation{Level: 1, Round: 1, Paged: []*murphy.TimelinePage{page, page}}, At: murphy.Now(),
+		})
+		_, err := repo.Record(t.Context(), quiet)
+		require.NoError(t, err)
+		_, err = repo.Record(t.Context(), paging)
+		require.NoError(t, err)
+		opening := quiet.Decision.Incident.GetCreatedAt().AsTime()
+		before, after := opening.Add(-time.Minute), opening.Add(time.Minute)
+
+		ofPolicy, err := repo.ListIncidents(t.Context(), incidents.Filter{PolicyIDs: []string{quiet.Decision.Incident.GetEscalationPolicyId()}}, maxID, 10)
+		require.NoError(t, err)
+		low, err := repo.ListIncidents(t.Context(), incidents.Filter{Urgencies: []murphy.Urgency{murphy.Urgency_URGENCY_LOW}}, maxID, 10)
+		require.NoError(t, err)
+		pagedAna, err := repo.ListIncidents(t.Context(), incidents.Filter{PagedUserIDs: []string{ana}}, maxID, 10)
+		require.NoError(t, err)
+		openedAfter, err := repo.ListIncidents(t.Context(), incidents.Filter{CreatedAfter: &before}, maxID, 10)
+		require.NoError(t, err)
+		openedBefore, err := repo.ListIncidents(t.Context(), incidents.Filter{CreatedBefore: &before}, maxID, 10)
+		require.NoError(t, err)
+		openedLater, err := repo.ListIncidents(t.Context(), incidents.Filter{CreatedAfter: &after}, maxID, 10)
+		require.NoError(t, err)
+
+		assert.Equal(t, []string{quiet.IncidentID}, ids(ofPolicy))
+		assert.Equal(t, []string{quiet.IncidentID}, ids(low))
+		assert.Equal(t, []string{paging.IncidentID}, ids(pagedAna), "once, though paged twice")
+		assert.Equal(t, []string{paging.IncidentID, quiet.IncidentID}, ids(openedAfter))
+		assert.Empty(t, openedBefore)
+		assert.Empty(t, openedLater)
+	})
+
 	t.Run("tells when the latest firing alert arrived", func(t *testing.T) {
 		repo := open(t)
 		outcome := opened(murphy.NewID(), "disk-full")
