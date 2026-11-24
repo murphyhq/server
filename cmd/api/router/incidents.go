@@ -102,8 +102,9 @@ func (s *Server) GetIncident(ctx context.Context, request GetIncidentRequestObje
 	if err := s.name(ctx, n); err != nil {
 		return nil, err
 	}
-	for i := range entries {
-		entries[i].Summary = summarize(entries[i])
+	nameOf := func(userID string) string { return *n.user(userID).Name }
+	for i, entry := range timeline {
+		entries[i].Summary = incidents.Summary(entry, nameOf)
 	}
 	return GetIncident200JSONResponse{
 		Id:         out.Id,
