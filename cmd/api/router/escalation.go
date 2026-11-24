@@ -34,7 +34,7 @@ func (s *Server) CreateEscalationPolicy(ctx context.Context, request CreateEscal
 	if err != nil {
 		return nil, err
 	}
-	return CreateEscalationPolicy201JSONResponse(toPolicy(policy, nil)), s.name(ctx, nil)
+	return CreateEscalationPolicy201JSONResponse(toPolicy(policy, nil)), nil
 }
 
 func (s *Server) GetEscalationPolicy(ctx context.Context, request GetEscalationPolicyRequestObject) (_ GetEscalationPolicyResponseObject, err error) {
@@ -59,7 +59,7 @@ func (s *Server) UpdateEscalationPolicy(ctx context.Context, request UpdateEscal
 	if err != nil {
 		return nil, err
 	}
-	return UpdateEscalationPolicy200JSONResponse(toPolicy(policy, nil)), s.name(ctx, nil)
+	return UpdateEscalationPolicy200JSONResponse(toPolicy(policy, nil)), nil
 }
 
 func (s *Server) DeleteEscalationPolicy(ctx context.Context, request DeleteEscalationPolicyRequestObject) (_ DeleteEscalationPolicyResponseObject, err error) {

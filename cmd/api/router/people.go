@@ -97,7 +97,7 @@ func (s *Server) CreateContactMethod(ctx context.Context, request CreateContactM
 	if err != nil {
 		return nil, err
 	}
-	return CreateContactMethod201JSONResponse(toContactMethod(method, nil)), s.name(ctx, nil)
+	return CreateContactMethod201JSONResponse(toContactMethod(method, nil)), nil
 }
 
 func (s *Server) GetContactMethod(ctx context.Context, request GetContactMethodRequestObject) (_ GetContactMethodResponseObject, err error) {
@@ -125,7 +125,7 @@ func (s *Server) UpdateContactMethod(ctx context.Context, request UpdateContactM
 	if err != nil {
 		return nil, err
 	}
-	return UpdateContactMethod200JSONResponse(toContactMethod(method, nil)), s.name(ctx, nil)
+	return UpdateContactMethod200JSONResponse(toContactMethod(method, nil)), nil
 }
 
 func (s *Server) DeleteContactMethod(ctx context.Context, request DeleteContactMethodRequestObject) (_ DeleteContactMethodResponseObject, err error) {

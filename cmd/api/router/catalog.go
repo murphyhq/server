@@ -32,7 +32,7 @@ func (s *Server) CreateService(ctx context.Context, request CreateServiceRequest
 	if err != nil {
 		return nil, err
 	}
-	return CreateService201JSONResponse(toService(service, nil)), s.name(ctx, nil)
+	return CreateService201JSONResponse(toService(service, nil)), nil
 }
 
 func (s *Server) GetService(ctx context.Context, request GetServiceRequestObject) (_ GetServiceResponseObject, err error) {
@@ -55,7 +55,7 @@ func (s *Server) UpdateService(ctx context.Context, request UpdateServiceRequest
 	if err != nil {
 		return nil, err
 	}
-	return UpdateService200JSONResponse(toService(service, nil)), s.name(ctx, nil)
+	return UpdateService200JSONResponse(toService(service, nil)), nil
 }
 
 func (s *Server) DeleteService(ctx context.Context, request DeleteServiceRequestObject) (_ DeleteServiceResponseObject, err error) {
@@ -98,7 +98,7 @@ func (s *Server) CreateIntegration(ctx context.Context, request CreateIntegratio
 	if err != nil {
 		return nil, err
 	}
-	return CreateIntegration201JSONResponse(withKey(integration, key, nil)), s.name(ctx, nil)
+	return CreateIntegration201JSONResponse(withKey(integration, key, nil)), nil
 }
 
 func (s *Server) RotateIntegrationKey(ctx context.Context, request RotateIntegrationKeyRequestObject) (_ RotateIntegrationKeyResponseObject, err error) {
@@ -109,7 +109,7 @@ func (s *Server) RotateIntegrationKey(ctx context.Context, request RotateIntegra
 	if err != nil {
 		return nil, err
 	}
-	return RotateIntegrationKey200JSONResponse(withKey(integration, key, nil)), s.name(ctx, nil)
+	return RotateIntegrationKey200JSONResponse(withKey(integration, key, nil)), nil
 }
 
 func (s *Server) GetIntegration(ctx context.Context, request GetIntegrationRequestObject) (_ GetIntegrationResponseObject, err error) {
@@ -136,7 +136,7 @@ func (s *Server) UpdateIntegration(ctx context.Context, request UpdateIntegratio
 	if err != nil {
 		return nil, err
 	}
-	return UpdateIntegration200JSONResponse(toIntegration(integration, nil)), s.name(ctx, nil)
+	return UpdateIntegration200JSONResponse(toIntegration(integration, nil)), nil
 }
 
 func (s *Server) DeleteIntegration(ctx context.Context, request DeleteIntegrationRequestObject) (_ DeleteIntegrationResponseObject, err error) {

@@ -156,7 +156,7 @@ func (s *Server) AcknowledgeIncident(ctx context.Context, request AcknowledgeInc
 	if err != nil {
 		return nil, err
 	}
-	return AcknowledgeIncident200JSONResponse(toIncident(incident, nil)), s.name(ctx, nil)
+	return AcknowledgeIncident200JSONResponse(toIncident(incident, nil)), nil
 }
 
 func (s *Server) ResolveIncident(ctx context.Context, request ResolveIncidentRequestObject) (_ ResolveIncidentResponseObject, err error) {
@@ -167,7 +167,7 @@ func (s *Server) ResolveIncident(ctx context.Context, request ResolveIncidentReq
 	if err != nil {
 		return nil, err
 	}
-	return ResolveIncident200JSONResponse(toIncident(incident, nil)), s.name(ctx, nil)
+	return ResolveIncident200JSONResponse(toIncident(incident, nil)), nil
 }
 
 func all[T any](values *[]T) []T {

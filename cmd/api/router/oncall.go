@@ -35,7 +35,7 @@ func (s *Server) CreateSchedule(ctx context.Context, request CreateScheduleReque
 	if err != nil {
 		return nil, err
 	}
-	return CreateSchedule201JSONResponse(toSchedule(schedule, nil)), s.name(ctx, nil)
+	return CreateSchedule201JSONResponse(toSchedule(schedule, nil)), nil
 }
 
 func (s *Server) GetSchedule(ctx context.Context, request GetScheduleRequestObject) (_ GetScheduleResponseObject, err error) {
@@ -60,7 +60,7 @@ func (s *Server) UpdateSchedule(ctx context.Context, request UpdateScheduleReque
 	if err != nil {
 		return nil, err
 	}
-	return UpdateSchedule200JSONResponse(toSchedule(schedule, nil)), s.name(ctx, nil)
+	return UpdateSchedule200JSONResponse(toSchedule(schedule, nil)), nil
 }
 
 func (s *Server) DeleteSchedule(ctx context.Context, request DeleteScheduleRequestObject) (_ DeleteScheduleResponseObject, err error) {
@@ -107,7 +107,7 @@ func (s *Server) CreateOverride(ctx context.Context, request CreateOverrideReque
 	if err != nil {
 		return nil, err
 	}
-	return CreateOverride201JSONResponse(toOverride(override, nil)), s.name(ctx, nil)
+	return CreateOverride201JSONResponse(toOverride(override, nil)), nil
 }
 
 func (s *Server) DeleteOverride(ctx context.Context, request DeleteOverrideRequestObject) (_ DeleteOverrideResponseObject, err error) {

@@ -94,7 +94,7 @@ func (s *Server) SetTeamMember(ctx context.Context, request SetTeamMemberRequest
 	if err != nil {
 		return nil, err
 	}
-	return SetTeamMember200JSONResponse(toMembership(membership, nil)), s.name(ctx, nil)
+	return SetTeamMember200JSONResponse(toMembership(membership, nil)), nil
 }
 
 func (s *Server) RemoveTeamMember(ctx context.Context, request RemoveTeamMemberRequestObject) (_ RemoveTeamMemberResponseObject, err error) {
