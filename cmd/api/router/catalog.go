@@ -27,10 +27,6 @@ func (s *Server) CreateService(ctx context.Context, request CreateServiceRequest
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
-	if err := s.access.ManagesPolicy(ctx, s.caller(ctx), request.Body.EscalationPolicy.Id); err != nil {
-		return nil, err
-	}
-
 	service, err := s.catalog.CreateService(ctx, fromServiceInput("", request.Body))
 	if err != nil {
 		return nil, err
@@ -53,13 +49,6 @@ func (s *Server) UpdateService(ctx context.Context, request UpdateServiceRequest
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
-	if err := s.access.ManagesService(ctx, s.caller(ctx), request.Id); err != nil {
-		return nil, err
-	}
-	if err := s.access.ManagesPolicy(ctx, s.caller(ctx), request.Body.EscalationPolicy.Id); err != nil {
-		return nil, err
-	}
-
 	service, err := s.catalog.UpdateService(ctx, fromServiceInput(request.Id, request.Body))
 	if err != nil {
 		return nil, err
@@ -70,10 +59,6 @@ func (s *Server) UpdateService(ctx context.Context, request UpdateServiceRequest
 func (s *Server) DeleteService(ctx context.Context, request DeleteServiceRequestObject) (_ DeleteServiceResponseObject, err error) {
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
-
-	if err := s.access.ManagesService(ctx, s.caller(ctx), request.Id); err != nil {
-		return nil, err
-	}
 
 	if err := s.catalog.DeleteService(ctx, request.Id); err != nil {
 		return nil, err
@@ -100,10 +85,6 @@ func (s *Server) CreateIntegration(ctx context.Context, request CreateIntegratio
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
-	if err := s.access.ManagesService(ctx, s.caller(ctx), request.Id); err != nil {
-		return nil, err
-	}
-
 	integration, key, err := s.catalog.CreateIntegration(ctx, &murphy.Integration{
 		ServiceId: request.Id,
 		Name:      request.Body.Name,
@@ -119,10 +100,6 @@ func (s *Server) CreateIntegration(ctx context.Context, request CreateIntegratio
 func (s *Server) RotateIntegrationKey(ctx context.Context, request RotateIntegrationKeyRequestObject) (_ RotateIntegrationKeyResponseObject, err error) {
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
-
-	if err := s.access.ManagesIntegration(ctx, s.caller(ctx), request.Id); err != nil {
-		return nil, err
-	}
 
 	integration, key, err := s.catalog.RotateIntegrationKey(ctx, request.Id)
 	if err != nil {
@@ -146,10 +123,6 @@ func (s *Server) UpdateIntegration(ctx context.Context, request UpdateIntegratio
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
-	if err := s.access.ManagesIntegration(ctx, s.caller(ctx), request.Id); err != nil {
-		return nil, err
-	}
-
 	integration, err := s.catalog.UpdateIntegration(ctx, &murphy.Integration{
 		Id:     request.Id,
 		Name:   request.Body.Name,
@@ -164,10 +137,6 @@ func (s *Server) UpdateIntegration(ctx context.Context, request UpdateIntegratio
 func (s *Server) DeleteIntegration(ctx context.Context, request DeleteIntegrationRequestObject) (_ DeleteIntegrationResponseObject, err error) {
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
-
-	if err := s.access.ManagesIntegration(ctx, s.caller(ctx), request.Id); err != nil {
-		return nil, err
-	}
 
 	if err := s.catalog.DeleteIntegration(ctx, request.Id); err != nil {
 		return nil, err

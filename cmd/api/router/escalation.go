@@ -29,10 +29,6 @@ func (s *Server) CreateEscalationPolicy(ctx context.Context, request CreateEscal
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
-	if err := s.access.ManagesTeams(ctx, s.caller(ctx), request.Body.Team.Id); err != nil {
-		return nil, err
-	}
-
 	policy, err := s.escalation.CreatePolicy(ctx, fromPolicyInput(request.Body))
 	if err != nil {
 		return nil, err
@@ -55,13 +51,6 @@ func (s *Server) UpdateEscalationPolicy(ctx context.Context, request UpdateEscal
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
-	if err := s.access.ManagesPolicy(ctx, s.caller(ctx), request.Id); err != nil {
-		return nil, err
-	}
-	if err := s.access.ManagesTeams(ctx, s.caller(ctx), request.Body.Team.Id); err != nil {
-		return nil, err
-	}
-
 	in := fromPolicyInput(request.Body)
 	in.Id = request.Id
 	policy, err := s.escalation.UpdatePolicy(ctx, in)
@@ -74,10 +63,6 @@ func (s *Server) UpdateEscalationPolicy(ctx context.Context, request UpdateEscal
 func (s *Server) DeleteEscalationPolicy(ctx context.Context, request DeleteEscalationPolicyRequestObject) (_ DeleteEscalationPolicyResponseObject, err error) {
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
-
-	if err := s.access.ManagesPolicy(ctx, s.caller(ctx), request.Id); err != nil {
-		return nil, err
-	}
 
 	if err := s.escalation.DeletePolicy(ctx, request.Id); err != nil {
 		return nil, err

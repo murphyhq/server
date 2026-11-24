@@ -30,10 +30,6 @@ func (s *Server) CreateSchedule(ctx context.Context, request CreateScheduleReque
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
-	if err := s.access.ManagesTeams(ctx, s.caller(ctx), fromScheduleInput(request.Body).GetTeamIds()...); err != nil {
-		return nil, err
-	}
-
 	schedule, err := s.oncall.CreateSchedule(ctx, fromScheduleInput(request.Body))
 	if err != nil {
 		return nil, err
@@ -56,13 +52,6 @@ func (s *Server) UpdateSchedule(ctx context.Context, request UpdateScheduleReque
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
-	if err := s.access.ManagesSchedule(ctx, s.caller(ctx), request.Id); err != nil {
-		return nil, err
-	}
-	if err := s.access.ManagesTeams(ctx, s.caller(ctx), fromScheduleInput(request.Body).GetTeamIds()...); err != nil {
-		return nil, err
-	}
-
 	in := fromScheduleInput(request.Body)
 	in.Id = request.Id
 	schedule, err := s.oncall.UpdateSchedule(ctx, in)
@@ -75,10 +64,6 @@ func (s *Server) UpdateSchedule(ctx context.Context, request UpdateScheduleReque
 func (s *Server) DeleteSchedule(ctx context.Context, request DeleteScheduleRequestObject) (_ DeleteScheduleResponseObject, err error) {
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
-
-	if err := s.access.ManagesSchedule(ctx, s.caller(ctx), request.Id); err != nil {
-		return nil, err
-	}
 
 	if err := s.oncall.DeleteSchedule(ctx, request.Id); err != nil {
 		return nil, err
@@ -109,10 +94,6 @@ func (s *Server) CreateOverride(ctx context.Context, request CreateOverrideReque
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
-	if err := s.access.ManagesSchedule(ctx, s.caller(ctx), request.Id); err != nil {
-		return nil, err
-	}
-
 	override, err := s.oncall.CreateOverride(ctx, &murphy.Override{
 		ScheduleId: request.Id,
 		UserId:     request.Body.User.Id,
@@ -128,10 +109,6 @@ func (s *Server) CreateOverride(ctx context.Context, request CreateOverrideReque
 func (s *Server) DeleteOverride(ctx context.Context, request DeleteOverrideRequestObject) (_ DeleteOverrideResponseObject, err error) {
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
-
-	if err := s.access.ManagesOverride(ctx, s.caller(ctx), request.Id); err != nil {
-		return nil, err
-	}
 
 	if err := s.oncall.DeleteOverride(ctx, request.Id); err != nil {
 		return nil, err

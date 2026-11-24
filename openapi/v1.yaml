@@ -95,6 +95,9 @@ paths:
   /v1/auth/sessions:
     get:
       operationId: listSessions
+      security:
+        - session: [sessions:own]
+        - sessionCookie: [sessions:own]
       summary: List your sessions
       description: Your sessions that are still active, newest first.
       tags: [auth]
@@ -112,6 +115,9 @@ paths:
           $ref: "#/components/responses/Problem"
     delete:
       operationId: signOutEverywhere
+      security:
+        - session: [sessions:own]
+        - sessionCookie: [sessions:own]
       summary: Sign out everywhere
       description: Ends all your sessions at once, this one included, and discards your unused one-time codes, such as connect codes.
       tags: [auth]
@@ -148,6 +154,9 @@ paths:
   /v1/auth/sessions/{id}:
     delete:
       operationId: endSession
+      security:
+        - session: [sessions:own]
+        - sessionCookie: [sessions:own]
       summary: End one of your sessions
       description: Ends one of your own sessions at once, such as a lost phone's.
       tags: [auth]
@@ -161,6 +170,9 @@ paths:
   /v1/auth/connect-codes:
     post:
       operationId: createConnectCode
+      security:
+        - session: [sessions:own]
+        - sessionCookie: [sessions:own]
       summary: Connect the app
       description: Creates a one-time code that signs the app in as you, valid for 45 seconds. Show its link as a QR code for the app to scan.
       tags: [auth]
@@ -176,6 +188,9 @@ paths:
   /v1/auth/session:
     get:
       operationId: getSession
+      security:
+        - session: [sessions:own]
+        - sessionCookie: [sessions:own]
       summary: Get the current session
       tags: [auth]
       responses:
@@ -187,6 +202,9 @@ paths:
                 $ref: "#/components/schemas/Session"
     delete:
       operationId: signOut
+      security:
+        - session: [sessions:own]
+        - sessionCookie: [sessions:own]
       summary: Sign out
       description: Ends the current session at once.
       tags: [auth]
@@ -216,6 +234,11 @@ paths:
           $ref: "#/components/responses/Problem"
     post:
       operationId: createService
+      security:
+        - session: [policies:manage]
+        - sessionCookie: [policies:manage]
+      x-murphy-resources:
+        policies:manage: body.escalation_policy.id
       summary: Create a service
       tags: [catalog]
       parameters:
@@ -257,6 +280,11 @@ paths:
           $ref: "#/components/responses/Problem"
     put:
       operationId: updateService
+      security:
+        - session: [services:manage, policies:manage]
+        - sessionCookie: [services:manage, policies:manage]
+      x-murphy-resources:
+        policies:manage: body.escalation_policy.id
       summary: Update a service
       tags: [catalog]
       requestBody:
@@ -280,6 +308,9 @@ paths:
           $ref: "#/components/responses/Problem"
     delete:
       operationId: deleteService
+      security:
+        - session: [services:manage]
+        - sessionCookie: [services:manage]
       summary: Delete a service
       tags: [catalog]
       responses:
@@ -310,6 +341,9 @@ paths:
           $ref: "#/components/responses/Problem"
     post:
       operationId: createIntegration
+      security:
+        - session: [services:manage]
+        - sessionCookie: [services:manage]
       summary: Create an integration
       tags: [catalog]
       parameters:
@@ -353,6 +387,9 @@ paths:
           $ref: "#/components/responses/Problem"
     put:
       operationId: updateIntegration
+      security:
+        - session: [integrations:manage]
+        - sessionCookie: [integrations:manage]
       summary: Update an integration
       tags: [catalog]
       requestBody:
@@ -374,6 +411,9 @@ paths:
           $ref: "#/components/responses/Problem"
     delete:
       operationId: deleteIntegration
+      security:
+        - session: [integrations:manage]
+        - sessionCookie: [integrations:manage]
       summary: Delete an integration
       tags: [catalog]
       responses:
@@ -386,6 +426,9 @@ paths:
       - $ref: "#/components/parameters/ID"
     post:
       operationId: rotateIntegrationKey
+      security:
+        - session: [integrations:manage]
+        - sessionCookie: [integrations:manage]
       summary: Rotate an integration's key
       description: Issues a new key and bumps the key version. The previous key keeps working for 24 hours, until previous_key_valid_until.
       tags: [catalog]
@@ -460,6 +503,9 @@ paths:
       - $ref: "#/components/parameters/ID"
     post:
       operationId: acknowledgeIncident
+      security:
+        - session: [incidents:respond]
+        - sessionCookie: [incidents:respond]
       summary: Acknowledge an incident, which stops its escalation
       tags: [incidents]
       parameters:
@@ -482,6 +528,9 @@ paths:
       - $ref: "#/components/parameters/ID"
     post:
       operationId: resolveIncident
+      security:
+        - session: [incidents:respond]
+        - sessionCookie: [incidents:respond]
       summary: Resolve an incident
       tags: [incidents]
       parameters:
@@ -518,6 +567,9 @@ paths:
           $ref: "#/components/responses/Problem"
     post:
       operationId: createUser
+      security:
+        - session: [install:manage]
+        - sessionCookie: [install:manage]
       summary: Create a user
       tags: [people]
       parameters:
@@ -559,6 +611,11 @@ paths:
           $ref: "#/components/responses/Problem"
     put:
       operationId: updateUser
+      security:
+        - session: [users:self, install:manage]
+        - sessionCookie: [users:self, install:manage]
+      x-murphy-resources:
+        install:manage: body.status?
       summary: Update a user
       tags: [people]
       requestBody:
@@ -580,6 +637,9 @@ paths:
           $ref: "#/components/responses/Problem"
     delete:
       operationId: deleteUser
+      security:
+        - session: [install:manage]
+        - sessionCookie: [install:manage]
       summary: Delete a user
       tags: [people]
       responses:
@@ -590,6 +650,9 @@ paths:
   /v1/users/{id}/sessions:
     delete:
       operationId: endUserSessions
+      security:
+        - session: [install:manage]
+        - sessionCookie: [install:manage]
       summary: End all of a user's sessions
       description: Ends all the user's sessions at once and discards their unused one-time codes, without deactivating them. Only admins may do this.
       tags: [people]
@@ -607,6 +670,9 @@ paths:
       - $ref: "#/components/parameters/ID"
     get:
       operationId: listContactMethods
+      security:
+        - session: [users:self]
+        - sessionCookie: [users:self]
       summary: List a user's contact methods
       tags: [people]
       responses:
@@ -620,6 +686,9 @@ paths:
           $ref: "#/components/responses/Problem"
     post:
       operationId: createContactMethod
+      security:
+        - session: [users:self]
+        - sessionCookie: [users:self]
       summary: Add a contact method to a user
       tags: [people]
       parameters:
@@ -650,6 +719,9 @@ paths:
       - $ref: "#/components/parameters/ID"
     get:
       operationId: getContactMethod
+      security:
+        - session: [contact-methods:own]
+        - sessionCookie: [contact-methods:own]
       summary: Get a contact method
       tags: [people]
       responses:
@@ -663,6 +735,9 @@ paths:
           $ref: "#/components/responses/Problem"
     put:
       operationId: updateContactMethod
+      security:
+        - session: [contact-methods:own]
+        - sessionCookie: [contact-methods:own]
       summary: Update a contact method
       tags: [people]
       requestBody:
@@ -684,6 +759,9 @@ paths:
           $ref: "#/components/responses/Problem"
     delete:
       operationId: deleteContactMethod
+      security:
+        - session: [contact-methods:own]
+        - sessionCookie: [contact-methods:own]
       summary: Delete a contact method
       tags: [people]
       responses:
@@ -710,6 +788,9 @@ paths:
           $ref: "#/components/responses/Problem"
     post:
       operationId: createTeam
+      security:
+        - session: [install:manage]
+        - sessionCookie: [install:manage]
       summary: Create a team
       tags: [people]
       parameters:
@@ -751,6 +832,9 @@ paths:
           $ref: "#/components/responses/Problem"
     put:
       operationId: updateTeam
+      security:
+        - session: [teams:manage]
+        - sessionCookie: [teams:manage]
       summary: Update a team
       tags: [people]
       requestBody:
@@ -772,6 +856,9 @@ paths:
           $ref: "#/components/responses/Problem"
     delete:
       operationId: deleteTeam
+      security:
+        - session: [teams:manage]
+        - sessionCookie: [teams:manage]
       summary: Delete a team
       tags: [people]
       responses:
@@ -805,6 +892,9 @@ paths:
           type: string
     put:
       operationId: setTeamMember
+      security:
+        - session: [teams:manage]
+        - sessionCookie: [teams:manage]
       summary: Add a member to a team, or change their role
       tags: [people]
       requestBody:
@@ -826,6 +916,9 @@ paths:
           $ref: "#/components/responses/Problem"
     delete:
       operationId: removeTeamMember
+      security:
+        - session: [teams:manage]
+        - sessionCookie: [teams:manage]
       summary: Remove a member from a team
       tags: [people]
       responses:
@@ -857,6 +950,11 @@ paths:
           $ref: "#/components/responses/Problem"
     post:
       operationId: createSchedule
+      security:
+        - session: [teams:manage]
+        - sessionCookie: [teams:manage]
+      x-murphy-resources:
+        teams:manage: body.teams.id
       summary: Create a schedule
       tags: [on-call]
       parameters:
@@ -898,6 +996,11 @@ paths:
           $ref: "#/components/responses/Problem"
     put:
       operationId: updateSchedule
+      security:
+        - session: [schedules:manage, teams:manage]
+        - sessionCookie: [schedules:manage, teams:manage]
+      x-murphy-resources:
+        teams:manage: body.teams.id?
       summary: Update a schedule
       tags: [on-call]
       requestBody:
@@ -919,6 +1022,9 @@ paths:
           $ref: "#/components/responses/Problem"
     delete:
       operationId: deleteSchedule
+      security:
+        - session: [schedules:manage]
+        - sessionCookie: [schedules:manage]
       summary: Delete a schedule
       tags: [on-call]
       responses:
@@ -953,6 +1059,9 @@ paths:
           $ref: "#/components/responses/Problem"
     post:
       operationId: createOverride
+      security:
+        - session: [schedules:manage]
+        - sessionCookie: [schedules:manage]
       summary: Override a schedule for a time range
       tags: [on-call]
       parameters:
@@ -983,6 +1092,9 @@ paths:
       - $ref: "#/components/parameters/ID"
     delete:
       operationId: deleteOverride
+      security:
+        - session: [overrides:manage]
+        - sessionCookie: [overrides:manage]
       summary: Delete an override
       tags: [on-call]
       responses:
@@ -1040,6 +1152,11 @@ paths:
           $ref: "#/components/responses/Problem"
     post:
       operationId: createEscalationPolicy
+      security:
+        - session: [teams:manage]
+        - sessionCookie: [teams:manage]
+      x-murphy-resources:
+        teams:manage: body.team.id
       summary: Create an escalation policy
       tags: [escalation]
       parameters:
@@ -1081,6 +1198,11 @@ paths:
           $ref: "#/components/responses/Problem"
     put:
       operationId: updateEscalationPolicy
+      security:
+        - session: [policies:manage, teams:manage]
+        - sessionCookie: [policies:manage, teams:manage]
+      x-murphy-resources:
+        teams:manage: body.team.id
       summary: Update an escalation policy
       tags: [escalation]
       requestBody:
@@ -1102,6 +1224,9 @@ paths:
           $ref: "#/components/responses/Problem"
     delete:
       operationId: deleteEscalationPolicy
+      security:
+        - session: [policies:manage]
+        - sessionCookie: [policies:manage]
       summary: Delete an escalation policy
       description: A policy that services still page with can't be deleted. Incidents that followed the policy keep reading its versions.
       tags: [escalation]

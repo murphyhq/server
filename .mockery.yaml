@@ -40,15 +40,15 @@ packages:
     interfaces:
       AuthRepository: {}
       Provider: {}
-  github.com/murphyhq/server/services/access:
+  github.com/murphyhq/server/cmd/api/router:
     config:
       dir: "{{.InterfaceDir}}"
       filename: mocks_test.go
-      pkgname: access_test
+      pkgname: router
       structname: "Mock{{.InterfaceName}}"
     interfaces:
-      People: {}
-      Policies: {}
-      Catalog: {}
-      Schedules: {}
-      Incidents: {}
+      TeamRoles: {}
+      PolicyOwners: {}
+      ServiceOwners: {}
+      ScheduleOwners: {}
+      IncidentResponders: {}

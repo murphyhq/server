@@ -11,7 +11,6 @@ import (
 	"github.com/murphyhq/server/internal/httpserver"
 	idempotencystore "github.com/murphyhq/server/internal/idempotency/store"
 	"github.com/murphyhq/server/internal/lifecycle"
-	"github.com/murphyhq/server/services/access"
 	"github.com/murphyhq/server/services/catalog"
 	catalogdb "github.com/murphyhq/server/services/catalog/db"
 	"github.com/murphyhq/server/services/escalation"
@@ -136,7 +135,6 @@ func New(ctx context.Context, s Settings) (_ *App, err error) {
 		Escalation:    escalationService,
 		PublicKeys:    publicKeys,
 		Auth:          auth,
-		Access:        access.New(peopleService, escalationService, catalogService, oncallService, incidentsService),
 		SecureCookies: strings.HasPrefix(s.PublicURL, "https://"),
 	}, keys)
 	if err != nil {

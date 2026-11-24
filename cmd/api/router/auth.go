@@ -10,7 +10,6 @@ import (
 	"github.com/murphyhq/server"
 	"github.com/murphyhq/server/internal/httpserver"
 	"github.com/murphyhq/server/internal/tracer"
-	"github.com/murphyhq/server/services/access"
 	"github.com/murphyhq/server/services/people"
 )
 
@@ -70,11 +69,6 @@ func jsonOrEmpty(r *http.Request) bool {
 	}
 	mediaType, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
 	return err == nil && mediaType == "application/json"
-}
-
-func (s *Server) caller(ctx context.Context) access.Caller {
-	current := sessionFrom(ctx)
-	return access.Caller{UserID: current.session.GetUserId(), Role: current.role}
 }
 
 func sessionFrom(ctx context.Context) *currentSession {
@@ -203,9 +197,6 @@ func (s *Server) EndUserSessions(ctx context.Context, request EndUserSessionsReq
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
-	if err := s.access.Admin(s.caller(ctx)); err != nil {
-		return nil, err
-	}
 	user, err := s.people.GetUser(ctx, request.Id)
 	if err != nil {
 		return nil, err
