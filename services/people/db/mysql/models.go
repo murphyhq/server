@@ -9,13 +9,15 @@ import (
 )
 
 type ContactMethod struct {
-	ID           string
-	UserID       string
-	Type         string
-	Address      string
-	PushPlatform *string
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
+	ID             string
+	UserID         string
+	Type           string
+	Address        string
+	PushPlatform   *string
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	DisabledAt     *time.Time
+	DisabledReason *string
 }
 
 type Identity struct {

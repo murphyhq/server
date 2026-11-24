@@ -35,6 +35,7 @@ type OnCall interface {
 type People interface {
 	ActiveUsers(ctx context.Context, ids []string) (map[string]bool, error)
 	ContactMethodsOfUsers(ctx context.Context, userIDs []string) (map[string][]*murphy.ContactMethod, error)
+	DisableContactMethod(ctx context.Context, method *murphy.ContactMethod, reason string, at time.Time) error
 }
 
 type Change struct {
@@ -209,6 +210,11 @@ func (s *Service) outcome(ctx context.Context, messageID string, notification *m
 	ctx = span.Set(ctx, telemetry.WithField("notification.id", notification.GetId()))
 	defer span.End(&err)
 
+	if notification.GetContactMethodGone() {
+		if err := s.people.DisableContactMethod(ctx, notification.GetContactMethod(), notification.GetFailure(), time.Now()); err != nil {
+			return fmt.Errorf("disable the contact method that is gone: %w", err)
+		}
+	}
 	return s.record(ctx, &Change{MessageID: messageID, Outcome: notification})
 }
 

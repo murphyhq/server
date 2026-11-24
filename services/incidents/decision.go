@@ -198,8 +198,8 @@ func pageEntries(incident *murphy.Incident, page *murphy.Page, now *timestamppb.
 	entries := []*murphy.TimelineEntry{entry}
 	for _, recipient := range page.GetReached() {
 		if recipient.GetContactMethods() == 0 {
-			failed := note(incident, murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_NOTIFICATION_FAILED, "Not paged: the user has no contact methods", now)
-			failed.Notification = &murphy.TimelineNotification{Reason: murphy.NotificationReason_NOTIFICATION_REASON_PAGED, UserId: recipient.GetUserId(), Failure: "the user has no contact methods"}
+			failed := note(incident, murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_NOTIFICATION_FAILED, "Not paged: the user has no working contact methods", now)
+			failed.Notification = &murphy.TimelineNotification{Reason: murphy.NotificationReason_NOTIFICATION_REASON_PAGED, UserId: recipient.GetUserId(), Failure: "the user has no working contact methods"}
 			entries = append(entries, failed)
 		}
 	}

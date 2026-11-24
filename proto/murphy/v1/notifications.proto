@@ -51,6 +51,7 @@ message Notification {
   string failure = 11;
   string page_id = 12;
   google.protobuf.Timestamp deadline = 13;
+  bool contact_method_gone = 14;
 }
 
 message NotificationEvent {

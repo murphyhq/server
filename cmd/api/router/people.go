@@ -161,7 +161,7 @@ func toUser(user *murphy.User) User {
 }
 
 func toContactMethod(method *murphy.ContactMethod, n *names) ContactMethod {
-	return ContactMethod{
+	out := ContactMethod{
 		Id:        method.GetId(),
 		User:      n.user(method.GetUserId()),
 		Type:      ContactMethodType(method.GetType().Text()),
@@ -170,6 +170,11 @@ func toContactMethod(method *murphy.ContactMethod, n *names) ContactMethod {
 		CreatedAt: method.GetCreatedAt().AsTime(),
 		UpdatedAt: method.GetUpdatedAt().AsTime(),
 	}
+	if at := method.GetDisabledAt(); at != nil {
+		disabled, reason := at.AsTime(), method.GetDisabledReason()
+		out.DisabledAt, out.DisabledReason = &disabled, &reason
+	}
+	return out
 }
 
 func pushPlatform(platform murphy.PushPlatform) *PushPlatform {

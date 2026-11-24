@@ -37,6 +37,8 @@ message ContactMethod {
   google.protobuf.Timestamp created_at = 5;
   google.protobuf.Timestamp updated_at = 6;
   PushPlatform push_platform = 7;
+  google.protobuf.Timestamp disabled_at = 8;
+  string disabled_reason = 9;
 }
 
 enum PushPlatform {

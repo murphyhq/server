@@ -2,6 +2,7 @@ package notifications_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -32,6 +33,8 @@ type domain struct {
 	methods    map[string][]*murphy.ContactMethod
 	recipients []string
 	recorded   *notifications.Change
+	people     *MockPeople
+	steps      []string
 }
 
 func target(kind murphy.EscalationTargetType, id string) *murphy.EscalationTarget {
@@ -48,6 +51,7 @@ func newDomain(t *testing.T) *domain {
 	d := &domain{
 		service: notifications.New(repo, policies, oncall, people),
 		repo:    repo,
+		people:  people,
 		policy: &murphy.EscalationPolicy{Id: murphy.NewID(), Version: 3, Levels: []*murphy.EscalationLevel{{
 			Delay: durationpb.New(5 * time.Minute),
 			Targets: []*murphy.EscalationTarget{
@@ -96,6 +100,7 @@ func newDomain(t *testing.T) *domain {
 	}).Maybe()
 	repo.EXPECT().Record(mock.Anything, mock.Anything).RunAndReturn(func(_ context.Context, change *notifications.Change) (bool, error) {
 		d.recorded = change
+		d.steps = append(d.steps, "record")
 		return true, nil
 	}).Maybe()
 	return d
@@ -221,4 +226,30 @@ func TestAnOutcomeIsRecordedOnItsNotification(t *testing.T) {
 
 	assert.Equal(t, "message-1", d.recorded.MessageID)
 	assert.Equal(t, sent, d.recorded.Outcome)
+}
+
+func TestAPhoneThatIsGoneIsDisabledBeforeTheOutcomeIsRecorded(t *testing.T) {
+	d := newDomain(t)
+	phone := &murphy.ContactMethod{Id: murphy.NewID(), UserId: ana, Type: murphy.ContactMethodType_CONTACT_METHOD_TYPE_PUSH, Address: "dead-token"}
+	failed := &murphy.Notification{Id: murphy.NewID(), ContactMethod: phone, Failure: "the phone is no longer registered", ContactMethodGone: true}
+	d.people.EXPECT().DisableContactMethod(mock.Anything, phone, "the phone is no longer registered", mock.Anything).RunAndReturn(func(context.Context, *murphy.ContactMethod, string, time.Time) error {
+		d.steps = append(d.steps, "disable")
+		return nil
+	})
+
+	require.NoError(t, d.service.NotificationFailed(t.Context(), "message-1", failed))
+
+	assert.Equal(t, []string{"disable", "record"}, d.steps, "a redelivery after a crash disables it again")
+	assert.Equal(t, failed, d.recorded.Outcome)
+}
+
+func TestAnOutcomeWaitsUntilTheGonePhoneIsDisabled(t *testing.T) {
+	d := newDomain(t)
+	failed := &murphy.Notification{Id: murphy.NewID(), ContactMethod: &murphy.ContactMethod{Id: murphy.NewID()}, ContactMethodGone: true}
+	d.people.EXPECT().DisableContactMethod(mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(errors.New("the database is down"))
+
+	err := d.service.NotificationFailed(t.Context(), "message-1", failed)
+
+	assert.Error(t, err, "so the broker redelivers it")
+	assert.Nil(t, d.recorded)
 }

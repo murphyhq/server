@@ -52,14 +52,18 @@ func TestAPageReachesAPhoneThroughTheRelay(t *testing.T) {
 	assert.Equal(t, m.APIURL(), push.Server)
 }
 
-func TestAPhoneWhoseTokenIsGoneFailsTheNotification(t *testing.T) {
+func TestAPhoneWhoseTokenIsGoneIsDisabledAndNotTriedAgain(t *testing.T) {
 	m := murphytest.New(t)
 	ana := m.User(murphytest.WithGonePhone())
 	service := m.Service(murphytest.Pages(ana.Target()))
+	reason := "the phone is no longer registered for pushes, so it's disabled until the app registers again"
 
-	incident := service.Fire("disk-full")
+	service.Fire("disk-full").WaitFor(murphytest.NotificationFailedBecause(ana, client.Push, reason))
+	phone := ana.WaitForDisabledPhone()
+	next := service.Fire("cpu-high")
 
-	incident.WaitFor(murphytest.NotificationFailedBecause(ana, client.Push, "the phone is no longer registered for pushes"))
+	assert.Equal(t, &reason, phone.DisabledReason)
+	next.WaitFor(murphytest.Unreachable(ana))
 }
 
 func TestSomeoneOnCallIsPagedThroughTheirSchedule(t *testing.T) {

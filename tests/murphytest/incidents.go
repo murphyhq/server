@@ -298,6 +298,18 @@ func NotificationFailedBecause(user *User, channel client.ContactMethodType, fai
 	}
 }
 
+func Unreachable(user *User) Expectation {
+	return func(c *assert.CollectT, incident *client.IncidentWithTimeline) {
+		var failures []string
+		for _, entry := range incident.Timeline {
+			if entry.Type == client.TimelineEntryTypeNotificationFailed && entry.Notification.User.Id == user.ID && entry.Notification.Channel == nil {
+				failures = append(failures, *entry.Notification.Failure)
+			}
+		}
+		assert.Equal(c, []string{"the user has no working contact methods"}, failures, "%s couldn't be reached at all", user.Email)
+	}
+}
+
 func notification(kind client.TimelineEntryType, user *User, channel client.ContactMethodType) Expectation {
 	return func(c *assert.CollectT, incident *client.IncidentWithTimeline) {
 		for _, entry := range incident.Timeline {
@@ -333,4 +345,22 @@ func (m *Murphy) IncidentsMatching(filter client.ListIncidentsParams) []string {
 		ids[i] = incident.Id
 	}
 	return ids
+}
+
+func (u *User) WaitForDisabledPhone() client.ContactMethod {
+	u.m.t.Helper()
+	var disabled client.ContactMethod
+	require.EventuallyWithT(u.m.t, func(c *assert.CollectT) {
+		methods, err := u.m.API.ListContactMethodsWithResponse(u.m.t.Context(), u.ID)
+		if !assert.NoError(c, err) || !assert.Equal(c, http.StatusOK, methods.StatusCode()) {
+			return
+		}
+		for _, method := range methods.JSON200.Items {
+			if method.Type == client.Push && method.DisabledAt != nil {
+				disabled = method
+			}
+		}
+		assert.NotNil(c, disabled.DisabledAt, "a disabled phone")
+	}, u.m.patience, tick)
+	return disabled
 }

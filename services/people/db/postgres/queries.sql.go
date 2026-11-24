@@ -313,6 +313,31 @@ func (q *Queries) DeleteUser(ctx context.Context, id string) (int64, error) {
 	return result.RowsAffected(), nil
 }
 
+const disableContactMethod = `-- name: DisableContactMethod :exec
+UPDATE contact_methods
+SET disabled_at = $1, disabled_reason = $2, updated_at = $3
+WHERE id = $4 AND address = $5 AND disabled_at IS NULL
+`
+
+type DisableContactMethodParams struct {
+	DisabledAt     *time.Time
+	DisabledReason *string
+	UpdatedAt      time.Time
+	ID             string
+	Address        string
+}
+
+func (q *Queries) DisableContactMethod(ctx context.Context, arg DisableContactMethodParams) error {
+	_, err := q.db.Exec(ctx, disableContactMethod,
+		arg.DisabledAt,
+		arg.DisabledReason,
+		arg.UpdatedAt,
+		arg.ID,
+		arg.Address,
+	)
+	return err
+}
+
 const discardOneTimeCodesOfUser = `-- name: DiscardOneTimeCodesOfUser :execrows
 UPDATE one_time_codes
 SET used_at = $1, updated_at = $2
@@ -375,7 +400,7 @@ func (q *Queries) GetActiveSession(ctx context.Context, arg GetActiveSessionPara
 }
 
 const getContactMethod = `-- name: GetContactMethod :one
-SELECT id, user_id, type, address, push_platform, created_at, updated_at
+SELECT id, user_id, type, address, push_platform, created_at, updated_at, disabled_at, disabled_reason
 FROM contact_methods
 WHERE id = $1
 `
@@ -391,6 +416,8 @@ func (q *Queries) GetContactMethod(ctx context.Context, id string) (ContactMetho
 		&i.PushPlatform,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DisabledAt,
+		&i.DisabledReason,
 	)
 	return i, err
 }
@@ -604,7 +631,7 @@ func (q *Queries) ListActiveSessions(ctx context.Context, arg ListActiveSessions
 }
 
 const listContactMethods = `-- name: ListContactMethods :many
-SELECT id, user_id, type, address, push_platform, created_at, updated_at
+SELECT id, user_id, type, address, push_platform, created_at, updated_at, disabled_at, disabled_reason
 FROM contact_methods
 WHERE user_id = $1
 ORDER BY id
@@ -627,6 +654,8 @@ func (q *Queries) ListContactMethods(ctx context.Context, userID string) ([]Cont
 			&i.PushPlatform,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.DisabledAt,
+			&i.DisabledReason,
 		); err != nil {
 			return nil, err
 		}
@@ -639,9 +668,9 @@ func (q *Queries) ListContactMethods(ctx context.Context, userID string) ([]Cont
 }
 
 const listContactMethodsOfUsers = `-- name: ListContactMethodsOfUsers :many
-SELECT id, user_id, type, address, push_platform, created_at, updated_at
+SELECT id, user_id, type, address, push_platform, created_at, updated_at, disabled_at, disabled_reason
 FROM contact_methods
-WHERE user_id = ANY($1::uuid[])
+WHERE user_id = ANY($1::uuid[]) AND disabled_at IS NULL
 ORDER BY user_id, id
 `
 
@@ -662,6 +691,8 @@ func (q *Queries) ListContactMethodsOfUsers(ctx context.Context, userIds []strin
 			&i.PushPlatform,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.DisabledAt,
+			&i.DisabledReason,
 		); err != nil {
 			return nil, err
 		}
@@ -968,15 +999,17 @@ func (q *Queries) TeamNames(ctx context.Context, ids []string) ([]TeamNamesRow, 
 
 const updateContactMethod = `-- name: UpdateContactMethod :execrows
 UPDATE contact_methods
-SET type = $1, address = $2, updated_at = $3
-WHERE id = $4
+SET type = $1, address = $2, updated_at = $3, disabled_at = $4, disabled_reason = $5
+WHERE id = $6
 `
 
 type UpdateContactMethodParams struct {
-	Type      string
-	Address   string
-	UpdatedAt time.Time
-	ID        string
+	Type           string
+	Address        string
+	UpdatedAt      time.Time
+	DisabledAt     *time.Time
+	DisabledReason *string
+	ID             string
 }
 
 func (q *Queries) UpdateContactMethod(ctx context.Context, arg UpdateContactMethodParams) (int64, error) {
@@ -984,6 +1017,8 @@ func (q *Queries) UpdateContactMethod(ctx context.Context, arg UpdateContactMeth
 		arg.Type,
 		arg.Address,
 		arg.UpdatedAt,
+		arg.DisabledAt,
+		arg.DisabledReason,
 		arg.ID,
 	)
 	if err != nil {

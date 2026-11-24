@@ -74,7 +74,8 @@ func TestAPhoneTheRelayForgotFailsForGood(t *testing.T) {
 
 	var refused *notifications.RefusedError
 	require.True(t, errors.As(err, &refused), "%v", err)
-	assert.Equal(t, "the phone is no longer registered for pushes", refused.Reason)
+	assert.Equal(t, "the phone is no longer registered for pushes, so it's disabled until the app registers again", refused.Reason)
+	assert.True(t, refused.Gone, "the token never works again")
 }
 
 func TestARelayThatIsDownIsRetried(t *testing.T) {

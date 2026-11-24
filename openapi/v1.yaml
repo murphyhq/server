@@ -1824,6 +1824,13 @@ components:
           description: An email address, an E.164 phone number, a webhook URL, or the push token iOS or Android gave the app.
         platform:
           $ref: "#/components/schemas/PushPlatform"
+        disabled_at:
+          type: string
+          format: date-time
+          description: When Murphy stopped using this contact method because its address no longer works, such as a push token the phone no longer has. A disabled contact method is never used to reach anyone; updating it with a new address enables it again.
+        disabled_reason:
+          type: string
+          description: Why it was disabled.
         created_at:
           type: string
           format: date-time
