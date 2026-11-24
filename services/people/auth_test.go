@@ -47,7 +47,7 @@ func newAccounts(t *testing.T) *accounts {
 	t.Helper()
 	repo, provider := NewMockAuthRepository(t), NewMockProvider(t)
 	a := &accounts{
-		auth:       people.NewAuth(repo, provider, time.Hour, initialAdmin),
+		auth:       people.NewAuth(repo, provider, people.AuthSettings{SessionDuration: time.Hour, InitialAdminEmail: initialAdmin, ReturnOrigins: []string{"https://murphy.example.com"}}),
 		claims:     &people.Claims{Issuer: issuer, Subject: "bo-at-the-provider", Email: "bo@example.com", EmailVerified: true, Name: "Bo", Nonce: nonce},
 		signIn:     &murphy.SignIn{StateHash: hashOf(state), Nonce: nonce, Verifier: "verifier-of-the-sign-in"},
 		identities: map[string]string{},
@@ -132,7 +132,7 @@ func (a *accounts) unlinked(email string) *murphy.User {
 func TestStartingASignInKeepsOnlyTheStateHash(t *testing.T) {
 	a := newAccounts(t)
 
-	started, err := a.auth.StartSignIn(t.Context())
+	started, err := a.auth.StartSignIn(t.Context(), "")
 
 	require.NoError(t, err)
 	require.Len(t, a.signInURL, 3)
@@ -141,6 +141,30 @@ func TestStartingASignInKeepsOnlyTheStateHash(t *testing.T) {
 	assert.Equal(t, a.signInURL[1], a.started.GetNonce())
 	assert.Equal(t, a.signInURL[2], a.started.GetVerifier())
 	assert.GreaterOrEqual(t, len(a.started.GetVerifier()), 43, "PKCE needs at least 43 characters")
+}
+
+func TestASignInReturnsToAnAllowedOrigin(t *testing.T) {
+	a := newAccounts(t)
+	a.signIn.ReturnTo = "https://murphy.example.com/incidents?status=triggered"
+
+	_, err := a.auth.StartSignIn(t.Context(), "https://MURPHY.example.com/incidents?status=triggered")
+	require.NoError(t, err)
+	signedIn, err := a.auth.FinishSignIn(t.Context(), state, state, code)
+
+	require.NoError(t, err)
+	assert.Equal(t, "https://MURPHY.example.com/incidents?status=triggered", a.started.GetReturnTo())
+	assert.Equal(t, "https://murphy.example.com/incidents?status=triggered", signedIn.ReturnTo)
+}
+
+func TestASignInNeverReturnsToAnotherOrigin(t *testing.T) {
+	a := newAccounts(t)
+
+	for _, returnTo := range []string{"https://evil.example/", "https://murphy.example.com.evil.example/", "//evil.example/", "https://user@murphy.example.com/", "javascript:alert(1)"} {
+		_, err := a.auth.StartSignIn(t.Context(), returnTo)
+
+		assert.ErrorIs(t, err, murphy.ErrInvalid, returnTo)
+	}
+	assert.Nil(t, a.started)
 }
 
 func TestSomeoneNewBecomesAMember(t *testing.T) {

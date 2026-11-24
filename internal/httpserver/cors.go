@@ -12,6 +12,7 @@ type CORS struct {
 	Methods       []string
 	AllowHeaders  []string
 	ExposeHeaders []string
+	Credentials   bool
 }
 
 func cors(c CORS) func(http.Handler) http.Handler {
@@ -39,6 +40,9 @@ func cors(c CORS) func(http.Handler) http.Handler {
 			h := w.Header()
 			h.Set("Access-Control-Allow-Origin", origin)
 			h.Set("Access-Control-Expose-Headers", expose)
+			if c.Credentials {
+				h.Set("Access-Control-Allow-Credentials", "true")
+			}
 			if r.Method == http.MethodOptions && r.Header.Get("Access-Control-Request-Method") != "" {
 				h.Set("Access-Control-Allow-Methods", strings.Join(c.Methods, ", "))
 				h.Set("Access-Control-Allow-Headers", strings.Join(c.AllowHeaders, ", "))

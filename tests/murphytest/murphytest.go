@@ -42,6 +42,7 @@ var (
 	receiverURL        = setting("MURPHY_TEST_RECEIVER_URL", "http://localhost:8092")
 	receiverFromMurphy = setting("MURPHY_TEST_RECEIVER_URL_FROM_MURPHY", "http://webhook-receiver:8080")
 	identityProvider   = setting("MURPHY_TEST_IDENTITY_PROVIDER_URL", "http://localhost:5556/dex")
+	docsURL            = setting("MURPHY_TEST_DOCS_URL", "http://localhost:8090")
 )
 
 const (
@@ -174,10 +175,19 @@ func (m *Murphy) Anonymous() *client.ClientWithResponses {
 	return api
 }
 
+func (m *Murphy) DocsURL() string {
+	return docsURL + "/"
+}
+
 func (m *Murphy) SignInThroughBrowser(email string) (*client.ClientWithResponses, *http.Response) {
 	m.t.Helper()
+	return m.SignInThroughBrowserReturningTo(email, "")
+}
+
+func (m *Murphy) SignInThroughBrowserReturningTo(email, returnTo string) (*client.ClientWithResponses, *http.Response) {
+	m.t.Helper()
 	browser := m.browser()
-	signedIn := m.loginThroughProvider(browser, email)
+	signedIn := m.loginThroughProvider(browser, m.apiURL+"/v1/auth/sign-in?"+url.Values{"return_to": {returnTo}}.Encode(), email)
 	api, err := client.NewClientWithResponses(m.apiURL, client.WithHTTPClient(browser))
 	require.NoError(m.t, err)
 	return api, signedIn
@@ -192,7 +202,7 @@ func (m *Murphy) CallbackFor(email string) string {
 		}
 		return nil
 	}
-	redirect := m.loginThroughProvider(browser, email)
+	redirect := m.loginThroughProvider(browser, m.apiURL+"/v1/auth/sign-in", email)
 	callback, err := redirect.Location()
 	require.NoError(m.t, err, "the identity provider sends the browser back to api")
 	return callback.String()
@@ -213,9 +223,9 @@ func (m *Murphy) browser() *http.Client {
 	return &http.Client{Jar: jar, Timeout: 10 * time.Second}
 }
 
-func (m *Murphy) loginThroughProvider(browser *http.Client, email string) *http.Response {
+func (m *Murphy) loginThroughProvider(browser *http.Client, signIn, email string) *http.Response {
 	m.t.Helper()
-	loginPage, err := browser.Get(m.apiURL + "/v1/auth/sign-in")
+	loginPage, err := browser.Get(signIn)
 	require.NoError(m.t, err, "open the sign-in page")
 	page, err := io.ReadAll(loginPage.Body)
 	_ = loginPage.Body.Close()

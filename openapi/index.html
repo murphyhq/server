@@ -20,25 +20,41 @@
     <div id="app"></div>
     <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference@1.77.0"></script>
     <script>
-      Scalar.createApiReference("#app", {
-        sources: [
-          {
-            title: "Murphy API",
-            slug: "v1",
-            url: "./v1.yaml",
-          },
-          {
-            title: "Ingest API",
-            slug: "ingest",
-            url: "./ingest/v1.yaml",
-          },
-          {
-            title: "Webhooks",
-            slug: "webhooks",
-            url: "./webhooks/v1.yaml",
-          },
-        ],
-      });
+      const api = "http://localhost:8080";
+      const reference = () =>
+        Scalar.createApiReference("#app", {
+          customFetch: (input, init) =>
+            fetch(input, {
+              ...init,
+              credentials: String(input.url ?? input).startsWith(api) ? "include" : "same-origin",
+            }),
+          sources: [
+            {
+              title: "Murphy API",
+              slug: "v1",
+              url: "./v1.yaml",
+            },
+            {
+              title: "Ingest API",
+              slug: "ingest",
+              url: "./ingest/v1.yaml",
+            },
+            {
+              title: "Webhooks",
+              slug: "webhooks",
+              url: "./webhooks/v1.yaml",
+            },
+          ],
+        });
+      fetch(api + "/v1/auth/session", { credentials: "include" })
+        .then((response) => {
+          if (response.status === 401) {
+            location.href = api + "/v1/auth/sign-in?return_to=" + encodeURIComponent(location.href);
+            return;
+          }
+          reference();
+        })
+        .catch(reference);
     </script>
   </body>
 </html>

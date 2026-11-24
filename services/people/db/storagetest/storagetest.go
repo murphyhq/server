@@ -36,13 +36,16 @@ func Run(t *testing.T, open func(t *testing.T) Storage) {
 	t.Run("hands a sign-in out once", func(t *testing.T) {
 		repo := open(t)
 		now := time.Now().UTC()
-		require.NoError(t, repo.StartSignIn(t.Context(), newSignIn("state", now.Add(time.Minute)), now))
+		signIn := newSignIn("state", now.Add(time.Minute))
+		signIn.ReturnTo = "http://localhost:8090/"
+		require.NoError(t, repo.StartSignIn(t.Context(), signIn, now))
 
 		first, err := repo.TakeSignIn(t.Context(), []byte("state"), now)
 		require.NoError(t, err)
 		_, again := repo.TakeSignIn(t.Context(), []byte("state"), now)
 
 		assert.Equal(t, "verifier", first.GetVerifier())
+		assert.Equal(t, "http://localhost:8090/", first.GetReturnTo())
 		assert.ErrorIs(t, again, murphy.ErrNotFound)
 	})
 
