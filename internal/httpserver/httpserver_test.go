@@ -1,8 +1,10 @@
 package httpserver_test
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -19,9 +21,10 @@ import (
 
 	"github.com/murphyhq/server"
 	"github.com/murphyhq/server/internal/httpserver"
+	"github.com/murphyhq/server/internal/telemetry"
 )
 
-func serve(t *testing.T) (*httptest.Server, *tracetest.InMemoryExporter) {
+func traced(t *testing.T) *tracetest.InMemoryExporter {
 	t.Helper()
 	exporter := tracetest.NewInMemoryExporter()
 	previous, previousPropagator := otel.GetTracerProvider(), otel.GetTextMapPropagator()
@@ -31,6 +34,12 @@ func serve(t *testing.T) (*httptest.Server, *tracetest.InMemoryExporter) {
 		otel.SetTracerProvider(previous)
 		otel.SetTextMapPropagator(previousPropagator)
 	})
+	return exporter
+}
+
+func serve(t *testing.T) (*httptest.Server, *tracetest.InMemoryExporter) {
+	t.Helper()
+	exporter := traced(t)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /things/{id}", func(w http.ResponseWriter, r *http.Request) {
@@ -111,6 +120,28 @@ func TestUnmatchedRoutesAnswerWithProblems(t *testing.T) {
 	assert.Equal(t, "application/problem+json", resp.Header.Get("Content-Type"))
 	assert.Equal(t, resp.Header.Get("X-Trace-Id"), body["trace_id"])
 	assert.Equal(t, "GET", span(t, exporter).Name)
+}
+
+func TestTheRequestLogSaysWhoAskedAndWhyTheyWereRefused(t *testing.T) {
+	exporter := traced(t)
+	var logs bytes.Buffer
+	previous := slog.Default()
+	slog.SetDefault(slog.New(slog.NewJSONHandler(&logs, nil)))
+	t.Cleanup(func() { slog.SetDefault(previous) })
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /incidents/{id}/resolve", func(w http.ResponseWriter, r *http.Request) {
+		telemetry.Collect(r.Context(), telemetry.WithField("user.id", "bo"))
+		httpserver.WriteError(w, r, &murphy.ForbiddenError{Reason: "only responders can resolve this"})
+	})
+
+	httpserver.Handler(mux).ServeHTTP(httptest.NewRecorder(), httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/incidents/1/resolve", nil))
+
+	var line map[string]any
+	require.NoError(t, json.Unmarshal(logs.Bytes(), &line))
+	assert.Equal(t, "request handled", line["msg"])
+	assert.Equal(t, "bo", line["murphy.user.id"])
+	assert.Equal(t, "only responders can resolve this", line["murphy.refusal"])
+	assert.Contains(t, span(t, exporter).Attributes, attributeOf("murphy.user.id", "bo"))
 }
 
 func attributeOf(key, value string) attribute.KeyValue {

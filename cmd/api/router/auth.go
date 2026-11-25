@@ -9,6 +9,7 @@ import (
 
 	"github.com/murphyhq/server"
 	"github.com/murphyhq/server/internal/httpserver"
+	"github.com/murphyhq/server/internal/telemetry"
 	"github.com/murphyhq/server/internal/tracer"
 	"github.com/murphyhq/server/services/people"
 )
@@ -47,7 +48,9 @@ func RequireSession(auth *people.Auth) func(http.Handler) http.Handler {
 				httpserver.WriteError(w, r, err)
 				return
 			}
-			ctx := context.WithValue(r.Context(), sessionContext{}, &currentSession{token: token, session: session, role: role})
+			who := []telemetry.Field{telemetry.WithField("user.id", session.GetUserId()), telemetry.WithField("session.id", session.GetId())}
+			telemetry.Collect(r.Context(), who...)
+			ctx := context.WithValue(telemetry.With(r.Context(), who...), sessionContext{}, &currentSession{token: token, session: session, role: role})
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}

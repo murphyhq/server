@@ -2,9 +2,13 @@ package telemetry
 
 import (
 	"context"
+	"fmt"
+	"slices"
 	"strings"
+	"sync"
 
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 const prefix = "murphy."
@@ -84,4 +88,63 @@ func ComponentAttributes(ctx context.Context) []attribute.KeyValue {
 		return []attribute.KeyValue{attribute.String(prefix+"component", name)}
 	}
 	return nil
+}
+
+type collectedKey struct{}
+
+type collected struct {
+	mu     sync.Mutex
+	fields []Field
+}
+
+func Collecting(ctx context.Context) context.Context {
+	return context.WithValue(ctx, collectedKey{}, &collected{})
+}
+
+func Collect(ctx context.Context, fields ...Field) {
+	c, ok := ctx.Value(collectedKey{}).(*collected)
+	if !ok {
+		return
+	}
+	trace.SpanFromContext(ctx).SetAttributes(Attributes(fields)...)
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.fields = append(c.fields, fields...)
+}
+
+func Collected(ctx context.Context) []Field {
+	c, ok := ctx.Value(collectedKey{}).(*collected)
+	if !ok {
+		return nil
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return slices.Clone(c.fields)
+}
+
+func Attributes(fields []Field) []attribute.KeyValue {
+	kvs := make([]attribute.KeyValue, 0, len(fields))
+	for _, f := range fields {
+		kvs = append(kvs, attributeOf(f.Name(), f.Value))
+	}
+	return kvs
+}
+
+func attributeOf(key string, v any) attribute.KeyValue {
+	switch v := v.(type) {
+	case string:
+		return attribute.String(key, v)
+	case bool:
+		return attribute.Bool(key, v)
+	case int:
+		return attribute.Int(key, v)
+	case int64:
+		return attribute.Int64(key, v)
+	case float64:
+		return attribute.Float64(key, v)
+	case fmt.Stringer:
+		return attribute.String(key, v.String())
+	default:
+		return attribute.String(key, fmt.Sprint(v))
+	}
 }

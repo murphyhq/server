@@ -91,8 +91,6 @@ func (s *Server) publish(ctx context.Context, source murphy.IntegrationType, ale
 
 	key := keyFrom(ctx)
 	ctx = span.Set(ctx,
-		telemetry.WithField("integration.id", key.GetIntegrationId()),
-		telemetry.WithField("service.id", key.GetServiceId()),
 		telemetry.WithField("alert.source", source.Text()),
 		telemetry.WithField("alert.count", len(alerts)),
 	)

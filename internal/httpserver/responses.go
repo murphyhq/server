@@ -22,6 +22,13 @@ type problem struct {
 }
 
 func WriteProblem(w http.ResponseWriter, r *http.Request, status int, detail string) {
+	if status < http.StatusInternalServerError && detail != "" {
+		telemetry.Collect(r.Context(), telemetry.WithField("refusal", detail))
+	}
+	write(w, r, status, detail)
+}
+
+func write(w http.ResponseWriter, r *http.Request, status int, detail string) {
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(problem{
@@ -33,7 +40,8 @@ func WriteProblem(w http.ResponseWriter, r *http.Request, status int, detail str
 }
 
 func BadRequest(w http.ResponseWriter, r *http.Request, err error) {
-	WriteProblem(w, r, http.StatusBadRequest, err.Error())
+	telemetry.Collect(r.Context(), telemetry.WithField("refusal", "the request doesn't match the API"))
+	write(w, r, http.StatusBadRequest, err.Error())
 }
 
 func WriteError(w http.ResponseWriter, r *http.Request, err error) {

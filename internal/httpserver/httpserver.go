@@ -91,7 +91,7 @@ func observe(next http.Handler) http.Handler {
 			w.Header().Set("traceresponse", tracer.TraceResponse(ctx))
 		}
 
-		ctx, scope := metrics.StartScope(ctx)
+		ctx, scope := metrics.StartScope(telemetry.Collecting(ctx))
 		r = r.WithContext(ctx)
 		recorder := &recorder{ResponseWriter: w, request: r, status: http.StatusOK}
 		next.ServeHTTP(recorder, r)
@@ -112,7 +112,7 @@ func observe(next http.Handler) http.Handler {
 			fields = append(fields, telemetry.Standard("http.route", route))
 			scope.Record(ctx, "http.request", metrics.Dimension{Name: "http.request.method", Value: r.Method}, metrics.Dimension{Name: "http.route", Value: route})
 		}
-		logger.Info(ctx, "request handled", fields...)
+		logger.Info(ctx, "request handled", append(fields, telemetry.Collected(ctx)...)...)
 	})
 }
 
