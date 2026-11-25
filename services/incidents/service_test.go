@@ -295,6 +295,26 @@ func TestAcknowledgingRetriesAfterAConcurrentChange(t *testing.T) {
 	assert.Equal(t, murphy.IncidentStatus_INCIDENT_STATUS_ACKNOWLEDGED, acknowledged.GetStatus())
 }
 
+func TestAcknowledgingAnAcknowledgedIncidentReadsOnlyItsAcknowledgements(t *testing.T) {
+	f := setup(t)
+	repo := NewMockRepository(t)
+	f.service = incidents.New(repo, nil, nil)
+	id := murphy.NewID()
+	repo.EXPECT().GetIncident(mock.Anything, id).Return(&murphy.Incident{Id: id, Status: murphy.IncidentStatus_INCIDENT_STATUS_ACKNOWLEDGED, Version: 3}, nil).Once()
+	repo.EXPECT().ListTimelineOfType(mock.Anything, id, murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_ACKNOWLEDGED).
+		Return([]*murphy.TimelineEntry{{Type: murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_ACKNOWLEDGED, ActorUserId: ana}}, nil).Once()
+	var recorded *incidents.Change
+	repo.EXPECT().Record(mock.Anything, mock.Anything).RunAndReturn(func(_ context.Context, change *incidents.Change) (bool, error) {
+		recorded = change
+		return true, nil
+	}).Once()
+
+	_, err := f.service.Acknowledge(t.Context(), id, bo)
+
+	require.NoError(t, err)
+	assert.Equal(t, bo, recorded.Decision.Timeline[0].GetActorUserId())
+}
+
 func TestAPolicyVersionIsReadOnceAndReused(t *testing.T) {
 	f := setup(t)
 	first, second := f.triggered(1, 1), f.triggered(1, 1)

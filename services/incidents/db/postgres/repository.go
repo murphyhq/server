@@ -104,6 +104,25 @@ func (r *Repository) ListTimeline(ctx context.Context, incidentID string) (_ []*
 	return entries, nil
 }
 
+func (r *Repository) ListTimelineOfType(ctx context.Context, incidentID string, kind murphy.TimelineEntryType) (_ []*murphy.TimelineEntry, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	rows, err := r.queries.ListTimelineOfType(ctx, ListTimelineOfTypeParams{IncidentID: incidentID, Type: kind.Text()})
+	if err != nil {
+		return nil, murphypostgres.Error("timeline entry", err)
+	}
+	entries := make([]*murphy.TimelineEntry, len(rows))
+	for i, row := range rows {
+		entry := &murphy.TimelineEntry{}
+		if err := proto.Unmarshal(row.Details, entry); err != nil {
+			return nil, fmt.Errorf("decode timeline entry %s: %w", row.ID, err)
+		}
+		entries[i] = entry
+	}
+	return entries, nil
+}
+
 func (r *Repository) LatestFiringAt(ctx context.Context, incidentID string) (_ time.Time, err error) {
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)

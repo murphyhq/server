@@ -56,6 +56,12 @@ FROM timeline_entries
 WHERE incident_id = sqlc.arg(incident_id)
 ORDER BY id;
 
+-- name: ListTimelineOfType :many
+SELECT id, details
+FROM timeline_entries
+WHERE incident_id = sqlc.arg(incident_id) AND type = sqlc.arg(type)
+ORDER BY id;
+
 -- name: OpenInstances :many
 SELECT DISTINCT fired.instance
 FROM alerts AS fired

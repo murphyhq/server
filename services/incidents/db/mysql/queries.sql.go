@@ -458,6 +458,46 @@ func (q *Queries) ListTimeline(ctx context.Context, incidentID string) ([]ListTi
 	return items, nil
 }
 
+const listTimelineOfType = `-- name: ListTimelineOfType :many
+SELECT id, details
+FROM timeline_entries
+WHERE incident_id = ? AND type = ?
+ORDER BY id
+`
+
+type ListTimelineOfTypeParams struct {
+	IncidentID string
+	Type       string
+}
+
+type ListTimelineOfTypeRow struct {
+	ID      string
+	Details []byte
+}
+
+func (q *Queries) ListTimelineOfType(ctx context.Context, arg ListTimelineOfTypeParams) ([]ListTimelineOfTypeRow, error) {
+	rows, err := q.db.QueryContext(ctx, listTimelineOfType, arg.IncidentID, arg.Type)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListTimelineOfTypeRow
+	for rows.Next() {
+		var i ListTimelineOfTypeRow
+		if err := rows.Scan(&i.ID, &i.Details); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const lockDueMessages = `-- name: LockDueMessages :many
 SELECT id, incident_id, kind, due_at, envelope
 FROM scheduled_messages

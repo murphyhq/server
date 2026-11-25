@@ -92,18 +92,31 @@ func RecordPage(incident *murphy.Incident, page *murphy.Page, policy *murphy.Esc
 	return decision
 }
 
-func AcknowledgeIncident(incident *murphy.Incident, actorID string, now *timestamppb.Timestamp) *Decision {
-	if incident.GetStatus() != murphy.IncidentStatus_INCIDENT_STATUS_TRIGGERED {
+func AcknowledgeIncident(incident *murphy.Incident, actorID string, acknowledgements []*murphy.TimelineEntry, now *timestamppb.Timestamp) *Decision {
+	switch incident.GetStatus() {
+	case murphy.IncidentStatus_INCIDENT_STATUS_TRIGGERED:
+		decision, previous := change(incident, now)
+		incident.Status, incident.AcknowledgedAt = murphy.IncidentStatus_INCIDENT_STATUS_ACKNOWLEDGED, now
+		decision.Announce = []Announcement{{Verb: murphy.IncidentVerb_INCIDENT_VERB_ACKNOWLEDGED, Previous: previous}}
+		decision.CancelTimers = true
+		decision.Timeline = []*murphy.TimelineEntry{acknowledgement(incident, actorID, now)}
+		return decision
+	case murphy.IncidentStatus_INCIDENT_STATUS_ACKNOWLEDGED:
+		if slices.ContainsFunc(acknowledgements, func(entry *murphy.TimelineEntry) bool { return entry.GetActorUserId() == actorID }) {
+			return nil
+		}
+		decision, _ := change(incident, now)
+		decision.Timeline = []*murphy.TimelineEntry{acknowledgement(incident, actorID, now)}
+		return decision
+	default:
 		return nil
 	}
-	decision, previous := change(incident, now)
-	incident.Status, incident.AcknowledgedAt = murphy.IncidentStatus_INCIDENT_STATUS_ACKNOWLEDGED, now
-	decision.Announce = []Announcement{{Verb: murphy.IncidentVerb_INCIDENT_VERB_ACKNOWLEDGED, Previous: previous}}
-	decision.CancelTimers = true
-	acknowledged := note(incident, murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_ACKNOWLEDGED, "Acknowledged through the API", now)
-	acknowledged.ActorUserId = actorID
-	decision.Timeline = []*murphy.TimelineEntry{acknowledged}
-	return decision
+}
+
+func acknowledgement(incident *murphy.Incident, actorID string, now *timestamppb.Timestamp) *murphy.TimelineEntry {
+	entry := note(incident, murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_ACKNOWLEDGED, "Acknowledged through the API", now)
+	entry.ActorUserId = actorID
+	return entry
 }
 
 func ResolveIncident(incident *murphy.Incident, actorID string, now *timestamppb.Timestamp) *Decision {

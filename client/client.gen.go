@@ -1557,6 +1557,8 @@ type ClientInterface interface {
 
 	// AcknowledgeIncident Acknowledge an incident, which stops its escalation
 	//
+	// Others can acknowledge an incident someone already acknowledged. Each goes on its timeline, and the incident and its notifications stay as they were. Acknowledging it a second time changes nothing.
+	//
 	// Corresponds with POST /v1/incidents/{id}/acknowledge (the `AcknowledgeIncident` operationId).
 	AcknowledgeIncident(ctx context.Context, id ID, params *AcknowledgeIncidentParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -2364,6 +2366,8 @@ func (c *Client) GetIncident(ctx context.Context, id ID, reqEditors ...RequestEd
 }
 
 // AcknowledgeIncident Acknowledge an incident, which stops its escalation
+//
+// Others can acknowledge an incident someone already acknowledged. Each goes on its timeline, and the incident and its notifications stay as they were. Acknowledging it a second time changes nothing.
 //
 // Corresponds with POST /v1/incidents/{id}/acknowledge (the `AcknowledgeIncident` operationId).
 func (c *Client) AcknowledgeIncident(ctx context.Context, id ID, params *AcknowledgeIncidentParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -6751,6 +6755,8 @@ type ClientWithResponsesInterface interface {
 
 	// AcknowledgeIncidentWithResponse Acknowledge an incident, which stops its escalation
 	//
+	// Others can acknowledge an incident someone already acknowledged. Each goes on its timeline, and the incident and its notifications stay as they were. Acknowledging it a second time changes nothing.
+	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /v1/incidents/{id}/acknowledge (the `AcknowledgeIncident` operationId).
@@ -10900,6 +10906,8 @@ func (c *ClientWithResponses) GetIncidentWithResponse(ctx context.Context, id ID
 }
 
 // AcknowledgeIncidentWithResponse Acknowledge an incident, which stops its escalation
+//
+// Others can acknowledge an incident someone already acknowledged. Each goes on its timeline, and the incident and its notifications stay as they were. Acknowledging it a second time changes nothing.
 //
 // Returns a wrapper object for the known response body format(s).
 //

@@ -22,6 +22,7 @@ type Repository interface {
 	PolicyOfIncident(ctx context.Context, id, userID string) (policyID string, paged bool, err error)
 	ListIncidents(ctx context.Context, filter Filter, before string, limit int) ([]*murphy.Incident, error)
 	ListTimeline(ctx context.Context, incidentID string) ([]*murphy.TimelineEntry, error)
+	ListTimelineOfType(ctx context.Context, incidentID string, kind murphy.TimelineEntryType) ([]*murphy.TimelineEntry, error)
 	LatestFiringAt(ctx context.Context, incidentID string) (time.Time, error)
 	OpenInstances(ctx context.Context, incidentID string) ([]string, error)
 	PurgeHandledMessages(ctx context.Context, before time.Time) (int64, error)
@@ -188,8 +189,15 @@ func (s *Service) Acknowledge(ctx context.Context, id, actorID string) (_ *murph
 	ctx = span.Set(ctx, telemetry.WithField("incident.id", id))
 	defer span.End(&err)
 
-	return s.change(ctx, id, func(incident *murphy.Incident, now *timestamppb.Timestamp) *Decision {
-		return AcknowledgeIncident(incident, actorID, now)
+	return s.change(ctx, id, func(incident *murphy.Incident, now *timestamppb.Timestamp) (*Decision, error) {
+		if incident.GetStatus() != murphy.IncidentStatus_INCIDENT_STATUS_ACKNOWLEDGED {
+			return AcknowledgeIncident(incident, actorID, nil, now), nil
+		}
+		acknowledgements, err := s.repo.ListTimelineOfType(ctx, id, murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_ACKNOWLEDGED)
+		if err != nil {
+			return nil, fmt.Errorf("list the incident's acknowledgements: %w", err)
+		}
+		return AcknowledgeIncident(incident, actorID, acknowledgements, now), nil
 	})
 }
 
@@ -198,12 +206,12 @@ func (s *Service) Resolve(ctx context.Context, id, actorID string) (_ *murphy.In
 	ctx = span.Set(ctx, telemetry.WithField("incident.id", id))
 	defer span.End(&err)
 
-	return s.change(ctx, id, func(incident *murphy.Incident, now *timestamppb.Timestamp) *Decision {
-		return ResolveIncident(incident, actorID, now)
+	return s.change(ctx, id, func(incident *murphy.Incident, now *timestamppb.Timestamp) (*Decision, error) {
+		return ResolveIncident(incident, actorID, now), nil
 	})
 }
 
-func (s *Service) change(ctx context.Context, id string, decide func(*murphy.Incident, *timestamppb.Timestamp) *Decision) (*murphy.Incident, error) {
+func (s *Service) change(ctx context.Context, id string, decide func(*murphy.Incident, *timestamppb.Timestamp) (*Decision, error)) (*murphy.Incident, error) {
 	if err := murphy.LookupID("incident", id); err != nil {
 		return nil, err
 	}
@@ -212,7 +220,10 @@ func (s *Service) change(ctx context.Context, id string, decide func(*murphy.Inc
 		if err != nil {
 			return nil, fmt.Errorf("get incident: %w", err)
 		}
-		decision := decide(incident, murphy.Now())
+		decision, err := decide(incident, murphy.Now())
+		if err != nil {
+			return nil, err
+		}
 		if decision == nil {
 			return incident, nil
 		}

@@ -114,6 +114,26 @@ func Run(t *testing.T, open func(t *testing.T) incidents.Repository) {
 		assert.NotNil(t, got.GetAcknowledgedAt())
 	})
 
+	t.Run("lists only the timeline entries of one type, in order", func(t *testing.T) {
+		repo := open(t)
+		outcome := opened(murphy.NewID(), "disk-full")
+		_, err := repo.Record(t.Context(), outcome)
+		require.NoError(t, err)
+		first, second := murphy.NewID(), murphy.NewID()
+		acknowledgements := &incidents.Change{IncidentID: outcome.IncidentID, Decision: &incidents.Decision{Timeline: []*murphy.TimelineEntry{
+			{Id: murphy.NewID(), IncidentId: outcome.IncidentID, Type: murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_ACKNOWLEDGED, ActorUserId: first, At: murphy.Now()},
+			{Id: murphy.NewID(), IncidentId: outcome.IncidentID, Type: murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_ACKNOWLEDGED, ActorUserId: second, At: murphy.Now()},
+		}}}
+		_, err = repo.Record(t.Context(), acknowledgements)
+		require.NoError(t, err)
+
+		got, err := repo.ListTimelineOfType(t.Context(), outcome.IncidentID, murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_ACKNOWLEDGED)
+
+		require.NoError(t, err)
+		require.Len(t, got, 2)
+		assert.Equal(t, []string{first, second}, []string{got[0].GetActorUserId(), got[1].GetActorUserId()})
+	})
+
 	t.Run("hands out due messages once, until their claim expires", func(t *testing.T) {
 		repo := open(t)
 		outcome := opened(murphy.NewID(), "disk-full")

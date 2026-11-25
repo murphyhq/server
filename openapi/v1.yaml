@@ -568,6 +568,7 @@ paths:
         - session: [incidents:respond]
         - sessionCookie: [incidents:respond]
       summary: Acknowledge an incident, which stops its escalation
+      description: Others can acknowledge an incident someone already acknowledged. Each goes on its timeline, and the incident and its notifications stay as they were. Acknowledging it a second time changes nothing.
       tags: [incidents]
       parameters:
         - $ref: "#/components/parameters/IdempotencyKey"
