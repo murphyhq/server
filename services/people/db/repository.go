@@ -12,6 +12,8 @@ import (
 type Tx interface {
 	CreateUser(ctx context.Context, user *murphy.User) error
 	CreateContactMethod(ctx context.Context, method *murphy.ContactMethod) error
+	DeleteNotificationRule(ctx context.Context, userID string, urgency murphy.Urgency) error
+	CreateNotificationRule(ctx context.Context, rule *murphy.NotificationRule, at time.Time) error
 	CreateIdentity(ctx context.Context, identity *murphy.Identity) error
 	AdminExists(ctx context.Context) (bool, error)
 	SetUserRole(ctx context.Context, id string, role murphy.UserRole, at time.Time) error
@@ -20,7 +22,7 @@ type Tx interface {
 }
 
 type Engine[T Tx] interface {
-	people.Repository
+	people.Store
 	GetUserByEmail(ctx context.Context, email string) (*murphy.User, error)
 	AdminExists(ctx context.Context) (bool, error)
 	GetIdentity(ctx context.Context, issuer, subject string) (*murphy.Identity, error)
@@ -146,4 +148,16 @@ func (r *Repository[T]) ClaimFirstAdmin(ctx context.Context, userID string, now 
 		return tx.SetUserRole(ctx, userID, murphy.UserRole_USER_ROLE_ADMIN, now)
 	})
 	return claimed && err == nil, err
+}
+
+func (r *Repository[T]) ReplaceNotificationRule(ctx context.Context, rule *murphy.NotificationRule, at time.Time) (err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	return r.Transaction(ctx, func(tx T) error {
+		if err := tx.DeleteNotificationRule(ctx, rule.GetUserId(), rule.GetUrgency()); err != nil {
+			return err
+		}
+		return tx.CreateNotificationRule(ctx, rule, at)
+	})
 }

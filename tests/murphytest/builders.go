@@ -149,6 +149,18 @@ func (u *User) ContactMethods() []client.ContactMethod {
 	return methods.JSON200.Items
 }
 
+func (u *User) ContactMethodOf(kind client.ContactMethodType) client.ContactMethod {
+	u.m.t.Helper()
+	for _, method := range u.ContactMethods() {
+		if method.Type == kind {
+			return method
+		}
+	}
+	u.m.t.Errorf("%s has no %s contact method", u.Email, kind)
+	u.m.t.FailNow()
+	return client.ContactMethod{}
+}
+
 func (u *User) Mailbox() *Mailbox {
 	return NewMailbox(u.m.t, u.Email)
 }

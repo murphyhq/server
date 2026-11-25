@@ -798,6 +798,71 @@ paths:
           $ref: "#/components/responses/Problem"
         "422":
           $ref: "#/components/responses/Problem"
+  /v1/users/{id}/notification-rules:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    get:
+      operationId: listNotificationRules
+      security:
+        - session: [users:self]
+        - sessionCookie: [users:self]
+      summary: How a person is paged, for each urgency
+      description: "Always lists both urgencies. A person who hasn't set their own steps for an urgency gets the default (`custom` is false), worked out from their working contact methods: pushes at once, everything else 2 minutes later, or everything at once when they have no push."
+      tags: [people]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationRuleList"
+        "404":
+          $ref: "#/components/responses/Problem"
+  /v1/users/{id}/notification-rules/{urgency}:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+      - name: urgency
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/Urgency"
+    put:
+      operationId: setNotificationRule
+      security:
+        - session: [users:self]
+        - sessionCookie: [users:self]
+      summary: Set how a person is paged for an urgency
+      description: "Replaces all of the urgency's steps. A page starts every step whose delay has passed, counted from when the person was paged, and acknowledging or resolving the incident cancels the steps still waiting. One step must have a delay of 0, so a page always reaches someone at once."
+      tags: [people]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NotificationRuleInput"
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationRule"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+    delete:
+      operationId: resetNotificationRule
+      security:
+        - session: [users:self]
+        - sessionCookie: [users:self]
+      summary: Go back to the default for an urgency
+      tags: [people]
+      responses:
+        "204":
+          description: The urgency uses the default again.
+        "404":
+          $ref: "#/components/responses/Problem"
   /v1/contact-methods/{id}:
     parameters:
       - $ref: "#/components/parameters/ID"
@@ -2095,6 +2160,49 @@ components:
       type: string
       enum: [ios, android]
       description: Push only. The phone's platform, which decides whether the push relay sends through Apple or Google.
+    NotificationRule:
+      type: object
+      required: [urgency, custom, steps]
+      properties:
+        urgency:
+          $ref: "#/components/schemas/Urgency"
+        custom:
+          type: boolean
+          description: "Whether the person set these steps; false for the default."
+        steps:
+          type: array
+          items:
+            $ref: "#/components/schemas/NotificationStep"
+    NotificationStep:
+      type: object
+      required: [contact_method, delay_seconds]
+      properties:
+        contact_method:
+          $ref: "#/components/schemas/Reference"
+        delay_seconds:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 3600
+          description: How long after the person was paged this contact method is notified.
+    NotificationRuleInput:
+      type: object
+      required: [steps]
+      properties:
+        steps:
+          type: array
+          minItems: 1
+          maxItems: 10
+          items:
+            $ref: "#/components/schemas/NotificationStep"
+    NotificationRuleList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/NotificationRule"
     ContactMethodList:
       type: object
       required: [items]

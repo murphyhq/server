@@ -101,6 +101,34 @@ func (q *Queries) CreateIdentity(ctx context.Context, arg CreateIdentityParams) 
 	return err
 }
 
+const createNotificationRules = `-- name: CreateNotificationRules :exec
+INSERT INTO notification_rules (id, user_id, urgency, position, contact_method_id, delay_seconds, created_at)
+SELECT unnest($1::uuid[]), $2, $3, unnest($4::integer[]), unnest($5::uuid[]), unnest($6::integer[]), $7
+`
+
+type CreateNotificationRulesParams struct {
+	Ids              []string
+	UserID           string
+	Urgency          string
+	Positions        []int32
+	ContactMethodIds []string
+	DelaySeconds     []int32
+	CreatedAt        time.Time
+}
+
+func (q *Queries) CreateNotificationRules(ctx context.Context, arg CreateNotificationRulesParams) error {
+	_, err := q.db.Exec(ctx, createNotificationRules,
+		arg.Ids,
+		arg.UserID,
+		arg.Urgency,
+		arg.Positions,
+		arg.ContactMethodIds,
+		arg.DelaySeconds,
+		arg.CreatedAt,
+	)
+	return err
+}
+
 const createOneTimeCode = `-- name: CreateOneTimeCode :exec
 INSERT INTO one_time_codes (id, code_hash, user_id, purpose, code_challenge, expires_at, created_at, updated_at)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
@@ -287,6 +315,21 @@ func (q *Queries) DeleteMembership(ctx context.Context, arg DeleteMembershipPara
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const deleteNotificationRules = `-- name: DeleteNotificationRules :exec
+DELETE FROM notification_rules
+WHERE user_id = $1 AND urgency = $2
+`
+
+type DeleteNotificationRulesParams struct {
+	UserID  string
+	Urgency string
+}
+
+func (q *Queries) DeleteNotificationRules(ctx context.Context, arg DeleteNotificationRulesParams) error {
+	_, err := q.db.Exec(ctx, deleteNotificationRules, arg.UserID, arg.Urgency)
+	return err
 }
 
 const deleteTeam = `-- name: DeleteTeam :execrows
@@ -779,6 +822,41 @@ func (q *Queries) ListMembershipsOfUser(ctx context.Context, userID string) ([]T
 			&i.Role,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listNotificationRules = `-- name: ListNotificationRules :many
+SELECT id, user_id, urgency, position, contact_method_id, delay_seconds, created_at
+FROM notification_rules
+WHERE user_id = $1
+ORDER BY urgency, position
+`
+
+func (q *Queries) ListNotificationRules(ctx context.Context, userID string) ([]NotificationRule, error) {
+	rows, err := q.db.Query(ctx, listNotificationRules, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []NotificationRule
+	for rows.Next() {
+		var i NotificationRule
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.Urgency,
+			&i.Position,
+			&i.ContactMethodID,
+			&i.DelaySeconds,
+			&i.CreatedAt,
 		); err != nil {
 			return nil, err
 		}

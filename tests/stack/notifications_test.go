@@ -305,3 +305,62 @@ func TestOnlyAdminsSeeOrChangeTheEmailProvider(t *testing.T) {
 	assert.Equal(t, http.StatusForbidden, read.StatusCode())
 	assert.Equal(t, http.StatusForbidden, set.StatusCode())
 }
+
+func TestSomeoneChoosesHowTheyArePagedAndCanGoBackToTheDefault(t *testing.T) {
+	m := murphytest.New(t)
+	ana := m.User(murphytest.WithWebhook())
+	email, hook := ana.ContactMethodOf(client.Email), ana.ContactMethodOf(client.Webhook)
+	steps := client.NotificationRuleInput{Steps: []client.NotificationStep{
+		{ContactMethod: client.Reference{Id: email.Id}, DelaySeconds: 120},
+		{ContactMethod: client.Reference{Id: hook.Id}, DelaySeconds: 0},
+	}}
+
+	before, err := m.API.ListNotificationRulesWithResponse(t.Context(), ana.ID)
+	require.NoError(t, err)
+	set, err := m.API.SetNotificationRuleWithResponse(t.Context(), ana.ID, client.High, steps)
+	require.NoError(t, err)
+	reset, err := m.API.ResetNotificationRuleWithResponse(t.Context(), ana.ID, client.High)
+	require.NoError(t, err)
+	after, err := m.API.ListNotificationRulesWithResponse(t.Context(), ana.ID)
+	require.NoError(t, err)
+
+	require.Equal(t, http.StatusOK, before.StatusCode())
+	assert.Equal(t, []client.NotificationRule{
+		{Urgency: client.High, Steps: []client.NotificationStep{{ContactMethod: client.Reference{Id: email.Id}}, {ContactMethod: client.Reference{Id: hook.Id}}}},
+		{Urgency: client.Low, Steps: []client.NotificationStep{{ContactMethod: client.Reference{Id: email.Id}}, {ContactMethod: client.Reference{Id: hook.Id}}}},
+	}, before.JSON200.Items, "without a phone, the default reaches everything at once")
+	require.Equal(t, http.StatusOK, set.StatusCode())
+	assert.Equal(t, client.NotificationRule{Urgency: client.High, Custom: true, Steps: []client.NotificationStep{
+		{ContactMethod: client.Reference{Id: hook.Id}, DelaySeconds: 0},
+		{ContactMethod: client.Reference{Id: email.Id}, DelaySeconds: 120},
+	}}, *set.JSON200, "steps come back in the order they fire")
+	assert.Equal(t, http.StatusNoContent, reset.StatusCode())
+	assert.Equal(t, before.JSON200.Items, after.JSON200.Items)
+}
+
+func TestRulesThatWouldDelayEveryNotificationAreRefused(t *testing.T) {
+	m := murphytest.New(t)
+	ana := m.User()
+	email := ana.ContactMethodOf(client.Email)
+
+	set, err := m.API.SetNotificationRuleWithResponse(t.Context(), ana.ID, client.High, client.NotificationRuleInput{Steps: []client.NotificationStep{
+		{ContactMethod: client.Reference{Id: email.Id}, DelaySeconds: 300},
+	}})
+
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusBadRequest, set.StatusCode())
+}
+
+func TestNobodyChangesHowSomeoneElseIsPaged(t *testing.T) {
+	m := murphytest.New(t)
+	ana := m.User()
+	bo := m.Member(murphytest.Bo)
+
+	read, err := bo.API.ListNotificationRulesWithResponse(t.Context(), ana.ID)
+	require.NoError(t, err)
+	reset, err := bo.API.ResetNotificationRuleWithResponse(t.Context(), ana.ID, client.High)
+	require.NoError(t, err)
+
+	assert.Equal(t, http.StatusForbidden, read.StatusCode())
+	assert.Equal(t, http.StatusForbidden, reset.StatusCode())
+}

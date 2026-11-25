@@ -2,6 +2,9 @@ package router
 
 import (
 	"context"
+	"time"
+
+	"google.golang.org/protobuf/types/known/durationpb"
 
 	"github.com/murphyhq/server"
 	"github.com/murphyhq/server/internal/tracer"
@@ -183,4 +186,52 @@ func pushPlatform(platform murphy.PushPlatform) *PushPlatform {
 	}
 	text := PushPlatform(platform.Text())
 	return &text
+}
+
+func (s *Server) ListNotificationRules(ctx context.Context, request ListNotificationRulesRequestObject) (_ ListNotificationRulesResponseObject, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	rules, err := s.people.NotificationRules(ctx, request.Id)
+	if err != nil {
+		return nil, err
+	}
+	items := make([]NotificationRule, len(rules))
+	for i, rule := range rules {
+		items[i] = toNotificationRule(rule)
+	}
+	return ListNotificationRules200JSONResponse{Items: items}, nil
+}
+
+func (s *Server) SetNotificationRule(ctx context.Context, request SetNotificationRuleRequestObject) (_ SetNotificationRuleResponseObject, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	in := &murphy.NotificationRule{UserId: request.Id, Urgency: murphy.UrgencyFromText(string(request.Urgency))}
+	for _, step := range request.Body.Steps {
+		in.Steps = append(in.Steps, &murphy.NotificationStep{ContactMethodId: step.ContactMethod.Id, Delay: durationpb.New(time.Duration(step.DelaySeconds) * time.Second)})
+	}
+	rule, err := s.people.SetNotificationRule(ctx, in)
+	if err != nil {
+		return nil, err
+	}
+	return SetNotificationRule200JSONResponse(toNotificationRule(rule)), nil
+}
+
+func (s *Server) ResetNotificationRule(ctx context.Context, request ResetNotificationRuleRequestObject) (_ ResetNotificationRuleResponseObject, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	if err := s.people.ResetNotificationRule(ctx, request.Id, murphy.UrgencyFromText(string(request.Urgency))); err != nil {
+		return nil, err
+	}
+	return ResetNotificationRule204Response{}, nil
+}
+
+func toNotificationRule(rule *murphy.NotificationRule) NotificationRule {
+	out := NotificationRule{Urgency: Urgency(rule.GetUrgency().Text()), Custom: rule.GetCustom(), Steps: make([]NotificationStep, len(rule.GetSteps()))}
+	for i, step := range rule.GetSteps() {
+		out.Steps[i] = NotificationStep{ContactMethod: ref(step.GetContactMethodId()), DelaySeconds: int32(step.GetDelay().AsDuration() / time.Second)}
+	}
+	return out
 }

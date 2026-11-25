@@ -9,6 +9,7 @@ package murphy
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	durationpb "google.golang.org/protobuf/types/known/durationpb"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
@@ -1151,11 +1152,131 @@ func (x *OneTimeCode) GetUpdatedAt() *timestamppb.Timestamp {
 	return nil
 }
 
+type NotificationRule struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	Urgency       Urgency                `protobuf:"varint,2,opt,name=urgency,proto3,enum=murphy.v1.Urgency" json:"urgency,omitempty"`
+	Steps         []*NotificationStep    `protobuf:"bytes,3,rep,name=steps,proto3" json:"steps,omitempty"`
+	Custom        bool                   `protobuf:"varint,4,opt,name=custom,proto3" json:"custom,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *NotificationRule) Reset() {
+	*x = NotificationRule{}
+	mi := &file_murphy_v1_people_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NotificationRule) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NotificationRule) ProtoMessage() {}
+
+func (x *NotificationRule) ProtoReflect() protoreflect.Message {
+	mi := &file_murphy_v1_people_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NotificationRule.ProtoReflect.Descriptor instead.
+func (*NotificationRule) Descriptor() ([]byte, []int) {
+	return file_murphy_v1_people_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *NotificationRule) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *NotificationRule) GetUrgency() Urgency {
+	if x != nil {
+		return x.Urgency
+	}
+	return Urgency_URGENCY_UNSPECIFIED
+}
+
+func (x *NotificationRule) GetSteps() []*NotificationStep {
+	if x != nil {
+		return x.Steps
+	}
+	return nil
+}
+
+func (x *NotificationRule) GetCustom() bool {
+	if x != nil {
+		return x.Custom
+	}
+	return false
+}
+
+type NotificationStep struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	ContactMethodId string                 `protobuf:"bytes,1,opt,name=contact_method_id,json=contactMethodId,proto3" json:"contact_method_id,omitempty"`
+	Delay           *durationpb.Duration   `protobuf:"bytes,2,opt,name=delay,proto3" json:"delay,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *NotificationStep) Reset() {
+	*x = NotificationStep{}
+	mi := &file_murphy_v1_people_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NotificationStep) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NotificationStep) ProtoMessage() {}
+
+func (x *NotificationStep) ProtoReflect() protoreflect.Message {
+	mi := &file_murphy_v1_people_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NotificationStep.ProtoReflect.Descriptor instead.
+func (*NotificationStep) Descriptor() ([]byte, []int) {
+	return file_murphy_v1_people_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *NotificationStep) GetContactMethodId() string {
+	if x != nil {
+		return x.ContactMethodId
+	}
+	return ""
+}
+
+func (x *NotificationStep) GetDelay() *durationpb.Duration {
+	if x != nil {
+		return x.Delay
+	}
+	return nil
+}
+
 var File_murphy_v1_people_proto protoreflect.FileDescriptor
 
 const file_murphy_v1_people_proto_rawDesc = "" +
 	"\n" +
-	"\x16murphy/v1/people.proto\x12\tmurphy.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xab\x02\n" +
+	"\x16murphy/v1/people.proto\x12\tmurphy.v1\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x16murphy/v1/shared.proto\"\xab\x02\n" +
 	"\x04User\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x14\n" +
@@ -1246,7 +1367,15 @@ const file_murphy_v1_people_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt*P\n" +
+	"updated_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"\xa4\x01\n" +
+	"\x10NotificationRule\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12,\n" +
+	"\aurgency\x18\x02 \x01(\x0e2\x12.murphy.v1.UrgencyR\aurgency\x121\n" +
+	"\x05steps\x18\x03 \x03(\v2\x1b.murphy.v1.NotificationStepR\x05steps\x12\x16\n" +
+	"\x06custom\x18\x04 \x01(\bR\x06custom\"o\n" +
+	"\x10NotificationStep\x12*\n" +
+	"\x11contact_method_id\x18\x01 \x01(\tR\x0fcontactMethodId\x12/\n" +
+	"\x05delay\x18\x02 \x01(\v2\x19.google.protobuf.DurationR\x05delay*P\n" +
 	"\bUserRole\x12\x19\n" +
 	"\x15USER_ROLE_UNSPECIFIED\x10\x00\x12\x13\n" +
 	"\x0fUSER_ROLE_ADMIN\x10\x01\x12\x14\n" +
@@ -1296,7 +1425,7 @@ func file_murphy_v1_people_proto_rawDescGZIP() []byte {
 }
 
 var file_murphy_v1_people_proto_enumTypes = make([]protoimpl.EnumInfo, 7)
-var file_murphy_v1_people_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_murphy_v1_people_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_murphy_v1_people_proto_goTypes = []any{
 	(UserRole)(0),                 // 0: murphy.v1.UserRole
 	(UserStatus)(0),               // 1: murphy.v1.UserStatus
@@ -1313,44 +1442,51 @@ var file_murphy_v1_people_proto_goTypes = []any{
 	(*Session)(nil),               // 12: murphy.v1.Session
 	(*SignIn)(nil),                // 13: murphy.v1.SignIn
 	(*OneTimeCode)(nil),           // 14: murphy.v1.OneTimeCode
-	(*timestamppb.Timestamp)(nil), // 15: google.protobuf.Timestamp
+	(*NotificationRule)(nil),      // 15: murphy.v1.NotificationRule
+	(*NotificationStep)(nil),      // 16: murphy.v1.NotificationStep
+	(*timestamppb.Timestamp)(nil), // 17: google.protobuf.Timestamp
+	(Urgency)(0),                  // 18: murphy.v1.Urgency
+	(*durationpb.Duration)(nil),   // 19: google.protobuf.Duration
 }
 var file_murphy_v1_people_proto_depIdxs = []int32{
 	1,  // 0: murphy.v1.User.status:type_name -> murphy.v1.UserStatus
-	15, // 1: murphy.v1.User.created_at:type_name -> google.protobuf.Timestamp
-	15, // 2: murphy.v1.User.updated_at:type_name -> google.protobuf.Timestamp
+	17, // 1: murphy.v1.User.created_at:type_name -> google.protobuf.Timestamp
+	17, // 2: murphy.v1.User.updated_at:type_name -> google.protobuf.Timestamp
 	0,  // 3: murphy.v1.User.role:type_name -> murphy.v1.UserRole
 	3,  // 4: murphy.v1.ContactMethod.type:type_name -> murphy.v1.ContactMethodType
-	15, // 5: murphy.v1.ContactMethod.created_at:type_name -> google.protobuf.Timestamp
-	15, // 6: murphy.v1.ContactMethod.updated_at:type_name -> google.protobuf.Timestamp
+	17, // 5: murphy.v1.ContactMethod.created_at:type_name -> google.protobuf.Timestamp
+	17, // 6: murphy.v1.ContactMethod.updated_at:type_name -> google.protobuf.Timestamp
 	2,  // 7: murphy.v1.ContactMethod.push_platform:type_name -> murphy.v1.PushPlatform
-	15, // 8: murphy.v1.ContactMethod.disabled_at:type_name -> google.protobuf.Timestamp
-	15, // 9: murphy.v1.Team.created_at:type_name -> google.protobuf.Timestamp
-	15, // 10: murphy.v1.Team.updated_at:type_name -> google.protobuf.Timestamp
+	17, // 8: murphy.v1.ContactMethod.disabled_at:type_name -> google.protobuf.Timestamp
+	17, // 9: murphy.v1.Team.created_at:type_name -> google.protobuf.Timestamp
+	17, // 10: murphy.v1.Team.updated_at:type_name -> google.protobuf.Timestamp
 	4,  // 11: murphy.v1.TeamMembership.role:type_name -> murphy.v1.TeamRole
-	15, // 12: murphy.v1.TeamMembership.created_at:type_name -> google.protobuf.Timestamp
-	15, // 13: murphy.v1.TeamMembership.updated_at:type_name -> google.protobuf.Timestamp
-	15, // 14: murphy.v1.Identity.created_at:type_name -> google.protobuf.Timestamp
-	15, // 15: murphy.v1.Identity.updated_at:type_name -> google.protobuf.Timestamp
-	15, // 16: murphy.v1.Session.expires_at:type_name -> google.protobuf.Timestamp
-	15, // 17: murphy.v1.Session.revoked_at:type_name -> google.protobuf.Timestamp
-	15, // 18: murphy.v1.Session.created_at:type_name -> google.protobuf.Timestamp
-	15, // 19: murphy.v1.Session.updated_at:type_name -> google.protobuf.Timestamp
+	17, // 12: murphy.v1.TeamMembership.created_at:type_name -> google.protobuf.Timestamp
+	17, // 13: murphy.v1.TeamMembership.updated_at:type_name -> google.protobuf.Timestamp
+	17, // 14: murphy.v1.Identity.created_at:type_name -> google.protobuf.Timestamp
+	17, // 15: murphy.v1.Identity.updated_at:type_name -> google.protobuf.Timestamp
+	17, // 16: murphy.v1.Session.expires_at:type_name -> google.protobuf.Timestamp
+	17, // 17: murphy.v1.Session.revoked_at:type_name -> google.protobuf.Timestamp
+	17, // 18: murphy.v1.Session.created_at:type_name -> google.protobuf.Timestamp
+	17, // 19: murphy.v1.Session.updated_at:type_name -> google.protobuf.Timestamp
 	5,  // 20: murphy.v1.Session.client:type_name -> murphy.v1.SessionClient
-	15, // 21: murphy.v1.Session.renewable_until:type_name -> google.protobuf.Timestamp
-	15, // 22: murphy.v1.SignIn.expires_at:type_name -> google.protobuf.Timestamp
-	15, // 23: murphy.v1.SignIn.created_at:type_name -> google.protobuf.Timestamp
-	15, // 24: murphy.v1.SignIn.updated_at:type_name -> google.protobuf.Timestamp
+	17, // 21: murphy.v1.Session.renewable_until:type_name -> google.protobuf.Timestamp
+	17, // 22: murphy.v1.SignIn.expires_at:type_name -> google.protobuf.Timestamp
+	17, // 23: murphy.v1.SignIn.created_at:type_name -> google.protobuf.Timestamp
+	17, // 24: murphy.v1.SignIn.updated_at:type_name -> google.protobuf.Timestamp
 	6,  // 25: murphy.v1.OneTimeCode.purpose:type_name -> murphy.v1.OneTimeCodePurpose
-	15, // 26: murphy.v1.OneTimeCode.expires_at:type_name -> google.protobuf.Timestamp
-	15, // 27: murphy.v1.OneTimeCode.used_at:type_name -> google.protobuf.Timestamp
-	15, // 28: murphy.v1.OneTimeCode.created_at:type_name -> google.protobuf.Timestamp
-	15, // 29: murphy.v1.OneTimeCode.updated_at:type_name -> google.protobuf.Timestamp
-	30, // [30:30] is the sub-list for method output_type
-	30, // [30:30] is the sub-list for method input_type
-	30, // [30:30] is the sub-list for extension type_name
-	30, // [30:30] is the sub-list for extension extendee
-	0,  // [0:30] is the sub-list for field type_name
+	17, // 26: murphy.v1.OneTimeCode.expires_at:type_name -> google.protobuf.Timestamp
+	17, // 27: murphy.v1.OneTimeCode.used_at:type_name -> google.protobuf.Timestamp
+	17, // 28: murphy.v1.OneTimeCode.created_at:type_name -> google.protobuf.Timestamp
+	17, // 29: murphy.v1.OneTimeCode.updated_at:type_name -> google.protobuf.Timestamp
+	18, // 30: murphy.v1.NotificationRule.urgency:type_name -> murphy.v1.Urgency
+	16, // 31: murphy.v1.NotificationRule.steps:type_name -> murphy.v1.NotificationStep
+	19, // 32: murphy.v1.NotificationStep.delay:type_name -> google.protobuf.Duration
+	33, // [33:33] is the sub-list for method output_type
+	33, // [33:33] is the sub-list for method input_type
+	33, // [33:33] is the sub-list for extension type_name
+	33, // [33:33] is the sub-list for extension extendee
+	0,  // [0:33] is the sub-list for field type_name
 }
 
 func init() { file_murphy_v1_people_proto_init() }
@@ -1358,13 +1494,14 @@ func file_murphy_v1_people_proto_init() {
 	if File_murphy_v1_people_proto != nil {
 		return
 	}
+	file_murphy_v1_shared_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_murphy_v1_people_proto_rawDesc), len(file_murphy_v1_people_proto_rawDesc)),
 			NumEnums:      7,
-			NumMessages:   8,
+			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

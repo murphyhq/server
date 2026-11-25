@@ -67,3 +67,24 @@ func (t *Tx) CreateContactMethod(ctx context.Context, method *murphy.ContactMeth
 
 	return insertContactMethod(ctx, t.queries, method)
 }
+
+func (t *Tx) DeleteNotificationRule(ctx context.Context, userID string, urgency murphy.Urgency) (err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	return deleteNotificationRule(ctx, t.queries, userID, urgency)
+}
+
+func (t *Tx) CreateNotificationRule(ctx context.Context, rule *murphy.NotificationRule, at time.Time) (err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	params := CreateNotificationRulesParams{UserID: rule.GetUserId(), Urgency: rule.GetUrgency().Text(), CreatedAt: at}
+	for i, step := range rule.GetSteps() {
+		params.Ids = append(params.Ids, murphy.NewID())
+		params.Positions = append(params.Positions, int32(i+1))
+		params.ContactMethodIds = append(params.ContactMethodIds, step.GetContactMethodId())
+		params.DelaySeconds = append(params.DelaySeconds, int32(step.GetDelay().AsDuration()/time.Second))
+	}
+	return murphypostgres.Error("notification rule", t.queries.CreateNotificationRules(ctx, params))
+}

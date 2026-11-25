@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/murphyhq/server"
@@ -45,6 +46,41 @@ func Run(t *testing.T, open func(t *testing.T) Storage) {
 		require.Len(t, methods, 2)
 		assert.Equal(t, []string{"ana@example.com", "bo@example.com"}, []string{methods[0].GetAddress(), methods[1].GetAddress()})
 		assert.Equal(t, murphy.ContactMethodType_CONTACT_METHOD_TYPE_EMAIL, methods[0].GetType())
+	})
+
+	t.Run("keeps only the latest steps for each urgency, and forgets a contact method's steps with it", func(t *testing.T) {
+		repo := open(t)
+		ana := newUser("ana@example.com")
+		require.NoError(t, repo.CreateUser(t.Context(), ana))
+		hook, phone := newContactMethod(ana, murphy.ContactMethodType_CONTACT_METHOD_TYPE_WEBHOOK), newContactMethod(ana, murphy.ContactMethodType_CONTACT_METHOD_TYPE_WEBHOOK)
+		require.NoError(t, repo.CreateContactMethod(t.Context(), hook))
+		require.NoError(t, repo.CreateContactMethod(t.Context(), phone))
+		high := func(steps ...*murphy.NotificationStep) *murphy.NotificationRule {
+			return &murphy.NotificationRule{UserId: ana.GetId(), Urgency: murphy.Urgency_URGENCY_HIGH, Steps: steps}
+		}
+		step := func(method *murphy.ContactMethod, delay time.Duration) *murphy.NotificationStep {
+			return &murphy.NotificationStep{ContactMethodId: method.GetId(), Delay: durationpb.New(delay)}
+		}
+		low := &murphy.NotificationRule{UserId: ana.GetId(), Urgency: murphy.Urgency_URGENCY_LOW, Steps: []*murphy.NotificationStep{step(hook, 0)}}
+		require.NoError(t, repo.ReplaceNotificationRule(t.Context(), high(step(hook, 0)), time.Now()))
+		require.NoError(t, repo.ReplaceNotificationRule(t.Context(), low, time.Now()))
+
+		require.NoError(t, repo.ReplaceNotificationRule(t.Context(), high(step(phone, 0), step(hook, 2*time.Minute)), time.Now()))
+		replaced, err := repo.ListNotificationRules(t.Context(), ana.GetId())
+		require.NoError(t, err)
+		require.NoError(t, repo.DeleteContactMethod(t.Context(), phone.GetId()))
+		require.NoError(t, repo.DeleteNotificationRule(t.Context(), ana.GetId(), murphy.Urgency_URGENCY_LOW))
+		after, err := repo.ListNotificationRules(t.Context(), ana.GetId())
+		require.NoError(t, err)
+
+		require.Len(t, replaced, 2)
+		assert.Equal(t, murphy.Urgency_URGENCY_HIGH, replaced[0].GetUrgency())
+		assert.Equal(t, []string{phone.GetId(), hook.GetId()}, []string{replaced[0].GetSteps()[0].GetContactMethodId(), replaced[0].GetSteps()[1].GetContactMethodId()})
+		assert.Equal(t, 2*time.Minute, replaced[0].GetSteps()[1].GetDelay().AsDuration())
+		assert.Equal(t, murphy.Urgency_URGENCY_LOW, replaced[1].GetUrgency())
+		require.Len(t, after, 1, "the low urgency is back to the default")
+		require.Len(t, after[0].GetSteps(), 1, "the deleted phone's step is gone")
+		assert.Equal(t, hook.GetId(), after[0].GetSteps()[0].GetContactMethodId())
 	})
 
 	t.Run("hands a sign-in out once", func(t *testing.T) {

@@ -2,7 +2,9 @@ syntax = "proto3";
 
 package murphy.v1;
 
+import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
+import "murphy/v1/shared.proto";
 
 option go_package = "github.com/murphyhq/server;murphy";
 
@@ -136,4 +138,16 @@ enum OneTimeCodePurpose {
   ONE_TIME_CODE_PURPOSE_APP_SIGN_IN = 1;
   ONE_TIME_CODE_PURPOSE_CONNECT = 2;
   ONE_TIME_CODE_PURPOSE_SET_PASSWORD = 3;
+}
+
+message NotificationRule {
+  string user_id = 1;
+  Urgency urgency = 2;
+  repeated NotificationStep steps = 3;
+  bool custom = 4;
+}
+
+message NotificationStep {
+  string contact_method_id = 1;
+  google.protobuf.Duration delay = 2;
 }

@@ -32,6 +32,22 @@ CREATE TABLE contact_methods (
 
 CREATE INDEX contact_methods_user_id_id_idx ON contact_methods (user_id, id);
 
+CREATE TABLE notification_rules (
+  id uuid NOT NULL,
+  user_id uuid NOT NULL,
+  urgency text NOT NULL,
+  position integer NOT NULL,
+  contact_method_id uuid NOT NULL,
+  delay_seconds integer NOT NULL,
+  created_at timestamptz NOT NULL,
+  CONSTRAINT notification_rules_pkey PRIMARY KEY (id),
+  CONSTRAINT notification_rules_user_id_fkey FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+  CONSTRAINT notification_rules_contact_method_id_fkey FOREIGN KEY (contact_method_id) REFERENCES contact_methods (id) ON DELETE CASCADE,
+  CONSTRAINT notification_rules_urgency_check CHECK (urgency IN ('high', 'low')),
+  CONSTRAINT notification_rules_delay_seconds_check CHECK (delay_seconds >= 0),
+  CONSTRAINT notification_rules_user_id_urgency_position_key UNIQUE (user_id, urgency, position)
+);
+
 CREATE TABLE teams (
   id uuid NOT NULL,
   name text NOT NULL,

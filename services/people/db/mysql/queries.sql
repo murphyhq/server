@@ -229,3 +229,13 @@ ON DUPLICATE KEY UPDATE hash = VALUES(hash), updated_at = VALUES(updated_at);
 SELECT hash
 FROM passwords
 WHERE user_id = sqlc.arg(user_id);
+
+-- name: ListNotificationRules :many
+SELECT id, user_id, urgency, position, contact_method_id, delay_seconds, created_at
+FROM notification_rules
+WHERE user_id = sqlc.arg(user_id)
+ORDER BY urgency, position;
+
+-- name: DeleteNotificationRules :exec
+DELETE FROM notification_rules
+WHERE user_id = sqlc.arg(user_id) AND urgency = sqlc.arg(urgency);
