@@ -109,6 +109,8 @@ func (r *Repository) RecordPage(ctx context.Context, change *notifications.Chang
 		params.MessageIds = append(params.MessageIds, message.ID)
 		params.DueAts = append(params.DueAts, message.DueAt.UTC())
 		params.Envelopes = append(params.Envelopes, message.Envelope)
+		params.WaitingIncidentIds = append(params.WaitingIncidentIds, message.Waiting.GetIncident().GetId())
+		params.WaitingNotificationIds = append(params.WaitingNotificationIds, message.Waiting.GetId())
 	}
 	handled, err := r.queries.RecordPage(ctx, params)
 	if err != nil {

@@ -34,6 +34,16 @@ UPDATE scheduled_messages
 SET claimed_until = sqlc.arg(claimed_until)
 WHERE id IN (sqlc.slice(ids));
 
+-- name: CancelWaitingNotifications :exec
+UPDATE notifications n
+JOIN scheduled_messages m ON m.waiting_notification_id = n.id
+SET n.status = 'cancelled', n.updated_at = sqlc.arg(at)
+WHERE m.waiting_incident_id = sqlc.arg(incident_id) AND (m.claimed_until IS NULL OR m.claimed_until <= sqlc.arg(claims_expire_by));
+
+-- name: DeleteWaitingMessages :exec
+DELETE FROM scheduled_messages
+WHERE waiting_incident_id = sqlc.arg(incident_id) AND (claimed_until IS NULL OR claimed_until <= sqlc.arg(claims_expire_by));
+
 -- name: DeleteMessages :exec
 DELETE FROM scheduled_messages
 WHERE id IN (sqlc.slice(ids));

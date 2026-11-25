@@ -4,6 +4,7 @@ package stack
 
 import (
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -363,4 +364,24 @@ func TestNobodyChangesHowSomeoneElseIsPaged(t *testing.T) {
 
 	assert.Equal(t, http.StatusForbidden, read.StatusCode())
 	assert.Equal(t, http.StatusForbidden, reset.StatusCode())
+}
+
+func TestAcknowledgingStopsTheStepsStillWaiting(t *testing.T) {
+	m := murphytest.New(t)
+	m.EmailThroughMailpit()
+	ana := m.User(murphytest.WithWebhook())
+	set, err := m.API.SetNotificationRuleWithResponse(t.Context(), ana.ID, client.High, client.NotificationRuleInput{Steps: []client.NotificationStep{
+		{ContactMethod: client.Reference{Id: ana.Webhook().ContactMethodID}, DelaySeconds: 0},
+		{ContactMethod: client.Reference{Id: ana.ContactMethodOf(client.Email).Id}, DelaySeconds: 10},
+	}})
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, set.StatusCode())
+	incident := m.Service(murphytest.Pages(ana.Target())).Fire("disk-full")
+	ana.Webhook().WaitForWebhooks(1)
+
+	incident.Acknowledge()
+
+	told := ana.Mailbox().WaitForMail(1)
+	assert.True(t, strings.HasPrefix(told[0].Subject, "[Murphy] Acknowledged:"), "only the acknowledgement reaches her by email: %s", told[0].Subject)
+	ana.Mailbox().GetsNoMoreFor(1, 15*time.Second)
 }

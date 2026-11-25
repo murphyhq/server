@@ -43,7 +43,7 @@ CREATE TABLE notifications (
   CONSTRAINT notifications_page_id_fkey FOREIGN KEY (page_id) REFERENCES pages (id) ON DELETE CASCADE,
   CONSTRAINT notifications_channel_check CHECK (channel IN ('email', 'sms', 'voice', 'webhook', 'push')),
   CONSTRAINT notifications_reason_check CHECK (reason IN ('paged', 'acknowledged', 'resolved')),
-  CONSTRAINT notifications_status_check CHECK (status IN ('created', 'sent', 'failed'))
+  CONSTRAINT notifications_status_check CHECK (status IN ('created', 'sent', 'failed', 'cancelled'))
 );
 
 CREATE INDEX notifications_incident_id_idx ON notifications (incident_id);
@@ -62,8 +62,12 @@ CREATE TABLE scheduled_messages (
   claimed_until timestamptz,
   envelope bytea NOT NULL,
   created_at timestamptz NOT NULL,
+  waiting_incident_id uuid,
+  waiting_notification_id uuid,
   CONSTRAINT scheduled_messages_pkey PRIMARY KEY (id)
 );
+
+CREATE INDEX scheduled_messages_waiting_incident_id_idx ON scheduled_messages (waiting_incident_id);
 
 CREATE INDEX scheduled_messages_due_at_id_idx ON scheduled_messages (due_at, id);
 

@@ -584,16 +584,32 @@ func (r *Repository) ListNotificationRules(ctx context.Context, userID string) (
 	if err != nil {
 		return nil, murphymysql.Error("notification rule", err)
 	}
+	return toNotificationRules(rows), nil
+}
+
+func (r *Repository) ListNotificationRulesOfUsers(ctx context.Context, userIDs []string, urgency murphy.Urgency) (_ []*murphy.NotificationRule, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	rows, err := r.queries.ListNotificationRulesOfUsers(ctx, ListNotificationRulesOfUsersParams{UserIds: userIDs, Urgency: urgency.Text()})
+	if err != nil {
+		return nil, murphymysql.Error("notification rule", err)
+	}
+	return toNotificationRules(rows), nil
+}
+
+func toNotificationRules(rows []NotificationRule) []*murphy.NotificationRule {
 	var rules []*murphy.NotificationRule
 	for _, row := range rows {
 		urgency := murphy.UrgencyFromText(row.Urgency)
-		if len(rules) == 0 || rules[len(rules)-1].GetUrgency() != urgency {
+		last := len(rules) - 1
+		if last < 0 || rules[last].GetUserId() != row.UserID || rules[last].GetUrgency() != urgency {
 			rules = append(rules, &murphy.NotificationRule{UserId: row.UserID, Urgency: urgency, Custom: true})
 		}
 		rule := rules[len(rules)-1]
 		rule.Steps = append(rule.Steps, &murphy.NotificationStep{ContactMethodId: row.ContactMethodID, Delay: durationpb.New(time.Duration(row.DelaySeconds) * time.Second)})
 	}
-	return rules, nil
+	return rules
 }
 
 func (r *Repository) DeleteNotificationRule(ctx context.Context, userID string, urgency murphy.Urgency) (err error) {

@@ -118,3 +118,22 @@ func TestRulesUseOnlyYourOwnWorkingContactMethods(t *testing.T) {
 	assert.Contains(t, err.Error(), "steps[1].contact_method is disabled: the phone is no longer registered for pushes")
 	assert.Contains(t, err.Error(), "steps[2].contact_method must be one of your contact methods")
 }
+
+func TestEveryonePagedIsReachedTheirOwnWayOrByTheDefault(t *testing.T) {
+	repo := NewMockRepository(t)
+	ana := "0195f3a0-0000-7000-8000-0000000000a1"
+	anaInbox := &murphy.ContactMethod{Id: murphy.NewID(), UserId: ana, Type: murphy.ContactMethodType_CONTACT_METHOD_TYPE_EMAIL}
+	dinaPhone, dinaInbox := method(phone, murphy.ContactMethodType_CONTACT_METHOD_TYPE_PUSH), method(inbox, murphy.ContactMethodType_CONTACT_METHOD_TYPE_EMAIL)
+	repo.EXPECT().ListContactMethodsOfUsers(mock.Anything, []string{dina, ana}).Return([]*murphy.ContactMethod{dinaPhone, dinaInbox, anaInbox}, nil).Once()
+	repo.EXPECT().ListNotificationRulesOfUsers(mock.Anything, []string{dina, ana}, murphy.Urgency_URGENCY_HIGH).Return([]*murphy.NotificationRule{{
+		UserId: dina, Urgency: murphy.Urgency_URGENCY_HIGH, Custom: true,
+		Steps: []*murphy.NotificationStep{step(inbox, 0), step(hook, time.Minute), step(phone, 5*time.Minute)},
+	}}, nil).Once()
+
+	rules, err := people.New(repo).NotificationRulesOfUsers(t.Context(), []string{dina, ana}, murphy.Urgency_URGENCY_HIGH)
+
+	require.NoError(t, err)
+	assert.Equal(t, delays{inbox: 0, phone: 5 * time.Minute}, delaysOf(rules[dina]), "a step whose contact method no longer works is skipped")
+	assert.Equal(t, dinaInbox, rules[dina].GetSteps()[0].GetContactMethod(), "steps carry their contact method")
+	assert.Equal(t, delays{anaInbox.GetId(): 0}, delaysOf(rules[ana]), "the default, for someone without rules")
+}

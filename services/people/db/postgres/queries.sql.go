@@ -868,6 +868,46 @@ func (q *Queries) ListNotificationRules(ctx context.Context, userID string) ([]N
 	return items, nil
 }
 
+const listNotificationRulesOfUsers = `-- name: ListNotificationRulesOfUsers :many
+SELECT id, user_id, urgency, position, contact_method_id, delay_seconds, created_at
+FROM notification_rules
+WHERE user_id = ANY($1::uuid[]) AND urgency = $2
+ORDER BY user_id, position
+`
+
+type ListNotificationRulesOfUsersParams struct {
+	UserIds []string
+	Urgency string
+}
+
+func (q *Queries) ListNotificationRulesOfUsers(ctx context.Context, arg ListNotificationRulesOfUsersParams) ([]NotificationRule, error) {
+	rows, err := q.db.Query(ctx, listNotificationRulesOfUsers, arg.UserIds, arg.Urgency)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []NotificationRule
+	for rows.Next() {
+		var i NotificationRule
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.Urgency,
+			&i.Position,
+			&i.ContactMethodID,
+			&i.DelaySeconds,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listTeams = `-- name: ListTeams :many
 SELECT id, name, created_at, updated_at
 FROM teams

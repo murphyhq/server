@@ -882,6 +882,60 @@ func (q *Queries) ListNotificationRules(ctx context.Context, userID string) ([]N
 	return items, nil
 }
 
+const listNotificationRulesOfUsers = `-- name: ListNotificationRulesOfUsers :many
+SELECT id, user_id, urgency, position, contact_method_id, delay_seconds, created_at
+FROM notification_rules
+WHERE user_id IN (/*SLICE:user_ids*/?) AND urgency = ?
+ORDER BY user_id, position
+`
+
+type ListNotificationRulesOfUsersParams struct {
+	UserIds []string
+	Urgency string
+}
+
+func (q *Queries) ListNotificationRulesOfUsers(ctx context.Context, arg ListNotificationRulesOfUsersParams) ([]NotificationRule, error) {
+	query := listNotificationRulesOfUsers
+	var queryParams []interface{}
+	if len(arg.UserIds) > 0 {
+		for _, v := range arg.UserIds {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:user_ids*/?", strings.Repeat(",?", len(arg.UserIds))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:user_ids*/?", "NULL", 1)
+	}
+	queryParams = append(queryParams, arg.Urgency)
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []NotificationRule
+	for rows.Next() {
+		var i NotificationRule
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.Urgency,
+			&i.Position,
+			&i.ContactMethodID,
+			&i.DelaySeconds,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listTeams = `-- name: ListTeams :many
 SELECT id, name, created_at, updated_at
 FROM teams

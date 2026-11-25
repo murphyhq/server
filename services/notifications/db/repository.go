@@ -15,6 +15,8 @@ type Tx interface {
 	CreateNotifications(ctx context.Context, notifications []*murphy.Notification) error
 	UpdateOutcome(ctx context.Context, notification *murphy.Notification, at time.Time) error
 	CreateScheduledMessages(ctx context.Context, messages []*notifications.ScheduledMessage, at time.Time) error
+	CancelWaitingNotifications(ctx context.Context, incidentID string, at time.Time) error
+	DeleteWaitingMessages(ctx context.Context, incidentID string, at time.Time) error
 	LockDueMessages(ctx context.Context, now time.Time, limit int) ([]*notifications.ScheduledMessage, error)
 	ClaimMessages(ctx context.Context, ids []string, until time.Time) error
 }
@@ -64,6 +66,14 @@ func (r *Repository[T]) Record(ctx context.Context, change *notifications.Change
 		if change.MessageID != "" {
 			first, err := tx.MarkHandled(ctx, change.MessageID, now)
 			if err != nil || !first {
+				return err
+			}
+		}
+		if change.StopWaiting != "" {
+			if err := tx.CancelWaitingNotifications(ctx, change.StopWaiting, now); err != nil {
+				return err
+			}
+			if err := tx.DeleteWaitingMessages(ctx, change.StopWaiting, now); err != nil {
 				return err
 			}
 		}

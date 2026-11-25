@@ -49,6 +49,7 @@ type Store interface {
 	ActiveUsers(ctx context.Context, ids []string) ([]string, error)
 	ListMembershipsOfUser(ctx context.Context, userID string) ([]*murphy.TeamMembership, error)
 	ListNotificationRules(ctx context.Context, userID string) ([]*murphy.NotificationRule, error)
+	ListNotificationRulesOfUsers(ctx context.Context, userIDs []string, urgency murphy.Urgency) ([]*murphy.NotificationRule, error)
 	DeleteNotificationRule(ctx context.Context, userID string, urgency murphy.Urgency) error
 }
 
@@ -574,6 +575,40 @@ func (s *Service) ResetNotificationRule(ctx context.Context, userID string, urge
 		return fmt.Errorf("reset notification rule: %w", err)
 	}
 	return nil
+}
+
+func (s *Service) NotificationRulesOfUsers(ctx context.Context, userIDs []string, urgency murphy.Urgency) (_ map[string]*murphy.NotificationRule, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	methods, err := s.ContactMethodsOfUsers(ctx, userIDs)
+	if err != nil {
+		return nil, err
+	}
+	rules := make(map[string]*murphy.NotificationRule, len(userIDs))
+	for _, user := range userIDs {
+		rules[user] = DefaultNotificationRule(user, urgency, methods[user])
+	}
+	if len(userIDs) > 0 {
+		custom, err := s.repo.ListNotificationRulesOfUsers(ctx, userIDs, urgency)
+		if err != nil {
+			return nil, fmt.Errorf("list notification rules: %w", err)
+		}
+		for _, rule := range custom {
+			rules[rule.GetUserId()] = rule
+		}
+	}
+	for user, rule := range rules {
+		working := map[string]*murphy.ContactMethod{}
+		for _, method := range methods[user] {
+			working[method.GetId()] = method
+		}
+		rule.Steps = slices.DeleteFunc(rule.Steps, func(step *murphy.NotificationStep) bool { return working[step.GetContactMethodId()] == nil })
+		for _, step := range rule.Steps {
+			step.ContactMethod = working[step.GetContactMethodId()]
+		}
+	}
+	return rules, nil
 }
 
 func DefaultNotificationRule(userID string, urgency murphy.Urgency, methods []*murphy.ContactMethod) *murphy.NotificationRule {

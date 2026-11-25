@@ -31,8 +31,9 @@ WHERE incident_id = @incident_id
 ORDER BY user_id;
 
 -- name: CreateScheduledMessages :exec
-INSERT INTO scheduled_messages (id, due_at, envelope, created_at)
-SELECT unnest(@ids::uuid[]), unnest(@due_ats::timestamptz[]), unnest(@envelopes::bytea[]), @created_at::timestamptz;
+INSERT INTO scheduled_messages (id, due_at, envelope, created_at, waiting_incident_id, waiting_notification_id)
+SELECT unnest(@ids::uuid[]), unnest(@due_ats::timestamptz[]), unnest(@envelopes::bytea[]), @created_at::timestamptz,
+  NULLIF(unnest(@waiting_incident_ids::text[]), '')::uuid, NULLIF(unnest(@waiting_notification_ids::text[]), '')::uuid;
 
 -- name: LockDueMessages :many
 SELECT id, due_at, envelope
@@ -46,6 +47,18 @@ FOR UPDATE SKIP LOCKED;
 UPDATE scheduled_messages
 SET claimed_until = @claimed_until
 WHERE id = ANY(@ids::uuid[]);
+
+-- name: CancelWaitingNotifications :exec
+UPDATE notifications
+SET status = 'cancelled', updated_at = @at
+WHERE id IN (
+  SELECT waiting_notification_id FROM scheduled_messages
+  WHERE waiting_incident_id = @incident_id AND (claimed_until IS NULL OR claimed_until <= @at)
+);
+
+-- name: DeleteWaitingMessages :exec
+DELETE FROM scheduled_messages
+WHERE waiting_incident_id = @incident_id AND (claimed_until IS NULL OR claimed_until <= @at);
 
 -- name: DeleteMessages :exec
 DELETE FROM scheduled_messages
@@ -85,8 +98,9 @@ WITH handled AS (
   SELECT unnest(@notification_ids::uuid[]), @incident_id::uuid, page.id, unnest(@notification_user_ids::uuid[]), unnest(@contact_method_ids::uuid[]), unnest(@channels::text[]), 'paged', 'created', @created_at::timestamptz, @created_at::timestamptz
   FROM page
 ), scheduled AS (
-  INSERT INTO scheduled_messages (id, due_at, envelope, created_at)
-  SELECT unnest(@message_ids::uuid[]), unnest(@due_ats::timestamptz[]), unnest(@envelopes::bytea[]), @at::timestamptz
+  INSERT INTO scheduled_messages (id, due_at, envelope, created_at, waiting_incident_id, waiting_notification_id)
+  SELECT unnest(@message_ids::uuid[]), unnest(@due_ats::timestamptz[]), unnest(@envelopes::bytea[]), @at::timestamptz,
+    NULLIF(unnest(@waiting_incident_ids::text[]), '')::uuid, NULLIF(unnest(@waiting_notification_ids::text[]), '')::uuid
   FROM handled
 )
 SELECT count(*) FROM handled;
