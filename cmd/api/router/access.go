@@ -44,6 +44,7 @@ type IncidentResponders interface {
 type rule struct {
 	adminOnly bool
 	anyone    bool
+	evenAdmin bool
 	check     func(a *access, ctx context.Context, c caller, id string) error
 	owner     func(a *access, ctx context.Context, id string) ([]string, error)
 	covers    bool
@@ -53,6 +54,7 @@ var rules = map[string]rule{
 	"sessions:own":        {anyone: true},
 	"install:manage":      {adminOnly: true},
 	"users:self":          {check: (*access).isSelf},
+	"users:only-self":     {check: (*access).isOnlySelf, evenAdmin: true},
 	"contact-methods:own": {check: (*access).ownsContactMethod},
 	"incidents:respond":   {check: (*access).respondsTo},
 	"teams:manage":        {owner: (*access).theTeam},
@@ -94,7 +96,10 @@ func requireAccess(a *access) MiddlewareFunc {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			current := sessionFrom(r.Context())
 			grants := a.grants[r.Pattern]
-			if current == nil || len(grants) == 0 || current.role == murphy.UserRole_USER_ROLE_ADMIN {
+			if current != nil && current.role == murphy.UserRole_USER_ROLE_ADMIN {
+				grants = slices.DeleteFunc(slices.Clone(grants), func(g grant) bool { return !rules[g.scope].evenAdmin })
+			}
+			if current == nil || len(grants) == 0 {
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -149,6 +154,13 @@ func (a *access) isSelf(_ context.Context, c caller, id string) error {
 		return nil
 	}
 	return &murphy.ForbiddenError{Reason: "only admins can do this for someone else"}
+}
+
+func (a *access) isOnlySelf(_ context.Context, c caller, id string) error {
+	if id == c.id {
+		return nil
+	}
+	return &murphy.ForbiddenError{Reason: "only the person themselves can do this"}
 }
 
 func (a *access) ownsContactMethod(ctx context.Context, c caller, id string) error {

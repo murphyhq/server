@@ -447,6 +447,7 @@ type Notification struct {
 	Deadline          *timestamppb.Timestamp `protobuf:"bytes,13,opt,name=deadline,proto3" json:"deadline,omitempty"`
 	ContactMethodGone bool                   `protobuf:"varint,14,opt,name=contact_method_gone,json=contactMethodGone,proto3" json:"contact_method_gone,omitempty"`
 	DueAt             *timestamppb.Timestamp `protobuf:"bytes,15,opt,name=due_at,json=dueAt,proto3" json:"due_at,omitempty"`
+	TestId            string                 `protobuf:"bytes,16,opt,name=test_id,json=testId,proto3" json:"test_id,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
@@ -584,6 +585,13 @@ func (x *Notification) GetDueAt() *timestamppb.Timestamp {
 		return x.DueAt
 	}
 	return nil
+}
+
+func (x *Notification) GetTestId() string {
+	if x != nil {
+		return x.TestId
+	}
+	return ""
 }
 
 type NotificationEvent struct {
@@ -783,7 +791,7 @@ const file_murphy_v1_notifications_proto_rawDesc = "" +
 	"\tPageEvent\x12'\n" +
 	"\x04verb\x18\x01 \x01(\x0e2\x13.murphy.v1.PageVerbR\x04verb\x12+\n" +
 	"\bprevious\x18\x02 \x01(\v2\x0f.murphy.v1.PageR\bprevious\x12)\n" +
-	"\acurrent\x18\x03 \x01(\v2\x0f.murphy.v1.PageR\acurrent\"\xa3\x05\n" +
+	"\acurrent\x18\x03 \x01(\v2\x0f.murphy.v1.PageR\acurrent\"\xbc\x05\n" +
 	"\fNotification\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x125\n" +
 	"\x06reason\x18\x02 \x01(\x0e2\x1d.murphy.v1.NotificationReasonR\x06reason\x12/\n" +
@@ -801,7 +809,8 @@ const file_murphy_v1_notifications_proto_rawDesc = "" +
 	"\apage_id\x18\f \x01(\tR\x06pageId\x126\n" +
 	"\bdeadline\x18\r \x01(\v2\x1a.google.protobuf.TimestampR\bdeadline\x12.\n" +
 	"\x13contact_method_gone\x18\x0e \x01(\bR\x11contactMethodGone\x121\n" +
-	"\x06due_at\x18\x0f \x01(\v2\x1a.google.protobuf.TimestampR\x05dueAt\"\xac\x01\n" +
+	"\x06due_at\x18\x0f \x01(\v2\x1a.google.protobuf.TimestampR\x05dueAt\x12\x17\n" +
+	"\atest_id\x18\x10 \x01(\tR\x06testId\"\xac\x01\n" +
 	"\x11NotificationEvent\x12/\n" +
 	"\x04verb\x18\x01 \x01(\x0e2\x1b.murphy.v1.NotificationVerbR\x04verb\x123\n" +
 	"\bprevious\x18\x02 \x01(\v2\x17.murphy.v1.NotificationR\bprevious\x121\n" +

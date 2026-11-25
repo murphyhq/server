@@ -53,8 +53,9 @@ func (t *Tx) CreateNotifications(ctx context.Context, created []*murphy.Notifica
 	defer span.End(&err)
 
 	first := created[0]
+	subject, subjectID := notifications.SubjectOf(first)
 	params := CreateNotificationsParams{
-		IncidentID: first.GetIncident().GetId(), Reason: first.GetReason().Text(), CreatedAt: first.GetCreatedAt().AsTime(),
+		Subject: subject, SubjectID: subjectID, Reason: first.GetReason().Text(), CreatedAt: first.GetCreatedAt().AsTime(),
 	}
 	if first.GetPageId() != "" {
 		page := first.GetPageId()

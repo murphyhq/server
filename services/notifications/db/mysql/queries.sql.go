@@ -56,6 +56,24 @@ func (q *Queries) ClaimMessages(ctx context.Context, arg ClaimMessagesParams) er
 	return err
 }
 
+const countTestsSince = `-- name: CountTestsSince :one
+SELECT count(DISTINCT subject_id)
+FROM notifications
+WHERE user_id = ? AND subject = 'test' AND created_at > ?
+`
+
+type CountTestsSinceParams struct {
+	UserID string
+	Since  time.Time
+}
+
+func (q *Queries) CountTestsSince(ctx context.Context, arg CountTestsSinceParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countTestsSince, arg.UserID, arg.Since)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createPage = `-- name: CreatePage :exec
 INSERT INTO pages (id, incident_id, escalation_level, escalation_round, created_at)
 VALUES (?, ?, ?, ?, ?)
@@ -158,6 +176,57 @@ func (q *Queries) GetEmailProvider(ctx context.Context) (GetEmailProviderRow, er
 		&i.CheckedAt,
 	)
 	return i, err
+}
+
+const listTestNotifications = `-- name: ListTestNotifications :many
+SELECT id, contact_method_id, channel, status, failure, created_at
+FROM notifications
+WHERE subject = 'test' AND subject_id = ? AND user_id = ?
+ORDER BY id
+`
+
+type ListTestNotificationsParams struct {
+	TestID string
+	UserID string
+}
+
+type ListTestNotificationsRow struct {
+	ID              string
+	ContactMethodID string
+	Channel         string
+	Status          string
+	Failure         *string
+	CreatedAt       time.Time
+}
+
+func (q *Queries) ListTestNotifications(ctx context.Context, arg ListTestNotificationsParams) ([]ListTestNotificationsRow, error) {
+	rows, err := q.db.QueryContext(ctx, listTestNotifications, arg.TestID, arg.UserID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListTestNotificationsRow
+	for rows.Next() {
+		var i ListTestNotificationsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ContactMethodID,
+			&i.Channel,
+			&i.Status,
+			&i.Failure,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const lockDueMessages = `-- name: LockDueMessages :many

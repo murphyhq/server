@@ -124,6 +124,9 @@ func ResolveIncident(incident *murphy.Incident, actorID string, now *timestamppb
 }
 
 func NotificationOutcome(notification *murphy.Notification, failed bool) *Decision {
+	if notification.GetReason() == murphy.NotificationReason_NOTIFICATION_REASON_TEST {
+		return nil
+	}
 	if !failed && notification.GetReason() != murphy.NotificationReason_NOTIFICATION_REASON_PAGED {
 		return nil
 	}

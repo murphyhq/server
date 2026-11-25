@@ -84,7 +84,7 @@ func Mailpit(secret string) client.EmailProviderInput {
 func (m *Murphy) EmailThroughMailpit() {
 	m.t.Helper()
 	m.SetEmailProvider(Mailpit("env://MURPHY_SECRET_SMTP_PASSWORD"))
-	m.WaitForEmailProvider(client.Ready)
+	m.WaitForEmailProvider(client.EmailProviderStatusReady)
 }
 
 func (m *Murphy) SetEmailProvider(input client.EmailProviderInput) {

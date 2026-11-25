@@ -29,7 +29,8 @@ type HandledMessage struct {
 
 type Notification struct {
 	ID              string
-	IncidentID      string
+	Subject         string
+	SubjectID       string
 	PageID          *string
 	UserID          string
 	ContactMethodID string

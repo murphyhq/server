@@ -55,6 +55,7 @@ const (
 	Acknowledged PushInputEvent = "acknowledged"
 	Paged        PushInputEvent = "paged"
 	Resolved     PushInputEvent = "resolved"
+	Test         PushInputEvent = "test"
 )
 
 // Valid indicates whether the value is a known member of the PushInputEvent enum.
@@ -65,6 +66,8 @@ func (e PushInputEvent) Valid() bool {
 	case Paged:
 		return true
 	case Resolved:
+		return true
+	case Test:
 		return true
 	default:
 		return false
@@ -97,11 +100,14 @@ type PushStatus string
 
 // PushInput defines model for PushInput.
 type PushInput struct {
+	// Event `test` is a test page someone sent to their own phone: it carries no incident, and is delivered like a page so it sounds the same.
 	Event PushInputEvent `json:"event"`
 
 	// Id The ID of the notification this push delivers. Retries use the same ID.
-	Id         string   `json:"id"`
-	IncidentId string   `json:"incident_id"`
+	Id string `json:"id"`
+
+	// IncidentId Present for every event except `test`.
+	IncidentId *string  `json:"incident_id,omitempty"`
 	Platform   Platform `json:"platform"`
 
 	// Server The Murphy server the app should fetch the incident from.
@@ -114,7 +120,7 @@ type PushInput struct {
 	Traceparent *string `json:"traceparent,omitempty"`
 }
 
-// PushInputEvent defines model for PushInput.Event.
+// PushInputEvent `test` is a test page someone sent to their own phone: it carries no incident, and is delivered like a page so it sounds the same.
 type PushInputEvent string
 
 // SendPushJSONRequestBody defines body for SendPush for application/json ContentType.

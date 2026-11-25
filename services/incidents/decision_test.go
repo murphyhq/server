@@ -318,3 +318,10 @@ func TestEntriesWithoutPeopleKeepTheirStoredSummary(t *testing.T) {
 
 	assert.Equal(t, "Escalation is exhausted: every level and repeat was paged", incidents.Summary(exhausted, named))
 }
+
+func TestATestPageNeverReachesAnIncident(t *testing.T) {
+	test := &murphy.Notification{Id: murphy.NewID(), Reason: murphy.NotificationReason_NOTIFICATION_REASON_TEST, TestId: murphy.NewID(), Failure: "the receiver answered 503"}
+
+	assert.Nil(t, incidents.NotificationOutcome(test, false))
+	assert.Nil(t, incidents.NotificationOutcome(test, true))
+}

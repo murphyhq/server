@@ -28,12 +28,14 @@ func (p *Pushes) Send(ctx context.Context, notification *murphy.Notification) (e
 	defer span.End(&err)
 
 	body := relay.SendPushJSONRequestBody{
-		Id:         notification.GetId(),
-		Platform:   relay.Platform(notification.GetContactMethod().GetPushPlatform().Text()),
-		Token:      notification.GetContactMethod().GetAddress(),
-		Event:      eventOf(notification.GetReason()),
-		Server:     p.server,
-		IncidentId: notification.GetIncident().GetId(),
+		Id:       notification.GetId(),
+		Platform: relay.Platform(notification.GetContactMethod().GetPushPlatform().Text()),
+		Token:    notification.GetContactMethod().GetAddress(),
+		Event:    eventOf(notification.GetReason()),
+		Server:   p.server,
+	}
+	if id := notification.GetIncident().GetId(); id != "" {
+		body.IncidentId = &id
 	}
 	if traceparent := tracer.Inject(ctx)["traceparent"]; traceparent != "" {
 		body.Traceparent = &traceparent
@@ -52,6 +54,9 @@ func (p *Pushes) Send(ctx context.Context, notification *murphy.Notification) (e
 	case http.StatusUnauthorized:
 		return &notifications.RefusedError{Reason: "the push relay doesn't accept this install's key"}
 	case http.StatusBadRequest:
+		if notification.GetReason() == murphy.NotificationReason_NOTIFICATION_REASON_TEST {
+			return &notifications.RefusedError{Reason: "the push relay doesn't accept test pages yet"}
+		}
 		return &notifications.RefusedError{Reason: "the push relay refused the push"}
 	default:
 		return fmt.Errorf("the push relay answered %s", response.Status)
@@ -64,6 +69,8 @@ func eventOf(reason murphy.NotificationReason) relay.PushInputEvent {
 		return relay.Acknowledged
 	case murphy.NotificationReason_NOTIFICATION_REASON_RESOLVED:
 		return relay.Resolved
+	case murphy.NotificationReason_NOTIFICATION_REASON_TEST:
+		return relay.Test
 	default:
 		return relay.Paged
 	}

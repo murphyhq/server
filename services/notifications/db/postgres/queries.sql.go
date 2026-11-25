@@ -45,14 +45,33 @@ func (q *Queries) ClaimMessages(ctx context.Context, arg ClaimMessagesParams) er
 	return err
 }
 
+const countTestsSince = `-- name: CountTestsSince :one
+SELECT count(DISTINCT subject_id)
+FROM notifications
+WHERE user_id = $1 AND subject = 'test' AND created_at > $2
+`
+
+type CountTestsSinceParams struct {
+	UserID string
+	Since  time.Time
+}
+
+func (q *Queries) CountTestsSince(ctx context.Context, arg CountTestsSinceParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countTestsSince, arg.UserID, arg.Since)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createNotifications = `-- name: CreateNotifications :exec
-INSERT INTO notifications (id, incident_id, page_id, user_id, contact_method_id, channel, reason, status, created_at, updated_at)
-SELECT unnest($1::uuid[]), $2::uuid, $3::uuid, unnest($4::uuid[]), unnest($5::uuid[]), unnest($6::text[]), $7::text, 'created', $8::timestamptz, $8::timestamptz
+INSERT INTO notifications (id, subject, subject_id, page_id, user_id, contact_method_id, channel, reason, status, created_at, updated_at)
+SELECT unnest($1::uuid[]), $2::text, $3::uuid, $4::uuid, unnest($5::uuid[]), unnest($6::uuid[]), unnest($7::text[]), $8::text, 'created', $9::timestamptz, $9::timestamptz
 `
 
 type CreateNotificationsParams struct {
 	Ids              []string
-	IncidentID       string
+	Subject          string
+	SubjectID        string
 	PageID           *string
 	UserIds          []string
 	ContactMethodIds []string
@@ -64,7 +83,8 @@ type CreateNotificationsParams struct {
 func (q *Queries) CreateNotifications(ctx context.Context, arg CreateNotificationsParams) error {
 	_, err := q.db.Exec(ctx, createNotifications,
 		arg.Ids,
-		arg.IncidentID,
+		arg.Subject,
+		arg.SubjectID,
 		arg.PageID,
 		arg.UserIds,
 		arg.ContactMethodIds,
@@ -222,6 +242,54 @@ func (q *Queries) GetEmailProvider(ctx context.Context) (GetEmailProviderRow, er
 		&i.CheckedAt,
 	)
 	return i, err
+}
+
+const listTestNotifications = `-- name: ListTestNotifications :many
+SELECT id, contact_method_id, channel, status, failure, created_at
+FROM notifications
+WHERE subject = 'test' AND subject_id = $1 AND user_id = $2
+ORDER BY id
+`
+
+type ListTestNotificationsParams struct {
+	TestID string
+	UserID string
+}
+
+type ListTestNotificationsRow struct {
+	ID              string
+	ContactMethodID string
+	Channel         string
+	Status          string
+	Failure         *string
+	CreatedAt       time.Time
+}
+
+func (q *Queries) ListTestNotifications(ctx context.Context, arg ListTestNotificationsParams) ([]ListTestNotificationsRow, error) {
+	rows, err := q.db.Query(ctx, listTestNotifications, arg.TestID, arg.UserID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListTestNotificationsRow
+	for rows.Next() {
+		var i ListTestNotificationsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ContactMethodID,
+			&i.Channel,
+			&i.Status,
+			&i.Failure,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const lockDueMessages = `-- name: LockDueMessages :many
@@ -404,8 +472,8 @@ WITH handled AS (
   SELECT unnest($8::uuid[]), page.id, $4::uuid, unnest($9::uuid[]), unnest($10::text[]), unnest($11::uuid[]), $7::timestamptz
   FROM page
 ), created AS (
-  INSERT INTO notifications (id, incident_id, page_id, user_id, contact_method_id, channel, reason, status, created_at, updated_at)
-  SELECT unnest($12::uuid[]), $4::uuid, page.id, unnest($13::uuid[]), unnest($14::uuid[]), unnest($15::text[]), 'paged', 'created', $7::timestamptz, $7::timestamptz
+  INSERT INTO notifications (id, subject, subject_id, page_id, user_id, contact_method_id, channel, reason, status, created_at, updated_at)
+  SELECT unnest($12::uuid[]), 'incident', $4::uuid, page.id, unnest($13::uuid[]), unnest($14::uuid[]), unnest($15::text[]), 'paged', 'created', $7::timestamptz, $7::timestamptz
   FROM page
 ), scheduled AS (
   INSERT INTO scheduled_messages (id, due_at, envelope, created_at, waiting_incident_id, waiting_notification_id)

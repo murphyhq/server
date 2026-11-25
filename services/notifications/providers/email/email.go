@@ -87,6 +87,19 @@ func Message(from, to *mail.Address, notification *murphy.Notification, at time.
 	case murphy.NotificationReason_NOTIFICATION_REASON_RESOLVED:
 		subject = "[Murphy] Resolved: " + headline
 	}
+	lines := []string{
+		headline,
+		"",
+		"Status: " + incident.GetStatus().Text(),
+		"Urgency: " + incident.GetUrgency().Text(),
+	}
+	if notification.GetReason() == murphy.NotificationReason_NOTIFICATION_REASON_PAGED {
+		lines = append(lines, "", "Acknowledge it in the Murphy app to stop the escalation.")
+	}
+	if notification.GetReason() == murphy.NotificationReason_NOTIFICATION_REASON_TEST {
+		subject = "[Murphy] Test page"
+		lines = []string{"This is a test page from Murphy.", "", "If you're reading this, Murphy can reach you at this address when you're paged."}
+	}
 	_, domain, _ := strings.Cut(from.Address, "@")
 
 	var out bytes.Buffer
@@ -103,15 +116,6 @@ func Message(from, to *mail.Address, notification *murphy.Notification, at time.
 	out.WriteString("\r\n")
 
 	body := quotedprintable.NewWriter(&out)
-	lines := []string{
-		headline,
-		"",
-		"Status: " + incident.GetStatus().Text(),
-		"Urgency: " + incident.GetUrgency().Text(),
-	}
-	if notification.GetReason() == murphy.NotificationReason_NOTIFICATION_REASON_PAGED {
-		lines = append(lines, "", "Acknowledge it in the Murphy app to stop the escalation.")
-	}
 	_, _ = body.Write([]byte(strings.Join(lines, "\r\n") + "\r\n"))
 	_ = body.Close()
 	return out.Bytes()

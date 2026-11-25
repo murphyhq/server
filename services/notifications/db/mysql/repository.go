@@ -10,6 +10,7 @@ import (
 	"github.com/murphyhq/server"
 	murphymysql "github.com/murphyhq/server/internal/mysql"
 	"github.com/murphyhq/server/internal/tracer"
+	"github.com/murphyhq/server/services/notifications"
 )
 
 //go:embed migrations/*.sql
@@ -113,4 +114,40 @@ func (r *Repository) DeleteEmailProvider(ctx context.Context) (err error) {
 	defer span.End(&err)
 
 	return murphymysql.Error("email provider", r.queries.DeleteEmailProvider(ctx))
+}
+
+func (r *Repository) GetTestPage(ctx context.Context, id, userID string) (_ *notifications.TestPage, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	rows, err := r.queries.ListTestNotifications(ctx, ListTestNotificationsParams{TestID: id, UserID: userID})
+	if err != nil {
+		return nil, murphymysql.Error("test page", err)
+	}
+	if len(rows) == 0 {
+		return nil, &murphy.NotFoundError{Entity: "test page"}
+	}
+	page := &notifications.TestPage{ID: id, UserID: userID, CreatedAt: rows[0].CreatedAt}
+	for _, row := range rows {
+		status := notifications.DeliveryPending
+		if row.Status == "sent" || row.Status == "failed" {
+			status = notifications.DeliveryStatus(row.Status)
+		}
+		failure := ""
+		if row.Failure != nil {
+			failure = *row.Failure
+		}
+		page.Deliveries = append(page.Deliveries, &notifications.TestDelivery{
+			ContactMethodID: row.ContactMethodID, Channel: murphy.ContactMethodTypeFromText(row.Channel), Status: status, Failure: failure,
+		})
+	}
+	return page, nil
+}
+
+func (r *Repository) TestsSince(ctx context.Context, userID string, since time.Time) (_ int, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	count, err := r.queries.CountTestsSince(ctx, CountTestsSinceParams{UserID: userID, Since: since})
+	return int(count), murphymysql.Error("test page", err)
 }

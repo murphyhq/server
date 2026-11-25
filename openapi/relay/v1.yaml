@@ -63,7 +63,7 @@ components:
     PushInput:
       type: object
       additionalProperties: false
-      required: [id, platform, token, event, server, incident_id]
+      required: [id, platform, token, event, server]
       properties:
         id:
           type: string
@@ -75,12 +75,14 @@ components:
           description: The push token iOS or Android gave the app.
         event:
           type: string
-          enum: [paged, acknowledged, resolved]
+          enum: [paged, acknowledged, resolved, test]
+          description: "`test` is a test page someone sent to their own phone: it carries no incident, and is delivered like a page so it sounds the same."
         server:
           type: string
           description: The Murphy server the app should fetch the incident from.
         incident_id:
           type: string
+          description: Present for every event except `test`.
         traceparent:
           type: string
           description: The W3C trace context of the notification's trace. The relay sends it to the phone so the app can continue the trace.

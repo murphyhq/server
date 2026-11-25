@@ -719,6 +719,80 @@ func (_c *MockRepository_GetEmailProvider_Call) RunAndReturn(run func(ctx contex
 	return _c
 }
 
+// GetTestPage provides a mock function for the type MockRepository
+func (_mock *MockRepository) GetTestPage(ctx context.Context, id string, userID string) (*notifications.TestPage, error) {
+	ret := _mock.Called(ctx, id, userID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetTestPage")
+	}
+
+	var r0 *notifications.TestPage
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) (*notifications.TestPage, error)); ok {
+		return returnFunc(ctx, id, userID)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) *notifications.TestPage); ok {
+		r0 = returnFunc(ctx, id, userID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*notifications.TestPage)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
+		r1 = returnFunc(ctx, id, userID)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockRepository_GetTestPage_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetTestPage'
+type MockRepository_GetTestPage_Call struct {
+	*mock.Call
+}
+
+// GetTestPage is a helper method to define mock.On call
+//   - ctx context.Context
+//   - id string
+//   - userID string
+func (_e *MockRepository_Expecter) GetTestPage(ctx any, id any, userID any) *MockRepository_GetTestPage_Call {
+	return &MockRepository_GetTestPage_Call{Call: _e.mock.On("GetTestPage", ctx, id, userID)}
+}
+
+func (_c *MockRepository_GetTestPage_Call) Run(run func(ctx context.Context, id string, userID string)) *MockRepository_GetTestPage_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_GetTestPage_Call) Return(testPage *notifications.TestPage, err error) *MockRepository_GetTestPage_Call {
+	_c.Call.Return(testPage, err)
+	return _c
+}
+
+func (_c *MockRepository_GetTestPage_Call) RunAndReturn(run func(ctx context.Context, id string, userID string) (*notifications.TestPage, error)) *MockRepository_GetTestPage_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // PurgeHandledMessages provides a mock function for the type MockRepository
 func (_mock *MockRepository) PurgeHandledMessages(ctx context.Context, before time.Time) (int64, error) {
 	ret := _mock.Called(ctx, before)
@@ -1029,6 +1103,78 @@ func (_c *MockRepository_SetEmailProvider_Call) Return(err error) *MockRepositor
 }
 
 func (_c *MockRepository_SetEmailProvider_Call) RunAndReturn(run func(ctx context.Context, provider *murphy.EmailProvider) error) *MockRepository_SetEmailProvider_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// TestsSince provides a mock function for the type MockRepository
+func (_mock *MockRepository) TestsSince(ctx context.Context, userID string, since time.Time) (int, error) {
+	ret := _mock.Called(ctx, userID, since)
+
+	if len(ret) == 0 {
+		panic("no return value specified for TestsSince")
+	}
+
+	var r0 int
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, time.Time) (int, error)); ok {
+		return returnFunc(ctx, userID, since)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, time.Time) int); ok {
+		r0 = returnFunc(ctx, userID, since)
+	} else {
+		r0 = ret.Get(0).(int)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, time.Time) error); ok {
+		r1 = returnFunc(ctx, userID, since)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockRepository_TestsSince_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'TestsSince'
+type MockRepository_TestsSince_Call struct {
+	*mock.Call
+}
+
+// TestsSince is a helper method to define mock.On call
+//   - ctx context.Context
+//   - userID string
+//   - since time.Time
+func (_e *MockRepository_Expecter) TestsSince(ctx any, userID any, since any) *MockRepository_TestsSince_Call {
+	return &MockRepository_TestsSince_Call{Call: _e.mock.On("TestsSince", ctx, userID, since)}
+}
+
+func (_c *MockRepository_TestsSince_Call) Run(run func(ctx context.Context, userID string, since time.Time)) *MockRepository_TestsSince_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 time.Time
+		if args[2] != nil {
+			arg2 = args[2].(time.Time)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_TestsSince_Call) Return(n int, err error) *MockRepository_TestsSince_Call {
+	_c.Call.Return(n, err)
+	return _c
+}
+
+func (_c *MockRepository_TestsSince_Call) RunAndReturn(run func(ctx context.Context, userID string, since time.Time) (int, error)) *MockRepository_TestsSince_Call {
 	_c.Call.Return(run)
 	return _c
 }

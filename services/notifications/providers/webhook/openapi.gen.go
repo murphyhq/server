@@ -69,6 +69,7 @@ const (
 	IncidentAcknowledged WebhookType = "incident.acknowledged"
 	IncidentPaged        WebhookType = "incident.paged"
 	IncidentResolved     WebhookType = "incident.resolved"
+	TestPage             WebhookType = "test.page"
 )
 
 // Valid indicates whether the value is a known member of the WebhookType enum.
@@ -79,6 +80,8 @@ func (e WebhookType) Valid() bool {
 	case IncidentPaged:
 		return true
 	case IncidentResolved:
+		return true
+	case TestPage:
 		return true
 	default:
 		return false
@@ -103,7 +106,9 @@ type Reference struct {
 type Webhook struct {
 	Data      WebhookData `json:"data"`
 	Timestamp time.Time   `json:"timestamp"`
-	Type      WebhookType `json:"type"`
+
+	// Type `test.page` is a test someone sent to check their contact methods reach them; it carries no incident.
+	Type WebhookType `json:"type"`
 }
 
 // WebhookData defines model for WebhookData.
@@ -113,7 +118,9 @@ type WebhookData struct {
 
 	// Escalation Why this person was paged. Only on `incident.paged`.
 	Escalation *WebhookEscalation `json:"escalation,omitempty"`
-	Incident   WebhookIncident    `json:"incident"`
+
+	// Incident Present for every type except `test.page`.
+	Incident *WebhookIncident `json:"incident,omitempty"`
 
 	// User Points at another resource.
 	User Reference `json:"user"`
@@ -145,7 +152,7 @@ type WebhookIncidentStatus string
 // WebhookIncidentUrgency defines model for WebhookIncident.Urgency.
 type WebhookIncidentUrgency string
 
-// WebhookType defines model for WebhookType.
+// WebhookType `test.page` is a test someone sent to check their contact methods reach them; it carries no incident.
 type WebhookType string
 
 // WebhookID defines model for WebhookID.

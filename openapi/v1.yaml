@@ -863,6 +863,66 @@ paths:
           description: The urgency uses the default again.
         "404":
           $ref: "#/components/responses/Problem"
+  /v1/users/{id}/test-pages:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+    post:
+      operationId: sendTestPage
+      security:
+        - session: [users:only-self]
+        - sessionCookie: [users:only-self]
+      summary: Send a test page to check a person can be reached
+      description: "Sends a test to every contact method in the person's steps for high urgency, all at once rather than with their delays, or only to the one named. Sending is asynchronous: each delivery starts `pending`, and reading the test page shows whether it was sent or why it failed. A test page is on no incident. One test page per person per minute, and only the person themselves can send one, admins included."
+      tags: [people]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TestPageInput"
+      responses:
+        "202":
+          description: The test page, with every delivery pending.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TestPage"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
+        "409":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "429":
+          $ref: "#/components/responses/Problem"
+  /v1/users/{id}/test-pages/{test_page_id}:
+    parameters:
+      - $ref: "#/components/parameters/ID"
+      - name: test_page_id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      operationId: getTestPage
+      security:
+        - session: [users:only-self]
+        - sessionCookie: [users:only-self]
+      summary: See whether a test page reached each contact method
+      tags: [people]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TestPage"
+        "404":
+          $ref: "#/components/responses/Problem"
   /v1/contact-methods/{id}:
     parameters:
       - $ref: "#/components/parameters/ID"
@@ -2203,6 +2263,38 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/NotificationRule"
+    TestPageInput:
+      type: object
+      properties:
+        contact_method:
+          $ref: "#/components/schemas/Reference"
+    TestPage:
+      type: object
+      required: [id, created_at, deliveries]
+      properties:
+        id:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        deliveries:
+          type: array
+          items:
+            $ref: "#/components/schemas/TestDelivery"
+    TestDelivery:
+      type: object
+      required: [contact_method, channel, status]
+      properties:
+        contact_method:
+          $ref: "#/components/schemas/Reference"
+        channel:
+          $ref: "#/components/schemas/ContactMethodType"
+        status:
+          type: string
+          enum: [pending, sent, failed]
+        failure:
+          type: string
+          description: Why it failed, such as "Murphy has no email provider". Only when `status` is `failed`.
     ContactMethodList:
       type: object
       required: [items]

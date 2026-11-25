@@ -370,3 +370,55 @@ func TestAnInvalidEmailProviderIsRefusedAndNotKept(t *testing.T) {
 		})
 	}
 }
+
+func TestATestPageReachesEveryContactMethodOnceAndAtOnce(t *testing.T) {
+	d := newDomain(t)
+	d.repo.EXPECT().TestsSince(mock.Anything, ana, mock.Anything).Return(0, nil).Once()
+	d.delays[d.methods[ana][1].GetId()] = 2 * time.Minute
+
+	page, err := d.service.SendTestPage(t.Context(), ana, "")
+
+	require.NoError(t, err)
+	require.Len(t, page.Deliveries, 2)
+	require.Len(t, d.recorded.Notifications, 2)
+	for i, notification := range d.recorded.Notifications {
+		assert.Equal(t, murphy.NotificationReason_NOTIFICATION_REASON_TEST, notification.GetReason())
+		assert.Equal(t, page.ID, notification.GetTestId())
+		assert.Nil(t, notification.GetIncident(), "a test page is on no incident")
+		assert.Nil(t, d.recorded.Messages[i].Waiting, "nothing waits for its delay")
+		assert.WithinDuration(t, time.Now(), d.recorded.Messages[i].DueAt, time.Second)
+	}
+	assert.Equal(t, notifications.DeliveryPending, page.Deliveries[0].Status)
+}
+
+func TestATestPageCanTryOneContactMethod(t *testing.T) {
+	d := newDomain(t)
+	d.repo.EXPECT().TestsSince(mock.Anything, ana, mock.Anything).Return(0, nil).Once()
+	email := d.methods[ana][1]
+
+	page, err := d.service.SendTestPage(t.Context(), ana, email.GetId())
+
+	require.NoError(t, err)
+	require.Len(t, page.Deliveries, 1)
+	assert.Equal(t, email.GetId(), page.Deliveries[0].ContactMethodID)
+}
+
+func TestATestPageToSomeoneElsesContactMethodIsRefused(t *testing.T) {
+	d := newDomain(t)
+	d.repo.EXPECT().TestsSince(mock.Anything, ana, mock.Anything).Return(0, nil).Once()
+
+	_, err := d.service.SendTestPage(t.Context(), ana, d.methods[bo][0].GetId())
+
+	assert.ErrorIs(t, err, murphy.ErrInvalid)
+	assert.Nil(t, d.recorded, "nothing is sent")
+}
+
+func TestAnotherTestPageWithinAMinuteIsRefused(t *testing.T) {
+	d := newDomain(t)
+	d.repo.EXPECT().TestsSince(mock.Anything, ana, mock.Anything).Return(1, nil).Once()
+
+	_, err := d.service.SendTestPage(t.Context(), ana, "")
+
+	assert.ErrorIs(t, err, murphy.ErrTooManyAttempts)
+	assert.Nil(t, d.recorded)
+}
