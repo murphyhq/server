@@ -173,7 +173,7 @@ func TestEachContactMethodOfEveryoneReachedGetsANotification(t *testing.T) {
 	}
 }
 
-func TestALaterStepWaitsForItsDelayAndCanStillBeRetriedAfterTheNextLevel(t *testing.T) {
+func TestALaterStepWaitsForItsDelayAndGivesUpWhenTheNextLevelIsDue(t *testing.T) {
 	d := newDomain(t)
 	email := d.methods[ana][1]
 	d.delays[email.GetId()] = 2 * time.Minute
@@ -187,7 +187,19 @@ func TestALaterStepWaitsForItsDelayAndCanStillBeRetriedAfterTheNextLevel(t *test
 	assert.WithinDuration(t, time.Now().Add(2*time.Minute), later.DueAt, time.Second)
 	require.NotNil(t, later.Waiting, "a step that waits can be cancelled")
 	assert.Equal(t, email.GetId(), later.Waiting.GetContactMethod().GetId())
-	assert.WithinDuration(t, time.Now().Add(7*time.Minute), later.Waiting.GetDeadline().AsTime(), time.Second, "retried for 5 minutes from when it's due, past the next level")
+	assert.WithinDuration(t, time.Now().Add(5*time.Minute), later.Waiting.GetDeadline().AsTime(), time.Second, "retried until the next level, like the rest of the page")
+}
+
+func TestAStepDueAfterTheNextLevelStillGetsItsTurn(t *testing.T) {
+	d := newDomain(t)
+	email := d.methods[ana][1]
+	d.delays[email.GetId()] = 6 * time.Minute
+
+	require.NoError(t, d.service.IncidentEscalated(t.Context(), "message-1", d.escalated(1)))
+
+	later := d.recorded.Messages[2].Waiting
+	require.NotNil(t, later)
+	assert.WithinDuration(t, time.Now().Add(11*time.Minute), later.GetDeadline().AsTime(), time.Second, "retried for 5 minutes from when it's due")
 }
 
 func TestAcknowledgingStopsTheStepsStillWaiting(t *testing.T) {

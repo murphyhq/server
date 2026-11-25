@@ -116,8 +116,8 @@ func (s *Service) IncidentEscalated(ctx context.Context, messageID string, incid
 		for _, step := range steps {
 			due := now.AsTime().Add(step.GetDelay().AsDuration())
 			deadline := nextLevelDue
-			if late := due.Add(FollowUpDeadline); late.After(deadline.AsTime()) {
-				deadline = timestamppb.New(late)
+			if !due.Before(nextLevelDue.AsTime()) {
+				deadline = timestamppb.New(due.Add(FollowUpDeadline))
 			}
 			notification := newNotification(incident, murphy.NotificationReason_NOTIFICATION_REASON_PAGED, step.GetContactMethod(), now, deadline)
 			notification.PageId, notification.Via, notification.DueAt = page.GetId(), recipient.GetVia(), timestamppb.New(due)

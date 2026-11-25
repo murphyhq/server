@@ -71,6 +71,7 @@ type userSpec struct {
 	phones   []string
 
 	withoutEmail bool
+	atOnce       bool
 }
 
 func Deactivated() UserOption {
@@ -82,6 +83,10 @@ func Deactivated() UserOption {
 
 func WithWebhook(options ...WebhookOption) UserOption {
 	return func(s *userSpec) { s.webhooks = append(s.webhooks, options) }
+}
+
+func ReachedAtOnce() UserOption {
+	return func(s *userSpec) { s.atOnce = true }
 }
 
 func WithoutEmail() UserOption {
@@ -129,6 +134,9 @@ func (m *Murphy) User(options ...UserOption) *User {
 		m.created(added, err, "add a phone")
 		user.phones = append(user.phones, &Phone{Token: added.JSON201.Address, receiver: m.Receiver()})
 	}
+	if spec.atOnce {
+		user.reachAtOnce()
+	}
 	return user
 }
 
@@ -139,6 +147,18 @@ func (u *User) removeContactMethods() {
 	for _, method := range methods.JSON200.Items {
 		removed, err := u.m.API.DeleteContactMethodWithResponse(u.m.t.Context(), method.Id)
 		u.m.expect(removed, err, http.StatusNoContent, "remove a contact method")
+	}
+}
+
+func (u *User) reachAtOnce() {
+	u.m.t.Helper()
+	var steps []client.NotificationStep
+	for _, method := range u.ContactMethods() {
+		steps = append(steps, client.NotificationStep{ContactMethod: client.Reference{Id: method.Id}})
+	}
+	for _, urgency := range []client.Urgency{client.High, client.Low} {
+		set, err := u.m.API.SetNotificationRuleWithResponse(u.m.t.Context(), u.ID, urgency, client.NotificationRuleInput{Steps: steps})
+		u.m.ok(set, err, "reach someone on every contact method at once")
 	}
 }
 

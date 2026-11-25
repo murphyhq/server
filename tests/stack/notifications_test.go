@@ -18,7 +18,7 @@ import (
 
 func TestAPageReachesEveryContactMethodOfEveryonePaged(t *testing.T) {
 	m := murphytest.New(t)
-	ana := m.User(murphytest.WithWebhook(), murphytest.WithPhone())
+	ana := m.User(murphytest.WithWebhook(), murphytest.WithPhone(), murphytest.ReachedAtOnce())
 	service := m.Service(murphytest.Pages(ana.Target()))
 
 	incident := service.Fire("disk-full")
