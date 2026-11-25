@@ -42,19 +42,17 @@ type IncidentResponders interface {
 }
 
 type rule struct {
-	adminOnly   bool
-	anyone      bool
-	bindsAdmins bool
-	check       func(a *access, ctx context.Context, c caller, id string) error
-	owner       func(a *access, ctx context.Context, id string) ([]string, error)
-	covers      bool
+	adminOnly bool
+	anyone    bool
+	check     func(a *access, ctx context.Context, c caller, id string) error
+	owner     func(a *access, ctx context.Context, id string) ([]string, error)
+	covers    bool
 }
 
 var rules = map[string]rule{
 	"sessions:own":        {anyone: true},
 	"install:manage":      {adminOnly: true},
 	"users:self":          {check: (*access).isSelf},
-	"users:only-self":     {check: (*access).isOnlySelf, bindsAdmins: true},
 	"contact-methods:own": {check: (*access).ownsContactMethod},
 	"incidents:respond":   {check: (*access).respondsTo},
 	"teams:manage":        {owner: (*access).theTeam},
@@ -95,8 +93,8 @@ func requireAccess(a *access) MiddlewareFunc {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			current := sessionFrom(r.Context())
-			grants := a.grantsFor(current, r.Pattern)
-			if len(grants) == 0 {
+			grants := a.grants[r.Pattern]
+			if current == nil || len(grants) == 0 || current.role == murphy.UserRole_USER_ROLE_ADMIN {
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -118,17 +116,6 @@ func requireAccess(a *access) MiddlewareFunc {
 			}
 			next.ServeHTTP(w, r)
 		})
-	}
-}
-
-func (a *access) grantsFor(current *currentSession, pattern string) []grant {
-	switch {
-	case current == nil:
-		return nil
-	case current.role == murphy.UserRole_USER_ROLE_ADMIN:
-		return slices.DeleteFunc(slices.Clone(a.grants[pattern]), func(g grant) bool { return !rules[g.scope].bindsAdmins })
-	default:
-		return a.grants[pattern]
 	}
 }
 
@@ -162,13 +149,6 @@ func (a *access) isSelf(_ context.Context, c caller, id string) error {
 		return nil
 	}
 	return &murphy.ForbiddenError{Reason: "only admins can do this for someone else"}
-}
-
-func (a *access) isOnlySelf(_ context.Context, c caller, id string) error {
-	if id == c.id {
-		return nil
-	}
-	return &murphy.ForbiddenError{Reason: "only the person themselves can do this"}
 }
 
 func (a *access) ownsContactMethod(ctx context.Context, c caller, id string) error {

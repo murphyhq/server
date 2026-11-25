@@ -392,17 +392,17 @@ func TestATestPageShowsWhetherEachContactMethodWasReached(t *testing.T) {
 	m.EmailThroughMailpit()
 	bo := m.Member(murphytest.Bo)
 
-	sent, err := bo.API.SendTestPageWithResponse(t.Context(), bo.ID, nil, client.TestPageInput{})
+	sent, err := bo.API.SendTestPageWithResponse(t.Context(), nil, client.TestPageInput{})
 	require.NoError(t, err)
 	require.Equal(t, http.StatusAccepted, sent.StatusCode())
 	page := bo.WaitForTestPage(sent.JSON202.Id)
-	again, err := bo.API.SendTestPageWithResponse(t.Context(), bo.ID, nil, client.TestPageInput{})
+	again, err := bo.API.SendTestPageWithResponse(t.Context(), nil, client.TestPageInput{})
 	require.NoError(t, err)
-	forBo, err := m.API.SendTestPageWithResponse(t.Context(), bo.ID, nil, client.TestPageInput{})
+	someoneElses, err := m.API.GetTestPageWithResponse(t.Context(), sent.JSON202.Id)
 	require.NoError(t, err)
 
 	assert.Equal(t, client.TestDeliveryStatusSent, murphytest.DeliveriesByChannel(page)[client.Email], "everyone has their email")
 	assert.Empty(t, murphytest.Failures(page))
 	assert.Equal(t, http.StatusTooManyRequests, again.StatusCode(), "one test page a minute")
-	assert.Equal(t, http.StatusForbidden, forBo.StatusCode(), "nobody pages someone else, admins included")
+	assert.Equal(t, http.StatusNotFound, someoneElses.StatusCode(), "a test page is only its sender's, admins included")
 }

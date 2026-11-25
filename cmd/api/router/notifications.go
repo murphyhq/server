@@ -65,7 +65,7 @@ func (s *Server) SendTestPage(ctx context.Context, request SendTestPageRequestOb
 	if request.Body != nil && request.Body.ContactMethod != nil {
 		contactMethod = request.Body.ContactMethod.Id
 	}
-	page, err := s.notifications.SendTestPage(ctx, request.Id, contactMethod)
+	page, err := s.notifications.SendTestPage(ctx, sessionFrom(ctx).session.GetUserId(), contactMethod)
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +76,7 @@ func (s *Server) GetTestPage(ctx context.Context, request GetTestPageRequestObje
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
-	page, err := s.notifications.TestPage(ctx, request.Id, request.TestPageId)
+	page, err := s.notifications.TestPage(ctx, sessionFrom(ctx).session.GetUserId(), request.Id)
 	if err != nil {
 		return nil, err
 	}

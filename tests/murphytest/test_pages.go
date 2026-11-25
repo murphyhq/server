@@ -11,7 +11,7 @@ func (m *Member) WaitForTestPage(id string) client.TestPage {
 	m.m.t.Helper()
 	var last client.TestPage
 	require.EventuallyWithT(m.m.t, func(c *assert.CollectT) {
-		got, err := m.API.GetTestPageWithResponse(m.m.t.Context(), m.ID, id)
+		got, err := m.API.GetTestPageWithResponse(m.m.t.Context(), id)
 		if !assert.NoError(c, err) || !assert.NotNil(c, got.JSON200) {
 			return
 		}

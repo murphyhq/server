@@ -180,19 +180,6 @@ func TestAdminsPassWithoutLookingAnythingUp(t *testing.T) {
 	assert.Equal(t, http.StatusNoContent, got)
 }
 
-func TestOnlyYouCanSendYourselfATestPageEvenAsAnAdmin(t *testing.T) {
-	i := newInstall(t)
-	admin := call{role: murphy.UserRole_USER_ROLE_ADMIN, userID: "ana", signed: true}
-
-	yourself := i.send(t, admin.to(http.MethodPost, "/v1/users/{id}/test-pages", "/v1/users/ana/test-pages"))
-	someoneElse := i.send(t, admin.to(http.MethodPost, "/v1/users/{id}/test-pages", "/v1/users/bo/test-pages"))
-	reading := i.send(t, admin.to(http.MethodGet, "/v1/users/{id}/test-pages/{test_page_id}", "/v1/users/bo/test-pages/a-test"))
-
-	assert.Equal(t, http.StatusNoContent, yourself)
-	assert.Equal(t, http.StatusForbidden, someoneElse)
-	assert.Equal(t, http.StatusForbidden, reading)
-}
-
 func TestAMemberAllowedReachesTheHandler(t *testing.T) {
 	i := newInstall(t)
 	bo := i.member("bo", payments, murphy.TeamRole_TEAM_ROLE_MANAGER)

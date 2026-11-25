@@ -863,16 +863,14 @@ paths:
           description: The urgency uses the default again.
         "404":
           $ref: "#/components/responses/Problem"
-  /v1/users/{id}/test-pages:
-    parameters:
-      - $ref: "#/components/parameters/ID"
+  /v1/test-pages:
     post:
       operationId: sendTestPage
       security:
-        - session: [users:only-self]
-        - sessionCookie: [users:only-self]
-      summary: Send a test page to check a person can be reached
-      description: "Sends a test to every contact method in the person's steps for high urgency, all at once rather than with their delays, or only to the one named. Sending is asynchronous: each delivery starts `pending`, and reading the test page shows whether it was sent or why it failed. A test page is on no incident. One test page per person per minute, and only the person themselves can send one, admins included."
+        - session: [sessions:own]
+        - sessionCookie: [sessions:own]
+      summary: Send yourself a test page, to check you can be reached
+      description: "Sends a test to every contact method in your steps for high urgency, all at once rather than with their delays, or only to the one named. Sending is asynchronous: each delivery starts `pending`, and reading the test page shows whether it was sent or why it failed. A test page is on no incident, and only ever goes to the person who signed in. One test page per person per minute."
       tags: [people]
       parameters:
         - $ref: "#/components/parameters/IdempotencyKey"
@@ -891,28 +889,22 @@ paths:
                 $ref: "#/components/schemas/TestPage"
         "400":
           $ref: "#/components/responses/Problem"
-        "404":
-          $ref: "#/components/responses/Problem"
         "409":
           $ref: "#/components/responses/Problem"
         "422":
           $ref: "#/components/responses/Problem"
         "429":
           $ref: "#/components/responses/Problem"
-  /v1/users/{id}/test-pages/{test_page_id}:
+  /v1/test-pages/{id}:
     parameters:
       - $ref: "#/components/parameters/ID"
-      - name: test_page_id
-        in: path
-        required: true
-        schema:
-          type: string
     get:
       operationId: getTestPage
       security:
-        - session: [users:only-self]
-        - sessionCookie: [users:only-self]
-      summary: See whether a test page reached each contact method
+        - session: [sessions:own]
+        - sessionCookie: [sessions:own]
+      summary: See whether your test page reached each contact method
+      description: Only your own test pages; anyone else's is not found.
       tags: [people]
       responses:
         "200":

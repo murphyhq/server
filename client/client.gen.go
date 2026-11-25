@@ -1349,6 +1349,12 @@ type CreateTeamParams struct {
 	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
 
+// SendTestPageParams defines parameters for SendTestPage.
+type SendTestPageParams struct {
+	// IdempotencyKey Makes retries safe. A retry with the same key and request returns the original response for 24 hours; the same key with a different request is rejected with 422, and a retry while the first request is still running gets 409.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
 // ListUsersParams defines parameters for ListUsers.
 type ListUsersParams struct {
 	// Limit Items per page, 50 by default and at most 100.
@@ -1366,12 +1372,6 @@ type CreateUserParams struct {
 
 // CreateContactMethodParams defines parameters for CreateContactMethod.
 type CreateContactMethodParams struct {
-	// IdempotencyKey Makes retries safe. A retry with the same key and request returns the original response for 24 hours; the same key with a different request is rejected with 422, and a retry while the first request is still running gets 409.
-	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
-}
-
-// SendTestPageParams defines parameters for SendTestPage.
-type SendTestPageParams struct {
 	// IdempotencyKey Makes retries safe. A retry with the same key and request returns the original response for 24 hours; the same key with a different request is rejected with 422, and a retry while the first request is still running gets 409.
 	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
@@ -1424,6 +1424,9 @@ type UpdateTeamJSONRequestBody = TeamInput
 // SetTeamMemberJSONRequestBody defines body for SetTeamMember for application/json ContentType.
 type SetTeamMemberJSONRequestBody = TeamMemberInput
 
+// SendTestPageJSONRequestBody defines body for SendTestPage for application/json ContentType.
+type SendTestPageJSONRequestBody = TestPageInput
+
 // CreateUserJSONRequestBody defines body for CreateUser for application/json ContentType.
 type CreateUserJSONRequestBody = UserInput
 
@@ -1435,9 +1438,6 @@ type CreateContactMethodJSONRequestBody = ContactMethodInput
 
 // SetNotificationRuleJSONRequestBody defines body for SetNotificationRule for application/json ContentType.
 type SetNotificationRuleJSONRequestBody = NotificationRuleInput
-
-// SendTestPageJSONRequestBody defines body for SendTestPage for application/json ContentType.
-type SendTestPageJSONRequestBody = TestPageInput
 
 // RequestEditorFn is the function signature for the RequestEditor callback function
 type RequestEditorFn func(ctx context.Context, req *http.Request) error
@@ -1981,6 +1981,31 @@ type ClientInterface interface {
 	// Corresponds with PUT /v1/teams/{id}/members/{user_id} (the `SetTeamMember` operationId).
 	SetTeamMember(ctx context.Context, id ID, userId string, body SetTeamMemberJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// SendTestPageWithBody Send yourself a test page, to check you can be reached
+	//
+	// Sends a test to every contact method in your steps for high urgency, all at once rather than with their delays, or only to the one named. Sending is asynchronous: each delivery starts `pending`, and reading the test page shows whether it was sent or why it failed. A test page is on no incident, and only ever goes to the person who signed in. One test page per person per minute.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /v1/test-pages (the `SendTestPage` operationId).
+	SendTestPageWithBody(ctx context.Context, params *SendTestPageParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SendTestPage Send yourself a test page, to check you can be reached
+	//
+	// Sends a test to every contact method in your steps for high urgency, all at once rather than with their delays, or only to the one named. Sending is asynchronous: each delivery starts `pending`, and reading the test page shows whether it was sent or why it failed. A test page is on no incident, and only ever goes to the person who signed in. One test page per person per minute.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /v1/test-pages (the `SendTestPage` operationId).
+	SendTestPage(ctx context.Context, params *SendTestPageParams, body SendTestPageJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetTestPage See whether your test page reached each contact method
+	//
+	// Only your own test pages; anyone else's is not found.
+	//
+	// Corresponds with GET /v1/test-pages/{id} (the `GetTestPage` operationId).
+	GetTestPage(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListUsers List users
 	//
 	// Corresponds with GET /v1/users (the `ListUsers` operationId).
@@ -2091,29 +2116,6 @@ type ClientInterface interface {
 	//
 	// Corresponds with DELETE /v1/users/{id}/sessions (the `EndUserSessions` operationId).
 	EndUserSessions(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// SendTestPageWithBody Send a test page to check a person can be reached
-	//
-	// Sends a test to every contact method in the person's steps for high urgency, all at once rather than with their delays, or only to the one named. Sending is asynchronous: each delivery starts `pending`, and reading the test page shows whether it was sent or why it failed. A test page is on no incident. One test page per person per minute, and only the person themselves can send one, admins included.
-	//
-	// Takes any type of body and a specified content type.
-	//
-	// Corresponds with POST /v1/users/{id}/test-pages (the `SendTestPage` operationId).
-	SendTestPageWithBody(ctx context.Context, id ID, params *SendTestPageParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// SendTestPage Send a test page to check a person can be reached
-	//
-	// Sends a test to every contact method in the person's steps for high urgency, all at once rather than with their delays, or only to the one named. Sending is asynchronous: each delivery starts `pending`, and reading the test page shows whether it was sent or why it failed. A test page is on no incident. One test page per person per minute, and only the person themselves can send one, admins included.
-	//
-	// Takes a body of the `application/json` content type.
-	//
-	// Corresponds with POST /v1/users/{id}/test-pages (the `SendTestPage` operationId).
-	SendTestPage(ctx context.Context, id ID, params *SendTestPageParams, body SendTestPageJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// GetTestPage See whether a test page reached each contact method
-	//
-	// Corresponds with GET /v1/users/{id}/test-pages/{test_page_id} (the `GetTestPage` operationId).
-	GetTestPage(ctx context.Context, id ID, testPageId string, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
 // FinishSignIn Finish signing in
@@ -3304,6 +3306,61 @@ func (c *Client) SetTeamMember(ctx context.Context, id ID, userId string, body S
 	return c.Client.Do(req)
 }
 
+// SendTestPageWithBody Send yourself a test page, to check you can be reached
+//
+// Sends a test to every contact method in your steps for high urgency, all at once rather than with their delays, or only to the one named. Sending is asynchronous: each delivery starts `pending`, and reading the test page shows whether it was sent or why it failed. A test page is on no incident, and only ever goes to the person who signed in. One test page per person per minute.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /v1/test-pages (the `SendTestPage` operationId).
+func (c *Client) SendTestPageWithBody(ctx context.Context, params *SendTestPageParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSendTestPageRequestWithBody(c.Server, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SendTestPage Send yourself a test page, to check you can be reached
+//
+// Sends a test to every contact method in your steps for high urgency, all at once rather than with their delays, or only to the one named. Sending is asynchronous: each delivery starts `pending`, and reading the test page shows whether it was sent or why it failed. A test page is on no incident, and only ever goes to the person who signed in. One test page per person per minute.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /v1/test-pages (the `SendTestPage` operationId).
+func (c *Client) SendTestPage(ctx context.Context, params *SendTestPageParams, body SendTestPageJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSendTestPageRequest(c.Server, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetTestPage See whether your test page reached each contact method
+//
+// Only your own test pages; anyone else's is not found.
+//
+// Corresponds with GET /v1/test-pages/{id} (the `GetTestPage` operationId).
+func (c *Client) GetTestPage(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetTestPageRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // ListUsers List users
 //
 // Corresponds with GET /v1/users (the `ListUsers` operationId).
@@ -3575,59 +3632,6 @@ func (c *Client) CreatePasswordLink(ctx context.Context, id ID, reqEditors ...Re
 // Corresponds with DELETE /v1/users/{id}/sessions (the `EndUserSessions` operationId).
 func (c *Client) EndUserSessions(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewEndUserSessionsRequest(c.Server, id)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// SendTestPageWithBody Send a test page to check a person can be reached
-//
-// Sends a test to every contact method in the person's steps for high urgency, all at once rather than with their delays, or only to the one named. Sending is asynchronous: each delivery starts `pending`, and reading the test page shows whether it was sent or why it failed. A test page is on no incident. One test page per person per minute, and only the person themselves can send one, admins included.
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with POST /v1/users/{id}/test-pages (the `SendTestPage` operationId).
-func (c *Client) SendTestPageWithBody(ctx context.Context, id ID, params *SendTestPageParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewSendTestPageRequestWithBody(c.Server, id, params, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// SendTestPage Send a test page to check a person can be reached
-//
-// Sends a test to every contact method in the person's steps for high urgency, all at once rather than with their delays, or only to the one named. Sending is asynchronous: each delivery starts `pending`, and reading the test page shows whether it was sent or why it failed. A test page is on no incident. One test page per person per minute, and only the person themselves can send one, admins included.
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with POST /v1/users/{id}/test-pages (the `SendTestPage` operationId).
-func (c *Client) SendTestPage(ctx context.Context, id ID, params *SendTestPageParams, body SendTestPageJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewSendTestPageRequest(c.Server, id, params, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// GetTestPage See whether a test page reached each contact method
-//
-// Corresponds with GET /v1/users/{id}/test-pages/{test_page_id} (the `GetTestPage` operationId).
-func (c *Client) GetTestPage(ctx context.Context, id ID, testPageId string, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetTestPageRequest(c.Server, id, testPageId)
 	if err != nil {
 		return nil, err
 	}
@@ -6377,6 +6381,95 @@ func NewSetTeamMemberRequestWithBody(server string, id ID, userId string, conten
 	return req, nil
 }
 
+// NewSendTestPageRequest calls the generic SendTestPage builder with application/json body
+func NewSendTestPageRequest(server string, params *SendTestPageParams, body SendTestPageJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewSendTestPageRequestWithBody(server, params, "application/json", bodyReader)
+}
+
+// NewSendTestPageRequestWithBody constructs an http.Request for the SendTestPage method, with any body, and a specified content type
+func NewSendTestPageRequestWithBody(server string, params *SendTestPageParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/test-pages")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IdempotencyKey != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("Idempotency-Key", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewGetTestPageRequest constructs an http.Request for the GetTestPage method
+func NewGetTestPageRequest(server string, id ID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/test-pages/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewListUsersRequest constructs an http.Request for the ListUsers method
 func NewListUsersRequest(server string, params *ListUsersParams) (*http.Request, error) {
 	var err error
@@ -6933,109 +7026,6 @@ func NewEndUserSessionsRequest(server string, id ID) (*http.Request, error) {
 	}
 
 	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewSendTestPageRequest calls the generic SendTestPage builder with application/json body
-func NewSendTestPageRequest(server string, id ID, params *SendTestPageParams, body SendTestPageJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewSendTestPageRequestWithBody(server, id, params, "application/json", bodyReader)
-}
-
-// NewSendTestPageRequestWithBody constructs an http.Request for the SendTestPage method, with any body, and a specified content type
-func NewSendTestPageRequestWithBody(server string, id ID, params *SendTestPageParams, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/v1/users/%s/test-pages", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	if params != nil {
-
-		if params.IdempotencyKey != nil {
-			var headerParam0 string
-
-			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", *params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
-			if err != nil {
-				return nil, err
-			}
-
-			req.Header.Set("Idempotency-Key", headerParam0)
-		}
-
-	}
-
-	return req, nil
-}
-
-// NewGetTestPageRequest constructs an http.Request for the GetTestPage method
-func NewGetTestPageRequest(server string, id ID, testPageId string) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
-	if err != nil {
-		return nil, err
-	}
-
-	var pathParam1 string
-
-	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "test_page_id", testPageId, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/v1/users/%s/test-pages/%s", pathParam0, pathParam1)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -7635,6 +7625,33 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with PUT /v1/teams/{id}/members/{user_id} (the `SetTeamMember` operationId).
 	SetTeamMemberWithResponse(ctx context.Context, id ID, userId string, body SetTeamMemberJSONRequestBody, reqEditors ...RequestEditorFn) (*SetTeamMemberResponse, error)
 
+	// SendTestPageWithBodyWithResponse Send yourself a test page, to check you can be reached
+	//
+	// Sends a test to every contact method in your steps for high urgency, all at once rather than with their delays, or only to the one named. Sending is asynchronous: each delivery starts `pending`, and reading the test page shows whether it was sent or why it failed. A test page is on no incident, and only ever goes to the person who signed in. One test page per person per minute.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /v1/test-pages (the `SendTestPage` operationId).
+	SendTestPageWithBodyWithResponse(ctx context.Context, params *SendTestPageParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SendTestPageResponse, error)
+
+	// SendTestPageWithResponse Send yourself a test page, to check you can be reached
+	//
+	// Sends a test to every contact method in your steps for high urgency, all at once rather than with their delays, or only to the one named. Sending is asynchronous: each delivery starts `pending`, and reading the test page shows whether it was sent or why it failed. A test page is on no incident, and only ever goes to the person who signed in. One test page per person per minute.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /v1/test-pages (the `SendTestPage` operationId).
+	SendTestPageWithResponse(ctx context.Context, params *SendTestPageParams, body SendTestPageJSONRequestBody, reqEditors ...RequestEditorFn) (*SendTestPageResponse, error)
+
+	// GetTestPageWithResponse See whether your test page reached each contact method
+	//
+	// Only your own test pages; anyone else's is not found.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /v1/test-pages/{id} (the `GetTestPage` operationId).
+	GetTestPageWithResponse(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*GetTestPageResponse, error)
+
 	// ListUsersWithResponse List users
 	//
 	// Returns a wrapper object for the known response body format(s).
@@ -7763,31 +7780,6 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with DELETE /v1/users/{id}/sessions (the `EndUserSessions` operationId).
 	EndUserSessionsWithResponse(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*EndUserSessionsResponse, error)
-
-	// SendTestPageWithBodyWithResponse Send a test page to check a person can be reached
-	//
-	// Sends a test to every contact method in the person's steps for high urgency, all at once rather than with their delays, or only to the one named. Sending is asynchronous: each delivery starts `pending`, and reading the test page shows whether it was sent or why it failed. A test page is on no incident. One test page per person per minute, and only the person themselves can send one, admins included.
-	//
-	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
-	//
-	// Corresponds with POST /v1/users/{id}/test-pages (the `SendTestPage` operationId).
-	SendTestPageWithBodyWithResponse(ctx context.Context, id ID, params *SendTestPageParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SendTestPageResponse, error)
-
-	// SendTestPageWithResponse Send a test page to check a person can be reached
-	//
-	// Sends a test to every contact method in the person's steps for high urgency, all at once rather than with their delays, or only to the one named. Sending is asynchronous: each delivery starts `pending`, and reading the test page shows whether it was sent or why it failed. A test page is on no incident. One test page per person per minute, and only the person themselves can send one, admins included.
-	//
-	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
-	//
-	// Corresponds with POST /v1/users/{id}/test-pages (the `SendTestPage` operationId).
-	SendTestPageWithResponse(ctx context.Context, id ID, params *SendTestPageParams, body SendTestPageJSONRequestBody, reqEditors ...RequestEditorFn) (*SendTestPageResponse, error)
-
-	// GetTestPageWithResponse See whether a test page reached each contact method
-	//
-	// Returns a wrapper object for the known response body format(s).
-	//
-	// Corresponds with GET /v1/users/{id}/test-pages/{test_page_id} (the `GetTestPage` operationId).
-	GetTestPageWithResponse(ctx context.Context, id ID, testPageId string, reqEditors ...RequestEditorFn) (*GetTestPageResponse, error)
 }
 
 // FinishSignInResponse200Headers the declared response headers of an HTTP 200 response for FinishSignIn
@@ -10620,6 +10612,123 @@ func (r SetTeamMemberResponse) ContentType() string {
 	return ""
 }
 
+type SendTestPageResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON202 the response for an HTTP 202 `application/json` response
+	JSON202 *TestPage
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *Problem
+	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
+	ApplicationproblemJSON409 *Problem
+	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
+	ApplicationproblemJSON422 *Problem
+	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
+	ApplicationproblemJSON429 *Problem
+}
+
+// GetJSON202 returns the response for an HTTP 202 `application/json` response
+func (r SendTestPageResponse) GetJSON202() *TestPage {
+	return r.JSON202
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r SendTestPageResponse) GetApplicationproblemJSON400() *Problem {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
+func (r SendTestPageResponse) GetApplicationproblemJSON409() *Problem {
+	return r.ApplicationproblemJSON409
+}
+
+// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
+func (r SendTestPageResponse) GetApplicationproblemJSON422() *Problem {
+	return r.ApplicationproblemJSON422
+}
+
+// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
+func (r SendTestPageResponse) GetApplicationproblemJSON429() *Problem {
+	return r.ApplicationproblemJSON429
+}
+
+// GetBody returns the raw response body bytes
+func (r SendTestPageResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r SendTestPageResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r SendTestPageResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r SendTestPageResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetTestPageResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *TestPage
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *Problem
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetTestPageResponse) GetJSON200() *TestPage {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r GetTestPageResponse) GetApplicationproblemJSON404() *Problem {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r GetTestPageResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetTestPageResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetTestPageResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetTestPageResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type ListUsersResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -11280,130 +11389,6 @@ func (r EndUserSessionsResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r EndUserSessionsResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-type SendTestPageResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	// JSON202 the response for an HTTP 202 `application/json` response
-	JSON202 *TestPage
-	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
-	ApplicationproblemJSON400 *Problem
-	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
-	ApplicationproblemJSON404 *Problem
-	// ApplicationproblemJSON409 the response for an HTTP 409 `application/problem+json` response
-	ApplicationproblemJSON409 *Problem
-	// ApplicationproblemJSON422 the response for an HTTP 422 `application/problem+json` response
-	ApplicationproblemJSON422 *Problem
-	// ApplicationproblemJSON429 the response for an HTTP 429 `application/problem+json` response
-	ApplicationproblemJSON429 *Problem
-}
-
-// GetJSON202 returns the response for an HTTP 202 `application/json` response
-func (r SendTestPageResponse) GetJSON202() *TestPage {
-	return r.JSON202
-}
-
-// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
-func (r SendTestPageResponse) GetApplicationproblemJSON400() *Problem {
-	return r.ApplicationproblemJSON400
-}
-
-// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
-func (r SendTestPageResponse) GetApplicationproblemJSON404() *Problem {
-	return r.ApplicationproblemJSON404
-}
-
-// GetApplicationproblemJSON409 returns the response for an HTTP 409 `application/problem+json` response
-func (r SendTestPageResponse) GetApplicationproblemJSON409() *Problem {
-	return r.ApplicationproblemJSON409
-}
-
-// GetApplicationproblemJSON422 returns the response for an HTTP 422 `application/problem+json` response
-func (r SendTestPageResponse) GetApplicationproblemJSON422() *Problem {
-	return r.ApplicationproblemJSON422
-}
-
-// GetApplicationproblemJSON429 returns the response for an HTTP 429 `application/problem+json` response
-func (r SendTestPageResponse) GetApplicationproblemJSON429() *Problem {
-	return r.ApplicationproblemJSON429
-}
-
-// GetBody returns the raw response body bytes
-func (r SendTestPageResponse) GetBody() []byte {
-	return r.Body
-}
-
-// Status returns HTTPResponse.Status
-func (r SendTestPageResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r SendTestPageResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r SendTestPageResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-type GetTestPageResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *TestPage
-	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
-	ApplicationproblemJSON404 *Problem
-}
-
-// GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r GetTestPageResponse) GetJSON200() *TestPage {
-	return r.JSON200
-}
-
-// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
-func (r GetTestPageResponse) GetApplicationproblemJSON404() *Problem {
-	return r.ApplicationproblemJSON404
-}
-
-// GetBody returns the raw response body bytes
-func (r GetTestPageResponse) GetBody() []byte {
-	return r.Body
-}
-
-// Status returns HTTPResponse.Status
-func (r GetTestPageResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r GetTestPageResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r GetTestPageResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -12390,6 +12375,51 @@ func (c *ClientWithResponses) SetTeamMemberWithResponse(ctx context.Context, id 
 	return ParseSetTeamMemberResponse(rsp)
 }
 
+// SendTestPageWithBodyWithResponse Send yourself a test page, to check you can be reached
+//
+// Sends a test to every contact method in your steps for high urgency, all at once rather than with their delays, or only to the one named. Sending is asynchronous: each delivery starts `pending`, and reading the test page shows whether it was sent or why it failed. A test page is on no incident, and only ever goes to the person who signed in. One test page per person per minute.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /v1/test-pages (the `SendTestPage` operationId).
+func (c *ClientWithResponses) SendTestPageWithBodyWithResponse(ctx context.Context, params *SendTestPageParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SendTestPageResponse, error) {
+	rsp, err := c.SendTestPageWithBody(ctx, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSendTestPageResponse(rsp)
+}
+
+// SendTestPageWithResponse Send yourself a test page, to check you can be reached
+//
+// Sends a test to every contact method in your steps for high urgency, all at once rather than with their delays, or only to the one named. Sending is asynchronous: each delivery starts `pending`, and reading the test page shows whether it was sent or why it failed. A test page is on no incident, and only ever goes to the person who signed in. One test page per person per minute.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /v1/test-pages (the `SendTestPage` operationId).
+func (c *ClientWithResponses) SendTestPageWithResponse(ctx context.Context, params *SendTestPageParams, body SendTestPageJSONRequestBody, reqEditors ...RequestEditorFn) (*SendTestPageResponse, error) {
+	rsp, err := c.SendTestPage(ctx, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSendTestPageResponse(rsp)
+}
+
+// GetTestPageWithResponse See whether your test page reached each contact method
+//
+// Only your own test pages; anyone else's is not found.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /v1/test-pages/{id} (the `GetTestPage` operationId).
+func (c *ClientWithResponses) GetTestPageWithResponse(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*GetTestPageResponse, error) {
+	rsp, err := c.GetTestPage(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetTestPageResponse(rsp)
+}
+
 // ListUsersWithResponse List users
 //
 // Returns a wrapper object for the known response body format(s).
@@ -12619,49 +12649,6 @@ func (c *ClientWithResponses) EndUserSessionsWithResponse(ctx context.Context, i
 		return nil, err
 	}
 	return ParseEndUserSessionsResponse(rsp)
-}
-
-// SendTestPageWithBodyWithResponse Send a test page to check a person can be reached
-//
-// Sends a test to every contact method in the person's steps for high urgency, all at once rather than with their delays, or only to the one named. Sending is asynchronous: each delivery starts `pending`, and reading the test page shows whether it was sent or why it failed. A test page is on no incident. One test page per person per minute, and only the person themselves can send one, admins included.
-//
-// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with POST /v1/users/{id}/test-pages (the `SendTestPage` operationId).
-func (c *ClientWithResponses) SendTestPageWithBodyWithResponse(ctx context.Context, id ID, params *SendTestPageParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SendTestPageResponse, error) {
-	rsp, err := c.SendTestPageWithBody(ctx, id, params, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseSendTestPageResponse(rsp)
-}
-
-// SendTestPageWithResponse Send a test page to check a person can be reached
-//
-// Sends a test to every contact method in the person's steps for high urgency, all at once rather than with their delays, or only to the one named. Sending is asynchronous: each delivery starts `pending`, and reading the test page shows whether it was sent or why it failed. A test page is on no incident. One test page per person per minute, and only the person themselves can send one, admins included.
-//
-// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with POST /v1/users/{id}/test-pages (the `SendTestPage` operationId).
-func (c *ClientWithResponses) SendTestPageWithResponse(ctx context.Context, id ID, params *SendTestPageParams, body SendTestPageJSONRequestBody, reqEditors ...RequestEditorFn) (*SendTestPageResponse, error) {
-	rsp, err := c.SendTestPage(ctx, id, params, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseSendTestPageResponse(rsp)
-}
-
-// GetTestPageWithResponse See whether a test page reached each contact method
-//
-// Returns a wrapper object for the known response body format(s).
-//
-// Corresponds with GET /v1/users/{id}/test-pages/{test_page_id} (the `GetTestPage` operationId).
-func (c *ClientWithResponses) GetTestPageWithResponse(ctx context.Context, id ID, testPageId string, reqEditors ...RequestEditorFn) (*GetTestPageResponse, error) {
-	rsp, err := c.GetTestPage(ctx, id, testPageId, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseGetTestPageResponse(rsp)
 }
 
 // ParseFinishSignInResponse parses an HTTP response from a FinishSignInWithResponse call
@@ -14720,6 +14707,93 @@ func ParseSetTeamMemberResponse(rsp *http.Response) (*SetTeamMemberResponse, err
 	return response, nil
 }
 
+// ParseSendTestPageResponse parses an HTTP response from a SendTestPageWithResponse call
+func ParseSendTestPageResponse(rsp *http.Response) (*SendTestPageResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &SendTestPageResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 202:
+		var dest TestPage
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON202 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON422 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON429 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetTestPageResponse parses an HTTP response from a GetTestPageWithResponse call
+func ParseGetTestPageResponse(rsp *http.Response) (*GetTestPageResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetTestPageResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest TestPage
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseListUsersResponse parses an HTTP response from a ListUsersWithResponse call
 func ParseListUsersResponse(rsp *http.Response) (*ListUsersResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -15187,100 +15261,6 @@ func ParseEndUserSessionsResponse(rsp *http.Response) (*EndUserSessionsResponse,
 			return nil, err
 		}
 		response.ApplicationproblemJSON403 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest Problem
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON404 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseSendTestPageResponse parses an HTTP response from a SendTestPageWithResponse call
-func ParseSendTestPageResponse(rsp *http.Response) (*SendTestPageResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &SendTestPageResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 202:
-		var dest TestPage
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON202 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest Problem
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON400 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest Problem
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON404 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
-		var dest Problem
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON409 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 422:
-		var dest Problem
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON422 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
-		var dest Problem
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON429 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseGetTestPageResponse parses an HTTP response from a GetTestPageWithResponse call
-func ParseGetTestPageResponse(rsp *http.Response) (*GetTestPageResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &GetTestPageResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest TestPage
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest Problem
