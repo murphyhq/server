@@ -48,11 +48,26 @@ type SnapshotSeries struct {
 	Points [][2]float64      `json:"points"`
 }
 
+type datasource struct {
+	Type string `json:"type"`
+	UID  string `json:"uid"`
+}
+
+var prometheus = datasource{Type: "prometheus", UID: "prometheus"}
+
+func (d datasource) queryRangePath() string {
+	if d.Type == "loki" {
+		return "/api/datasources/proxy/uid/" + d.UID + "/loki/api/v1/query_range"
+	}
+	return "/api/datasources/proxy/uid/" + d.UID + "/api/v1/query_range"
+}
+
 type dashboard struct {
 	Title  string `json:"title"`
 	Panels []struct {
-		Type        string `json:"type"`
-		Title       string `json:"title"`
+		Type        string      `json:"type"`
+		Title       string      `json:"title"`
+		Datasource  *datasource `json:"datasource"`
 		FieldConfig struct {
 			Defaults struct {
 				Unit string `json:"unit"`
@@ -114,7 +129,11 @@ func snapshotBoard(board dashboard, profile string, from, to time.Time, componen
 		}
 		out := SnapshotPanel{Title: panel.Title, Unit: panel.FieldConfig.Defaults.Unit, Series: []SnapshotSeries{}}
 		for _, target := range panel.Targets {
-			series, err := queryRange(replacer.Replace(target.Expr), from, to, step)
+			source := prometheus
+			if panel.Datasource != nil && panel.Datasource.UID != "" {
+				source = *panel.Datasource
+			}
+			series, err := queryRange(source, replacer.Replace(target.Expr), from, to, step)
 			if err != nil {
 				return fmt.Errorf("%s, panel %q: %w", board.Title, panel.Title, err)
 			}
@@ -133,7 +152,7 @@ func snapshotBoard(board dashboard, profile string, from, to time.Time, componen
 }
 
 func murphyComponents() ([]string, error) {
-	series, err := queryRange(`group by (service_name) (target_info{service_namespace="murphy"})`, time.Now().Add(-time.Minute), time.Now(), 15*time.Second)
+	series, err := queryRange(prometheus, `group by (service_name) (target_info{service_namespace="murphy"})`, time.Now().Add(-time.Minute), time.Now(), 15*time.Second)
 	if err != nil {
 		return nil, err
 	}
@@ -145,14 +164,14 @@ func murphyComponents() ([]string, error) {
 	return components, nil
 }
 
-func queryRange(query string, from, to time.Time, step time.Duration) ([]SnapshotSeries, error) {
+func queryRange(source datasource, query string, from, to time.Time, step time.Duration) ([]SnapshotSeries, error) {
 	params := neturl.Values{
 		"query": {query},
 		"start": {strconv.FormatInt(from.Unix(), 10)},
 		"end":   {strconv.FormatInt(to.Unix(), 10)},
 		"step":  {strconv.Itoa(int(step.Seconds()))},
 	}
-	req, err := http.NewRequest(http.MethodGet, grafanaURL+"/api/datasources/proxy/uid/prometheus/api/v1/query_range?"+params.Encode(), nil)
+	req, err := http.NewRequest(http.MethodGet, grafanaURL+source.queryRangePath()+"?"+params.Encode(), nil)
 	if err != nil {
 		return nil, err
 	}
