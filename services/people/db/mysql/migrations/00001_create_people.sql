@@ -77,6 +77,7 @@ CREATE TABLE sessions (
   token_hash VARBINARY(32) NOT NULL,
   client VARCHAR(16) NOT NULL,
   expires_at DATETIME(6) NOT NULL,
+  renewable_until DATETIME(6) NOT NULL,
   revoked_at DATETIME(6),
   created_at DATETIME(6) NOT NULL,
   updated_at DATETIME(6) NOT NULL,

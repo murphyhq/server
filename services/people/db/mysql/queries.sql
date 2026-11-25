@@ -141,14 +141,19 @@ FROM identities
 WHERE issuer = sqlc.arg(issuer) AND subject = sqlc.arg(subject);
 
 -- name: CreateSession :exec
-INSERT INTO sessions (id, user_id, token_hash, client, expires_at, created_at, updated_at)
-VALUES (sqlc.arg(id), sqlc.arg(user_id), sqlc.arg(token_hash), sqlc.arg(client), sqlc.arg(expires_at), sqlc.arg(created_at), sqlc.arg(updated_at));
+INSERT INTO sessions (id, user_id, token_hash, client, expires_at, renewable_until, created_at, updated_at)
+VALUES (sqlc.arg(id), sqlc.arg(user_id), sqlc.arg(token_hash), sqlc.arg(client), sqlc.arg(expires_at), sqlc.arg(renewable_until), sqlc.arg(created_at), sqlc.arg(updated_at));
 
 -- name: GetActiveSession :one
-SELECT sessions.id, sessions.user_id, sessions.token_hash, sessions.client, sessions.expires_at, sessions.revoked_at, sessions.created_at, sessions.updated_at, users.role
+SELECT sessions.id, sessions.user_id, sessions.token_hash, sessions.client, sessions.expires_at, sessions.renewable_until, sessions.revoked_at, sessions.created_at, sessions.updated_at, users.role
 FROM sessions
 JOIN users ON users.id = sessions.user_id
 WHERE sessions.token_hash = sqlc.arg(token_hash) AND sessions.revoked_at IS NULL AND sessions.expires_at > sqlc.arg(now) AND users.status = 'active';
+
+-- name: RenewSession :exec
+UPDATE sessions
+SET expires_at = sqlc.arg(expires_at), updated_at = sqlc.arg(updated_at)
+WHERE id = sqlc.arg(id) AND revoked_at IS NULL;
 
 -- name: RevokeSession :execrows
 UPDATE sessions
@@ -188,7 +193,7 @@ FROM one_time_codes
 WHERE code_hash = sqlc.arg(code_hash);
 
 -- name: ListActiveSessions :many
-SELECT id, user_id, token_hash, client, expires_at, revoked_at, created_at, updated_at
+SELECT id, user_id, token_hash, client, expires_at, renewable_until, revoked_at, created_at, updated_at
 FROM sessions
 WHERE user_id = sqlc.arg(user_id) AND revoked_at IS NULL AND expires_at > sqlc.arg(now) AND id < sqlc.arg(before)
 ORDER BY id DESC

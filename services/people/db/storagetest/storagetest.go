@@ -142,6 +142,37 @@ func Run(t *testing.T, open func(t *testing.T) Storage) {
 		assert.ErrorIs(t, err, murphy.ErrNotFound)
 	})
 
+	t.Run("a renewed session works until its new expiry", func(t *testing.T) {
+		repo := open(t)
+		user := newUser("ana@example.com")
+		now := time.Now().UTC()
+		require.NoError(t, repo.CreateUser(t.Context(), user))
+		session := newSession(user, "token", now.Add(time.Hour))
+		require.NoError(t, repo.CreateSession(t.Context(), session))
+
+		require.NoError(t, repo.RenewSession(t.Context(), session.GetId(), now.Add(3*time.Hour), now))
+		renewed, _, err := repo.GetActiveSession(t.Context(), []byte("token"), now.Add(2*time.Hour))
+
+		require.NoError(t, err)
+		assert.WithinDuration(t, now.Add(3*time.Hour), renewed.GetExpiresAt().AsTime(), time.Millisecond)
+		assert.WithinDuration(t, session.GetRenewableUntil().AsTime(), renewed.GetRenewableUntil().AsTime(), time.Millisecond)
+	})
+
+	t.Run("renewing a revoked session doesn't bring it back", func(t *testing.T) {
+		repo := open(t)
+		user := newUser("ana@example.com")
+		now := time.Now().UTC()
+		require.NoError(t, repo.CreateUser(t.Context(), user))
+		session := newSession(user, "token", now.Add(time.Hour))
+		require.NoError(t, repo.CreateSession(t.Context(), session))
+		require.NoError(t, repo.RevokeSession(t.Context(), []byte("token"), now))
+
+		require.NoError(t, repo.RenewSession(t.Context(), session.GetId(), now.Add(3*time.Hour), now))
+		_, _, err := repo.GetActiveSession(t.Context(), []byte("token"), now)
+
+		assert.ErrorIs(t, err, murphy.ErrNotFound)
+	})
+
 	t.Run("a session stops working when its user is deactivated", func(t *testing.T) {
 		repo := open(t)
 		user := newUser("ana@example.com")
@@ -465,7 +496,7 @@ func newSession(user *murphy.User, token string, expiresAt time.Time) *murphy.Se
 	now := murphy.Now()
 	return &murphy.Session{
 		Id: murphy.NewID(), UserId: user.GetId(), TokenHash: []byte(token), Client: murphy.SessionClient_SESSION_CLIENT_TOKEN,
-		ExpiresAt: timestamppb.New(expiresAt), CreatedAt: now, UpdatedAt: now,
+		ExpiresAt: timestamppb.New(expiresAt), RenewableUntil: timestamppb.New(expiresAt.Add(24 * time.Hour)), CreatedAt: now, UpdatedAt: now,
 	}
 }
 

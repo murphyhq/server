@@ -1173,6 +1173,75 @@ func (_c *MockAuthRepository_ListActiveSessions_Call) RunAndReturn(run func(ctx 
 	return _c
 }
 
+// RenewSession provides a mock function for the type MockAuthRepository
+func (_mock *MockAuthRepository) RenewSession(ctx context.Context, id string, expiresAt time.Time, at time.Time) error {
+	ret := _mock.Called(ctx, id, expiresAt, at)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RenewSession")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, time.Time, time.Time) error); ok {
+		r0 = returnFunc(ctx, id, expiresAt, at)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockAuthRepository_RenewSession_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RenewSession'
+type MockAuthRepository_RenewSession_Call struct {
+	*mock.Call
+}
+
+// RenewSession is a helper method to define mock.On call
+//   - ctx context.Context
+//   - id string
+//   - expiresAt time.Time
+//   - at time.Time
+func (_e *MockAuthRepository_Expecter) RenewSession(ctx any, id any, expiresAt any, at any) *MockAuthRepository_RenewSession_Call {
+	return &MockAuthRepository_RenewSession_Call{Call: _e.mock.On("RenewSession", ctx, id, expiresAt, at)}
+}
+
+func (_c *MockAuthRepository_RenewSession_Call) Run(run func(ctx context.Context, id string, expiresAt time.Time, at time.Time)) *MockAuthRepository_RenewSession_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 time.Time
+		if args[2] != nil {
+			arg2 = args[2].(time.Time)
+		}
+		var arg3 time.Time
+		if args[3] != nil {
+			arg3 = args[3].(time.Time)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *MockAuthRepository_RenewSession_Call) Return(err error) *MockAuthRepository_RenewSession_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockAuthRepository_RenewSession_Call) RunAndReturn(run func(ctx context.Context, id string, expiresAt time.Time, at time.Time) error) *MockAuthRepository_RenewSession_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // RevokeSession provides a mock function for the type MockAuthRepository
 func (_mock *MockAuthRepository) RevokeSession(ctx context.Context, tokenHash []byte, at time.Time) error {
 	ret := _mock.Called(ctx, tokenHash, at)

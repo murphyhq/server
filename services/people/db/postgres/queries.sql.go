@@ -132,18 +132,19 @@ func (q *Queries) CreateOneTimeCode(ctx context.Context, arg CreateOneTimeCodePa
 }
 
 const createSession = `-- name: CreateSession :exec
-INSERT INTO sessions (id, user_id, token_hash, client, expires_at, created_at, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
+INSERT INTO sessions (id, user_id, token_hash, client, expires_at, renewable_until, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 `
 
 type CreateSessionParams struct {
-	ID        string
-	UserID    string
-	TokenHash []byte
-	Client    string
-	ExpiresAt time.Time
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID             string
+	UserID         string
+	TokenHash      []byte
+	Client         string
+	ExpiresAt      time.Time
+	RenewableUntil time.Time
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
 }
 
 func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) error {
@@ -153,6 +154,7 @@ func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) er
 		arg.TokenHash,
 		arg.Client,
 		arg.ExpiresAt,
+		arg.RenewableUntil,
 		arg.CreatedAt,
 		arg.UpdatedAt,
 	)
@@ -359,7 +361,7 @@ func (q *Queries) DiscardOneTimeCodesOfUser(ctx context.Context, arg DiscardOneT
 }
 
 const getActiveSession = `-- name: GetActiveSession :one
-SELECT sessions.id, sessions.user_id, sessions.token_hash, sessions.client, sessions.expires_at, sessions.revoked_at, sessions.created_at, sessions.updated_at, users.role
+SELECT sessions.id, sessions.user_id, sessions.token_hash, sessions.client, sessions.expires_at, sessions.renewable_until, sessions.revoked_at, sessions.created_at, sessions.updated_at, users.role
 FROM sessions
 JOIN users ON users.id = sessions.user_id
 WHERE sessions.token_hash = $1 AND sessions.revoked_at IS NULL AND sessions.expires_at > $2 AND users.status = 'active'
@@ -371,15 +373,16 @@ type GetActiveSessionParams struct {
 }
 
 type GetActiveSessionRow struct {
-	ID        string
-	UserID    string
-	TokenHash []byte
-	Client    string
-	ExpiresAt time.Time
-	RevokedAt *time.Time
-	CreatedAt time.Time
-	UpdatedAt time.Time
-	Role      string
+	ID             string
+	UserID         string
+	TokenHash      []byte
+	Client         string
+	ExpiresAt      time.Time
+	RenewableUntil time.Time
+	RevokedAt      *time.Time
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	Role           string
 }
 
 func (q *Queries) GetActiveSession(ctx context.Context, arg GetActiveSessionParams) (GetActiveSessionRow, error) {
@@ -391,6 +394,7 @@ func (q *Queries) GetActiveSession(ctx context.Context, arg GetActiveSessionPara
 		&i.TokenHash,
 		&i.Client,
 		&i.ExpiresAt,
+		&i.RenewableUntil,
 		&i.RevokedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -595,7 +599,7 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 }
 
 const listActiveSessions = `-- name: ListActiveSessions :many
-SELECT id, user_id, token_hash, client, expires_at, revoked_at, created_at, updated_at
+SELECT id, user_id, token_hash, client, expires_at, renewable_until, revoked_at, created_at, updated_at
 FROM sessions
 WHERE user_id = $1 AND revoked_at IS NULL AND expires_at > $2 AND id < $3
 ORDER BY id DESC
@@ -629,6 +633,7 @@ func (q *Queries) ListActiveSessions(ctx context.Context, arg ListActiveSessions
 			&i.TokenHash,
 			&i.Client,
 			&i.ExpiresAt,
+			&i.RenewableUntil,
 			&i.RevokedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
@@ -863,6 +868,23 @@ func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]User, e
 		return nil, err
 	}
 	return items, nil
+}
+
+const renewSession = `-- name: RenewSession :exec
+UPDATE sessions
+SET expires_at = $1, updated_at = $2
+WHERE id = $3 AND revoked_at IS NULL
+`
+
+type RenewSessionParams struct {
+	ExpiresAt time.Time
+	UpdatedAt time.Time
+	ID        string
+}
+
+func (q *Queries) RenewSession(ctx context.Context, arg RenewSessionParams) error {
+	_, err := q.db.Exec(ctx, renewSession, arg.ExpiresAt, arg.UpdatedAt, arg.ID)
+	return err
 }
 
 const revokeSession = `-- name: RevokeSession :execrows

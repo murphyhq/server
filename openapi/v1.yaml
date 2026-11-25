@@ -1513,6 +1513,7 @@ components:
         expires_at:
           type: string
           format: date-time
+          description: When the session ends if it isn't used. Using it moves this later, up to the session's absolute timeout.
     SessionSummaryPage:
       type: object
       required: [items, next_cursor]
@@ -1545,6 +1546,7 @@ components:
         expires_at:
           type: string
           format: date-time
+          description: When the session ends if it isn't used. Using it moves this later, up to the session's absolute timeout.
     SessionToken:
       type: object
       required: [token, session]

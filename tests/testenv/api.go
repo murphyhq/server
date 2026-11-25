@@ -5,7 +5,6 @@ package testenv
 import (
 	"net/http/httptest"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -45,7 +44,6 @@ func APIWith(t *testing.T, databases migrateapp.Settings) string {
 		OIDCIssuer:            IdentityProviderURL(),
 		OIDCClientID:          "murphy",
 		OIDCClientSecret:      "murphy-local-secret",
-		SessionDuration:       time.Hour,
 		InitialAdminEmail:     "ana@murphy.test",
 		AllowPasswords:        true,
 		RateLimitStoreURL:     RedisURL(),
