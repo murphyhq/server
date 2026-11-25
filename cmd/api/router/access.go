@@ -45,6 +45,7 @@ type rule struct {
 	anyone    bool
 	check     func(a *access, ctx context.Context, c caller, id string) error
 	owner     func(a *access, ctx context.Context, id string) ([]string, error)
+	covers    bool
 }
 
 var rules = map[string]rule{
@@ -58,7 +59,8 @@ var rules = map[string]rule{
 	"services:manage":     {owner: (*access).teamOfService},
 	"integrations:manage": {owner: (*access).teamOfIntegration},
 	"schedules:manage":    {owner: (*access).teamsOfSchedule},
-	"overrides:manage":    {owner: (*access).teamsOfOverride},
+	"overrides:create":    {owner: (*access).teamsOfSchedule, covers: true},
+	"overrides:manage":    {owner: (*access).teamsOfOverride, covers: true},
 }
 
 type grant struct {
@@ -133,6 +135,10 @@ func (a *access) allows(ctx context.Context, c caller, scope string, ids []strin
 			return err
 		}
 		teams = append(teams, owners...)
+	}
+	if rule.covers {
+		return hasRoleIn(c, teams, "only the team's managers and responders can do this",
+			murphy.TeamRole_TEAM_ROLE_MANAGER, murphy.TeamRole_TEAM_ROLE_RESPONDER)
 	}
 	return hasRoleIn(c, teams, "only the team's managers can do this", murphy.TeamRole_TEAM_ROLE_MANAGER)
 }

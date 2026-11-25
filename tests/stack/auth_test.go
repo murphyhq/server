@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -427,4 +428,38 @@ func TestRepeatedWrongPasswordsSlowDown(t *testing.T) {
 
 	assert.Equal(t, []int{http.StatusUnauthorized, http.StatusUnauthorized, http.StatusUnauthorized, http.StatusUnauthorized, http.StatusUnauthorized}, wrong)
 	assert.Equal(t, http.StatusTooManyRequests, refused, "even the right password waits")
+}
+
+func TestAResponderCoversForATeammateWithAnOverride(t *testing.T) {
+	m := murphytest.New(t)
+	team := m.Team()
+	bo := m.Member(murphytest.Bo)
+	team.Add(bo, client.Responder)
+	schedule := m.Schedule(team)
+	from := time.Now().Add(24 * time.Hour)
+
+	created, err := bo.API.CreateOverrideWithResponse(t.Context(), schedule.ID, nil, client.OverrideInput{User: client.Reference{Id: bo.ID}, StartsAt: from, EndsAt: from.Add(8 * time.Hour)})
+	require.NoError(t, err)
+	require.Equal(t, http.StatusCreated, created.StatusCode())
+	removed, err := bo.API.DeleteOverrideWithResponse(t.Context(), created.JSON201.Id)
+	require.NoError(t, err)
+	edited, err := bo.API.DeleteScheduleWithResponse(t.Context(), schedule.ID)
+	require.NoError(t, err)
+
+	assert.Equal(t, http.StatusNoContent, removed.StatusCode())
+	assert.Equal(t, http.StatusForbidden, edited.StatusCode(), "changing the schedule itself stays with managers")
+}
+
+func TestAnObserverCannotOverrideTheirTeamsSchedule(t *testing.T) {
+	m := murphytest.New(t)
+	team := m.Team()
+	bo := m.Member(murphytest.Bo)
+	team.Add(bo, client.Observer)
+	schedule := m.Schedule(team)
+	from := time.Now().Add(24 * time.Hour)
+
+	got, err := bo.API.CreateOverrideWithResponse(t.Context(), schedule.ID, nil, client.OverrideInput{User: client.Reference{Id: bo.ID}, StartsAt: from, EndsAt: from.Add(8 * time.Hour)})
+
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusForbidden, got.StatusCode())
 }

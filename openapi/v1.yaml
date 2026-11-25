@@ -1159,8 +1159,8 @@ paths:
     post:
       operationId: createOverride
       security:
-        - session: [schedules:manage]
-        - sessionCookie: [schedules:manage]
+        - session: [overrides:create]
+        - sessionCookie: [overrides:create]
       summary: Override a schedule for a time range
       tags: [on-call]
       parameters:
@@ -1440,7 +1440,7 @@ components:
     session:
       type: http
       scheme: bearer
-      description: A session token from `POST /v1/auth/sessions`. Requests without a valid session get 401, and changes the person's roles don't allow get 403. Everyone signed in can read; admins set up the install, team managers manage their team's escalation policies, services, schedules and members, responders and anyone paged respond to incidents, and everyone manages themselves.
+      description: A session token from `POST /v1/auth/sessions`. Requests without a valid session get 401, and changes the person's roles don't allow get 403. Everyone signed in can read; admins set up the install, team managers manage their team's escalation policies, services, schedules and members, responders cover for each other with schedule overrides, responders and anyone paged respond to incidents, and everyone manages themselves.
     sessionCookie:
       type: apiKey
       in: cookie
