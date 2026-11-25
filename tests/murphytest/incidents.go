@@ -324,7 +324,11 @@ func notification(kind client.TimelineEntryType, user *User, channel client.Cont
 	}
 }
 
-func ActedBy(kind client.TimelineEntryType, user *User) Expectation {
+func ActedBy(kind client.TimelineEntryType, users ...*User) Expectation {
+	want := make([]client.Reference, len(users))
+	for i, user := range users {
+		want[i] = user.Reference()
+	}
 	return func(c *assert.CollectT, incident *client.IncidentWithTimeline) {
 		var actors []client.Reference
 		for _, entry := range incident.Timeline {
@@ -332,7 +336,7 @@ func ActedBy(kind client.TimelineEntryType, user *User) Expectation {
 				actors = append(actors, *entry.Actor)
 			}
 		}
-		assert.Equal(c, []client.Reference{user.Reference()}, actors, "who did it")
+		assert.Equal(c, want, actors, "who did it, in order")
 	}
 }
 
