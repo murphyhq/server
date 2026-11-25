@@ -96,11 +96,13 @@ func observe(next http.Handler) http.Handler {
 		recorder := &recorder{ResponseWriter: w, request: r, status: http.StatusOK}
 		next.ServeHTTP(recorder, r)
 
-		fields := []telemetry.Field{
+		client := clientValues(r)
+		trace.SpanFromContext(ctx).SetAttributes(clientAttributes(client)...)
+		fields := append([]telemetry.Field{
 			telemetry.Standard("http.request.method", r.Method),
 			telemetry.Standard("http.response.status_code", recorder.status),
 			telemetry.WithField("duration_ms", time.Since(start).Milliseconds()),
-		}
+		}, clientFields(client)...)
 		if _, route, ok := strings.Cut(r.Pattern, " "); ok {
 			trace.SpanFromContext(ctx).SetAttributes(attribute.String("http.route", route))
 			if labeler, ok := otelhttp.LabelerFromContext(ctx); ok {
