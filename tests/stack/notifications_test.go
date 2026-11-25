@@ -231,10 +231,32 @@ func TestAContactMethodMurphyCantSendToYetIsRefused(t *testing.T) {
 	m := murphytest.New(t)
 	ana := m.User()
 
-	created, err := m.API.CreateContactMethodWithResponse(t.Context(), ana.ID, nil, client.ContactMethodInput{Type: client.Email, Address: ana.Email})
+	created, err := m.API.CreateContactMethodWithResponse(t.Context(), ana.ID, nil, client.ContactMethodInput{Type: client.Sms, Address: "+14155550100"})
 
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusBadRequest, created.StatusCode())
+}
+
+func TestAPageReachesSomeoneByEmail(t *testing.T) {
+	m := murphytest.New(t)
+	m.EmailThroughMailpit()
+	ana := m.User(murphytest.WithEmail())
+	service := m.Service(murphytest.Pages(ana.Target()))
+
+	incident := service.Fire("disk-full")
+
+	mail := ana.Mailbox().WaitForMail(1)
+	assert.Contains(t, mail[0].Subject, "disk-full is firing")
+	incident.WaitFor(murphytest.Summaries(client.TimelineEntryTypeNotified, "Paged "+ana.Name+" by email"))
+}
+
+func TestAPasswordOutsideWhatTheInstallAllowsFailsTheEmailProvider(t *testing.T) {
+	m := murphytest.New(t)
+
+	m.SetEmailProvider(murphytest.Mailpit("env://SMTP_PASSWORD"))
+
+	failing := m.WaitForEmailProvider(client.Failing)
+	assert.Contains(t, failing.Problem, "only variables starting with MURPHY_SECRET_")
 }
 
 func TestAnAdminSetsAndRemovesTheEmailProvider(t *testing.T) {
@@ -252,8 +274,10 @@ func TestAnAdminSetsAndRemovesTheEmailProvider(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, set.StatusCode())
 	require.Equal(t, http.StatusOK, read.StatusCode())
-	assert.Equal(t, *set.JSON200, *read.JSON200)
+	assert.Equal(t, set.JSON200.UpdatedAt, read.JSON200.UpdatedAt)
+	assert.Equal(t, "smtp.example.com", read.JSON200.Host)
 	assert.Equal(t, "env://SMTP_PASSWORD", read.JSON200.Secret)
+	assert.Equal(t, client.Pending, set.JSON200.Status, "notifier hasn't checked it yet")
 	assert.Equal(t, http.StatusNoContent, removed.StatusCode())
 	assert.Equal(t, http.StatusNotFound, gone.StatusCode())
 }

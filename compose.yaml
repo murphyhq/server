@@ -317,6 +317,18 @@ services:
       MURPHY_RELAY_KEY: mik_local-development-key
       MURPHY_PUBLIC_URL: http://localhost:8080
       MURPHY_WEBHOOK_ALLOWED_NETWORKS: 10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
+      MURPHY_EMAIL_CA_FILE: /src/.murphy/mail/ca.crt
+      MURPHY_EMAIL_CHECK_INTERVAL: 5s
+      MURPHY_SECRET_SMTP_PASSWORD: murphy-local
+    depends_on:
+      lgtm:
+        condition: service_started
+      migrate:
+        condition: service_completed_successfully
+      provision:
+        condition: service_completed_successfully
+      mail-certs:
+        condition: service_completed_successfully
 
   single:
     image: golang:1.27.4
@@ -350,6 +362,8 @@ services:
         restart: true
       redis:
         condition: service_healthy
+      mail-certs:
+        condition: service_completed_successfully
 
   dex:
     image: ghcr.io/dexidp/dex:v2.46.1
@@ -362,6 +376,41 @@ services:
       test: ["CMD", "wget", "-qO-", "http://localhost:5558/healthz"]
       interval: 5s
       retries: 10
+
+  mail-certs:
+    image: alpine/openssl:3.5.8
+    entrypoint: ["sh", "-ec"]
+    command:
+      - |
+        cd /certs
+        [ -s ca.crt ] && [ -s mailpit.crt ] && exit 0
+        openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes -days 3650 -subj "/CN=Murphy local mail CA" -keyout ca.key -out ca.crt
+        openssl req -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes -subj "/CN=mailpit" -keyout mailpit.key -out mailpit.csr
+        printf 'subjectAltName=DNS:mailpit,DNS:localhost,IP:127.0.0.1' > san.ext
+        openssl x509 -req -in mailpit.csr -CA ca.crt -CAkey ca.key -CAcreateserial -days 825 -extfile san.ext -out mailpit.crt
+        chmod 644 ./*
+    volumes:
+      - ./.murphy/mail:/certs
+
+  mailpit:
+    image: axllent/mailpit:v1.33.1
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    environment:
+      MP_SMTP_TLS_CERT: /certs/mailpit.crt
+      MP_SMTP_TLS_KEY: /certs/mailpit.key
+      MP_SMTP_REQUIRE_STARTTLS: "true"
+      MP_SMTP_AUTH_ACCEPT_ANY: "true"
+    volumes:
+      - ./.murphy/mail:/certs:ro
+    healthcheck:
+      test: ["CMD", "/mailpit", "readyz"]
+      interval: 5s
+      retries: 10
+    depends_on:
+      mail-certs:
+        condition: service_completed_successfully
 
   webhook-receiver:
     image: wiremock/wiremock:3.9.1

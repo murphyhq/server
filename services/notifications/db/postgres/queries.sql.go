@@ -150,7 +150,7 @@ func (q *Queries) DeleteMessages(ctx context.Context, ids []string) error {
 }
 
 const getEmailProvider = `-- name: GetEmailProvider :one
-SELECT type, from_address, host, port, username, secret, updated_at
+SELECT type, from_address, host, port, username, secret, updated_at, status, problem, checked_at
 FROM email_provider
 `
 
@@ -162,6 +162,9 @@ type GetEmailProviderRow struct {
 	Username    string
 	Secret      string
 	UpdatedAt   time.Time
+	Status      string
+	Problem     string
+	CheckedAt   *time.Time
 }
 
 func (q *Queries) GetEmailProvider(ctx context.Context) (GetEmailProviderRow, error) {
@@ -175,6 +178,9 @@ func (q *Queries) GetEmailProvider(ctx context.Context) (GetEmailProviderRow, er
 		&i.Username,
 		&i.Secret,
 		&i.UpdatedAt,
+		&i.Status,
+		&i.Problem,
+		&i.CheckedAt,
 	)
 	return i, err
 }
@@ -277,6 +283,32 @@ func (q *Queries) RecipientsOf(ctx context.Context, incidentID string) ([]string
 		return nil, err
 	}
 	return items, nil
+}
+
+const recordEmailProviderCheck = `-- name: RecordEmailProviderCheck :execrows
+UPDATE email_provider
+SET status = $1, problem = $2, checked_at = $3
+WHERE updated_at = $4
+`
+
+type RecordEmailProviderCheckParams struct {
+	Status    string
+	Problem   string
+	CheckedAt *time.Time
+	UpdatedAt time.Time
+}
+
+func (q *Queries) RecordEmailProviderCheck(ctx context.Context, arg RecordEmailProviderCheckParams) (int64, error) {
+	result, err := q.db.Exec(ctx, recordEmailProviderCheck,
+		arg.Status,
+		arg.Problem,
+		arg.CheckedAt,
+		arg.UpdatedAt,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const recordOutcome = `-- name: RecordOutcome :one
@@ -396,7 +428,8 @@ INSERT INTO email_provider (type, from_address, host, port, username, secret, up
 VALUES ($1, $2, $3, $4, $5, $6, $7)
 ON CONFLICT (singleton) DO UPDATE
 SET type = EXCLUDED.type, from_address = EXCLUDED.from_address, host = EXCLUDED.host, port = EXCLUDED.port,
-  username = EXCLUDED.username, secret = EXCLUDED.secret, updated_at = EXCLUDED.updated_at
+  username = EXCLUDED.username, secret = EXCLUDED.secret, updated_at = EXCLUDED.updated_at,
+  status = 'pending', problem = '', checked_at = NULL
 `
 
 type SetEmailProviderParams struct {

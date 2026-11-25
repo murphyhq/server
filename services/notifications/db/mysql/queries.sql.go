@@ -92,7 +92,7 @@ func (q *Queries) DeleteMessages(ctx context.Context, ids []string) error {
 }
 
 const getEmailProvider = `-- name: GetEmailProvider :one
-SELECT type, from_address, host, port, username, secret, updated_at
+SELECT type, from_address, host, port, username, secret, updated_at, status, problem, checked_at
 FROM email_provider
 `
 
@@ -104,6 +104,9 @@ type GetEmailProviderRow struct {
 	Username    string
 	Secret      string
 	UpdatedAt   time.Time
+	Status      string
+	Problem     string
+	CheckedAt   *time.Time
 }
 
 func (q *Queries) GetEmailProvider(ctx context.Context) (GetEmailProviderRow, error) {
@@ -117,6 +120,9 @@ func (q *Queries) GetEmailProvider(ctx context.Context) (GetEmailProviderRow, er
 		&i.Username,
 		&i.Secret,
 		&i.UpdatedAt,
+		&i.Status,
+		&i.Problem,
+		&i.CheckedAt,
 	)
 	return i, err
 }
@@ -226,11 +232,38 @@ func (q *Queries) RecipientsOf(ctx context.Context, incidentID string) ([]string
 	return items, nil
 }
 
+const recordEmailProviderCheck = `-- name: RecordEmailProviderCheck :execrows
+UPDATE email_provider
+SET status = ?, problem = ?, checked_at = ?
+WHERE updated_at = ?
+`
+
+type RecordEmailProviderCheckParams struct {
+	Status    string
+	Problem   string
+	CheckedAt *time.Time
+	UpdatedAt time.Time
+}
+
+func (q *Queries) RecordEmailProviderCheck(ctx context.Context, arg RecordEmailProviderCheckParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, recordEmailProviderCheck,
+		arg.Status,
+		arg.Problem,
+		arg.CheckedAt,
+		arg.UpdatedAt,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 const setEmailProvider = `-- name: SetEmailProvider :exec
 INSERT INTO email_provider (type, from_address, host, port, username, secret, updated_at)
 VALUES (?, ?, ?, ?, ?, ?, ?)
 ON DUPLICATE KEY UPDATE type = VALUES(type), from_address = VALUES(from_address), host = VALUES(host), port = VALUES(port),
-  username = VALUES(username), secret = VALUES(secret), updated_at = VALUES(updated_at)
+  username = VALUES(username), secret = VALUES(secret), updated_at = VALUES(updated_at),
+  status = 'pending', problem = '', checked_at = NULL
 `
 
 type SetEmailProviderParams struct {

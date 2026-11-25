@@ -75,6 +75,16 @@ message EmailProvider {
   string username = 5;
   string secret = 6;
   google.protobuf.Timestamp updated_at = 7;
+  EmailProviderStatus status = 8;
+  string problem = 9;
+  google.protobuf.Timestamp checked_at = 10;
+}
+
+enum EmailProviderStatus {
+  EMAIL_PROVIDER_STATUS_UNSPECIFIED = 0;
+  EMAIL_PROVIDER_STATUS_PENDING = 1;
+  EMAIL_PROVIDER_STATUS_READY = 2;
+  EMAIL_PROVIDER_STATUS_FAILING = 3;
 }
 
 enum EmailProviderType {

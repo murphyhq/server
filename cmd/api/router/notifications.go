@@ -44,8 +44,14 @@ func (s *Server) RemoveEmailProvider(ctx context.Context, _ RemoveEmailProviderR
 }
 
 func toEmailProvider(provider *murphy.EmailProvider) EmailProvider {
-	return EmailProvider{
+	out := EmailProvider{
 		Type: EmailProviderType(provider.GetType().Text()), From: provider.GetFrom(), Host: provider.GetHost(), Port: provider.GetPort(),
 		Username: provider.GetUsername(), Secret: provider.GetSecret(), UpdatedAt: provider.GetUpdatedAt().AsTime(),
+		Status: EmailProviderStatus(provider.GetStatus().Text()), Problem: provider.GetProblem(),
 	}
+	if at := provider.GetCheckedAt(); at != nil {
+		checked := at.AsTime()
+		out.CheckedAt = &checked
+	}
+	return out
 }

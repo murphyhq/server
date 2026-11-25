@@ -30,8 +30,8 @@ func (c *ContactMethod) Validate() error {
 	address := c.GetAddress()
 	switch c.GetType() {
 	case ContactMethodType_CONTACT_METHOD_TYPE_EMAIL:
-		if _, err := mail.ParseAddress(address); err != nil {
-			errs = append(errs, invalid("address", "must be an email address"))
+		if parsed, err := mail.ParseAddress(address); err != nil || parsed.Address != address {
+			errs = append(errs, invalid("address", "must be an email address, as in ana@example.com"))
 		}
 	case ContactMethodType_CONTACT_METHOD_TYPE_SMS, ContactMethodType_CONTACT_METHOD_TYPE_VOICE:
 		if !phoneNumber.MatchString(address) {

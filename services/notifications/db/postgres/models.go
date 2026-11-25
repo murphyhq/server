@@ -17,6 +17,9 @@ type EmailProvider struct {
 	Username    string
 	Secret      string
 	UpdatedAt   time.Time
+	Status      string
+	Problem     string
+	CheckedAt   *time.Time
 }
 
 type HandledMessage struct {

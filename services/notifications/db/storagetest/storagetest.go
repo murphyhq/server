@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/murphyhq/server"
 	"github.com/murphyhq/server/services/notifications"
@@ -56,6 +57,30 @@ func Run(t *testing.T, open func(t *testing.T) notifications.Repository) {
 		assert.Equal(t, second.GetSecret(), got.GetSecret())
 		assert.Equal(t, second.GetType(), got.GetType())
 		assert.WithinDuration(t, second.GetUpdatedAt().AsTime(), got.GetUpdatedAt().AsTime(), time.Millisecond)
+	})
+
+	t.Run("records a check only for the provider it checked, and a new set starts pending", func(t *testing.T) {
+		repo := open(t)
+		checked := &murphy.EmailProvider{Type: murphy.EmailProviderType_EMAIL_PROVIDER_TYPE_SMTP, From: "murphy@example.com", Host: "smtp.example.com", Port: 587, UpdatedAt: timestamppb.New(time.Now().Add(-time.Minute))}
+		require.NoError(t, repo.SetEmailProvider(t.Context(), checked))
+		checked.Status, checked.Problem, checked.CheckedAt = murphy.EmailProviderStatus_EMAIL_PROVIDER_STATUS_FAILING, "start TLS: certificate signed by unknown authority", murphy.Now()
+		require.NoError(t, repo.RecordEmailProviderCheck(t.Context(), checked))
+		failing, err := repo.GetEmailProvider(t.Context())
+		require.NoError(t, err)
+		replaced := &murphy.EmailProvider{Type: murphy.EmailProviderType_EMAIL_PROVIDER_TYPE_SMTP, From: "murphy@example.com", Host: "mail.example.com", Port: 587, UpdatedAt: murphy.Now()}
+		require.NoError(t, repo.SetEmailProvider(t.Context(), replaced))
+
+		checked.Status, checked.Problem = murphy.EmailProviderStatus_EMAIL_PROVIDER_STATUS_READY, ""
+		require.NoError(t, repo.RecordEmailProviderCheck(t.Context(), checked))
+		got, err := repo.GetEmailProvider(t.Context())
+
+		require.NoError(t, err)
+		assert.Equal(t, murphy.EmailProviderStatus_EMAIL_PROVIDER_STATUS_FAILING, failing.GetStatus())
+		assert.Equal(t, "start TLS: certificate signed by unknown authority", failing.GetProblem())
+		assert.NotNil(t, failing.GetCheckedAt())
+		assert.Equal(t, murphy.EmailProviderStatus_EMAIL_PROVIDER_STATUS_PENDING, got.GetStatus(), "a check of the old settings doesn't apply to the new ones")
+		assert.Empty(t, got.GetProblem())
+		assert.Nil(t, got.GetCheckedAt())
 	})
 
 	t.Run("has no email provider until one is set, and none once it's removed", func(t *testing.T) {
