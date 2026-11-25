@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 	"time"
+	"unicode"
 
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel/attribute"
@@ -96,11 +97,11 @@ func observe(next http.Handler) http.Handler {
 		recorder := &recorder{ResponseWriter: w, request: r, status: http.StatusOK}
 		next.ServeHTTP(recorder, r)
 
-		fields := []telemetry.Field{
+		fields := append([]telemetry.Field{
 			telemetry.Standard("http.request.method", r.Method),
 			telemetry.Standard("http.response.status_code", recorder.status),
 			telemetry.WithField("duration_ms", time.Since(start).Milliseconds()),
-		}
+		}, clientFields(r)...)
 		if _, route, ok := strings.Cut(r.Pattern, " "); ok {
 			trace.SpanFromContext(ctx).SetAttributes(attribute.String("http.route", route))
 			if labeler, ok := otelhttp.LabelerFromContext(ctx); ok {
@@ -142,4 +143,28 @@ func (r *recorder) Write(p []byte) (int, error) {
 
 func (r *recorder) Unwrap() http.ResponseWriter {
 	return r.ResponseWriter
+}
+
+func clientFields(r *http.Request) []telemetry.Field {
+	return []telemetry.Field{
+		telemetry.WithField("murphy.client.app.version", clean(r.Header.Get("Murphy-App-Version"))),
+		telemetry.WithField("murphy.client.app.build", clean(r.Header.Get("Murphy-App-Build"))),
+		telemetry.Standard("os.name", clean(r.Header.Get("Murphy-OS"))),
+		telemetry.Standard("os.version", clean(r.Header.Get("Murphy-OS-Version"))),
+		telemetry.Standard("device.model.name", clean(r.Header.Get("Murphy-Device-Model"))),
+		telemetry.WithField("murphy.client.locale", clean(r.Header.Get("Murphy-Locale"))),
+	}
+}
+
+func clean(value string) string {
+	runes := []rune(strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) {
+			return -1
+		}
+		return r
+	}, strings.TrimSpace(value)))
+	if len(runes) > 64 {
+		runes = runes[:64]
+	}
+	return string(runes)
 }

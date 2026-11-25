@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -220,4 +221,60 @@ func requestFrom(origin string) *http.Request {
 	req := httptest.NewRequest(http.MethodGet, "/v1/services", nil)
 	req.Header.Set("Origin", origin)
 	return req
+}
+
+func requestWithAppHeaders(t *testing.T, headers map[string]string) {
+	t.Helper()
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /incidents", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	request := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/incidents", nil)
+	for name, value := range headers {
+		request.Header.Set(name, value)
+	}
+	httpserver.Handler(mux).ServeHTTP(httptest.NewRecorder(), request)
+}
+
+func TestAnAppsDeviceIsOnItsRequestLog(t *testing.T) {
+	var logs bytes.Buffer
+	previous := slog.Default()
+	slog.SetDefault(slog.New(slog.NewJSONHandler(&logs, nil)))
+	t.Cleanup(func() { slog.SetDefault(previous) })
+
+	requestWithAppHeaders(t, map[string]string{
+		"Murphy-App-Version":  "1.4.2",
+		"Murphy-App-Build":    "57",
+		"Murphy-OS":           "iOS",
+		"Murphy-OS-Version":   "26.1",
+		"Murphy-Device-Model": "iPhone 16",
+		"Murphy-Locale":       "pt-BR",
+	})
+
+	var line map[string]any
+	require.NoError(t, json.Unmarshal(bytes.TrimSpace(logs.Bytes()), &line))
+	assert.Equal(t, "1.4.2", line["murphy.client.app.version"])
+	assert.Equal(t, "57", line["murphy.client.app.build"])
+	assert.Equal(t, "iOS", line["os.name"])
+	assert.Equal(t, "26.1", line["os.version"])
+	assert.Equal(t, "iPhone 16", line["device.model.name"])
+	assert.Equal(t, "pt-BR", line["murphy.client.locale"])
+}
+
+func TestAClientsValuesAreCleanedAndCapped(t *testing.T) {
+	var logs bytes.Buffer
+	previous := slog.Default()
+	slog.SetDefault(slog.New(slog.NewJSONHandler(&logs, nil)))
+	t.Cleanup(func() { slog.SetDefault(previous) })
+
+	requestWithAppHeaders(t, map[string]string{
+		"Murphy-Device-Model": "iPhone\x00 16 " + strings.Repeat("x", 200),
+	})
+
+	var line map[string]any
+	require.NoError(t, json.Unmarshal(bytes.TrimSpace(logs.Bytes()), &line))
+	model := line["device.model.name"].(string)
+	assert.Len(t, []rune(model), 64)
+	assert.NotContains(t, model, "\x00")
+	assert.True(t, strings.HasPrefix(model, "iPhone 16 "))
 }
