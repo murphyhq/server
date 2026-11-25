@@ -375,6 +375,13 @@ services:
       interval: 5s
       retries: 10
 
+  hub:
+    image: nginx:1.27-alpine
+    ports:
+      - "8000:80"
+    volumes:
+      - ./tests/provision/local/hub:/usr/share/nginx/html:ro
+
   api-docs:
     image: nginx:1.27-alpine
     ports:

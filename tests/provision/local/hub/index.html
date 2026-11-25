@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Murphy local</title>
+<base target="_blank">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<style>
+  :root {
+    --bg: #f7f7f5; --card: #ffffff; --text: #1d1d1b; --muted: #6b6b66; --line: #e4e4df;
+    --accent: #e5622a; --up: #15803d; --down: #b91c1c; --unknown: #a3a39e;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #141413; --card: #1e1e1c; --text: #ececea; --muted: #9b9b95; --line: #2e2e2b;
+      --accent: #ff8a3d; --up: #4ade80; --down: #f87171; --unknown: #5c5c57;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 960px; margin: 0 auto; padding: 32px 16px 48px; }
+  header { display: flex; align-items: center; gap: 14px; margin: 0 0 4px; }
+  header img { width: 44px; height: 44px; border-radius: 11px; flex: none; }
+  h1 { font-size: 24px; margin: 0; }
+  h1 span { background: linear-gradient(135deg, #ffc56b, #ff8a3d 55%, #ff3d5a); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .lead { color: var(--muted); margin: 12px 0 28px; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 28px 0 10px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+  a.tool { display: block; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; color: inherit; text-decoration: none; }
+  a.tool:hover { border-color: var(--accent); }
+  .name { font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--unknown); flex: none; }
+  .dot.up { background: var(--up); }
+  .dot.down { background: var(--down); }
+  .what { color: var(--muted); font-size: 14px; margin-top: 2px; }
+  .url { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--muted); margin-top: 6px; overflow-wrap: anywhere; }
+  table { width: 100%; border-collapse: collapse; background: var(--card); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  th, td { text-align: left; padding: 9px 14px; border-top: 1px solid var(--line); font-size: 14px; vertical-align: top; }
+  tr:first-child th, tr:first-child td { border-top: 0; }
+  th { font-weight: 600; width: 34%; }
+  code { font: 13px ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .scroll { overflow-x: auto; }
+</style>
+</head>
+<body>
+<main>
+  <header><img src="/icon.svg" alt=""><h1><span>Murphy</span> local stack</h1></header>
+  <p class="lead">Everything <code>docker compose --profile murphy up</code> runs, in one place. A green dot means the tool answers.</p>
+
+  <h2>Try the API</h2>
+  <div class="grid">
+    <a class="tool" href="http://localhost:8090/" data-ping="http://localhost:8090/">
+      <div class="name"><span class="dot"></span>API reference</div>
+      <div class="what">Every endpoint, signed in through Dex, sending requests with your session.</div>
+      <div class="url">localhost:8090</div>
+    </a>
+    <a class="tool" href="http://localhost:8090/connect.html" data-ping="http://localhost:8090/connect.html">
+      <div class="name"><span class="dot"></span>Connect the app</div>
+      <div class="what">A connect code as a QR code, and the command that opens it in the iOS Simulator.</div>
+      <div class="url">localhost:8090/connect.html</div>
+    </a>
+    <a class="tool" href="http://localhost:8080/v1/auth/sign-in" data-ping="http://localhost:8080/v1/auth/sign-in">
+      <div class="name"><span class="dot"></span>API</div>
+      <div class="what">Signs you in through the browser, then serves the API with your session cookie.</div>
+      <div class="url">localhost:8080</div>
+    </a>
+    <a class="tool" href="http://localhost:8090/ingest/v1.yaml" data-ping="http://localhost:8081/">
+      <div class="name"><span class="dot"></span>Ingest</div>
+      <div class="what">Where monitoring tools send alerts. The link opens its spec.</div>
+      <div class="url">localhost:8081</div>
+    </a>
+  </div>
+
+  <h2>See what Murphy sent</h2>
+  <div class="grid">
+    <a class="tool" href="http://localhost:8025/" data-ping="http://localhost:8025/">
+      <div class="name"><span class="dot"></span>Mailpit</div>
+      <div class="what">The inbox for every email Murphy sends.</div>
+      <div class="url">localhost:8025</div>
+    </a>
+    <a class="tool" href="http://localhost:8092/__admin/requests" data-ping="http://localhost:8092/__admin/health">
+      <div class="name"><span class="dot"></span>Webhook receiver</div>
+      <div class="what">Webhooks and app pushes Murphy sent, as WireMock received them.</div>
+      <div class="url">localhost:8092/__admin/requests</div>
+    </a>
+  </div>
+
+  <h2>Look inside</h2>
+  <div class="grid">
+    <a class="tool" href="http://localhost:3000/dashboards" data-ping="http://localhost:3000/api/health">
+      <div class="name"><span class="dot"></span>Grafana</div>
+      <div class="what">Dashboards for each component, and logs, traces and metrics under Explore.</div>
+      <div class="url">localhost:3000</div>
+    </a>
+    <a class="tool" href="http://localhost:8082/" data-ping="http://localhost:8082/">
+      <div class="name"><span class="dot"></span>DbGate</div>
+      <div class="what">Every domain's database, on PostgreSQL and MySQL.</div>
+      <div class="url">localhost:8082</div>
+    </a>
+    <a class="tool" href="http://localhost:8222/" data-ping="http://localhost:8222/healthz">
+      <div class="name"><span class="dot"></span>NATS monitoring</div>
+      <div class="what">The broker's streams, consumers and connections.</div>
+      <div class="url">localhost:8222</div>
+    </a>
+    <a class="tool" href="http://localhost:5556/dex/.well-known/openid-configuration" data-ping="http://localhost:5556/dex/healthz">
+      <div class="name"><span class="dot"></span>Dex</div>
+      <div class="what">The local identity provider. It has no pages of its own; you meet it when signing in.</div>
+      <div class="url">localhost:5556/dex</div>
+    </a>
+  </div>
+
+  <h2>Sign-ins</h2>
+  <div class="scroll">
+    <table>
+      <tr><th>Murphy, through Dex</th><td><code>ana@murphy.test</code> (admin), <code>bo@murphy.test</code>, <code>cy@murphy.test</code>, <code>dee@murphy.test</code>, password <code>murphy</code></td></tr>
+      <tr><th>Grafana</th><td><code>admin</code> / <code>admin</code></td></tr>
+      <tr><th>PostgreSQL</th><td><code>localhost:5432</code>, user <code>murphy</code>, password <code>murphy</code>, one database per domain</td></tr>
+      <tr><th>MySQL</th><td><code>localhost:3306</code>, user <code>murphy</code>, password <code>murphy</code></td></tr>
+    </table>
+  </div>
+</main>
+<script>
+  for (const tool of document.querySelectorAll("[data-ping]")) {
+    const dot = tool.querySelector(".dot");
+    fetch(tool.dataset.ping, { mode: "no-cors", cache: "no-store", signal: AbortSignal.timeout(3000) })
+      .then(() => dot.classList.add("up"), () => dot.classList.add("down"));
+  }
+</script>
+</body>
+</html>
