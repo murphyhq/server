@@ -2,8 +2,11 @@ package router
 
 import (
 	"context"
+	"errors"
+	"slices"
 
 	"github.com/murphyhq/server"
+	"github.com/murphyhq/server/internal/telemetry"
 	"github.com/murphyhq/server/internal/tracer"
 	"github.com/murphyhq/server/services/incidents"
 )
@@ -53,8 +56,13 @@ func (s *Server) GetIncident(ctx context.Context, request GetIncidentRequestObje
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
+	telemetry.Collect(ctx, telemetry.WithField("incident.id", request.Id))
 	n := newNames()
 	incident, timeline, err := s.incidents.GetIncident(ctx, request.Id)
+	if err != nil {
+		return nil, err
+	}
+	viewer, err := s.viewerOf(ctx, incident, timeline, n)
 	if err != nil {
 		return nil, err
 	}
@@ -118,10 +126,44 @@ func (s *Server) GetIncident(ctx context.Context, request GetIncidentRequestObje
 		UpdatedAt:  out.UpdatedAt,
 		ResolvedAt: out.ResolvedAt,
 		Timeline:   entries,
+		Viewer:     viewer,
 
 		AcknowledgedAt: out.AcknowledgedAt,
 		Escalation:     out.Escalation,
 	}, nil
+}
+
+func (s *Server) viewerOf(ctx context.Context, incident *murphy.Incident, timeline []*murphy.TimelineEntry, n *names) (IncidentViewer, error) {
+	current := sessionFrom(ctx)
+	if !incident.Open() {
+		return IncidentViewer{}, nil
+	}
+	can := current.role == murphy.UserRole_USER_ROLE_ADMIN || pagedIn(timeline, current.session.GetUserId())
+	if !can && incident.GetEscalationPolicyId() != "" {
+		policy, err := s.escalation.GetPolicyRecord(ctx, incident.GetEscalationPolicyId())
+		if err != nil && !errors.Is(err, murphy.ErrNotFound) {
+			return IncidentViewer{}, err
+		}
+		if err == nil {
+			n.knowPolicy(policy.GetId(), policy.GetName())
+			c := caller{id: current.session.GetUserId(), roles: func() (map[string]murphy.TeamRole, error) {
+				return s.people.TeamRolesOf(ctx, current.session.GetUserId())
+			}}
+			refused := mayRespond(c, []string{policy.GetTeamId()})
+			var forbidden *murphy.ForbiddenError
+			if refused != nil && !errors.As(refused, &forbidden) {
+				return IncidentViewer{}, refused
+			}
+			can = refused == nil
+		}
+	}
+	return IncidentViewer{CanAcknowledge: can, CanResolve: can}, nil
+}
+
+func pagedIn(timeline []*murphy.TimelineEntry, userID string) bool {
+	return slices.ContainsFunc(timeline, func(entry *murphy.TimelineEntry) bool {
+		return slices.ContainsFunc(entry.GetEscalation().GetPaged(), func(page *murphy.TimelinePage) bool { return page.GetUserId() == userID })
+	})
 }
 
 func toIncident(incident *murphy.Incident, n *names) Incident {
@@ -159,6 +201,7 @@ func (s *Server) AcknowledgeIncident(ctx context.Context, request AcknowledgeInc
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
+	telemetry.Collect(ctx, telemetry.WithField("incident.id", request.Id))
 	incident, err := s.incidents.Acknowledge(ctx, request.Id, sessionFrom(ctx).session.GetUserId())
 	if err != nil {
 		return nil, err
@@ -170,6 +213,7 @@ func (s *Server) ResolveIncident(ctx context.Context, request ResolveIncidentReq
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
+	telemetry.Collect(ctx, telemetry.WithField("incident.id", request.Id))
 	incident, err := s.incidents.Resolve(ctx, request.Id, sessionFrom(ctx).session.GetUserId())
 	if err != nil {
 		return nil, err

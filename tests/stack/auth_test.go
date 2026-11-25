@@ -314,6 +314,40 @@ func TestTheOwningTeamsResponderAcknowledges(t *testing.T) {
 	assert.Equal(t, http.StatusOK, got.StatusCode())
 }
 
+func TestTheSessionListsTheTeamsYouAreOn(t *testing.T) {
+	m := murphytest.New(t)
+	team := m.Team()
+	bo := m.Member(murphytest.Bo)
+	team.Add(bo, client.Responder)
+
+	got, err := bo.API.GetSessionWithResponse(t.Context())
+
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, got.StatusCode())
+	assert.Equal(t, client.Responder, murphytest.RolesIn(got.JSON200.Memberships)[team.ID])
+}
+
+func TestAnIncidentTellsTheViewerWhetherTheyCanRespond(t *testing.T) {
+	m := murphytest.New(t)
+	team := m.Team()
+	bo := m.Member(murphytest.Bo)
+	team.Add(bo, client.Responder)
+	cy := m.Member(murphytest.Cy)
+	incident := m.Service(murphytest.OwnedBy(team), murphytest.Pages(m.User().Target())).Fire("disk-full")
+
+	responder, err := bo.API.GetIncidentWithResponse(t.Context(), incident.ID)
+	require.NoError(t, err)
+	outsider, err := cy.API.GetIncidentWithResponse(t.Context(), incident.ID)
+	require.NoError(t, err)
+	incident.Resolve()
+	resolved, err := bo.API.GetIncidentWithResponse(t.Context(), incident.ID)
+	require.NoError(t, err)
+
+	assert.Equal(t, client.IncidentViewer{CanAcknowledge: true, CanResolve: true}, responder.JSON200.Viewer)
+	assert.Equal(t, client.IncidentViewer{}, outsider.JSON200.Viewer)
+	assert.Equal(t, client.IncidentViewer{}, resolved.JSON200.Viewer, "a resolved incident takes no more responses")
+}
+
 func TestAnObserverCannotAcknowledge(t *testing.T) {
 	m := murphytest.New(t)
 	team := m.Team()

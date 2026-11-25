@@ -241,11 +241,17 @@ func (s *Server) SignOut(ctx context.Context, _ SignOutRequestObject) (_ SignOut
 }
 
 func (s *Server) session(ctx context.Context, session *murphy.Session) (Session, error) {
-	user, err := s.people.GetUser(ctx, session.GetUserId())
+	user, memberships, err := s.people.ListMembershipsOfUser(ctx, session.GetUserId())
 	if err != nil {
 		return Session{}, err
 	}
-	return Session{User: toUser(user), ExpiresAt: session.GetExpiresAt().AsTime()}, nil
+	n := newNames()
+	n.knowUser(user)
+	out := Session{User: toUser(user), Memberships: make([]TeamMembership, len(memberships)), ExpiresAt: session.GetExpiresAt().AsTime()}
+	for i, membership := range memberships {
+		out.Memberships[i] = toMembership(membership, n)
+	}
+	return out, s.name(ctx, n)
 }
 
 func (s *Server) cookie(token string, expires time.Time) string {

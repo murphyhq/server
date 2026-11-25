@@ -109,7 +109,10 @@ func Collect(ctx context.Context, fields ...Field) {
 	trace.SpanFromContext(ctx).SetAttributes(Attributes(fields)...)
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.fields = append(c.fields, fields...)
+	for _, field := range fields {
+		c.fields = slices.DeleteFunc(c.fields, func(collected Field) bool { return collected.Name() == field.Name() })
+		c.fields = append(c.fields, field)
+	}
 }
 
 func Collected(ctx context.Context) []Field {
