@@ -236,16 +236,7 @@ func requestWithAppHeaders(t *testing.T, headers map[string]string) {
 	httpserver.Handler(mux).ServeHTTP(httptest.NewRecorder(), request)
 }
 
-func attributeValues(attributes []attribute.KeyValue) map[string]string {
-	values := map[string]string{}
-	for _, kv := range attributes {
-		values[string(kv.Key)] = kv.Value.String()
-	}
-	return values
-}
-
-func TestAnAppsDeviceIsOnItsRequestsSpanAndLog(t *testing.T) {
-	exporter := traced(t)
+func TestAnAppsDeviceIsOnItsRequestLog(t *testing.T) {
 	var logs bytes.Buffer
 	previous := slog.Default()
 	slog.SetDefault(slog.New(slog.NewJSONHandler(&logs, nil)))
@@ -260,32 +251,29 @@ func TestAnAppsDeviceIsOnItsRequestsSpanAndLog(t *testing.T) {
 		"Murphy-Locale":       "pt-BR",
 	})
 
-	spans := exporter.GetSpans()
-	require.NotEmpty(t, spans)
-	values := attributeValues(spans[len(spans)-1].Attributes)
-	assert.Equal(t, "1.4.2", values["murphy.client.app.version"])
-	assert.Equal(t, "57", values["murphy.client.app.build"])
-	assert.Equal(t, "iOS", values["os.name"])
-	assert.Equal(t, "26.1", values["os.version"])
-	assert.Equal(t, "iPhone 16", values["device.model.name"])
-	assert.Equal(t, "pt-BR", values["murphy.client.locale"])
-
 	var line map[string]any
 	require.NoError(t, json.Unmarshal(bytes.TrimSpace(logs.Bytes()), &line))
+	assert.Equal(t, "1.4.2", line["murphy.client.app.version"])
+	assert.Equal(t, "57", line["murphy.client.app.build"])
 	assert.Equal(t, "iOS", line["os.name"])
+	assert.Equal(t, "26.1", line["os.version"])
 	assert.Equal(t, "iPhone 16", line["device.model.name"])
+	assert.Equal(t, "pt-BR", line["murphy.client.locale"])
 }
 
 func TestAClientsValuesAreCleanedAndCapped(t *testing.T) {
-	exporter := traced(t)
+	var logs bytes.Buffer
+	previous := slog.Default()
+	slog.SetDefault(slog.New(slog.NewJSONHandler(&logs, nil)))
+	t.Cleanup(func() { slog.SetDefault(previous) })
 
 	requestWithAppHeaders(t, map[string]string{
 		"Murphy-Device-Model": "iPhone\x00 16 " + strings.Repeat("x", 200),
 	})
 
-	spans := exporter.GetSpans()
-	require.NotEmpty(t, spans)
-	model := attributeValues(spans[len(spans)-1].Attributes)["device.model.name"]
+	var line map[string]any
+	require.NoError(t, json.Unmarshal(bytes.TrimSpace(logs.Bytes()), &line))
+	model := line["device.model.name"].(string)
 	assert.Len(t, []rune(model), 64)
 	assert.NotContains(t, model, "\x00")
 	assert.True(t, strings.HasPrefix(model, "iPhone 16 "))
