@@ -76,7 +76,11 @@ CREATE TABLE email_provider (
   username text NOT NULL,
   secret text NOT NULL,
   updated_at timestamptz NOT NULL,
+  status text NOT NULL DEFAULT 'pending',
+  problem text NOT NULL DEFAULT '',
+  checked_at timestamptz,
   CONSTRAINT email_provider_pkey PRIMARY KEY (singleton),
   CONSTRAINT email_provider_singleton_check CHECK (singleton),
-  CONSTRAINT email_provider_type_check CHECK (type IN ('smtp'))
+  CONSTRAINT email_provider_type_check CHECK (type IN ('smtp')),
+  CONSTRAINT email_provider_status_check CHECK (status IN ('pending', 'ready', 'failing'))
 );
