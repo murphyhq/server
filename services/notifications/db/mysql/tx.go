@@ -81,11 +81,32 @@ func (t *Tx) CreateScheduledMessages(ctx context.Context, messages []*notificati
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
-	rows := murphymysql.Rows{Name: "CreateScheduledMessages", Table: "scheduled_messages", Columns: []string{"id", "due_at", "envelope", "created_at"}}
+	rows := murphymysql.Rows{Name: "CreateScheduledMessages", Table: "scheduled_messages", Columns: []string{"id", "due_at", "envelope", "created_at", "waiting_incident_id", "waiting_notification_id"}}
 	for _, message := range messages {
-		rows.Values = append(rows.Values, []any{message.ID, message.DueAt.UTC(), message.Envelope, at})
+		rows.Values = append(rows.Values, []any{message.ID, message.DueAt.UTC(), message.Envelope, at, waitingID(message.Waiting.GetIncident().GetId()), waitingID(message.Waiting.GetId())})
 	}
 	return murphymysql.Error("scheduled message", murphymysql.Insert(ctx, t.tx, rows))
+}
+
+func waitingID(id string) *string {
+	if id == "" {
+		return nil
+	}
+	return &id
+}
+
+func (t *Tx) CancelWaitingNotifications(ctx context.Context, incidentID string, at time.Time) (err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	return murphymysql.Error("notification", t.queries.CancelWaitingNotifications(ctx, CancelWaitingNotificationsParams{IncidentID: &incidentID, At: at, ClaimsExpireBy: &at}))
+}
+
+func (t *Tx) DeleteWaitingMessages(ctx context.Context, incidentID string, at time.Time) (err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	return murphymysql.Error("scheduled message", t.queries.DeleteWaitingMessages(ctx, DeleteWaitingMessagesParams{IncidentID: &incidentID, ClaimsExpireBy: &at}))
 }
 
 func (t *Tx) LockDueMessages(ctx context.Context, now time.Time, limit int) (_ []*notifications.ScheduledMessage, err error) {

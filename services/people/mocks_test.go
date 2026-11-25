@@ -3132,6 +3132,80 @@ func (_c *MockRepository_ListNotificationRules_Call) RunAndReturn(run func(ctx c
 	return _c
 }
 
+// ListNotificationRulesOfUsers provides a mock function for the type MockRepository
+func (_mock *MockRepository) ListNotificationRulesOfUsers(ctx context.Context, userIDs []string, urgency murphy.Urgency) ([]*murphy.NotificationRule, error) {
+	ret := _mock.Called(ctx, userIDs, urgency)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListNotificationRulesOfUsers")
+	}
+
+	var r0 []*murphy.NotificationRule
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, []string, murphy.Urgency) ([]*murphy.NotificationRule, error)); ok {
+		return returnFunc(ctx, userIDs, urgency)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, []string, murphy.Urgency) []*murphy.NotificationRule); ok {
+		r0 = returnFunc(ctx, userIDs, urgency)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]*murphy.NotificationRule)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, []string, murphy.Urgency) error); ok {
+		r1 = returnFunc(ctx, userIDs, urgency)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockRepository_ListNotificationRulesOfUsers_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListNotificationRulesOfUsers'
+type MockRepository_ListNotificationRulesOfUsers_Call struct {
+	*mock.Call
+}
+
+// ListNotificationRulesOfUsers is a helper method to define mock.On call
+//   - ctx context.Context
+//   - userIDs []string
+//   - urgency murphy.Urgency
+func (_e *MockRepository_Expecter) ListNotificationRulesOfUsers(ctx any, userIDs any, urgency any) *MockRepository_ListNotificationRulesOfUsers_Call {
+	return &MockRepository_ListNotificationRulesOfUsers_Call{Call: _e.mock.On("ListNotificationRulesOfUsers", ctx, userIDs, urgency)}
+}
+
+func (_c *MockRepository_ListNotificationRulesOfUsers_Call) Run(run func(ctx context.Context, userIDs []string, urgency murphy.Urgency)) *MockRepository_ListNotificationRulesOfUsers_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 []string
+		if args[1] != nil {
+			arg1 = args[1].([]string)
+		}
+		var arg2 murphy.Urgency
+		if args[2] != nil {
+			arg2 = args[2].(murphy.Urgency)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_ListNotificationRulesOfUsers_Call) Return(notificationRules []*murphy.NotificationRule, err error) *MockRepository_ListNotificationRulesOfUsers_Call {
+	_c.Call.Return(notificationRules, err)
+	return _c
+}
+
+func (_c *MockRepository_ListNotificationRulesOfUsers_Call) RunAndReturn(run func(ctx context.Context, userIDs []string, urgency murphy.Urgency) ([]*murphy.NotificationRule, error)) *MockRepository_ListNotificationRulesOfUsers_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ListTeams provides a mock function for the type MockRepository
 func (_mock *MockRepository) ListTeams(ctx context.Context, before string, limit int) ([]*murphy.Team, error) {
 	ret := _mock.Called(ctx, before, limit)

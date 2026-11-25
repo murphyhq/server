@@ -61,9 +61,11 @@ type PageRecipient struct {
 }
 
 type ScheduledMessage struct {
-	ID           string
-	DueAt        time.Time
-	ClaimedUntil *time.Time
-	Envelope     []byte
-	CreatedAt    time.Time
+	ID                    string
+	DueAt                 time.Time
+	ClaimedUntil          *time.Time
+	Envelope              []byte
+	CreatedAt             time.Time
+	WaitingIncidentID     *string
+	WaitingNotificationID *string
 }

@@ -31,6 +31,7 @@ type domain struct {
 	onCall     map[string]string
 	active     map[string]bool
 	methods    map[string][]*murphy.ContactMethod
+	delays     map[string]time.Duration
 	recipients []string
 	recorded   *notifications.Change
 	people     *MockPeople
@@ -61,6 +62,7 @@ func newDomain(t *testing.T) *domain {
 		}}},
 		onCall: map[string]string{primary: ana},
 		active: map[string]bool{ana: true, bo: true},
+		delays: map[string]time.Duration{},
 		methods: map[string][]*murphy.ContactMethod{
 			ana: {contactMethod(ana, murphy.ContactMethodType_CONTACT_METHOD_TYPE_WEBHOOK), contactMethod(ana, murphy.ContactMethodType_CONTACT_METHOD_TYPE_EMAIL)},
 			bo:  {contactMethod(bo, murphy.ContactMethodType_CONTACT_METHOD_TYPE_WEBHOOK)},
@@ -92,6 +94,17 @@ func newDomain(t *testing.T) *domain {
 			if methods, ok := d.methods[id]; ok {
 				found[id] = methods
 			}
+		}
+		return found, nil
+	}).Maybe()
+	people.EXPECT().NotificationRulesOfUsers(mock.Anything, mock.Anything, mock.Anything).RunAndReturn(func(_ context.Context, ids []string, urgency murphy.Urgency) (map[string]*murphy.NotificationRule, error) {
+		found := map[string]*murphy.NotificationRule{}
+		for _, id := range ids {
+			rule := &murphy.NotificationRule{UserId: id, Urgency: urgency}
+			for _, method := range d.methods[id] {
+				rule.Steps = append(rule.Steps, &murphy.NotificationStep{ContactMethodId: method.GetId(), ContactMethod: method, Delay: durationpb.New(d.delays[method.GetId()])})
+			}
+			found[id] = rule
 		}
 		return found, nil
 	}).Maybe()
@@ -158,6 +171,46 @@ func TestEachContactMethodOfEveryoneReachedGetsANotification(t *testing.T) {
 	for _, envelope := range envelopes[1:] {
 		assert.Equal(t, murphy.NotificationVerb_NOTIFICATION_VERB_CREATED, envelope.GetNotification().GetVerb())
 	}
+}
+
+func TestALaterStepWaitsForItsDelayAndGivesUpWhenTheNextLevelIsDue(t *testing.T) {
+	d := newDomain(t)
+	email := d.methods[ana][1]
+	d.delays[email.GetId()] = 2 * time.Minute
+
+	require.NoError(t, d.service.IncidentEscalated(t.Context(), "message-1", d.escalated(1)))
+
+	require.Len(t, d.recorded.Messages, 4)
+	webhook, later := d.recorded.Messages[1], d.recorded.Messages[2]
+	assert.WithinDuration(t, time.Now(), webhook.DueAt, time.Second, "the first step goes at once")
+	assert.Nil(t, webhook.Waiting, "a step going at once is never cancelled")
+	assert.WithinDuration(t, time.Now().Add(2*time.Minute), later.DueAt, time.Second)
+	require.NotNil(t, later.Waiting, "a step that waits can be cancelled")
+	assert.Equal(t, email.GetId(), later.Waiting.GetContactMethod().GetId())
+	assert.WithinDuration(t, time.Now().Add(5*time.Minute), later.Waiting.GetDeadline().AsTime(), time.Second, "retried until the next level, like the rest of the page")
+}
+
+func TestAStepDueAfterTheNextLevelStillGetsItsTurn(t *testing.T) {
+	d := newDomain(t)
+	email := d.methods[ana][1]
+	d.delays[email.GetId()] = 6 * time.Minute
+
+	require.NoError(t, d.service.IncidentEscalated(t.Context(), "message-1", d.escalated(1)))
+
+	later := d.recorded.Messages[2].Waiting
+	require.NotNil(t, later)
+	assert.WithinDuration(t, time.Now().Add(11*time.Minute), later.GetDeadline().AsTime(), time.Second, "retried for 5 minutes from when it's due")
+}
+
+func TestAcknowledgingStopsTheStepsStillWaiting(t *testing.T) {
+	d := newDomain(t)
+	d.recipients = []string{ana}
+	incident := d.escalated(1)
+	incident.Status = murphy.IncidentStatus_INCIDENT_STATUS_ACKNOWLEDGED
+
+	require.NoError(t, d.service.IncidentAcknowledged(t.Context(), "message-1", incident))
+
+	assert.Equal(t, incident.GetId(), d.recorded.StopWaiting)
 }
 
 func TestTargetsThatReachNobodyAreRecordedOnThePage(t *testing.T) {

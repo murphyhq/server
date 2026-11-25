@@ -150,4 +150,5 @@ message NotificationRule {
 message NotificationStep {
   string contact_method_id = 1;
   google.protobuf.Duration delay = 2;
+  ContactMethod contact_method = 3;
 }

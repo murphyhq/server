@@ -244,3 +244,9 @@ WHERE user_id = @user_id AND urgency = @urgency;
 -- name: CreateNotificationRules :exec
 INSERT INTO notification_rules (id, user_id, urgency, position, contact_method_id, delay_seconds, created_at)
 SELECT unnest(@ids::uuid[]), @user_id, @urgency, unnest(@positions::integer[]), unnest(@contact_method_ids::uuid[]), unnest(@delay_seconds::integer[]), @created_at;
+
+-- name: ListNotificationRulesOfUsers :many
+SELECT id, user_id, urgency, position, contact_method_id, delay_seconds, created_at
+FROM notification_rules
+WHERE user_id = ANY(@user_ids::uuid[]) AND urgency = @urgency
+ORDER BY user_id, position;

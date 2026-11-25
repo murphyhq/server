@@ -93,8 +93,24 @@ func (t *Tx) CreateScheduledMessages(ctx context.Context, messages []*notificati
 		params.Ids = append(params.Ids, message.ID)
 		params.DueAts = append(params.DueAts, message.DueAt.UTC())
 		params.Envelopes = append(params.Envelopes, message.Envelope)
+		params.WaitingIncidentIds = append(params.WaitingIncidentIds, message.Waiting.GetIncident().GetId())
+		params.WaitingNotificationIds = append(params.WaitingNotificationIds, message.Waiting.GetId())
 	}
 	return murphypostgres.Error("scheduled message", t.queries.CreateScheduledMessages(ctx, params))
+}
+
+func (t *Tx) CancelWaitingNotifications(ctx context.Context, incidentID string, at time.Time) (err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	return murphypostgres.Error("notification", t.queries.CancelWaitingNotifications(ctx, CancelWaitingNotificationsParams{IncidentID: &incidentID, At: at}))
+}
+
+func (t *Tx) DeleteWaitingMessages(ctx context.Context, incidentID string, at time.Time) (err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	return murphypostgres.Error("scheduled message", t.queries.DeleteWaitingMessages(ctx, DeleteWaitingMessagesParams{IncidentID: &incidentID, At: &at}))
 }
 
 func (t *Tx) LockDueMessages(ctx context.Context, now time.Time, limit int) (_ []*notifications.ScheduledMessage, err error) {

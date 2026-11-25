@@ -10,6 +10,25 @@ import (
 	"time"
 )
 
+const cancelWaitingNotifications = `-- name: CancelWaitingNotifications :exec
+UPDATE notifications
+SET status = 'cancelled', updated_at = $1
+WHERE id IN (
+  SELECT waiting_notification_id FROM scheduled_messages
+  WHERE waiting_incident_id = $2 AND (claimed_until IS NULL OR claimed_until <= $1)
+)
+`
+
+type CancelWaitingNotificationsParams struct {
+	At         time.Time
+	IncidentID *string
+}
+
+func (q *Queries) CancelWaitingNotifications(ctx context.Context, arg CancelWaitingNotificationsParams) error {
+	_, err := q.db.Exec(ctx, cancelWaitingNotifications, arg.At, arg.IncidentID)
+	return err
+}
+
 const claimMessages = `-- name: ClaimMessages :exec
 UPDATE scheduled_messages
 SET claimed_until = $1
@@ -109,15 +128,18 @@ func (q *Queries) CreatePageRecipients(ctx context.Context, arg CreatePageRecipi
 }
 
 const createScheduledMessages = `-- name: CreateScheduledMessages :exec
-INSERT INTO scheduled_messages (id, due_at, envelope, created_at)
-SELECT unnest($1::uuid[]), unnest($2::timestamptz[]), unnest($3::bytea[]), $4::timestamptz
+INSERT INTO scheduled_messages (id, due_at, envelope, created_at, waiting_incident_id, waiting_notification_id)
+SELECT unnest($1::uuid[]), unnest($2::timestamptz[]), unnest($3::bytea[]), $4::timestamptz,
+  NULLIF(unnest($5::text[]), '')::uuid, NULLIF(unnest($6::text[]), '')::uuid
 `
 
 type CreateScheduledMessagesParams struct {
-	Ids       []string
-	DueAts    []time.Time
-	Envelopes [][]byte
-	CreatedAt time.Time
+	Ids                    []string
+	DueAts                 []time.Time
+	Envelopes              [][]byte
+	CreatedAt              time.Time
+	WaitingIncidentIds     []string
+	WaitingNotificationIds []string
 }
 
 func (q *Queries) CreateScheduledMessages(ctx context.Context, arg CreateScheduledMessagesParams) error {
@@ -126,6 +148,8 @@ func (q *Queries) CreateScheduledMessages(ctx context.Context, arg CreateSchedul
 		arg.DueAts,
 		arg.Envelopes,
 		arg.CreatedAt,
+		arg.WaitingIncidentIds,
+		arg.WaitingNotificationIds,
 	)
 	return err
 }
@@ -146,6 +170,21 @@ WHERE id = ANY($1::uuid[])
 
 func (q *Queries) DeleteMessages(ctx context.Context, ids []string) error {
 	_, err := q.db.Exec(ctx, deleteMessages, ids)
+	return err
+}
+
+const deleteWaitingMessages = `-- name: DeleteWaitingMessages :exec
+DELETE FROM scheduled_messages
+WHERE waiting_incident_id = $1 AND (claimed_until IS NULL OR claimed_until <= $2)
+`
+
+type DeleteWaitingMessagesParams struct {
+	IncidentID *string
+	At         *time.Time
+}
+
+func (q *Queries) DeleteWaitingMessages(ctx context.Context, arg DeleteWaitingMessagesParams) error {
+	_, err := q.db.Exec(ctx, deleteWaitingMessages, arg.IncidentID, arg.At)
 	return err
 }
 
@@ -369,32 +408,35 @@ WITH handled AS (
   SELECT unnest($12::uuid[]), $4::uuid, page.id, unnest($13::uuid[]), unnest($14::uuid[]), unnest($15::text[]), 'paged', 'created', $7::timestamptz, $7::timestamptz
   FROM page
 ), scheduled AS (
-  INSERT INTO scheduled_messages (id, due_at, envelope, created_at)
-  SELECT unnest($16::uuid[]), unnest($17::timestamptz[]), unnest($18::bytea[]), $2::timestamptz
+  INSERT INTO scheduled_messages (id, due_at, envelope, created_at, waiting_incident_id, waiting_notification_id)
+  SELECT unnest($16::uuid[]), unnest($17::timestamptz[]), unnest($18::bytea[]), $2::timestamptz,
+    NULLIF(unnest($19::text[]), '')::uuid, NULLIF(unnest($20::text[]), '')::uuid
   FROM handled
 )
 SELECT count(*) FROM handled
 `
 
 type RecordPageParams struct {
-	MessageID           string
-	At                  time.Time
-	PageID              string
-	IncidentID          string
-	EscalationLevel     int32
-	EscalationRound     int32
-	CreatedAt           time.Time
-	RecipientIds        []string
-	RecipientUserIds    []string
-	RecipientViaTypes   []string
-	RecipientViaIds     []string
-	NotificationIds     []string
-	NotificationUserIds []string
-	ContactMethodIds    []string
-	Channels            []string
-	MessageIds          []string
-	DueAts              []time.Time
-	Envelopes           [][]byte
+	MessageID              string
+	At                     time.Time
+	PageID                 string
+	IncidentID             string
+	EscalationLevel        int32
+	EscalationRound        int32
+	CreatedAt              time.Time
+	RecipientIds           []string
+	RecipientUserIds       []string
+	RecipientViaTypes      []string
+	RecipientViaIds        []string
+	NotificationIds        []string
+	NotificationUserIds    []string
+	ContactMethodIds       []string
+	Channels               []string
+	MessageIds             []string
+	DueAts                 []time.Time
+	Envelopes              [][]byte
+	WaitingIncidentIds     []string
+	WaitingNotificationIds []string
 }
 
 func (q *Queries) RecordPage(ctx context.Context, arg RecordPageParams) (int64, error) {
@@ -417,6 +459,8 @@ func (q *Queries) RecordPage(ctx context.Context, arg RecordPageParams) (int64, 
 		arg.MessageIds,
 		arg.DueAts,
 		arg.Envelopes,
+		arg.WaitingIncidentIds,
+		arg.WaitingNotificationIds,
 	)
 	var count int64
 	err := row.Scan(&count)

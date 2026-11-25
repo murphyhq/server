@@ -1224,6 +1224,7 @@ type NotificationStep struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
 	ContactMethodId string                 `protobuf:"bytes,1,opt,name=contact_method_id,json=contactMethodId,proto3" json:"contact_method_id,omitempty"`
 	Delay           *durationpb.Duration   `protobuf:"bytes,2,opt,name=delay,proto3" json:"delay,omitempty"`
+	ContactMethod   *ContactMethod         `protobuf:"bytes,3,opt,name=contact_method,json=contactMethod,proto3" json:"contact_method,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -1268,6 +1269,13 @@ func (x *NotificationStep) GetContactMethodId() string {
 func (x *NotificationStep) GetDelay() *durationpb.Duration {
 	if x != nil {
 		return x.Delay
+	}
+	return nil
+}
+
+func (x *NotificationStep) GetContactMethod() *ContactMethod {
+	if x != nil {
+		return x.ContactMethod
 	}
 	return nil
 }
@@ -1372,10 +1380,11 @@ const file_murphy_v1_people_proto_rawDesc = "" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12,\n" +
 	"\aurgency\x18\x02 \x01(\x0e2\x12.murphy.v1.UrgencyR\aurgency\x121\n" +
 	"\x05steps\x18\x03 \x03(\v2\x1b.murphy.v1.NotificationStepR\x05steps\x12\x16\n" +
-	"\x06custom\x18\x04 \x01(\bR\x06custom\"o\n" +
+	"\x06custom\x18\x04 \x01(\bR\x06custom\"\xb0\x01\n" +
 	"\x10NotificationStep\x12*\n" +
 	"\x11contact_method_id\x18\x01 \x01(\tR\x0fcontactMethodId\x12/\n" +
-	"\x05delay\x18\x02 \x01(\v2\x19.google.protobuf.DurationR\x05delay*P\n" +
+	"\x05delay\x18\x02 \x01(\v2\x19.google.protobuf.DurationR\x05delay\x12?\n" +
+	"\x0econtact_method\x18\x03 \x01(\v2\x18.murphy.v1.ContactMethodR\rcontactMethod*P\n" +
 	"\bUserRole\x12\x19\n" +
 	"\x15USER_ROLE_UNSPECIFIED\x10\x00\x12\x13\n" +
 	"\x0fUSER_ROLE_ADMIN\x10\x01\x12\x14\n" +
@@ -1482,11 +1491,12 @@ var file_murphy_v1_people_proto_depIdxs = []int32{
 	18, // 30: murphy.v1.NotificationRule.urgency:type_name -> murphy.v1.Urgency
 	16, // 31: murphy.v1.NotificationRule.steps:type_name -> murphy.v1.NotificationStep
 	19, // 32: murphy.v1.NotificationStep.delay:type_name -> google.protobuf.Duration
-	33, // [33:33] is the sub-list for method output_type
-	33, // [33:33] is the sub-list for method input_type
-	33, // [33:33] is the sub-list for extension type_name
-	33, // [33:33] is the sub-list for extension extendee
-	0,  // [0:33] is the sub-list for field type_name
+	8,  // 33: murphy.v1.NotificationStep.contact_method:type_name -> murphy.v1.ContactMethod
+	34, // [34:34] is the sub-list for method output_type
+	34, // [34:34] is the sub-list for method input_type
+	34, // [34:34] is the sub-list for extension type_name
+	34, // [34:34] is the sub-list for extension extendee
+	0,  // [0:34] is the sub-list for field type_name
 }
 
 func init() { file_murphy_v1_people_proto_init() }

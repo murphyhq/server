@@ -446,6 +446,7 @@ type Notification struct {
 	PageId            string                 `protobuf:"bytes,12,opt,name=page_id,json=pageId,proto3" json:"page_id,omitempty"`
 	Deadline          *timestamppb.Timestamp `protobuf:"bytes,13,opt,name=deadline,proto3" json:"deadline,omitempty"`
 	ContactMethodGone bool                   `protobuf:"varint,14,opt,name=contact_method_gone,json=contactMethodGone,proto3" json:"contact_method_gone,omitempty"`
+	DueAt             *timestamppb.Timestamp `protobuf:"bytes,15,opt,name=due_at,json=dueAt,proto3" json:"due_at,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
@@ -576,6 +577,13 @@ func (x *Notification) GetContactMethodGone() bool {
 		return x.ContactMethodGone
 	}
 	return false
+}
+
+func (x *Notification) GetDueAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.DueAt
+	}
+	return nil
 }
 
 type NotificationEvent struct {
@@ -775,7 +783,7 @@ const file_murphy_v1_notifications_proto_rawDesc = "" +
 	"\tPageEvent\x12'\n" +
 	"\x04verb\x18\x01 \x01(\x0e2\x13.murphy.v1.PageVerbR\x04verb\x12+\n" +
 	"\bprevious\x18\x02 \x01(\v2\x0f.murphy.v1.PageR\bprevious\x12)\n" +
-	"\acurrent\x18\x03 \x01(\v2\x0f.murphy.v1.PageR\acurrent\"\xf0\x04\n" +
+	"\acurrent\x18\x03 \x01(\v2\x0f.murphy.v1.PageR\acurrent\"\xa3\x05\n" +
 	"\fNotification\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x125\n" +
 	"\x06reason\x18\x02 \x01(\x0e2\x1d.murphy.v1.NotificationReasonR\x06reason\x12/\n" +
@@ -792,7 +800,8 @@ const file_murphy_v1_notifications_proto_rawDesc = "" +
 	"\afailure\x18\v \x01(\tR\afailure\x12\x17\n" +
 	"\apage_id\x18\f \x01(\tR\x06pageId\x126\n" +
 	"\bdeadline\x18\r \x01(\v2\x1a.google.protobuf.TimestampR\bdeadline\x12.\n" +
-	"\x13contact_method_gone\x18\x0e \x01(\bR\x11contactMethodGone\"\xac\x01\n" +
+	"\x13contact_method_gone\x18\x0e \x01(\bR\x11contactMethodGone\x121\n" +
+	"\x06due_at\x18\x0f \x01(\v2\x1a.google.protobuf.TimestampR\x05dueAt\"\xac\x01\n" +
 	"\x11NotificationEvent\x12/\n" +
 	"\x04verb\x18\x01 \x01(\x0e2\x1b.murphy.v1.NotificationVerbR\x04verb\x123\n" +
 	"\bprevious\x18\x02 \x01(\v2\x17.murphy.v1.NotificationR\bprevious\x121\n" +
@@ -875,18 +884,19 @@ var file_murphy_v1_notifications_proto_depIdxs = []int32{
 	12, // 12: murphy.v1.Notification.created_at:type_name -> google.protobuf.Timestamp
 	12, // 13: murphy.v1.Notification.sent_at:type_name -> google.protobuf.Timestamp
 	12, // 14: murphy.v1.Notification.deadline:type_name -> google.protobuf.Timestamp
-	1,  // 15: murphy.v1.NotificationEvent.verb:type_name -> murphy.v1.NotificationVerb
-	7,  // 16: murphy.v1.NotificationEvent.previous:type_name -> murphy.v1.Notification
-	7,  // 17: murphy.v1.NotificationEvent.current:type_name -> murphy.v1.Notification
-	3,  // 18: murphy.v1.EmailProvider.type:type_name -> murphy.v1.EmailProviderType
-	12, // 19: murphy.v1.EmailProvider.updated_at:type_name -> google.protobuf.Timestamp
-	2,  // 20: murphy.v1.EmailProvider.status:type_name -> murphy.v1.EmailProviderStatus
-	12, // 21: murphy.v1.EmailProvider.checked_at:type_name -> google.protobuf.Timestamp
-	22, // [22:22] is the sub-list for method output_type
-	22, // [22:22] is the sub-list for method input_type
-	22, // [22:22] is the sub-list for extension type_name
-	22, // [22:22] is the sub-list for extension extendee
-	0,  // [0:22] is the sub-list for field type_name
+	12, // 15: murphy.v1.Notification.due_at:type_name -> google.protobuf.Timestamp
+	1,  // 16: murphy.v1.NotificationEvent.verb:type_name -> murphy.v1.NotificationVerb
+	7,  // 17: murphy.v1.NotificationEvent.previous:type_name -> murphy.v1.Notification
+	7,  // 18: murphy.v1.NotificationEvent.current:type_name -> murphy.v1.Notification
+	3,  // 19: murphy.v1.EmailProvider.type:type_name -> murphy.v1.EmailProviderType
+	12, // 20: murphy.v1.EmailProvider.updated_at:type_name -> google.protobuf.Timestamp
+	2,  // 21: murphy.v1.EmailProvider.status:type_name -> murphy.v1.EmailProviderStatus
+	12, // 22: murphy.v1.EmailProvider.checked_at:type_name -> google.protobuf.Timestamp
+	23, // [23:23] is the sub-list for method output_type
+	23, // [23:23] is the sub-list for method input_type
+	23, // [23:23] is the sub-list for extension type_name
+	23, // [23:23] is the sub-list for extension extendee
+	0,  // [0:23] is the sub-list for field type_name
 }
 
 func init() { file_murphy_v1_notifications_proto_init() }

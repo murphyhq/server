@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -40,6 +41,14 @@ func (b *Mailbox) WaitForMail(count int) []Mail {
 		assert.Len(c, found, count, "mail to %s", b.address)
 	}, Settle, tick)
 	return found
+}
+
+func (b *Mailbox) GetsNoMoreFor(count int, wait time.Duration) {
+	b.t.Helper()
+	require.Never(b.t, func() bool {
+		c := &assert.CollectT{}
+		return len(b.mail(c)) > count
+	}, wait, time.Second, "more than %d mails to %s", count, b.address)
 }
 
 func (b *Mailbox) mail(c *assert.CollectT) []Mail {

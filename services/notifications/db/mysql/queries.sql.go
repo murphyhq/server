@@ -11,6 +11,24 @@ import (
 	"time"
 )
 
+const cancelWaitingNotifications = `-- name: CancelWaitingNotifications :exec
+UPDATE notifications n
+JOIN scheduled_messages m ON m.waiting_notification_id = n.id
+SET n.status = 'cancelled', n.updated_at = ?
+WHERE m.waiting_incident_id = ? AND (m.claimed_until IS NULL OR m.claimed_until <= ?)
+`
+
+type CancelWaitingNotificationsParams struct {
+	At             time.Time
+	IncidentID     *string
+	ClaimsExpireBy *time.Time
+}
+
+func (q *Queries) CancelWaitingNotifications(ctx context.Context, arg CancelWaitingNotificationsParams) error {
+	_, err := q.db.ExecContext(ctx, cancelWaitingNotifications, arg.At, arg.IncidentID, arg.ClaimsExpireBy)
+	return err
+}
+
 const claimMessages = `-- name: ClaimMessages :exec
 UPDATE scheduled_messages
 SET claimed_until = ?
@@ -88,6 +106,21 @@ func (q *Queries) DeleteMessages(ctx context.Context, ids []string) error {
 		query = strings.Replace(query, "/*SLICE:ids*/?", "NULL", 1)
 	}
 	_, err := q.db.ExecContext(ctx, query, queryParams...)
+	return err
+}
+
+const deleteWaitingMessages = `-- name: DeleteWaitingMessages :exec
+DELETE FROM scheduled_messages
+WHERE waiting_incident_id = ? AND (claimed_until IS NULL OR claimed_until <= ?)
+`
+
+type DeleteWaitingMessagesParams struct {
+	IncidentID     *string
+	ClaimsExpireBy *time.Time
+}
+
+func (q *Queries) DeleteWaitingMessages(ctx context.Context, arg DeleteWaitingMessagesParams) error {
+	_, err := q.db.ExecContext(ctx, deleteWaitingMessages, arg.IncidentID, arg.ClaimsExpireBy)
 	return err
 }
 

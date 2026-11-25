@@ -39,6 +39,7 @@ type OnCall interface {
 type People interface {
 	ActiveUsers(ctx context.Context, ids []string) (map[string]bool, error)
 	ContactMethodsOfUsers(ctx context.Context, userIDs []string) (map[string][]*murphy.ContactMethod, error)
+	NotificationRulesOfUsers(ctx context.Context, userIDs []string, urgency murphy.Urgency) (map[string]*murphy.NotificationRule, error)
 	DisableContactMethod(ctx context.Context, method *murphy.ContactMethod, reason string, at time.Time) error
 }
 
@@ -48,12 +49,14 @@ type Change struct {
 	Notifications []*murphy.Notification
 	Outcome       *murphy.Notification
 	Messages      []*ScheduledMessage
+	StopWaiting   string
 }
 
 type ScheduledMessage struct {
 	ID       string
 	DueAt    time.Time
 	Envelope []byte
+	Waiting  *murphy.Notification
 }
 
 const (
@@ -102,16 +105,22 @@ func (s *Service) IncidentEscalated(ctx context.Context, messageID string, incid
 	for i, recipient := range page.GetReached() {
 		users[i] = recipient.GetUserId()
 	}
-	methods, err := s.people.ContactMethodsOfUsers(ctx, users)
+	rules, err := s.people.NotificationRulesOfUsers(ctx, users, incident.GetUrgency())
 	if err != nil {
-		return fmt.Errorf("find contact methods: %w", err)
+		return fmt.Errorf("find how to reach who was paged: %w", err)
 	}
 	var created []*murphy.Notification
 	for _, recipient := range page.GetReached() {
-		recipient.ContactMethods = int32(len(methods[recipient.GetUserId()]))
-		for _, method := range methods[recipient.GetUserId()] {
-			notification := newNotification(incident, murphy.NotificationReason_NOTIFICATION_REASON_PAGED, method, now, nextLevelDue)
-			notification.PageId, notification.Via = page.GetId(), recipient.GetVia()
+		steps := rules[recipient.GetUserId()].GetSteps()
+		recipient.ContactMethods = int32(len(steps))
+		for _, step := range steps {
+			due := now.AsTime().Add(step.GetDelay().AsDuration())
+			deadline := nextLevelDue
+			if !due.Before(nextLevelDue.AsTime()) {
+				deadline = timestamppb.New(due.Add(FollowUpDeadline))
+			}
+			notification := newNotification(incident, murphy.NotificationReason_NOTIFICATION_REASON_PAGED, step.GetContactMethod(), now, deadline)
+			notification.PageId, notification.Via, notification.DueAt = page.GetId(), recipient.GetVia(), timestamppb.New(due)
 			created = append(created, notification)
 		}
 	}
@@ -198,7 +207,7 @@ func (s *Service) followUp(ctx context.Context, messageID string, incident *murp
 	if err != nil {
 		return err
 	}
-	return s.record(ctx, &Change{MessageID: messageID, Notifications: created, Messages: messages})
+	return s.record(ctx, &Change{MessageID: messageID, Notifications: created, Messages: messages, StopWaiting: incident.GetId()})
 }
 
 func (s *Service) NotificationSent(ctx context.Context, messageID string, notification *murphy.Notification) error {
@@ -259,11 +268,18 @@ func newNotification(incident *murphy.Incident, reason murphy.NotificationReason
 func notificationsCreated(ctx context.Context, notifications []*murphy.Notification) ([]*ScheduledMessage, error) {
 	messages := make([]*ScheduledMessage, len(notifications))
 	for i, notification := range notifications {
-		created, err := message(ctx, notification.GetCreatedAt().AsTime(), &murphy.Envelope{
+		due := notification.GetCreatedAt().AsTime()
+		if notification.GetDueAt() != nil {
+			due = notification.GetDueAt().AsTime()
+		}
+		created, err := message(ctx, due, &murphy.Envelope{
 			Event: &murphy.Envelope_Notification{Notification: &murphy.NotificationEvent{Verb: murphy.NotificationVerb_NOTIFICATION_VERB_CREATED, Current: notification}},
 		})
 		if err != nil {
 			return nil, err
+		}
+		if due.After(notification.GetCreatedAt().AsTime()) {
+			created.Waiting = notification
 		}
 		messages[i] = created
 	}

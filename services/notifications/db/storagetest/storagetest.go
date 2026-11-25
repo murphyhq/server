@@ -37,6 +37,37 @@ func Run(t *testing.T, open func(t *testing.T) notifications.Repository) {
 		assert.Len(t, due, 1)
 	})
 
+	t.Run("stops an incident's waiting steps, but nothing already due or another incident's", func(t *testing.T) {
+		repo := open(t)
+		now := time.Now().UTC()
+		incident, other := &murphy.Incident{Id: murphy.NewID()}, &murphy.Incident{Id: murphy.NewID()}
+		ana := murphy.NewID()
+		page, otherPage := newPage(incident, ana), newPage(other, ana)
+		atOnce, later, elsewhere := newNotification(incident, page, ana), newNotification(incident, page, ana), newNotification(other, otherPage, ana)
+		messages := map[string]*notifications.ScheduledMessage{
+			"at once":   {ID: murphy.NewID(), DueAt: now, Envelope: []byte("at once")},
+			"later":     {ID: murphy.NewID(), DueAt: now.Add(2 * time.Minute), Envelope: []byte("later"), Waiting: later},
+			"elsewhere": {ID: murphy.NewID(), DueAt: now.Add(2 * time.Minute), Envelope: []byte("elsewhere"), Waiting: elsewhere},
+		}
+		_, err := repo.Record(t.Context(), &notifications.Change{MessageID: murphy.NewID(), Page: page, Notifications: []*murphy.Notification{atOnce, later},
+			Messages: []*notifications.ScheduledMessage{messages["at once"], messages["later"]}})
+		require.NoError(t, err)
+		_, err = repo.Record(t.Context(), &notifications.Change{MessageID: murphy.NewID(), Page: otherPage, Notifications: []*murphy.Notification{elsewhere},
+			Messages: []*notifications.ScheduledMessage{messages["elsewhere"]}})
+		require.NoError(t, err)
+
+		_, err = repo.Record(t.Context(), &notifications.Change{MessageID: murphy.NewID(), StopWaiting: incident.GetId()})
+		require.NoError(t, err)
+
+		due, err := repo.ClaimDueMessages(t.Context(), now.Add(3*time.Minute), 10, time.Minute)
+		require.NoError(t, err)
+		envelopes := make([]string, len(due))
+		for i, message := range due {
+			envelopes[i] = string(message.Envelope)
+		}
+		assert.ElementsMatch(t, []string{"at once", "elsewhere"}, envelopes)
+	})
+
 	t.Run("keeps one email provider, replaced by each set", func(t *testing.T) {
 		repo := open(t)
 		first := &murphy.EmailProvider{Type: murphy.EmailProviderType_EMAIL_PROVIDER_TYPE_SMTP, From: "murphy@example.com", Host: "smtp.example.com", Port: 587, UpdatedAt: murphy.Now()}
