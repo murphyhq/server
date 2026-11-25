@@ -935,11 +935,13 @@ type TimelineEntry struct {
 	Notification *TimelineNotification `json:"notification,omitempty"`
 
 	// Summary What happened, in a sentence that names the people involved as they're called now.
-	Summary string            `json:"summary"`
-	Type    TimelineEntryType `json:"type"`
+	Summary string `json:"summary"`
+
+	// Type `notified` is a page that reached someone. Telling people an incident was acknowledged or resolved appears only when it fails, as `notification_failed`.
+	Type TimelineEntryType `json:"type"`
 }
 
-// TimelineEntryType defines model for TimelineEntry.Type.
+// TimelineEntryType `notified` is a page that reached someone. Telling people an incident was acknowledged or resolved appears only when it fails, as `notification_failed`.
 type TimelineEntryType string
 
 // TimelineEscalation defines model for TimelineEscalation.

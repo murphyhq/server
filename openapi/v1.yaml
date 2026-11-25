@@ -1794,6 +1794,7 @@ components:
         type:
           type: string
           enum: [triggered, alerted, acknowledged, resolved, escalated, escalation_skipped, escalation_exhausted, notified, notification_failed]
+          description: "`notified` is a page that reached someone. Telling people an incident was acknowledged or resolved appears only when it fails, as `notification_failed`."
         alert:
           $ref: "#/components/schemas/Reference"
         actor:

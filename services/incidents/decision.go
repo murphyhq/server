@@ -121,6 +121,9 @@ func ResolveIncident(incident *murphy.Incident, actorID string, now *timestamppb
 }
 
 func NotificationOutcome(notification *murphy.Notification, failed bool) *Decision {
+	if !failed && notification.GetReason() != murphy.NotificationReason_NOTIFICATION_REASON_PAGED {
+		return nil
+	}
 	channel := notification.GetContactMethod().GetType()
 	kind := murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_NOTIFIED
 	summary := fmt.Sprintf("%s sent by %s", outcomeNoun(notification.GetReason()), channel.Text())
