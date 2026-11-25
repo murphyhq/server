@@ -51,7 +51,7 @@ func run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	policies, err := seedPolicies(ctx, api, teams, users, schedules)
+	policies, err := seedPolicies(ctx, api, teams, schedules)
 	if err != nil {
 		return err
 	}

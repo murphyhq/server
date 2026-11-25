@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/durationpb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/murphyhq/server"
 	"github.com/murphyhq/server/services/incidents"
@@ -160,6 +161,16 @@ func TestAPageRecordsWhomItReached(t *testing.T) {
 	assert.Equal(t, murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_ESCALATED, decision.Timeline[0].GetType())
 	assert.Equal(t, ana, decision.Timeline[0].GetEscalation().GetPaged()[0].GetUserId())
 	assert.Equal(t, primary, decision.Timeline[0].GetEscalation().GetPaged()[0].GetVia().GetId())
+}
+
+func TestAPageIsOnTheTimelineWhenItWasCreated(t *testing.T) {
+	created := page(1, 1, &murphy.PageRecipient{UserId: ana})
+	created.CreatedAt = murphy.Now()
+
+	decision := incidents.RecordPage(incidentAt(1, 1), created, twoLevels(), timestamppb.New(created.GetCreatedAt().AsTime().Add(time.Second)))
+
+	assert.Equal(t, created.GetCreatedAt().AsTime(), decision.Timeline[0].GetAt().AsTime(), "the level comes before what its notifications did")
+	assert.Equal(t, created.GetCreatedAt().AsTime(), decision.Timeline[1].GetAt().AsTime())
 }
 
 func TestSomeoneReachedWithoutContactMethodsIsOnTheTimeline(t *testing.T) {

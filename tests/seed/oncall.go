@@ -19,6 +19,10 @@ func seedSchedules(ctx context.Context, api *client.ClientWithResponses, teams, 
 			Layers: []client.Layer{{Name: new("weekly"), TurnLengthSeconds: week, StartsAt: rotationStart, Participants: []client.Reference{{Id: users["ana@example.com"]}, {Id: users["bo@example.com"]}}}},
 		},
 		{
+			Name: "platform secondary", TimeZone: &malta, Teams: &[]client.Reference{{Id: teams["platform"]}},
+			Layers: []client.Layer{{Name: new("weekly"), TurnLengthSeconds: week, StartsAt: rotationStart, Participants: []client.Reference{{Id: users["bo@example.com"]}, {Id: users["ana@example.com"]}}}},
+		},
+		{
 			Name: "payments primary", TimeZone: &malta, Teams: &[]client.Reference{{Id: teams["payments"]}},
 			Layers: []client.Layer{{Name: new("daily"), TurnLengthSeconds: day, StartsAt: rotationStart, Participants: []client.Reference{{Id: users["cy@example.com"]}, {Id: users["dee@example.com"]}}}},
 		},
