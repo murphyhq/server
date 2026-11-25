@@ -94,7 +94,8 @@ func TestAnIncidentPagesItsFirstLevelUntilAcknowledged(t *testing.T) {
 	assert.Equal(t, int32(1), acknowledged.Escalation.Level)
 	assert.Equal(t, service.PolicyVersion, acknowledged.Escalation.Policy.Version)
 	again := incident.Acknowledge()
-	assert.Equal(t, acknowledged.UpdatedAt, again.UpdatedAt, "acknowledging again changes nothing")
+	assert.Equal(t, client.IncidentStatusAcknowledged, again.Status)
+	assert.Equal(t, acknowledged.AcknowledgedAt, again.AcknowledgedAt, "the first acknowledgement stays")
 	assert.Equal(t, client.IncidentStatusResolved, incident.Resolve().Status)
 }
 
@@ -228,6 +229,23 @@ func TestAnIncidentNamesWhatItPointsAtAndWhoActed(t *testing.T) {
 	assert.Equal(t, &service.Name, got.Service.Name)
 	require.NotNil(t, got.Escalation)
 	assert.Equal(t, &service.PolicyName, got.Escalation.Policy.Name)
+}
+
+func TestEveryoneWhoAcknowledgesGoesOnTheTimeline(t *testing.T) {
+	m := murphytest.New(t)
+	team := m.Team()
+	ana := m.Member(murphytest.Ana)
+	bo := m.Member(murphytest.Bo)
+	team.Add(bo, client.Responder)
+	incident := m.Service(murphytest.OwnedBy(team), murphytest.Pages(bo.Target())).Fire("disk-full")
+	incident.WaitFor(murphytest.Paged(bo.User))
+	incident.Acknowledge()
+
+	got, err := bo.API.AcknowledgeIncidentWithResponse(t.Context(), incident.ID, nil)
+
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, got.StatusCode())
+	incident.WaitFor(murphytest.ActedBy(client.TimelineEntryTypeAcknowledged, ana.User, bo.User))
 }
 
 func TestIncidentsFilterByTeamPersonPagedUrgencyAndTime(t *testing.T) {
