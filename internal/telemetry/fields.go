@@ -2,7 +2,9 @@ package telemetry
 
 import (
 	"context"
+	"slices"
 	"strings"
+	"sync"
 
 	"go.opentelemetry.io/otel/attribute"
 )
@@ -84,4 +86,35 @@ func ComponentAttributes(ctx context.Context) []attribute.KeyValue {
 		return []attribute.KeyValue{attribute.String(prefix+"component", name)}
 	}
 	return nil
+}
+
+type collectedKey struct{}
+
+type collected struct {
+	mu     sync.Mutex
+	fields []Field
+}
+
+func Collecting(ctx context.Context) context.Context {
+	return context.WithValue(ctx, collectedKey{}, &collected{})
+}
+
+func Collect(ctx context.Context, fields ...Field) {
+	c, ok := ctx.Value(collectedKey{}).(*collected)
+	if !ok {
+		return
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.fields = append(c.fields, fields...)
+}
+
+func Collected(ctx context.Context) []Field {
+	c, ok := ctx.Value(collectedKey{}).(*collected)
+	if !ok {
+		return nil
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return slices.Clone(c.fields)
 }
