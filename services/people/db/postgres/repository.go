@@ -385,7 +385,7 @@ func (r *Repository) CreateSession(ctx context.Context, session *murphy.Session)
 
 	return murphypostgres.Error("session", r.queries.CreateSession(ctx, CreateSessionParams{
 		ID: session.GetId(), UserID: session.GetUserId(), TokenHash: session.GetTokenHash(), Client: session.GetClient().Text(), ExpiresAt: session.GetExpiresAt().AsTime(),
-		CreatedAt: session.GetCreatedAt().AsTime(), UpdatedAt: session.GetUpdatedAt().AsTime(),
+		RenewableUntil: session.GetRenewableUntil().AsTime(), CreatedAt: session.GetCreatedAt().AsTime(), UpdatedAt: session.GetUpdatedAt().AsTime(),
 	}))
 }
 
@@ -398,7 +398,7 @@ func (r *Repository) GetActiveSession(ctx context.Context, tokenHash []byte, now
 		return nil, 0, murphypostgres.Error("session", err)
 	}
 	session := toSession(Session{
-		ID: row.ID, UserID: row.UserID, TokenHash: row.TokenHash, Client: row.Client, ExpiresAt: row.ExpiresAt,
+		ID: row.ID, UserID: row.UserID, TokenHash: row.TokenHash, Client: row.Client, ExpiresAt: row.ExpiresAt, RenewableUntil: row.RenewableUntil,
 		RevokedAt: row.RevokedAt, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt,
 	})
 	return session, murphy.UserRoleFromText(row.Role), nil
@@ -417,6 +417,13 @@ func (r *Repository) ListMembershipsOfUser(ctx context.Context, userID string) (
 		memberships[i] = toMembership(row)
 	}
 	return memberships, nil
+}
+
+func (r *Repository) RenewSession(ctx context.Context, id string, expiresAt, at time.Time) (err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	return murphypostgres.Error("session", r.queries.RenewSession(ctx, RenewSessionParams{ExpiresAt: expiresAt, UpdatedAt: at, ID: id}))
 }
 
 func (r *Repository) RevokeSession(ctx context.Context, tokenHash []byte, at time.Time) (err error) {
@@ -542,7 +549,7 @@ func (r *Repository) RevokeSessionOfUser(ctx context.Context, userID, id string,
 func toSession(row Session) *murphy.Session {
 	return &murphy.Session{
 		Id: row.ID, UserId: row.UserID, TokenHash: row.TokenHash, Client: murphy.SessionClientFromText(row.Client),
-		ExpiresAt: timestamppb.New(row.ExpiresAt), RevokedAt: database.Timestamp(row.RevokedAt),
+		ExpiresAt: timestamppb.New(row.ExpiresAt), RenewableUntil: timestamppb.New(row.RenewableUntil), RevokedAt: database.Timestamp(row.RevokedAt),
 		CreatedAt: timestamppb.New(row.CreatedAt), UpdatedAt: timestamppb.New(row.UpdatedAt),
 	}
 }

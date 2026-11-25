@@ -749,6 +749,7 @@ type ServiceStatus string
 
 // Session defines model for Session.
 type Session struct {
+	// ExpiresAt When the session ends if it isn't used. Using it moves this later, up to the session's absolute timeout.
 	ExpiresAt time.Time `json:"expires_at"`
 	User      User      `json:"user"`
 }
@@ -778,7 +779,9 @@ type SessionSummary struct {
 	CreatedAt time.Time            `json:"created_at"`
 
 	// Current Whether this is the session the request was made with.
-	Current   bool      `json:"current"`
+	Current bool `json:"current"`
+
+	// ExpiresAt When the session ends if it isn't used. Using it moves this later, up to the session's absolute timeout.
 	ExpiresAt time.Time `json:"expires_at"`
 	Id        string    `json:"id"`
 }

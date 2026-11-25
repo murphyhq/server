@@ -77,6 +77,7 @@ CREATE TABLE sessions (
   token_hash bytea NOT NULL,
   client text NOT NULL,
   expires_at timestamptz NOT NULL,
+  renewable_until timestamptz NOT NULL,
   revoked_at timestamptz,
   created_at timestamptz NOT NULL,
   updated_at timestamptz NOT NULL,

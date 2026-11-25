@@ -49,7 +49,10 @@ type Settings struct {
 	AllowPasswords         bool          `env:"ALLOW_PASSWORDS"`
 	RateLimitStoreURL      string        `env:"RATE_LIMIT_STORE_URL"`
 	TrustedProxies         []string      `env:"TRUSTED_PROXIES" validate:"cidr"`
-	SessionDuration        time.Duration `env:"SESSION_DURATION" default:"720h"`
+	BrowserSessionIdle     time.Duration `env:"BROWSER_SESSION_IDLE_TIMEOUT" default:"24h"`
+	BrowserSessionAbsolute time.Duration `env:"BROWSER_SESSION_ABSOLUTE_TIMEOUT" default:"720h"`
+	AppSessionIdle         time.Duration `env:"APP_SESSION_IDLE_TIMEOUT" default:"5040h"`
+	AppSessionAbsolute     time.Duration `env:"APP_SESSION_ABSOLUTE_TIMEOUT" default:"43800h"`
 	InitialAdminEmail      string        `env:"INITIAL_ADMIN_EMAIL"`
 	InitialAdminPassword   string        `env:"INITIAL_ADMIN_PASSWORD"`
 	AppScheme              string        `env:"APP_SCHEME" default:"murphy"`
@@ -143,7 +146,8 @@ func New(ctx context.Context, s Settings) (_ *App, err error) {
 	catalogService := catalog.New(catalogStorage, keyring)
 	peopleService := people.New(peopleStorage)
 	auth := people.NewAuth(peopleStorage, provider, limiter, people.AuthSettings{
-		SessionDuration:      s.SessionDuration,
+		BrowserSessions:      people.SessionTimeouts{Idle: s.BrowserSessionIdle, Absolute: s.BrowserSessionAbsolute},
+		AppSessions:          people.SessionTimeouts{Idle: s.AppSessionIdle, Absolute: s.AppSessionAbsolute},
 		InitialAdminEmail:    s.InitialAdminEmail,
 		ReturnOrigins:        append([]string{s.PublicURL}, s.CORSOrigins...),
 		PublicURL:            s.PublicURL,

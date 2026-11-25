@@ -63,6 +63,7 @@ type AuthRepository interface {
 	CreateUserWithIdentity(ctx context.Context, user *murphy.User, identity *murphy.Identity) error
 	CreateSession(ctx context.Context, session *murphy.Session) error
 	GetActiveSession(ctx context.Context, tokenHash []byte, now time.Time) (*murphy.Session, murphy.UserRole, error)
+	RenewSession(ctx context.Context, id string, expiresAt, at time.Time) error
 	RevokeSession(ctx context.Context, tokenHash []byte, at time.Time) error
 	ClaimFirstAdmin(ctx context.Context, userID string, now time.Time) (bool, error)
 	CreateOneTimeCode(ctx context.Context, code *murphy.OneTimeCode) error
@@ -82,8 +83,14 @@ type Limiter interface {
 	Reset(ctx context.Context, key string) error
 }
 
+type SessionTimeouts struct {
+	Idle     time.Duration
+	Absolute time.Duration
+}
+
 type AuthSettings struct {
-	SessionDuration      time.Duration
+	BrowserSessions      SessionTimeouts
+	AppSessions          SessionTimeouts
 	InitialAdminEmail    string
 	ReturnOrigins        []string
 	PublicURL            string
@@ -312,8 +319,34 @@ func (a *Auth) Authenticate(ctx context.Context, token string) (_ *murphy.Sessio
 	if err != nil {
 		return nil, 0, fmt.Errorf("get session: %w", err)
 	}
-	span.Set(ctx, telemetry.WithField("user.id", session.GetUserId()))
+	ctx = span.Set(ctx, telemetry.WithField("user.id", session.GetUserId()))
+	if err := a.renew(ctx, session, time.Now().UTC()); err != nil {
+		return nil, 0, err
+	}
 	return session, role, nil
+}
+
+func (a *Auth) renew(ctx context.Context, session *murphy.Session, now time.Time) error {
+	idle := a.timeouts(session.GetClient()).Idle
+	renewed := now.Add(idle)
+	if renewableUntil := session.GetRenewableUntil().AsTime(); renewed.After(renewableUntil) {
+		renewed = renewableUntil
+	}
+	if renewed.Sub(session.GetExpiresAt().AsTime()) < idle/2 {
+		return nil
+	}
+	if err := a.repo.RenewSession(ctx, session.GetId(), renewed, now); err != nil {
+		return fmt.Errorf("renew session: %w", err)
+	}
+	session.ExpiresAt, session.UpdatedAt = timestamppb.New(renewed), timestamppb.New(now)
+	return nil
+}
+
+func (a *Auth) timeouts(client murphy.SessionClient) SessionTimeouts {
+	if client == murphy.SessionClient_SESSION_CLIENT_BROWSER {
+		return a.settings.BrowserSessions
+	}
+	return a.settings.AppSessions
 }
 
 func (a *Auth) SignOut(ctx context.Context, token string) (err error) {
@@ -402,14 +435,16 @@ func (a *Auth) signedInUser(ctx context.Context, claims *Claims, now time.Time) 
 
 func (a *Auth) startSession(ctx context.Context, userID string, client murphy.SessionClient, now time.Time) (*SignedIn, error) {
 	token := sessionPrefix + secret()
+	timeouts := a.timeouts(client)
 	session := &murphy.Session{
-		Id:        murphy.NewID(),
-		UserId:    userID,
-		TokenHash: hash(token),
-		Client:    client,
-		ExpiresAt: timestamppb.New(now.Add(a.settings.SessionDuration)),
-		CreatedAt: timestamppb.New(now),
-		UpdatedAt: timestamppb.New(now),
+		Id:             murphy.NewID(),
+		UserId:         userID,
+		TokenHash:      hash(token),
+		Client:         client,
+		ExpiresAt:      timestamppb.New(now.Add(min(timeouts.Idle, timeouts.Absolute))),
+		RenewableUntil: timestamppb.New(now.Add(timeouts.Absolute)),
+		CreatedAt:      timestamppb.New(now),
+		UpdatedAt:      timestamppb.New(now),
 	}
 	if err := a.repo.CreateSession(ctx, session); err != nil {
 		return nil, fmt.Errorf("create session: %w", err)

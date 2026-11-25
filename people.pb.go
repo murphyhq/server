@@ -828,17 +828,18 @@ func (x *Identity) GetUpdatedAt() *timestamppb.Timestamp {
 }
 
 type Session struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	UserId        string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	TokenHash     []byte                 `protobuf:"bytes,3,opt,name=token_hash,json=tokenHash,proto3" json:"token_hash,omitempty"`
-	ExpiresAt     *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
-	RevokedAt     *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=revoked_at,json=revokedAt,proto3" json:"revoked_at,omitempty"`
-	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
-	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
-	Client        SessionClient          `protobuf:"varint,8,opt,name=client,proto3,enum=murphy.v1.SessionClient" json:"client,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Id             string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	UserId         string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	TokenHash      []byte                 `protobuf:"bytes,3,opt,name=token_hash,json=tokenHash,proto3" json:"token_hash,omitempty"`
+	ExpiresAt      *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
+	RevokedAt      *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=revoked_at,json=revokedAt,proto3" json:"revoked_at,omitempty"`
+	CreatedAt      *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt      *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	Client         SessionClient          `protobuf:"varint,8,opt,name=client,proto3,enum=murphy.v1.SessionClient" json:"client,omitempty"`
+	RenewableUntil *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=renewable_until,json=renewableUntil,proto3" json:"renewable_until,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *Session) Reset() {
@@ -925,6 +926,13 @@ func (x *Session) GetClient() SessionClient {
 		return x.Client
 	}
 	return SessionClient_SESSION_CLIENT_UNSPECIFIED
+}
+
+func (x *Session) GetRenewableUntil() *timestamppb.Timestamp {
+	if x != nil {
+		return x.RenewableUntil
+	}
+	return nil
 }
 
 type SignIn struct {
@@ -1196,7 +1204,7 @@ const file_murphy_v1_people_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"\xef\x02\n" +
+	"updated_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"\xb4\x03\n" +
 	"\aSession\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x12\x1d\n" +
@@ -1210,7 +1218,8 @@ const file_murphy_v1_people_proto_rawDesc = "" +
 	"created_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
 	"updated_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x120\n" +
-	"\x06client\x18\b \x01(\x0e2\x18.murphy.v1.SessionClientR\x06client\"\xde\x02\n" +
+	"\x06client\x18\b \x01(\x0e2\x18.murphy.v1.SessionClientR\x06client\x12C\n" +
+	"\x0frenewable_until\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\x0erenewableUntil\"\xde\x02\n" +
 	"\x06SignIn\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
 	"\n" +
@@ -1328,19 +1337,20 @@ var file_murphy_v1_people_proto_depIdxs = []int32{
 	15, // 18: murphy.v1.Session.created_at:type_name -> google.protobuf.Timestamp
 	15, // 19: murphy.v1.Session.updated_at:type_name -> google.protobuf.Timestamp
 	5,  // 20: murphy.v1.Session.client:type_name -> murphy.v1.SessionClient
-	15, // 21: murphy.v1.SignIn.expires_at:type_name -> google.protobuf.Timestamp
-	15, // 22: murphy.v1.SignIn.created_at:type_name -> google.protobuf.Timestamp
-	15, // 23: murphy.v1.SignIn.updated_at:type_name -> google.protobuf.Timestamp
-	6,  // 24: murphy.v1.OneTimeCode.purpose:type_name -> murphy.v1.OneTimeCodePurpose
-	15, // 25: murphy.v1.OneTimeCode.expires_at:type_name -> google.protobuf.Timestamp
-	15, // 26: murphy.v1.OneTimeCode.used_at:type_name -> google.protobuf.Timestamp
-	15, // 27: murphy.v1.OneTimeCode.created_at:type_name -> google.protobuf.Timestamp
-	15, // 28: murphy.v1.OneTimeCode.updated_at:type_name -> google.protobuf.Timestamp
-	29, // [29:29] is the sub-list for method output_type
-	29, // [29:29] is the sub-list for method input_type
-	29, // [29:29] is the sub-list for extension type_name
-	29, // [29:29] is the sub-list for extension extendee
-	0,  // [0:29] is the sub-list for field type_name
+	15, // 21: murphy.v1.Session.renewable_until:type_name -> google.protobuf.Timestamp
+	15, // 22: murphy.v1.SignIn.expires_at:type_name -> google.protobuf.Timestamp
+	15, // 23: murphy.v1.SignIn.created_at:type_name -> google.protobuf.Timestamp
+	15, // 24: murphy.v1.SignIn.updated_at:type_name -> google.protobuf.Timestamp
+	6,  // 25: murphy.v1.OneTimeCode.purpose:type_name -> murphy.v1.OneTimeCodePurpose
+	15, // 26: murphy.v1.OneTimeCode.expires_at:type_name -> google.protobuf.Timestamp
+	15, // 27: murphy.v1.OneTimeCode.used_at:type_name -> google.protobuf.Timestamp
+	15, // 28: murphy.v1.OneTimeCode.created_at:type_name -> google.protobuf.Timestamp
+	15, // 29: murphy.v1.OneTimeCode.updated_at:type_name -> google.protobuf.Timestamp
+	30, // [30:30] is the sub-list for method output_type
+	30, // [30:30] is the sub-list for method input_type
+	30, // [30:30] is the sub-list for extension type_name
+	30, // [30:30] is the sub-list for extension extendee
+	0,  // [0:30] is the sub-list for field type_name
 }
 
 func init() { file_murphy_v1_people_proto_init() }

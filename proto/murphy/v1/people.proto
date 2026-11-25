@@ -97,6 +97,7 @@ message Session {
   google.protobuf.Timestamp created_at = 6;
   google.protobuf.Timestamp updated_at = 7;
   SessionClient client = 8;
+  google.protobuf.Timestamp renewable_until = 9;
 }
 
 enum SessionClient {

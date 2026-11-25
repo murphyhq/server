@@ -138,7 +138,9 @@ func newAccounts(t *testing.T) *accounts {
 
 func settings() people.AuthSettings {
 	return people.AuthSettings{
-		SessionDuration: time.Hour, InitialAdminEmail: initialAdmin, ReturnOrigins: []string{"https://murphy.example.com"},
+		BrowserSessions:   people.SessionTimeouts{Idle: time.Hour, Absolute: 8 * time.Hour},
+		AppSessions:       people.SessionTimeouts{Idle: 24 * time.Hour, Absolute: 30 * 24 * time.Hour},
+		InitialAdminEmail: initialAdmin, ReturnOrigins: []string{"https://murphy.example.com"},
 		PublicURL: "https://murphy.example.com", AppScheme: "murphy",
 	}
 }
@@ -316,19 +318,88 @@ func TestASessionIsKeptOnlyAsTheHashOfItsToken(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, hashOf(signedIn.Token), a.session.GetTokenHash())
-	assert.WithinDuration(t, time.Now().Add(time.Hour), a.session.GetExpiresAt().AsTime(), time.Minute)
 }
 
 func TestAnActiveSessionAuthenticates(t *testing.T) {
 	a := newAccounts(t)
-	session := &murphy.Session{Id: murphy.NewID(), UserId: murphy.NewID(), ExpiresAt: timestamppb.New(time.Now().Add(time.Hour))}
-	a.sessions[string(hashOf("mss_token"))] = session
+	session := a.activeSession(23*time.Hour, 30*24*time.Hour)
 
 	got, role, err := a.auth.Authenticate(t.Context(), "mss_token")
 
 	require.NoError(t, err)
 	assert.Equal(t, session.GetUserId(), got.GetUserId())
 	assert.Equal(t, murphy.UserRole_USER_ROLE_MEMBER, role)
+}
+
+func (a *accounts) activeSession(expiresIn, renewableFor time.Duration) *murphy.Session {
+	now := time.Now()
+	session := &murphy.Session{
+		Id: murphy.NewID(), UserId: murphy.NewID(), Client: murphy.SessionClient_SESSION_CLIENT_APP,
+		ExpiresAt: timestamppb.New(now.Add(expiresIn)), RenewableUntil: timestamppb.New(now.Add(renewableFor)),
+	}
+	a.sessions[string(hashOf("mss_token"))] = session
+	return session
+}
+
+func (a *accounts) renewals() *[]time.Time {
+	renewed := &[]time.Time{}
+	a.repo.EXPECT().RenewSession(mock.Anything, mock.Anything, mock.Anything, mock.Anything).RunAndReturn(func(_ context.Context, _ string, expiresAt, _ time.Time) error {
+		*renewed = append(*renewed, expiresAt)
+		return nil
+	}).Maybe()
+	return renewed
+}
+
+func TestBrowserAndAppSessionsLastTheirOwnTimeouts(t *testing.T) {
+	a := newAccounts(t)
+	_, err := a.auth.FinishSignIn(t.Context(), state, state, code)
+	require.NoError(t, err)
+	browser := a.session
+	connect, err := a.auth.CreateConnectCode(t.Context(), murphy.NewID())
+	require.NoError(t, err)
+
+	_, err = a.auth.SignInWithCode(t.Context(), connect.Code, "")
+
+	require.NoError(t, err)
+	assert.WithinDuration(t, time.Now().Add(time.Hour), browser.GetExpiresAt().AsTime(), time.Minute)
+	assert.WithinDuration(t, time.Now().Add(8*time.Hour), browser.GetRenewableUntil().AsTime(), time.Minute)
+	assert.WithinDuration(t, time.Now().Add(24*time.Hour), a.session.GetExpiresAt().AsTime(), time.Minute)
+	assert.WithinDuration(t, time.Now().Add(30*24*time.Hour), a.session.GetRenewableUntil().AsTime(), time.Minute)
+}
+
+func TestASessionInUseIsRenewed(t *testing.T) {
+	a := newAccounts(t)
+	renewed := a.renewals()
+	a.activeSession(time.Hour, 30*24*time.Hour)
+
+	got, _, err := a.auth.Authenticate(t.Context(), "mss_token")
+
+	require.NoError(t, err)
+	require.Len(t, *renewed, 1)
+	assert.WithinDuration(t, time.Now().Add(24*time.Hour), (*renewed)[0], time.Minute)
+	assert.Equal(t, (*renewed)[0], got.GetExpiresAt().AsTime(), "the caller sees the new expiry")
+}
+
+func TestASessionIsRenewedOnlyOnceHalfItsIdleTimeoutHasPassed(t *testing.T) {
+	a := newAccounts(t)
+	renewed := a.renewals()
+	a.activeSession(13*time.Hour, 30*24*time.Hour)
+
+	_, _, err := a.auth.Authenticate(t.Context(), "mss_token")
+
+	require.NoError(t, err)
+	assert.Empty(t, *renewed)
+}
+
+func TestRenewingNeverPassesTheAbsoluteTimeout(t *testing.T) {
+	a := newAccounts(t)
+	renewed := a.renewals()
+	session := a.activeSession(time.Hour, 20*time.Hour)
+
+	_, _, err := a.auth.Authenticate(t.Context(), "mss_token")
+
+	require.NoError(t, err)
+	assert.Equal(t, []time.Time{session.GetRenewableUntil().AsTime()}, *renewed)
 }
 
 func TestAnUnknownSessionIsRefused(t *testing.T) {

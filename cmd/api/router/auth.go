@@ -105,7 +105,7 @@ func (s *Server) FinishSignIn(ctx context.Context, request FinishSignInRequestOb
 	if signedIn.Session == nil {
 		return FinishSignIn303Response{Headers: FinishSignIn303ResponseHeaders{Location: &signedIn.ReturnTo}}, nil
 	}
-	cookie := s.cookie(signedIn.Token, signedIn.Session.GetExpiresAt().AsTime())
+	cookie := s.cookie(signedIn.Token, signedIn.Session.GetRenewableUntil().AsTime())
 	if signedIn.ReturnTo != "" {
 		return FinishSignIn303Response{Headers: FinishSignIn303ResponseHeaders{Location: &signedIn.ReturnTo, SetCookie: &cookie}}, nil
 	}
