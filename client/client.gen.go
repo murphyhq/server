@@ -1255,9 +1255,6 @@ type CreateSessionJSONRequestBody = SessionInput
 // UpdateContactMethodJSONRequestBody defines body for UpdateContactMethod for application/json ContentType.
 type UpdateContactMethodJSONRequestBody = ContactMethodInput
 
-// SetEmailProviderJSONRequestBody defines body for SetEmailProvider for application/json ContentType.
-type SetEmailProviderJSONRequestBody = EmailProviderInput
-
 // CreateEscalationPolicyJSONRequestBody defines body for CreateEscalationPolicy for application/json ContentType.
 type CreateEscalationPolicyJSONRequestBody = EscalationPolicyInput
 
@@ -1266,6 +1263,9 @@ type UpdateEscalationPolicyJSONRequestBody = EscalationPolicyInput
 
 // UpdateIntegrationJSONRequestBody defines body for UpdateIntegration for application/json ContentType.
 type UpdateIntegrationJSONRequestBody = IntegrationUpdate
+
+// SetEmailProviderJSONRequestBody defines body for SetEmailProvider for application/json ContentType.
+type SetEmailProviderJSONRequestBody = EmailProviderInput
 
 // CreateScheduleJSONRequestBody defines body for CreateSchedule for application/json ContentType.
 type CreateScheduleJSONRequestBody = ScheduleInput
@@ -1491,38 +1491,6 @@ type ClientInterface interface {
 	// Corresponds with PUT /v1/contact-methods/{id} (the `UpdateContactMethod` operationId).
 	UpdateContactMethod(ctx context.Context, id ID, body UpdateContactMethodJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// RemoveEmailProvider Remove the email provider
-	//
-	// Murphy stops sending email until a provider is set again.
-	//
-	// Corresponds with DELETE /v1/email-provider (the `RemoveEmailProvider` operationId).
-	RemoveEmailProvider(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// GetEmailProvider Get the email provider
-	//
-	// The server Murphy sends email through. 404 until an admin sets one.
-	//
-	// Corresponds with GET /v1/email-provider (the `GetEmailProvider` operationId).
-	GetEmailProvider(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// SetEmailProviderWithBody Set the email provider
-	//
-	// Replaces the email provider, if there is one.
-	//
-	// Takes any type of body and a specified content type.
-	//
-	// Corresponds with PUT /v1/email-provider (the `SetEmailProvider` operationId).
-	SetEmailProviderWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// SetEmailProvider Set the email provider
-	//
-	// Replaces the email provider, if there is one.
-	//
-	// Takes a body of the `application/json` content type.
-	//
-	// Corresponds with PUT /v1/email-provider (the `SetEmailProvider` operationId).
-	SetEmailProvider(ctx context.Context, body SetEmailProviderJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
 	// ListEscalationPolicies List escalation policies
 	//
 	// Corresponds with GET /v1/escalation-policies (the `ListEscalationPolicies` operationId).
@@ -1637,6 +1605,38 @@ type ClientInterface interface {
 	//
 	// Corresponds with DELETE /v1/overrides/{id} (the `DeleteOverride` operationId).
 	DeleteOverride(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RemoveEmailProvider Remove the email provider
+	//
+	// Murphy stops sending email until a provider is set again.
+	//
+	// Corresponds with DELETE /v1/providers/email (the `RemoveEmailProvider` operationId).
+	RemoveEmailProvider(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetEmailProvider Get the email provider
+	//
+	// The server Murphy sends email through. 404 until an admin sets one.
+	//
+	// Corresponds with GET /v1/providers/email (the `GetEmailProvider` operationId).
+	GetEmailProvider(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetEmailProviderWithBody Set the email provider
+	//
+	// Replaces the email provider, if there is one.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /v1/providers/email (the `SetEmailProvider` operationId).
+	SetEmailProviderWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetEmailProvider Set the email provider
+	//
+	// Replaces the email provider, if there is one.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /v1/providers/email (the `SetEmailProvider` operationId).
+	SetEmailProvider(ctx context.Context, body SetEmailProviderJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListSchedules List schedules
 	//
@@ -2199,78 +2199,6 @@ func (c *Client) UpdateContactMethod(ctx context.Context, id ID, body UpdateCont
 	return c.Client.Do(req)
 }
 
-// RemoveEmailProvider Remove the email provider
-//
-// Murphy stops sending email until a provider is set again.
-//
-// Corresponds with DELETE /v1/email-provider (the `RemoveEmailProvider` operationId).
-func (c *Client) RemoveEmailProvider(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewRemoveEmailProviderRequest(c.Server)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// GetEmailProvider Get the email provider
-//
-// The server Murphy sends email through. 404 until an admin sets one.
-//
-// Corresponds with GET /v1/email-provider (the `GetEmailProvider` operationId).
-func (c *Client) GetEmailProvider(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetEmailProviderRequest(c.Server)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// SetEmailProviderWithBody Set the email provider
-//
-// Replaces the email provider, if there is one.
-//
-// Takes any type of body and a specified content type.
-//
-// Corresponds with PUT /v1/email-provider (the `SetEmailProvider` operationId).
-func (c *Client) SetEmailProviderWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewSetEmailProviderRequestWithBody(c.Server, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-// SetEmailProvider Set the email provider
-//
-// Replaces the email provider, if there is one.
-//
-// Takes a body of the `application/json` content type.
-//
-// Corresponds with PUT /v1/email-provider (the `SetEmailProvider` operationId).
-func (c *Client) SetEmailProvider(ctx context.Context, body SetEmailProviderJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewSetEmailProviderRequest(c.Server, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
 // ListEscalationPolicies List escalation policies
 //
 // Corresponds with GET /v1/escalation-policies (the `ListEscalationPolicies` operationId).
@@ -2566,6 +2494,78 @@ func (c *Client) ListOnCall(ctx context.Context, params *ListOnCallParams, reqEd
 // Corresponds with DELETE /v1/overrides/{id} (the `DeleteOverride` operationId).
 func (c *Client) DeleteOverride(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDeleteOverrideRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RemoveEmailProvider Remove the email provider
+//
+// Murphy stops sending email until a provider is set again.
+//
+// Corresponds with DELETE /v1/providers/email (the `RemoveEmailProvider` operationId).
+func (c *Client) RemoveEmailProvider(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRemoveEmailProviderRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetEmailProvider Get the email provider
+//
+// The server Murphy sends email through. 404 until an admin sets one.
+//
+// Corresponds with GET /v1/providers/email (the `GetEmailProvider` operationId).
+func (c *Client) GetEmailProvider(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetEmailProviderRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SetEmailProviderWithBody Set the email provider
+//
+// Replaces the email provider, if there is one.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PUT /v1/providers/email (the `SetEmailProvider` operationId).
+func (c *Client) SetEmailProviderWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetEmailProviderRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SetEmailProvider Set the email provider
+//
+// Replaces the email provider, if there is one.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PUT /v1/providers/email (the `SetEmailProvider` operationId).
+func (c *Client) SetEmailProvider(ctx context.Context, body SetEmailProviderJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetEmailProviderRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
@@ -3913,100 +3913,6 @@ func NewUpdateContactMethodRequestWithBody(server string, id ID, contentType str
 	return req, nil
 }
 
-// NewRemoveEmailProviderRequest constructs an http.Request for the RemoveEmailProvider method
-func NewRemoveEmailProviderRequest(server string) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/v1/email-provider")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewGetEmailProviderRequest constructs an http.Request for the GetEmailProvider method
-func NewGetEmailProviderRequest(server string) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/v1/email-provider")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewSetEmailProviderRequest calls the generic SetEmailProvider builder with application/json body
-func NewSetEmailProviderRequest(server string, body SetEmailProviderJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewSetEmailProviderRequestWithBody(server, "application/json", bodyReader)
-}
-
-// NewSetEmailProviderRequestWithBody constructs an http.Request for the SetEmailProvider method, with any body, and a specified content type
-func NewSetEmailProviderRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/v1/email-provider")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
 // NewListEscalationPoliciesRequest constructs an http.Request for the ListEscalationPolicies method
 func NewListEscalationPoliciesRequest(server string, params *ListEscalationPoliciesParams) (*http.Request, error) {
 	var err error
@@ -4862,6 +4768,100 @@ func NewDeleteOverrideRequest(server string, id ID) (*http.Request, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	return req, nil
+}
+
+// NewRemoveEmailProviderRequest constructs an http.Request for the RemoveEmailProvider method
+func NewRemoveEmailProviderRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/providers/email")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetEmailProviderRequest constructs an http.Request for the GetEmailProvider method
+func NewGetEmailProviderRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/providers/email")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewSetEmailProviderRequest calls the generic SetEmailProvider builder with application/json body
+func NewSetEmailProviderRequest(server string, body SetEmailProviderJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewSetEmailProviderRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewSetEmailProviderRequestWithBody constructs an http.Request for the SetEmailProvider method, with any body, and a specified content type
+func NewSetEmailProviderRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/providers/email")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
 
 	return req, nil
 }
@@ -6673,42 +6673,6 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with PUT /v1/contact-methods/{id} (the `UpdateContactMethod` operationId).
 	UpdateContactMethodWithResponse(ctx context.Context, id ID, body UpdateContactMethodJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateContactMethodResponse, error)
 
-	// RemoveEmailProviderWithResponse Remove the email provider
-	//
-	// Murphy stops sending email until a provider is set again.
-	//
-	// Returns a wrapper object for the known response body format(s).
-	//
-	// Corresponds with DELETE /v1/email-provider (the `RemoveEmailProvider` operationId).
-	RemoveEmailProviderWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*RemoveEmailProviderResponse, error)
-
-	// GetEmailProviderWithResponse Get the email provider
-	//
-	// The server Murphy sends email through. 404 until an admin sets one.
-	//
-	// Returns a wrapper object for the known response body format(s).
-	//
-	// Corresponds with GET /v1/email-provider (the `GetEmailProvider` operationId).
-	GetEmailProviderWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetEmailProviderResponse, error)
-
-	// SetEmailProviderWithBodyWithResponse Set the email provider
-	//
-	// Replaces the email provider, if there is one.
-	//
-	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
-	//
-	// Corresponds with PUT /v1/email-provider (the `SetEmailProvider` operationId).
-	SetEmailProviderWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetEmailProviderResponse, error)
-
-	// SetEmailProviderWithResponse Set the email provider
-	//
-	// Replaces the email provider, if there is one.
-	//
-	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
-	//
-	// Corresponds with PUT /v1/email-provider (the `SetEmailProvider` operationId).
-	SetEmailProviderWithResponse(ctx context.Context, body SetEmailProviderJSONRequestBody, reqEditors ...RequestEditorFn) (*SetEmailProviderResponse, error)
-
 	// ListEscalationPoliciesWithResponse List escalation policies
 	//
 	// Returns a wrapper object for the known response body format(s).
@@ -6849,6 +6813,42 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with DELETE /v1/overrides/{id} (the `DeleteOverride` operationId).
 	DeleteOverrideWithResponse(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*DeleteOverrideResponse, error)
+
+	// RemoveEmailProviderWithResponse Remove the email provider
+	//
+	// Murphy stops sending email until a provider is set again.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /v1/providers/email (the `RemoveEmailProvider` operationId).
+	RemoveEmailProviderWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*RemoveEmailProviderResponse, error)
+
+	// GetEmailProviderWithResponse Get the email provider
+	//
+	// The server Murphy sends email through. 404 until an admin sets one.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /v1/providers/email (the `GetEmailProvider` operationId).
+	GetEmailProviderWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetEmailProviderResponse, error)
+
+	// SetEmailProviderWithBodyWithResponse Set the email provider
+	//
+	// Replaces the email provider, if there is one.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /v1/providers/email (the `SetEmailProvider` operationId).
+	SetEmailProviderWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetEmailProviderResponse, error)
+
+	// SetEmailProviderWithResponse Set the email provider
+	//
+	// Replaces the email provider, if there is one.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /v1/providers/email (the `SetEmailProvider` operationId).
+	SetEmailProviderWithResponse(ctx context.Context, body SetEmailProviderJSONRequestBody, reqEditors ...RequestEditorFn) (*SetEmailProviderResponse, error)
 
 	// ListSchedulesWithResponse List schedules
 	//
@@ -7800,136 +7800,6 @@ func (r UpdateContactMethodResponse) ContentType() string {
 	return ""
 }
 
-type RemoveEmailProviderResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-}
-
-// GetBody returns the raw response body bytes
-func (r RemoveEmailProviderResponse) GetBody() []byte {
-	return r.Body
-}
-
-// Status returns HTTPResponse.Status
-func (r RemoveEmailProviderResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r RemoveEmailProviderResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r RemoveEmailProviderResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-type GetEmailProviderResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *EmailProvider
-	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
-	ApplicationproblemJSON404 *Problem
-}
-
-// GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r GetEmailProviderResponse) GetJSON200() *EmailProvider {
-	return r.JSON200
-}
-
-// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
-func (r GetEmailProviderResponse) GetApplicationproblemJSON404() *Problem {
-	return r.ApplicationproblemJSON404
-}
-
-// GetBody returns the raw response body bytes
-func (r GetEmailProviderResponse) GetBody() []byte {
-	return r.Body
-}
-
-// Status returns HTTPResponse.Status
-func (r GetEmailProviderResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r GetEmailProviderResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r GetEmailProviderResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
-type SetEmailProviderResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *EmailProvider
-	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
-	ApplicationproblemJSON400 *Problem
-}
-
-// GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r SetEmailProviderResponse) GetJSON200() *EmailProvider {
-	return r.JSON200
-}
-
-// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
-func (r SetEmailProviderResponse) GetApplicationproblemJSON400() *Problem {
-	return r.ApplicationproblemJSON400
-}
-
-// GetBody returns the raw response body bytes
-func (r SetEmailProviderResponse) GetBody() []byte {
-	return r.Body
-}
-
-// Status returns HTTPResponse.Status
-func (r SetEmailProviderResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r SetEmailProviderResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
-func (r SetEmailProviderResponse) ContentType() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Header.Get("Content-Type")
-	}
-	return ""
-}
-
 type ListEscalationPoliciesResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -8748,6 +8618,136 @@ func (r DeleteOverrideResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r DeleteOverrideResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type RemoveEmailProviderResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+}
+
+// GetBody returns the raw response body bytes
+func (r RemoveEmailProviderResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r RemoveEmailProviderResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RemoveEmailProviderResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r RemoveEmailProviderResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetEmailProviderResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *EmailProvider
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *Problem
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetEmailProviderResponse) GetJSON200() *EmailProvider {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r GetEmailProviderResponse) GetApplicationproblemJSON404() *Problem {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r GetEmailProviderResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetEmailProviderResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetEmailProviderResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetEmailProviderResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type SetEmailProviderResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *EmailProvider
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *Problem
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r SetEmailProviderResponse) GetJSON200() *EmailProvider {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r SetEmailProviderResponse) GetApplicationproblemJSON400() *Problem {
+	return r.ApplicationproblemJSON400
+}
+
+// GetBody returns the raw response body bytes
+func (r SetEmailProviderResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r SetEmailProviderResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r SetEmailProviderResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r SetEmailProviderResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -10763,66 +10763,6 @@ func (c *ClientWithResponses) UpdateContactMethodWithResponse(ctx context.Contex
 	return ParseUpdateContactMethodResponse(rsp)
 }
 
-// RemoveEmailProviderWithResponse Remove the email provider
-//
-// Murphy stops sending email until a provider is set again.
-//
-// Returns a wrapper object for the known response body format(s).
-//
-// Corresponds with DELETE /v1/email-provider (the `RemoveEmailProvider` operationId).
-func (c *ClientWithResponses) RemoveEmailProviderWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*RemoveEmailProviderResponse, error) {
-	rsp, err := c.RemoveEmailProvider(ctx, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseRemoveEmailProviderResponse(rsp)
-}
-
-// GetEmailProviderWithResponse Get the email provider
-//
-// The server Murphy sends email through. 404 until an admin sets one.
-//
-// Returns a wrapper object for the known response body format(s).
-//
-// Corresponds with GET /v1/email-provider (the `GetEmailProvider` operationId).
-func (c *ClientWithResponses) GetEmailProviderWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetEmailProviderResponse, error) {
-	rsp, err := c.GetEmailProvider(ctx, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseGetEmailProviderResponse(rsp)
-}
-
-// SetEmailProviderWithBodyWithResponse Set the email provider
-//
-// Replaces the email provider, if there is one.
-//
-// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with PUT /v1/email-provider (the `SetEmailProvider` operationId).
-func (c *ClientWithResponses) SetEmailProviderWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetEmailProviderResponse, error) {
-	rsp, err := c.SetEmailProviderWithBody(ctx, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseSetEmailProviderResponse(rsp)
-}
-
-// SetEmailProviderWithResponse Set the email provider
-//
-// Replaces the email provider, if there is one.
-//
-// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
-//
-// Corresponds with PUT /v1/email-provider (the `SetEmailProvider` operationId).
-func (c *ClientWithResponses) SetEmailProviderWithResponse(ctx context.Context, body SetEmailProviderJSONRequestBody, reqEditors ...RequestEditorFn) (*SetEmailProviderResponse, error) {
-	rsp, err := c.SetEmailProvider(ctx, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseSetEmailProviderResponse(rsp)
-}
-
 // ListEscalationPoliciesWithResponse List escalation policies
 //
 // Returns a wrapper object for the known response body format(s).
@@ -11076,6 +11016,66 @@ func (c *ClientWithResponses) DeleteOverrideWithResponse(ctx context.Context, id
 		return nil, err
 	}
 	return ParseDeleteOverrideResponse(rsp)
+}
+
+// RemoveEmailProviderWithResponse Remove the email provider
+//
+// Murphy stops sending email until a provider is set again.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /v1/providers/email (the `RemoveEmailProvider` operationId).
+func (c *ClientWithResponses) RemoveEmailProviderWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*RemoveEmailProviderResponse, error) {
+	rsp, err := c.RemoveEmailProvider(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRemoveEmailProviderResponse(rsp)
+}
+
+// GetEmailProviderWithResponse Get the email provider
+//
+// The server Murphy sends email through. 404 until an admin sets one.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /v1/providers/email (the `GetEmailProvider` operationId).
+func (c *ClientWithResponses) GetEmailProviderWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetEmailProviderResponse, error) {
+	rsp, err := c.GetEmailProvider(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetEmailProviderResponse(rsp)
+}
+
+// SetEmailProviderWithBodyWithResponse Set the email provider
+//
+// Replaces the email provider, if there is one.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /v1/providers/email (the `SetEmailProvider` operationId).
+func (c *ClientWithResponses) SetEmailProviderWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetEmailProviderResponse, error) {
+	rsp, err := c.SetEmailProviderWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSetEmailProviderResponse(rsp)
+}
+
+// SetEmailProviderWithResponse Set the email provider
+//
+// Replaces the email provider, if there is one.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /v1/providers/email (the `SetEmailProvider` operationId).
+func (c *ClientWithResponses) SetEmailProviderWithResponse(ctx context.Context, body SetEmailProviderJSONRequestBody, reqEditors ...RequestEditorFn) (*SetEmailProviderResponse, error) {
+	rsp, err := c.SetEmailProvider(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSetEmailProviderResponse(rsp)
 }
 
 // ListSchedulesWithResponse List schedules
@@ -12156,88 +12156,6 @@ func ParseUpdateContactMethodResponse(rsp *http.Response) (*UpdateContactMethodR
 	return response, nil
 }
 
-// ParseRemoveEmailProviderResponse parses an HTTP response from a RemoveEmailProviderWithResponse call
-func ParseRemoveEmailProviderResponse(rsp *http.Response) (*RemoveEmailProviderResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &RemoveEmailProviderResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	return response, nil
-}
-
-// ParseGetEmailProviderResponse parses an HTTP response from a GetEmailProviderWithResponse call
-func ParseGetEmailProviderResponse(rsp *http.Response) (*GetEmailProviderResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &GetEmailProviderResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest EmailProvider
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest Problem
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON404 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseSetEmailProviderResponse parses an HTTP response from a SetEmailProviderWithResponse call
-func ParseSetEmailProviderResponse(rsp *http.Response) (*SetEmailProviderResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &SetEmailProviderResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest EmailProvider
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest Problem
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.ApplicationproblemJSON400 = &dest
-
-	}
-
-	return response, nil
-}
-
 // ParseListEscalationPoliciesResponse parses an HTTP response from a ListEscalationPoliciesWithResponse call
 func ParseListEscalationPoliciesResponse(rsp *http.Response) (*ListEscalationPoliciesResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -12825,6 +12743,88 @@ func ParseDeleteOverrideResponse(rsp *http.Response) (*DeleteOverrideResponse, e
 			return nil, err
 		}
 		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseRemoveEmailProviderResponse parses an HTTP response from a RemoveEmailProviderWithResponse call
+func ParseRemoveEmailProviderResponse(rsp *http.Response) (*RemoveEmailProviderResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RemoveEmailProviderResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	return response, nil
+}
+
+// ParseGetEmailProviderResponse parses an HTTP response from a GetEmailProviderWithResponse call
+func ParseGetEmailProviderResponse(rsp *http.Response) (*GetEmailProviderResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetEmailProviderResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest EmailProvider
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseSetEmailProviderResponse parses an HTTP response from a SetEmailProviderWithResponse call
+func ParseSetEmailProviderResponse(rsp *http.Response) (*SetEmailProviderResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &SetEmailProviderResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest EmailProvider
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
 
 	}
 

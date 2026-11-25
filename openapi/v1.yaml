@@ -1393,7 +1393,7 @@ paths:
                 $ref: "#/components/schemas/EscalationPolicy"
         "404":
           $ref: "#/components/responses/Problem"
-  /v1/email-provider:
+  /v1/providers/email:
     get:
       operationId: getEmailProvider
       security:
