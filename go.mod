@@ -21,6 +21,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/credentials v1.21.3
 	github.com/aws/aws-sdk-go-v2/service/sns v1.48.0
 	github.com/aws/aws-sdk-go-v2/service/sqs v1.53.0
+	github.com/aws/aws-sdk-go-v2/service/ssm v1.84.0
 	github.com/coreos/go-oidc/v3 v3.21.0
 	github.com/exaring/otelpgx v0.13.0
 	github.com/getkin/kin-openapi v0.153.0
