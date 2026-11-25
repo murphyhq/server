@@ -13,6 +13,7 @@ import (
 
 type settings struct {
 	APIURL              string `env:"SEED_API_URL" default:"http://localhost:8080"`
+	IngestURL           string `env:"SEED_INGEST_URL" default:"http://localhost:8081"`
 	WebhookURL          string `env:"SEED_WEBHOOK_URL" default:"http://localhost:8092"`
 	IdentityProviderURL string `env:"SEED_IDENTITY_PROVIDER_URL" default:"http://localhost:5556/dex"`
 	Dogfood             dogfoodSettings
@@ -51,11 +52,15 @@ func run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	policies, err := seedPolicies(ctx, api, teams, schedules)
+	policies, err := seedPolicies(ctx, api, teams, users, schedules)
 	if err != nil {
 		return err
 	}
-	if err := seedCatalog(ctx, api, policies); err != nil {
+	keys, err := seedCatalog(ctx, api, policies)
+	if err != nil {
+		return err
+	}
+	if err := seedIncidents(ctx, s.IngestURL, keys); err != nil {
 		return err
 	}
 	return seedDogfood(ctx, api, policies["platform"], s.Dogfood)
