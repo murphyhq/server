@@ -28,17 +28,17 @@ import (
 const purgeInterval = time.Hour
 
 type Settings struct {
-	EventsSubscriptionURL    string   `env:"NOTIFIER_SUBSCRIPTION_URL" required:"true"`
-	EventsTopicURL           string   `env:"EVENTS_TOPIC_URL" required:"true"`
-	NotificationsDatabaseURL string   `env:"NOTIFICATIONS_DATABASE_URL" required:"true"`
-	PeopleDatabaseURL        string   `env:"PEOPLE_DATABASE_URL" required:"true"`
-	OnCallDatabaseURL        string   `env:"ONCALL_DATABASE_URL" required:"true"`
-	EscalationDatabaseURL    string   `env:"ESCALATION_DATABASE_URL" required:"true"`
-	WebhookSigningKeys       string   `env:"WEBHOOK_SIGNING_KEYS" required:"true"`
-	RelayURL                 string   `env:"RELAY_URL" validate:"http-url"`
-	RelayKey                 string   `env:"RELAY_KEY"`
-	PublicURL                string   `env:"PUBLIC_URL" validate:"base-url"`
-	WebhookAllowedNetworks   []string `env:"WEBHOOK_ALLOWED_NETWORKS" validate:"cidr"`
+	EventsSubscriptionURL    string         `env:"NOTIFIER_SUBSCRIPTION_URL" required:"true"`
+	EventsTopicURL           string         `env:"EVENTS_TOPIC_URL" required:"true"`
+	NotificationsDatabaseURL string         `env:"NOTIFICATIONS_DATABASE_URL" required:"true"`
+	PeopleDatabaseURL        string         `env:"PEOPLE_DATABASE_URL" required:"true"`
+	OnCallDatabaseURL        string         `env:"ONCALL_DATABASE_URL" required:"true"`
+	EscalationDatabaseURL    string         `env:"ESCALATION_DATABASE_URL" required:"true"`
+	WebhookSigningKeys       string         `env:"WEBHOOK_SIGNING_KEYS" required:"true"`
+	RelayURL                 string         `env:"RELAY_URL" validate:"http-url"`
+	RelayKey                 string         `env:"RELAY_KEY"`
+	PublicURL                string         `env:"PUBLIC_URL" validate:"base-url"`
+	WebhookAllowedNetworks   []netip.Prefix `env:"WEBHOOK_ALLOWED_NETWORKS"`
 }
 
 type App struct {
@@ -60,10 +60,6 @@ func New(ctx context.Context, s Settings) (_ *App, err error) {
 	keys, err := webhook.ParseSigningKeys(s.WebhookSigningKeys)
 	if err != nil {
 		return nil, fmt.Errorf("MURPHY_WEBHOOK_SIGNING_KEYS: %w", err)
-	}
-	allowed, err := networks(s.WebhookAllowedNetworks)
-	if err != nil {
-		return nil, fmt.Errorf("MURPHY_WEBHOOK_ALLOWED_NETWORKS: %w", err)
 	}
 
 	notificationsStorage, err := notificationsdb.Open(ctx, s.NotificationsDatabaseURL)
@@ -103,7 +99,7 @@ func New(ctx context.Context, s Settings) (_ *App, err error) {
 	a.resources.Add(func() { _ = a.subscription.Close() }, a.subscription.Ping)
 
 	providers := map[murphy.ContactMethodType]notifications.Provider{
-		murphy.ContactMethodType_CONTACT_METHOD_TYPE_WEBHOOK: webhook.New(keys, allowed),
+		murphy.ContactMethodType_CONTACT_METHOD_TYPE_WEBHOOK: webhook.New(keys, s.WebhookAllowedNetworks),
 	}
 	if s.RelayURL != "" {
 		pushes, err := pushProvider(s)
@@ -147,16 +143,4 @@ func (a *App) Run(ctx context.Context) error {
 
 func (a *App) Close() {
 	a.resources.Close()
-}
-
-func networks(cidrs []string) ([]netip.Prefix, error) {
-	prefixes := make([]netip.Prefix, len(cidrs))
-	for i, cidr := range cidrs {
-		prefix, err := netip.ParsePrefix(cidr)
-		if err != nil {
-			return nil, err
-		}
-		prefixes[i] = prefix
-	}
-	return prefixes, nil
 }
