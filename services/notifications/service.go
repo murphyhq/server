@@ -22,6 +22,9 @@ type Repository interface {
 	ClaimDueMessages(ctx context.Context, now time.Time, limit int, lease time.Duration) ([]*ScheduledMessage, error)
 	DeleteMessages(ctx context.Context, ids []string) error
 	PurgeHandledMessages(ctx context.Context, before time.Time) (int64, error)
+	GetEmailProvider(ctx context.Context) (*murphy.EmailProvider, error)
+	SetEmailProvider(ctx context.Context, provider *murphy.EmailProvider) error
+	DeleteEmailProvider(ctx context.Context) error
 }
 
 type Policies interface {
@@ -309,5 +312,43 @@ func (s *Service) PurgeHandledMessages(ctx context.Context) (err error) {
 		return fmt.Errorf("purge handled messages: %w", err)
 	}
 	span.Set(ctx, telemetry.WithField("messages.purged", purged))
+	return nil
+}
+
+func (s *Service) EmailProvider(ctx context.Context) (_ *murphy.EmailProvider, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	provider, err := s.repo.GetEmailProvider(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get email provider: %w", err)
+	}
+	return provider, nil
+}
+
+func (s *Service) SetEmailProvider(ctx context.Context, in *murphy.EmailProvider) (_ *murphy.EmailProvider, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	provider := &murphy.EmailProvider{
+		Type: in.GetType(), From: in.GetFrom(), Host: in.GetHost(), Port: in.GetPort(),
+		Username: in.GetUsername(), Secret: in.GetSecret(), UpdatedAt: murphy.Now(),
+	}
+	if err := provider.Validate(); err != nil {
+		return nil, err
+	}
+	if err := s.repo.SetEmailProvider(ctx, provider); err != nil {
+		return nil, fmt.Errorf("set email provider: %w", err)
+	}
+	return provider, nil
+}
+
+func (s *Service) RemoveEmailProvider(ctx context.Context) (err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	if err := s.repo.DeleteEmailProvider(ctx); err != nil {
+		return fmt.Errorf("remove email provider: %w", err)
+	}
 	return nil
 }

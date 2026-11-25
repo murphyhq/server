@@ -236,3 +236,37 @@ func TestAContactMethodMurphyCantSendToYetIsRefused(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusBadRequest, created.StatusCode())
 }
+
+func TestAnAdminSetsAndRemovesTheEmailProvider(t *testing.T) {
+	m := murphytest.New(t)
+	input := client.EmailProviderInput{Type: client.Smtp, From: "Murphy <murphy@example.com>", Host: "smtp.example.com", Port: 587, Username: new("murphy"), Secret: new("env://SMTP_PASSWORD")}
+
+	set, err := m.API.SetEmailProviderWithResponse(t.Context(), input)
+	require.NoError(t, err)
+	read, err := m.API.GetEmailProviderWithResponse(t.Context())
+	require.NoError(t, err)
+	removed, err := m.API.RemoveEmailProviderWithResponse(t.Context())
+	require.NoError(t, err)
+	gone, err := m.API.GetEmailProviderWithResponse(t.Context())
+	require.NoError(t, err)
+
+	require.Equal(t, http.StatusOK, set.StatusCode())
+	require.Equal(t, http.StatusOK, read.StatusCode())
+	assert.Equal(t, *set.JSON200, *read.JSON200)
+	assert.Equal(t, "env://SMTP_PASSWORD", read.JSON200.Secret)
+	assert.Equal(t, http.StatusNoContent, removed.StatusCode())
+	assert.Equal(t, http.StatusNotFound, gone.StatusCode())
+}
+
+func TestOnlyAdminsSeeOrChangeTheEmailProvider(t *testing.T) {
+	m := murphytest.New(t)
+	bo := m.ClientWith(m.SessionAs(murphytest.Bo))
+
+	read, err := bo.GetEmailProviderWithResponse(t.Context())
+	require.NoError(t, err)
+	set, err := bo.SetEmailProviderWithResponse(t.Context(), client.EmailProviderInput{Type: client.Smtp, From: "murphy@example.com", Host: "smtp.example.com", Port: 587})
+	require.NoError(t, err)
+
+	assert.Equal(t, http.StatusForbidden, read.StatusCode())
+	assert.Equal(t, http.StatusForbidden, set.StatusCode())
+}

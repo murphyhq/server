@@ -90,3 +90,17 @@ WITH handled AS (
   FROM handled
 )
 SELECT count(*) FROM handled;
+
+-- name: GetEmailProvider :one
+SELECT type, from_address, host, port, username, secret, updated_at
+FROM email_provider;
+
+-- name: SetEmailProvider :exec
+INSERT INTO email_provider (type, from_address, host, port, username, secret, updated_at)
+VALUES (@type, @from_address, @host, @port, @username, @secret, @updated_at)
+ON CONFLICT (singleton) DO UPDATE
+SET type = EXCLUDED.type, from_address = EXCLUDED.from_address, host = EXCLUDED.host, port = EXCLUDED.port,
+  username = EXCLUDED.username, secret = EXCLUDED.secret, updated_at = EXCLUDED.updated_at;
+
+-- name: DeleteEmailProvider :exec
+DELETE FROM email_provider;

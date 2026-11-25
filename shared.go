@@ -3,6 +3,8 @@ package murphy
 import (
 	"crypto/sha256"
 	"errors"
+	"net/url"
+	"regexp"
 	"strings"
 	"time"
 	"uuid"
@@ -108,6 +110,25 @@ func requireID(field, value string) error {
 		return invalid(field, "must be a UUID")
 	}
 	return nil
+}
+
+var secretVariable = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+
+func validSecretReference(field, reference string) error {
+	ref, err := url.Parse(reference)
+	if err == nil {
+		switch ref.Scheme {
+		case "env":
+			if secretVariable.MatchString(ref.Host) && ref.Path == "" {
+				return nil
+			}
+		case "file", "aws-ssm":
+			if ref.Host == "" && len(ref.Path) > 1 {
+				return nil
+			}
+		}
+	}
+	return invalid(field, "must be a secret reference: env://NAME, file:///path or aws-ssm:///name")
 }
 
 func (r NotificationReason) Text() string {

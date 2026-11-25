@@ -36,6 +36,40 @@ func Run(t *testing.T, open func(t *testing.T) notifications.Repository) {
 		assert.Len(t, due, 1)
 	})
 
+	t.Run("keeps one email provider, replaced by each set", func(t *testing.T) {
+		repo := open(t)
+		first := &murphy.EmailProvider{Type: murphy.EmailProviderType_EMAIL_PROVIDER_TYPE_SMTP, From: "murphy@example.com", Host: "smtp.example.com", Port: 587, UpdatedAt: murphy.Now()}
+		second := &murphy.EmailProvider{
+			Type: murphy.EmailProviderType_EMAIL_PROVIDER_TYPE_SMTP, From: "Murphy <pager@example.com>", Host: "mail.example.com", Port: 465,
+			Username: "murphy", Secret: "env://SMTP_PASSWORD", UpdatedAt: murphy.Now(),
+		}
+
+		require.NoError(t, repo.SetEmailProvider(t.Context(), first))
+		require.NoError(t, repo.SetEmailProvider(t.Context(), second))
+		got, err := repo.GetEmailProvider(t.Context())
+
+		require.NoError(t, err)
+		assert.Equal(t, second.GetFrom(), got.GetFrom())
+		assert.Equal(t, second.GetHost(), got.GetHost())
+		assert.Equal(t, second.GetPort(), got.GetPort())
+		assert.Equal(t, second.GetUsername(), got.GetUsername())
+		assert.Equal(t, second.GetSecret(), got.GetSecret())
+		assert.Equal(t, second.GetType(), got.GetType())
+		assert.WithinDuration(t, second.GetUpdatedAt().AsTime(), got.GetUpdatedAt().AsTime(), time.Millisecond)
+	})
+
+	t.Run("has no email provider until one is set, and none once it's removed", func(t *testing.T) {
+		repo := open(t)
+		_, before := repo.GetEmailProvider(t.Context())
+		require.NoError(t, repo.SetEmailProvider(t.Context(), &murphy.EmailProvider{Type: murphy.EmailProviderType_EMAIL_PROVIDER_TYPE_SMTP, From: "murphy@example.com", Host: "smtp.example.com", Port: 587, UpdatedAt: murphy.Now()}))
+
+		require.NoError(t, repo.DeleteEmailProvider(t.Context()))
+		_, after := repo.GetEmailProvider(t.Context())
+
+		assert.ErrorIs(t, before, murphy.ErrNotFound)
+		assert.ErrorIs(t, after, murphy.ErrNotFound)
+	})
+
 	t.Run("knows everyone an incident's pages reached, once each", func(t *testing.T) {
 		repo := open(t)
 		incident, other := &murphy.Incident{Id: murphy.NewID()}, &murphy.Incident{Id: murphy.NewID()}

@@ -37,3 +37,16 @@ WHERE id IN (sqlc.slice(ids));
 -- name: DeleteMessages :exec
 DELETE FROM scheduled_messages
 WHERE id IN (sqlc.slice(ids));
+
+-- name: GetEmailProvider :one
+SELECT type, from_address, host, port, username, secret, updated_at
+FROM email_provider;
+
+-- name: SetEmailProvider :exec
+INSERT INTO email_provider (type, from_address, host, port, username, secret, updated_at)
+VALUES (sqlc.arg(type), sqlc.arg(from_address), sqlc.arg(host), sqlc.arg(port), sqlc.arg(username), sqlc.arg(secret), sqlc.arg(updated_at))
+ON DUPLICATE KEY UPDATE type = VALUES(type), from_address = VALUES(from_address), host = VALUES(host), port = VALUES(port),
+  username = VALUES(username), secret = VALUES(secret), updated_at = VALUES(updated_at);
+
+-- name: DeleteEmailProvider :exec
+DELETE FROM email_provider;

@@ -1393,6 +1393,58 @@ paths:
                 $ref: "#/components/schemas/EscalationPolicy"
         "404":
           $ref: "#/components/responses/Problem"
+  /v1/providers/email:
+    get:
+      operationId: getEmailProvider
+      security:
+        - session: [install:manage]
+        - sessionCookie: [install:manage]
+      summary: Get the email provider
+      description: The server Murphy sends email through. 404 until an admin sets one.
+      tags: [notifications]
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmailProvider"
+        "404":
+          $ref: "#/components/responses/Problem"
+    put:
+      operationId: setEmailProvider
+      security:
+        - session: [install:manage]
+        - sessionCookie: [install:manage]
+      summary: Set the email provider
+      description: Replaces the email provider, if there is one.
+      tags: [notifications]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EmailProviderInput"
+      responses:
+        "200":
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmailProvider"
+        "400":
+          $ref: "#/components/responses/Problem"
+    delete:
+      operationId: removeEmailProvider
+      security:
+        - session: [install:manage]
+        - sessionCookie: [install:manage]
+      summary: Remove the email provider
+      description: Murphy stops sending email until a provider is set again.
+      tags: [notifications]
+      responses:
+        "204":
+          description: Removed, or there was none.
   /v1/signing-keys:
     get:
       operationId: getSigningKeys
@@ -1942,6 +1994,60 @@ components:
         created_at:
           type: string
           format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    EmailProviderInput:
+      type: object
+      required: [type, from, host, port]
+      properties:
+        type:
+          $ref: "#/components/schemas/EmailProviderType"
+        from:
+          type: string
+          description: The sender, as in `Murphy <murphy@example.com>`.
+        host:
+          type: string
+          description: The SMTP server.
+        port:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 65535
+          description: Usually 587, where Murphy upgrades the connection with STARTTLS, or 465 for TLS from the start.
+        username:
+          type: string
+          description: Required with a secret.
+        secret:
+          type: string
+          description: Where Murphy reads the password, never the password itself, as `env://NAME`, `file:///path` or `aws-ssm:///name`. `notifier` reads it each time it sends.
+    EmailProviderType:
+      type: string
+      enum: [smtp]
+    EmailProvider:
+      type: object
+      required: [type, from, host, port, username, secret, updated_at]
+      properties:
+        type:
+          $ref: "#/components/schemas/EmailProviderType"
+        from:
+          type: string
+          description: The sender, as in `Murphy <murphy@example.com>`.
+        host:
+          type: string
+          description: The SMTP server.
+        port:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 65535
+          description: Usually 587, where Murphy upgrades the connection with STARTTLS, or 465 for TLS from the start.
+        username:
+          type: string
+          description: Required with a secret.
+        secret:
+          type: string
+          description: Where Murphy reads the password, never the password itself, as `env://NAME`, `file:///path` or `aws-ssm:///name`. `notifier` reads it each time it sends.
         updated_at:
           type: string
           format: date-time

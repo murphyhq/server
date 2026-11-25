@@ -130,6 +130,15 @@ func (q *Queries) CreateScheduledMessages(ctx context.Context, arg CreateSchedul
 	return err
 }
 
+const deleteEmailProvider = `-- name: DeleteEmailProvider :exec
+DELETE FROM email_provider
+`
+
+func (q *Queries) DeleteEmailProvider(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, deleteEmailProvider)
+	return err
+}
+
 const deleteMessages = `-- name: DeleteMessages :exec
 DELETE FROM scheduled_messages
 WHERE id = ANY($1::uuid[])
@@ -138,6 +147,36 @@ WHERE id = ANY($1::uuid[])
 func (q *Queries) DeleteMessages(ctx context.Context, ids []string) error {
 	_, err := q.db.Exec(ctx, deleteMessages, ids)
 	return err
+}
+
+const getEmailProvider = `-- name: GetEmailProvider :one
+SELECT type, from_address, host, port, username, secret, updated_at
+FROM email_provider
+`
+
+type GetEmailProviderRow struct {
+	Type        string
+	FromAddress string
+	Host        string
+	Port        int32
+	Username    string
+	Secret      string
+	UpdatedAt   time.Time
+}
+
+func (q *Queries) GetEmailProvider(ctx context.Context) (GetEmailProviderRow, error) {
+	row := q.db.QueryRow(ctx, getEmailProvider)
+	var i GetEmailProviderRow
+	err := row.Scan(
+		&i.Type,
+		&i.FromAddress,
+		&i.Host,
+		&i.Port,
+		&i.Username,
+		&i.Secret,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
 
 const lockDueMessages = `-- name: LockDueMessages :many
@@ -350,6 +389,37 @@ func (q *Queries) RecordPage(ctx context.Context, arg RecordPageParams) (int64, 
 	var count int64
 	err := row.Scan(&count)
 	return count, err
+}
+
+const setEmailProvider = `-- name: SetEmailProvider :exec
+INSERT INTO email_provider (type, from_address, host, port, username, secret, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+ON CONFLICT (singleton) DO UPDATE
+SET type = EXCLUDED.type, from_address = EXCLUDED.from_address, host = EXCLUDED.host, port = EXCLUDED.port,
+  username = EXCLUDED.username, secret = EXCLUDED.secret, updated_at = EXCLUDED.updated_at
+`
+
+type SetEmailProviderParams struct {
+	Type        string
+	FromAddress string
+	Host        string
+	Port        int32
+	Username    string
+	Secret      string
+	UpdatedAt   time.Time
+}
+
+func (q *Queries) SetEmailProvider(ctx context.Context, arg SetEmailProviderParams) error {
+	_, err := q.db.Exec(ctx, setEmailProvider,
+		arg.Type,
+		arg.FromAddress,
+		arg.Host,
+		arg.Port,
+		arg.Username,
+		arg.Secret,
+		arg.UpdatedAt,
+	)
+	return err
 }
 
 const updateNotificationOutcome = `-- name: UpdateNotificationOutcome :exec
