@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
@@ -49,7 +48,7 @@ func ContinuedFrom(carrier map[string]string) Option {
 
 func Span(ctx context.Context, opts ...Option) (context.Context, Scope) {
 	caller := telemetry.CallerOf(1)
-	options := []trace.SpanStartOption{trace.WithAttributes(attributes(telemetry.Fields(ctx))...)}
+	options := []trace.SpanStartOption{trace.WithAttributes(telemetry.Attributes(telemetry.Fields(ctx))...)}
 	for _, opt := range opts {
 		ctx = opt(ctx, &options)
 	}
@@ -64,12 +63,8 @@ func Inject(ctx context.Context) map[string]string {
 }
 
 func (s Scope) Set(ctx context.Context, fields ...telemetry.Field) context.Context {
-	s.span.SetAttributes(attributes(fields)...)
+	s.span.SetAttributes(telemetry.Attributes(fields)...)
 	return telemetry.With(ctx, fields...)
-}
-
-func Annotate(ctx context.Context, fields ...telemetry.Field) {
-	trace.SpanFromContext(ctx).SetAttributes(attributes(fields)...)
 }
 
 func (s Scope) End(err *error) {
@@ -100,31 +95,4 @@ func TraceResponse(ctx context.Context) string {
 		return ""
 	}
 	return fmt.Sprintf("00-%s-%s-%s", span.TraceID(), span.SpanID(), span.TraceFlags())
-}
-
-func attributes(fields []telemetry.Field) []attribute.KeyValue {
-	kvs := make([]attribute.KeyValue, 0, len(fields))
-	for _, f := range fields {
-		kvs = append(kvs, attributeOf(f.Name(), f.Value))
-	}
-	return kvs
-}
-
-func attributeOf(key string, v any) attribute.KeyValue {
-	switch v := v.(type) {
-	case string:
-		return attribute.String(key, v)
-	case bool:
-		return attribute.Bool(key, v)
-	case int:
-		return attribute.Int(key, v)
-	case int64:
-		return attribute.Int64(key, v)
-	case float64:
-		return attribute.Float64(key, v)
-	case fmt.Stringer:
-		return attribute.String(key, v.String())
-	default:
-		return attribute.String(key, fmt.Sprint(v))
-	}
 }

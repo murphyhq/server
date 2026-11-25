@@ -22,6 +22,13 @@ type problem struct {
 }
 
 func WriteProblem(w http.ResponseWriter, r *http.Request, status int, detail string) {
+	if status < http.StatusInternalServerError && detail != "" {
+		telemetry.Collect(r.Context(), telemetry.WithField("refusal", detail))
+	}
+	write(w, r, status, detail)
+}
+
+func write(w http.ResponseWriter, r *http.Request, status int, detail string) {
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(problem{
@@ -33,42 +40,38 @@ func WriteProblem(w http.ResponseWriter, r *http.Request, status int, detail str
 }
 
 func BadRequest(w http.ResponseWriter, r *http.Request, err error) {
-	WriteProblem(w, r, http.StatusBadRequest, err.Error())
+	telemetry.Collect(r.Context(), telemetry.WithField("refusal", "the request doesn't match the API"))
+	write(w, r, http.StatusBadRequest, err.Error())
 }
 
 func WriteError(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
 	case errors.Is(err, murphy.ErrInvalid):
-		refuse(w, r, http.StatusBadRequest, strings.ReplaceAll(err.Error(), "\n", "; "))
+		WriteProblem(w, r, http.StatusBadRequest, strings.ReplaceAll(err.Error(), "\n", "; "))
 	case errors.Is(err, murphy.ErrNotFound):
 		var notFound *murphy.NotFoundError
 		detail := ""
 		if errors.As(err, &notFound) {
 			detail = notFound.Error()
 		}
-		refuse(w, r, http.StatusNotFound, detail)
+		WriteProblem(w, r, http.StatusNotFound, detail)
 	case errors.Is(err, murphy.ErrConflict):
-		refuse(w, r, http.StatusConflict, "conflicts with an existing resource")
+		WriteProblem(w, r, http.StatusConflict, "conflicts with an existing resource")
 	case errors.Is(err, murphy.ErrUnauthenticated):
-		refuse(w, r, http.StatusUnauthorized, "sign in first")
+		WriteProblem(w, r, http.StatusUnauthorized, "sign in first")
 	case errors.Is(err, murphy.ErrTooManyAttempts):
-		refuse(w, r, http.StatusTooManyRequests, "too many failed attempts; try again later")
+		WriteProblem(w, r, http.StatusTooManyRequests, "too many failed attempts; try again later")
 	case errors.Is(err, murphy.ErrForbidden):
 		var forbidden *murphy.ForbiddenError
 		detail := "you aren't allowed to do this"
 		if errors.As(err, &forbidden) {
 			detail = forbidden.Reason
 		}
-		refuse(w, r, http.StatusForbidden, detail)
+		WriteProblem(w, r, http.StatusForbidden, detail)
 	default:
 		logger.Error(r.Context(), "request failed", telemetry.WithError(err))
 		WriteProblem(w, r, http.StatusInternalServerError, "")
 	}
-}
-
-func refuse(w http.ResponseWriter, r *http.Request, status int, detail string) {
-	telemetry.Collect(r.Context(), telemetry.WithField("refusal", detail))
-	WriteProblem(w, r, status, detail)
 }
 
 func RejectUnknownParameters(spec *openapi3.T) func(http.Handler) http.Handler {

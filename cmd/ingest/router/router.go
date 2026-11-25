@@ -11,6 +11,7 @@ import (
 	"github.com/murphyhq/server/internal/httpclient"
 	"github.com/murphyhq/server/internal/httpserver"
 	"github.com/murphyhq/server/internal/messaging"
+	"github.com/murphyhq/server/internal/telemetry"
 	"github.com/murphyhq/server/services/catalog"
 )
 
@@ -51,7 +52,9 @@ func authenticate(keys *catalog.Keyring) MiddlewareFunc {
 				httpserver.WriteProblem(w, r, http.StatusUnauthorized, "invalid integration key")
 				return
 			}
-			next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), keyContext{}, claims)))
+			who := []telemetry.Field{telemetry.WithField("integration.id", claims.GetIntegrationId()), telemetry.WithField("service.id", claims.GetServiceId())}
+			telemetry.Collect(r.Context(), who...)
+			next.ServeHTTP(w, r.WithContext(context.WithValue(telemetry.With(r.Context(), who...), keyContext{}, claims)))
 		})
 	}
 }
