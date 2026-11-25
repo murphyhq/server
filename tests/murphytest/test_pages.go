@@ -40,4 +40,3 @@ func Failures(page client.TestPage) []string {
 	}
 	return failures
 }
-
