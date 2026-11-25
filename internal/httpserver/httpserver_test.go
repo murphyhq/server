@@ -24,7 +24,7 @@ import (
 	"github.com/murphyhq/server/internal/telemetry"
 )
 
-func serve(t *testing.T) (*httptest.Server, *tracetest.InMemoryExporter) {
+func traced(t *testing.T) *tracetest.InMemoryExporter {
 	t.Helper()
 	exporter := tracetest.NewInMemoryExporter()
 	previous, previousPropagator := otel.GetTracerProvider(), otel.GetTextMapPropagator()
@@ -34,6 +34,12 @@ func serve(t *testing.T) (*httptest.Server, *tracetest.InMemoryExporter) {
 		otel.SetTracerProvider(previous)
 		otel.SetTextMapPropagator(previousPropagator)
 	})
+	return exporter
+}
+
+func serve(t *testing.T) (*httptest.Server, *tracetest.InMemoryExporter) {
+	t.Helper()
+	exporter := traced(t)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /things/{id}", func(w http.ResponseWriter, r *http.Request) {
@@ -117,6 +123,7 @@ func TestUnmatchedRoutesAnswerWithProblems(t *testing.T) {
 }
 
 func TestTheRequestLogSaysWhoAskedAndWhyTheyWereRefused(t *testing.T) {
+	exporter := traced(t)
 	var logs bytes.Buffer
 	previous := slog.Default()
 	slog.SetDefault(slog.New(slog.NewJSONHandler(&logs, nil)))
@@ -134,6 +141,7 @@ func TestTheRequestLogSaysWhoAskedAndWhyTheyWereRefused(t *testing.T) {
 	assert.Equal(t, "request handled", line["msg"])
 	assert.Equal(t, "bo", line["murphy.user.id"])
 	assert.Equal(t, "only responders can resolve this", line["murphy.refusal"])
+	assert.Contains(t, span(t, exporter).Attributes, attributeOf("murphy.user.id", "bo"))
 }
 
 func attributeOf(key, value string) attribute.KeyValue {

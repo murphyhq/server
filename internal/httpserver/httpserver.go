@@ -112,7 +112,9 @@ func observe(next http.Handler) http.Handler {
 			fields = append(fields, telemetry.Standard("http.route", route))
 			scope.Record(ctx, "http.request", metrics.Dimension{Name: "http.request.method", Value: r.Method}, metrics.Dimension{Name: "http.route", Value: route})
 		}
-		logger.Info(ctx, "request handled", append(fields, telemetry.Collected(ctx)...)...)
+		collected := telemetry.Collected(ctx)
+		tracer.Annotate(ctx, collected...)
+		logger.Info(ctx, "request handled", append(fields, collected...)...)
 	})
 }
 

@@ -7,9 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/trace"
-
 	"github.com/murphyhq/server"
 	"github.com/murphyhq/server/internal/httpserver"
 	"github.com/murphyhq/server/internal/telemetry"
@@ -51,9 +48,9 @@ func RequireSession(auth *people.Auth) func(http.Handler) http.Handler {
 				httpserver.WriteError(w, r, err)
 				return
 			}
-			telemetry.Collect(r.Context(), telemetry.WithField("user.id", session.GetUserId()), telemetry.WithField("session.id", session.GetId()))
-			trace.SpanFromContext(r.Context()).SetAttributes(attribute.String("user.id", session.GetUserId()))
-			ctx := context.WithValue(r.Context(), sessionContext{}, &currentSession{token: token, session: session, role: role})
+			who := []telemetry.Field{telemetry.WithField("user.id", session.GetUserId()), telemetry.WithField("session.id", session.GetId())}
+			telemetry.Collect(r.Context(), who...)
+			ctx := context.WithValue(telemetry.With(r.Context(), who...), sessionContext{}, &currentSession{token: token, session: session, role: role})
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}

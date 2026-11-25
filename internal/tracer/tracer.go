@@ -68,6 +68,10 @@ func (s Scope) Set(ctx context.Context, fields ...telemetry.Field) context.Conte
 	return telemetry.With(ctx, fields...)
 }
 
+func Annotate(ctx context.Context, fields ...telemetry.Field) {
+	trace.SpanFromContext(ctx).SetAttributes(attributes(fields)...)
+}
+
 func (s Scope) End(err *error) {
 	if err != nil && *err != nil {
 		s.span.RecordError(*err)
