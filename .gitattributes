@@ -1,0 +1,5 @@
+*.gen.go               linguist-generated=true
+*.pb.go                linguist-generated=true
+**/db/*/queries.sql.go linguist-generated=true
+**/db/*/models.go      linguist-generated=true
+**/mocks_test.go       linguist-generated=true
