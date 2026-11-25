@@ -84,13 +84,21 @@ func parse(v reflect.Value, raw string) error {
 	}
 
 	if v.Type() == reflect.TypeFor[[]string]() {
-		var values []string
-		for _, part := range strings.Split(raw, ",") {
-			if part = strings.TrimSpace(part); part != "" {
-				values = append(values, part)
+		v.Set(reflect.ValueOf(list(raw)))
+		return nil
+	}
+
+	if v.Type() == reflect.TypeFor[[]netip.Prefix]() {
+		entries := list(raw)
+		prefixes := make([]netip.Prefix, len(entries))
+		for i, entry := range entries {
+			prefix, err := netip.ParsePrefix(entry)
+			if err != nil {
+				return fmt.Errorf("entry %d: not a network in CIDR notation, as in 10.0.0.0/8", i+1)
 			}
+			prefixes[i] = prefix
 		}
-		v.Set(reflect.ValueOf(values))
+		v.Set(reflect.ValueOf(prefixes))
 		return nil
 	}
 
@@ -115,10 +123,19 @@ func parse(v reflect.Value, raw string) error {
 	return nil
 }
 
+func list(raw string) []string {
+	var values []string
+	for _, part := range strings.Split(raw, ",") {
+		if part = strings.TrimSpace(part); part != "" {
+			values = append(values, part)
+		}
+	}
+	return values
+}
+
 var rules = map[string]func(string) error{
 	"base-url": baseURL,
 	"http-url": httpURL,
-	"cidr":     cidr,
 }
 
 func validate(v reflect.Value, rule string) error {
@@ -153,13 +170,6 @@ func baseURL(raw string) error {
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" ||
 		u.Path != "" || u.RawQuery != "" || u.Fragment != "" || u.User != nil {
 		return errors.New("not a base URL of the form scheme://host[:port]")
-	}
-	return nil
-}
-
-func cidr(raw string) error {
-	if _, err := netip.ParsePrefix(raw); err != nil {
-		return errors.New("not a network in CIDR notation, as in 10.0.0.0/8")
 	}
 	return nil
 }

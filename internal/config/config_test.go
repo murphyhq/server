@@ -1,6 +1,7 @@
 package config_test
 
 import (
+	"net/netip"
 	"testing"
 	"time"
 
@@ -97,13 +98,14 @@ func TestLoadAcceptsBaseURLsAndRejectsEverythingElseWithoutEchoingIt(t *testing.
 }
 
 type networks struct {
-	Allowed []string `env:"ALLOWED_NETWORKS" validate:"cidr"`
+	Allowed []netip.Prefix `env:"ALLOWED_NETWORKS"`
 }
 
 func TestLoadAcceptsNetworksAndRejectsEverythingElseWithoutEchoingIt(t *testing.T) {
 	t.Setenv("MURPHY_ALLOWED_NETWORKS", "10.0.0.0/8,fd00::/8")
 	var ok networks
 	require.NoError(t, config.Load(&ok))
+	assert.Equal(t, []netip.Prefix{netip.MustParsePrefix("10.0.0.0/8"), netip.MustParsePrefix("fd00::/8")}, ok.Allowed)
 
 	t.Setenv("MURPHY_ALLOWED_NETWORKS", "10.0.0.0/8,s3cret-host")
 	var bad networks

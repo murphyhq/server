@@ -30,33 +30,33 @@ import (
 )
 
 type Settings struct {
-	Addr                   string        `env:"API_ADDR" default:":8080"`
-	CatalogDatabaseURL     string        `env:"CATALOG_DATABASE_URL" required:"true"`
-	IncidentsDatabaseURL   string        `env:"INCIDENTS_DATABASE_URL" required:"true"`
-	PeopleDatabaseURL      string        `env:"PEOPLE_DATABASE_URL" required:"true"`
-	OnCallDatabaseURL      string        `env:"ONCALL_DATABASE_URL" required:"true"`
-	EscalationDatabaseURL  string        `env:"ESCALATION_DATABASE_URL" required:"true"`
-	IdempotencyStoreURL    string        `env:"IDEMPOTENCY_STORE_URL" required:"true"`
-	IntegrationKeySecrets  string        `env:"INTEGRATION_KEY_SECRETS" required:"true"`
-	WebhookPublicKeys      string        `env:"WEBHOOK_PUBLIC_KEYS" required:"true"`
-	EscalationMinimumDelay time.Duration `env:"ESCALATION_MINIMUM_DELAY" default:"1m"`
-	CORSOrigins            []string      `env:"CORS_ORIGINS" validate:"base-url"`
-	PublicURL              string        `env:"PUBLIC_URL" required:"true" validate:"base-url"`
-	OIDCIssuer             string        `env:"OIDC_ISSUER" validate:"http-url"`
-	OIDCBackchannelURL     string        `env:"OIDC_BACKCHANNEL_URL" validate:"http-url"`
-	OIDCClientID           string        `env:"OIDC_CLIENT_ID"`
-	OIDCClientSecret       string        `env:"OIDC_CLIENT_SECRET"`
-	AllowPasswords         bool          `env:"ALLOW_PASSWORDS"`
-	RateLimitStoreURL      string        `env:"RATE_LIMIT_STORE_URL"`
-	TrustedProxies         []string      `env:"TRUSTED_PROXIES" validate:"cidr"`
-	BrowserSessionIdle     time.Duration `env:"BROWSER_SESSION_IDLE_TIMEOUT" default:"24h"`
-	BrowserSessionAbsolute time.Duration `env:"BROWSER_SESSION_ABSOLUTE_TIMEOUT" default:"720h"`
-	AppSessionIdle         time.Duration `env:"APP_SESSION_IDLE_TIMEOUT" default:"5040h"`
-	AppSessionAbsolute     time.Duration `env:"APP_SESSION_ABSOLUTE_TIMEOUT" default:"43800h"`
-	InitialAdminEmail      string        `env:"INITIAL_ADMIN_EMAIL"`
-	InitialAdminPassword   string        `env:"INITIAL_ADMIN_PASSWORD"`
-	AppScheme              string        `env:"APP_SCHEME" default:"murphy"`
-	AllowedEmailDomains    []string      `env:"ALLOWED_EMAIL_DOMAINS"`
+	Addr                   string         `env:"API_ADDR" default:":8080"`
+	CatalogDatabaseURL     string         `env:"CATALOG_DATABASE_URL" required:"true"`
+	IncidentsDatabaseURL   string         `env:"INCIDENTS_DATABASE_URL" required:"true"`
+	PeopleDatabaseURL      string         `env:"PEOPLE_DATABASE_URL" required:"true"`
+	OnCallDatabaseURL      string         `env:"ONCALL_DATABASE_URL" required:"true"`
+	EscalationDatabaseURL  string         `env:"ESCALATION_DATABASE_URL" required:"true"`
+	IdempotencyStoreURL    string         `env:"IDEMPOTENCY_STORE_URL" required:"true"`
+	IntegrationKeySecrets  string         `env:"INTEGRATION_KEY_SECRETS" required:"true"`
+	WebhookPublicKeys      string         `env:"WEBHOOK_PUBLIC_KEYS" required:"true"`
+	EscalationMinimumDelay time.Duration  `env:"ESCALATION_MINIMUM_DELAY" default:"1m"`
+	CORSOrigins            []string       `env:"CORS_ORIGINS" validate:"base-url"`
+	PublicURL              string         `env:"PUBLIC_URL" required:"true" validate:"base-url"`
+	OIDCIssuer             string         `env:"OIDC_ISSUER" validate:"http-url"`
+	OIDCBackchannelURL     string         `env:"OIDC_BACKCHANNEL_URL" validate:"http-url"`
+	OIDCClientID           string         `env:"OIDC_CLIENT_ID"`
+	OIDCClientSecret       string         `env:"OIDC_CLIENT_SECRET"`
+	AllowPasswords         bool           `env:"ALLOW_PASSWORDS"`
+	RateLimitStoreURL      string         `env:"RATE_LIMIT_STORE_URL"`
+	TrustedProxies         []netip.Prefix `env:"TRUSTED_PROXIES"`
+	BrowserSessionIdle     time.Duration  `env:"BROWSER_SESSION_IDLE_TIMEOUT" default:"24h"`
+	BrowserSessionAbsolute time.Duration  `env:"BROWSER_SESSION_ABSOLUTE_TIMEOUT" default:"720h"`
+	AppSessionIdle         time.Duration  `env:"APP_SESSION_IDLE_TIMEOUT" default:"5040h"`
+	AppSessionAbsolute     time.Duration  `env:"APP_SESSION_ABSOLUTE_TIMEOUT" default:"43800h"`
+	InitialAdminEmail      string         `env:"INITIAL_ADMIN_EMAIL"`
+	InitialAdminPassword   string         `env:"INITIAL_ADMIN_PASSWORD"`
+	AppScheme              string         `env:"APP_SCHEME" default:"murphy"`
+	AllowedEmailDomains    []string       `env:"ALLOWED_EMAIL_DOMAINS"`
 }
 
 type App struct {
@@ -138,10 +138,6 @@ func New(ctx context.Context, s Settings) (_ *App, err error) {
 		a.resources.Add(func() { _ = store.Close() }, store.Ping)
 		limiter = store
 	}
-	trusted, err := networks(s.TrustedProxies)
-	if err != nil {
-		return nil, fmt.Errorf("MURPHY_TRUSTED_PROXIES: %w", err)
-	}
 
 	catalogService := catalog.New(catalogStorage, keyring)
 	peopleService := people.New(peopleStorage)
@@ -168,7 +164,7 @@ func New(ctx context.Context, s Settings) (_ *App, err error) {
 		PublicKeys:     publicKeys,
 		Auth:           auth,
 		SecureCookies:  strings.HasPrefix(s.PublicURL, "https://"),
-		TrustedProxies: trusted,
+		TrustedProxies: s.TrustedProxies,
 	}, keys)
 	if err != nil {
 		return nil, err
@@ -206,18 +202,6 @@ func identityProvider(s Settings) (people.Provider, error) {
 		ClientSecret:   s.OIDCClientSecret,
 		RedirectURL:    s.PublicURL + "/v1/auth/callback",
 	}), nil
-}
-
-func networks(cidrs []string) ([]netip.Prefix, error) {
-	prefixes := make([]netip.Prefix, len(cidrs))
-	for i, cidr := range cidrs {
-		prefix, err := netip.ParsePrefix(cidr)
-		if err != nil {
-			return nil, err
-		}
-		prefixes[i] = prefix
-	}
-	return prefixes, nil
 }
 
 func (a *App) Serve(ctx context.Context, shutdownTimeout time.Duration) error {
