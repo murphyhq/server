@@ -213,6 +213,7 @@ services:
     environment:
       <<: *component-environment
       MURPHY_SEED_API_URL: http://api:8080
+      MURPHY_SEED_INGEST_URL: http://ingest:8081
       MURPHY_SEED_WEBHOOK_URL: http://webhook-receiver:8080
       MURPHY_SEED_IDENTITY_PROVIDER_URL: http://dex:5556/dex
       MURPHY_SEED_GRAFANA_URL: http://lgtm:3000
@@ -220,6 +221,9 @@ services:
       disable: true
     depends_on:
       api:
+        condition: service_healthy
+        required: false
+      ingest:
         condition: service_healthy
         required: false
       single:
