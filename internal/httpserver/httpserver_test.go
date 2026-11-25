@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -142,6 +143,27 @@ func TestTheRequestLogSaysWhoAskedAndWhyTheyWereRefused(t *testing.T) {
 	assert.Equal(t, "bo", line["murphy.user.id"])
 	assert.Equal(t, "only responders can resolve this", line["murphy.refusal"])
 	assert.Contains(t, span(t, exporter).Attributes, attributeOf("murphy.user.id", "bo"))
+}
+
+func TestAFieldCollectedTwiceIsLoggedOnceWithItsLatestValue(t *testing.T) {
+	traced(t)
+	var logs bytes.Buffer
+	previous := slog.Default()
+	slog.SetDefault(slog.New(slog.NewJSONHandler(&logs, nil)))
+	t.Cleanup(func() { slog.SetDefault(previous) })
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /incidents/{id}/acknowledge", func(w http.ResponseWriter, r *http.Request) {
+		telemetry.Collect(r.Context(), telemetry.WithField("incident.id", "first"))
+		telemetry.Collect(r.Context(), telemetry.WithField("incident.id", "1"))
+		w.WriteHeader(http.StatusOK)
+	})
+
+	httpserver.Handler(mux).ServeHTTP(httptest.NewRecorder(), httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/incidents/1/acknowledge", nil))
+
+	assert.Equal(t, 1, strings.Count(logs.String(), `"murphy.incident.id"`))
+	var line map[string]any
+	require.NoError(t, json.Unmarshal(logs.Bytes(), &line))
+	assert.Equal(t, "1", line["murphy.incident.id"])
 }
 
 func attributeOf(key, value string) attribute.KeyValue {

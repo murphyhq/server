@@ -15,6 +15,7 @@ import (
 
 	"github.com/murphyhq/server"
 	"github.com/murphyhq/server/internal/httpserver"
+	"github.com/murphyhq/server/internal/telemetry"
 )
 
 type TeamRoles interface {
@@ -159,6 +160,7 @@ func (a *access) ownsContactMethod(ctx context.Context, c caller, id string) err
 }
 
 func (a *access) respondsTo(ctx context.Context, c caller, id string) error {
+	telemetry.Collect(ctx, telemetry.WithField("incident.id", id))
 	policyID, paged, err := a.incidents.PolicyOfIncident(ctx, id, c.id)
 	if err != nil {
 		return err
@@ -170,6 +172,10 @@ func (a *access) respondsTo(ctx context.Context, c caller, id string) error {
 	if err != nil {
 		return err
 	}
+	return mayRespond(c, teams)
+}
+
+func mayRespond(c caller, teams []string) error {
 	return hasRoleIn(c, teams, "only the owning team's responders and managers, and people paged for it, can respond to this incident",
 		murphy.TeamRole_TEAM_ROLE_RESPONDER, murphy.TeamRole_TEAM_ROLE_MANAGER)
 }

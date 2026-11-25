@@ -31,6 +31,14 @@ func (t *Team) Add(member *Member, role client.TeamRole) {
 	t.m.ok(added, err, "add someone to the team")
 }
 
+func RolesIn(memberships []client.TeamMembership) map[string]client.TeamRole {
+	roles := map[string]client.TeamRole{}
+	for _, membership := range memberships {
+		roles[membership.Team.Id] = membership.Role
+	}
+	return roles
+}
+
 type Member struct {
 	*User
 	API *client.ClientWithResponses

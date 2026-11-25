@@ -534,6 +534,12 @@ type IncidentPage struct {
 // IncidentStatus defines model for IncidentStatus.
 type IncidentStatus string
 
+// IncidentViewer What the signed-in person can do to this incident, by the same rules the actions enforce.
+type IncidentViewer struct {
+	CanAcknowledge bool `json:"can_acknowledge"`
+	CanResolve     bool `json:"can_resolve"`
+}
+
 // IncidentWithTimeline defines model for IncidentWithTimeline.
 type IncidentWithTimeline struct {
 	AcknowledgedAt *time.Time `json:"acknowledged_at,omitempty"`
@@ -555,6 +561,9 @@ type IncidentWithTimeline struct {
 	Title     string          `json:"title"`
 	UpdatedAt time.Time       `json:"updated_at"`
 	Urgency   Urgency         `json:"urgency"`
+
+	// Viewer What the signed-in person can do to this incident, by the same rules the actions enforce.
+	Viewer IncidentViewer `json:"viewer"`
 }
 
 // Integration defines model for Integration.
@@ -808,7 +817,10 @@ type ServiceStatus string
 type Session struct {
 	// ExpiresAt When the session ends if it isn't used. Using it moves this later, up to the session's absolute timeout.
 	ExpiresAt time.Time `json:"expires_at"`
-	User      User      `json:"user"`
+
+	// Memberships The signed-in person's teams, with their role in each.
+	Memberships []TeamMembership `json:"memberships"`
+	User        User             `json:"user"`
 }
 
 // SessionInput defines model for SessionInput.

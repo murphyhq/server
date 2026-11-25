@@ -1592,10 +1592,15 @@ components:
           format: date-time
     Session:
       type: object
-      required: [user, expires_at]
+      required: [user, memberships, expires_at]
       properties:
         user:
           $ref: "#/components/schemas/User"
+        memberships:
+          type: array
+          description: The signed-in person's teams, with their role in each.
+          items:
+            $ref: "#/components/schemas/TeamMembership"
         expires_at:
           type: string
           format: date-time
@@ -1898,12 +1903,23 @@ components:
       allOf:
         - $ref: "#/components/schemas/Incident"
         - type: object
-          required: [timeline]
+          required: [timeline, viewer]
           properties:
             timeline:
               type: array
               items:
                 $ref: "#/components/schemas/TimelineEntry"
+            viewer:
+              $ref: "#/components/schemas/IncidentViewer"
+    IncidentViewer:
+      type: object
+      description: What the signed-in person can do to this incident, by the same rules the actions enforce.
+      required: [can_acknowledge, can_resolve]
+      properties:
+        can_acknowledge:
+          type: boolean
+        can_resolve:
+          type: boolean
     IncidentPage:
       type: object
       required: [items, next_cursor]
