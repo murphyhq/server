@@ -10,6 +10,7 @@ import (
 )
 
 type Tx struct {
+	tx      murphymysql.DBTX
 	queries *Queries
 }
 
@@ -66,4 +67,22 @@ func (t *Tx) CreateContactMethod(ctx context.Context, method *murphy.ContactMeth
 	defer span.End(&err)
 
 	return insertContactMethod(ctx, t.queries, method)
+}
+
+func (t *Tx) DeleteNotificationRule(ctx context.Context, userID string, urgency murphy.Urgency) (err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	return deleteNotificationRule(ctx, t.queries, userID, urgency)
+}
+
+func (t *Tx) CreateNotificationRule(ctx context.Context, rule *murphy.NotificationRule, at time.Time) (err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	rows := murphymysql.Rows{Name: "CreateNotificationRules", Table: "notification_rules", Columns: []string{"id", "user_id", "urgency", "position", "contact_method_id", "delay_seconds", "created_at"}}
+	for i, step := range rule.GetSteps() {
+		rows.Values = append(rows.Values, []any{murphy.NewID(), rule.GetUserId(), rule.GetUrgency().Text(), i + 1, step.GetContactMethodId(), int32(step.GetDelay().AsDuration() / time.Second), at})
+	}
+	return murphymysql.Error("notification rule", murphymysql.Insert(ctx, t.tx, rows))
 }

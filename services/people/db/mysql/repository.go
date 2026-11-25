@@ -5,6 +5,7 @@ import (
 	"embed"
 	"time"
 
+	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/murphyhq/server"
@@ -26,7 +27,7 @@ func Open(ctx context.Context, url string) (*Repository, error) {
 		URL:        url,
 		Service:    "people",
 		Migrations: migrations,
-		Tx:         func(tx murphymysql.DBTX) *Tx { return &Tx{queries: New(tx)} },
+		Tx:         func(tx murphymysql.DBTX) *Tx { return &Tx{tx: tx, queries: New(tx)} },
 	})
 	if err != nil {
 		return nil, err
@@ -573,4 +574,35 @@ func (r *Repository) GetPasswordHash(ctx context.Context, userID string) (_ stri
 		return "", murphymysql.Error("password", err)
 	}
 	return hash, nil
+}
+
+func (r *Repository) ListNotificationRules(ctx context.Context, userID string) (_ []*murphy.NotificationRule, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	rows, err := r.queries.ListNotificationRules(ctx, userID)
+	if err != nil {
+		return nil, murphymysql.Error("notification rule", err)
+	}
+	var rules []*murphy.NotificationRule
+	for _, row := range rows {
+		urgency := murphy.UrgencyFromText(row.Urgency)
+		if len(rules) == 0 || rules[len(rules)-1].GetUrgency() != urgency {
+			rules = append(rules, &murphy.NotificationRule{UserId: row.UserID, Urgency: urgency, Custom: true})
+		}
+		rule := rules[len(rules)-1]
+		rule.Steps = append(rule.Steps, &murphy.NotificationStep{ContactMethodId: row.ContactMethodID, Delay: durationpb.New(time.Duration(row.DelaySeconds) * time.Second)})
+	}
+	return rules, nil
+}
+
+func (r *Repository) DeleteNotificationRule(ctx context.Context, userID string, urgency murphy.Urgency) (err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	return deleteNotificationRule(ctx, r.queries, userID, urgency)
+}
+
+func deleteNotificationRule(ctx context.Context, queries *Queries, userID string, urgency murphy.Urgency) error {
+	return murphymysql.Error("notification rule", queries.DeleteNotificationRules(ctx, DeleteNotificationRulesParams{UserID: userID, Urgency: urgency.Text()}))
 }

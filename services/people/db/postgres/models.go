@@ -29,6 +29,16 @@ type Identity struct {
 	UpdatedAt time.Time
 }
 
+type NotificationRule struct {
+	ID              string
+	UserID          string
+	Urgency         string
+	Position        int32
+	ContactMethodID string
+	DelaySeconds    int32
+	CreatedAt       time.Time
+}
+
 type OneTimeCode struct {
 	ID            string
 	CodeHash      []byte

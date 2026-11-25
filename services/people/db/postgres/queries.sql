@@ -230,3 +230,17 @@ ON CONFLICT (user_id) DO UPDATE SET hash = EXCLUDED.hash, updated_at = EXCLUDED.
 SELECT hash
 FROM passwords
 WHERE user_id = @user_id;
+
+-- name: ListNotificationRules :many
+SELECT id, user_id, urgency, position, contact_method_id, delay_seconds, created_at
+FROM notification_rules
+WHERE user_id = @user_id
+ORDER BY urgency, position;
+
+-- name: DeleteNotificationRules :exec
+DELETE FROM notification_rules
+WHERE user_id = @user_id AND urgency = @urgency;
+
+-- name: CreateNotificationRules :exec
+INSERT INTO notification_rules (id, user_id, urgency, position, contact_method_id, delay_seconds, created_at)
+SELECT unnest(@ids::uuid[]), @user_id, @urgency, unnest(@positions::integer[]), unnest(@contact_method_ids::uuid[]), unnest(@delay_seconds::integer[]), @created_at;

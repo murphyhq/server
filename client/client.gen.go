@@ -671,6 +671,33 @@ type Layer struct {
 	TurnLengthSeconds int64 `json:"turn_length_seconds"`
 }
 
+// NotificationRule defines model for NotificationRule.
+type NotificationRule struct {
+	// Custom Whether the person set these steps; false for the default.
+	Custom  bool               `json:"custom"`
+	Steps   []NotificationStep `json:"steps"`
+	Urgency Urgency            `json:"urgency"`
+}
+
+// NotificationRuleInput defines model for NotificationRuleInput.
+type NotificationRuleInput struct {
+	Steps []NotificationStep `json:"steps"`
+}
+
+// NotificationRuleList defines model for NotificationRuleList.
+type NotificationRuleList struct {
+	Items []NotificationRule `json:"items"`
+}
+
+// NotificationStep defines model for NotificationStep.
+type NotificationStep struct {
+	// ContactMethod Points at another resource.
+	ContactMethod Reference `json:"contact_method"`
+
+	// DelaySeconds How long after the person was paged this contact method is notified.
+	DelaySeconds int32 `json:"delay_seconds"`
+}
+
 // OnCall defines model for OnCall.
 type OnCall struct {
 	At time.Time `json:"at"`
@@ -1350,6 +1377,9 @@ type UpdateUserJSONRequestBody = UserInput
 // CreateContactMethodJSONRequestBody defines body for CreateContactMethod for application/json ContentType.
 type CreateContactMethodJSONRequestBody = ContactMethodInput
 
+// SetNotificationRuleJSONRequestBody defines body for SetNotificationRule for application/json ContentType.
+type SetNotificationRuleJSONRequestBody = NotificationRuleInput
+
 // RequestEditorFn is the function signature for the RequestEditor callback function
 type RequestEditorFn func(ctx context.Context, req *http.Request) error
 
@@ -1958,6 +1988,36 @@ type ClientInterface interface {
 	//
 	// Corresponds with GET /v1/users/{id}/memberships (the `ListUserMemberships` operationId).
 	ListUserMemberships(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListNotificationRules How a person is paged, for each urgency
+	//
+	// Always lists both urgencies. A person who hasn't set their own steps for an urgency gets the default (`custom` is false), worked out from their working contact methods: pushes at once, everything else 2 minutes later, or everything at once when they have no push.
+	//
+	// Corresponds with GET /v1/users/{id}/notification-rules (the `ListNotificationRules` operationId).
+	ListNotificationRules(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ResetNotificationRule Go back to the default for an urgency
+	//
+	// Corresponds with DELETE /v1/users/{id}/notification-rules/{urgency} (the `ResetNotificationRule` operationId).
+	ResetNotificationRule(ctx context.Context, id ID, urgency Urgency, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetNotificationRuleWithBody Set how a person is paged for an urgency
+	//
+	// Replaces all of the urgency's steps. A page starts every step whose delay has passed, counted from when the person was paged, and acknowledging or resolving the incident cancels the steps still waiting. One step must have a delay of 0, so a page always reaches someone at once.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /v1/users/{id}/notification-rules/{urgency} (the `SetNotificationRule` operationId).
+	SetNotificationRuleWithBody(ctx context.Context, id ID, urgency Urgency, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetNotificationRule Set how a person is paged for an urgency
+	//
+	// Replaces all of the urgency's steps. A page starts every step whose delay has passed, counted from when the person was paged, and acknowledging or resolving the incident cancels the steps still waiting. One step must have a delay of 0, so a page always reaches someone at once.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /v1/users/{id}/notification-rules/{urgency} (the `SetNotificationRule` operationId).
+	SetNotificationRule(ctx context.Context, id ID, urgency Urgency, body SetNotificationRuleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CreatePasswordLink Create a link to set a user's password
 	//
@@ -3329,6 +3389,76 @@ func (c *Client) CreateContactMethod(ctx context.Context, id ID, params *CreateC
 // Corresponds with GET /v1/users/{id}/memberships (the `ListUserMemberships` operationId).
 func (c *Client) ListUserMemberships(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListUserMembershipsRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListNotificationRules How a person is paged, for each urgency
+//
+// Always lists both urgencies. A person who hasn't set their own steps for an urgency gets the default (`custom` is false), worked out from their working contact methods: pushes at once, everything else 2 minutes later, or everything at once when they have no push.
+//
+// Corresponds with GET /v1/users/{id}/notification-rules (the `ListNotificationRules` operationId).
+func (c *Client) ListNotificationRules(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListNotificationRulesRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ResetNotificationRule Go back to the default for an urgency
+//
+// Corresponds with DELETE /v1/users/{id}/notification-rules/{urgency} (the `ResetNotificationRule` operationId).
+func (c *Client) ResetNotificationRule(ctx context.Context, id ID, urgency Urgency, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewResetNotificationRuleRequest(c.Server, id, urgency)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SetNotificationRuleWithBody Set how a person is paged for an urgency
+//
+// Replaces all of the urgency's steps. A page starts every step whose delay has passed, counted from when the person was paged, and acknowledging or resolving the incident cancels the steps still waiting. One step must have a delay of 0, so a page always reaches someone at once.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PUT /v1/users/{id}/notification-rules/{urgency} (the `SetNotificationRule` operationId).
+func (c *Client) SetNotificationRuleWithBody(ctx context.Context, id ID, urgency Urgency, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetNotificationRuleRequestWithBody(c.Server, id, urgency, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SetNotificationRule Set how a person is paged for an urgency
+//
+// Replaces all of the urgency's steps. A page starts every step whose delay has passed, counted from when the person was paged, and acknowledging or resolving the incident cancels the steps still waiting. One step must have a delay of 0, so a page always reaches someone at once.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PUT /v1/users/{id}/notification-rules/{urgency} (the `SetNotificationRule` operationId).
+func (c *Client) SetNotificationRule(ctx context.Context, id ID, urgency Urgency, body SetNotificationRuleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetNotificationRuleRequest(c.Server, id, urgency, body)
 	if err != nil {
 		return nil, err
 	}
@@ -6478,6 +6608,135 @@ func NewListUserMembershipsRequest(server string, id ID) (*http.Request, error) 
 	return req, nil
 }
 
+// NewListNotificationRulesRequest constructs an http.Request for the ListNotificationRules method
+func NewListNotificationRulesRequest(server string, id ID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/users/%s/notification-rules", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewResetNotificationRuleRequest constructs an http.Request for the ResetNotificationRule method
+func NewResetNotificationRuleRequest(server string, id ID, urgency Urgency) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "urgency", urgency, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/users/%s/notification-rules/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewSetNotificationRuleRequest calls the generic SetNotificationRule builder with application/json body
+func NewSetNotificationRuleRequest(server string, id ID, urgency Urgency, body SetNotificationRuleJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewSetNotificationRuleRequestWithBody(server, id, urgency, "application/json", bodyReader)
+}
+
+// NewSetNotificationRuleRequestWithBody constructs an http.Request for the SetNotificationRule method, with any body, and a specified content type
+func NewSetNotificationRuleRequestWithBody(server string, id ID, urgency Urgency, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "urgency", urgency, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/users/%s/notification-rules/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewCreatePasswordLinkRequest constructs an http.Request for the CreatePasswordLink method
 func NewCreatePasswordLinkRequest(server string, id ID) (*http.Request, error) {
 	var err error
@@ -7214,6 +7473,40 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with GET /v1/users/{id}/memberships (the `ListUserMemberships` operationId).
 	ListUserMembershipsWithResponse(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*ListUserMembershipsResponse, error)
+
+	// ListNotificationRulesWithResponse How a person is paged, for each urgency
+	//
+	// Always lists both urgencies. A person who hasn't set their own steps for an urgency gets the default (`custom` is false), worked out from their working contact methods: pushes at once, everything else 2 minutes later, or everything at once when they have no push.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /v1/users/{id}/notification-rules (the `ListNotificationRules` operationId).
+	ListNotificationRulesWithResponse(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*ListNotificationRulesResponse, error)
+
+	// ResetNotificationRuleWithResponse Go back to the default for an urgency
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /v1/users/{id}/notification-rules/{urgency} (the `ResetNotificationRule` operationId).
+	ResetNotificationRuleWithResponse(ctx context.Context, id ID, urgency Urgency, reqEditors ...RequestEditorFn) (*ResetNotificationRuleResponse, error)
+
+	// SetNotificationRuleWithBodyWithResponse Set how a person is paged for an urgency
+	//
+	// Replaces all of the urgency's steps. A page starts every step whose delay has passed, counted from when the person was paged, and acknowledging or resolving the incident cancels the steps still waiting. One step must have a delay of 0, so a page always reaches someone at once.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /v1/users/{id}/notification-rules/{urgency} (the `SetNotificationRule` operationId).
+	SetNotificationRuleWithBodyWithResponse(ctx context.Context, id ID, urgency Urgency, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetNotificationRuleResponse, error)
+
+	// SetNotificationRuleWithResponse Set how a person is paged for an urgency
+	//
+	// Replaces all of the urgency's steps. A page starts every step whose delay has passed, counted from when the person was paged, and acknowledging or resolving the incident cancels the steps still waiting. One step must have a delay of 0, so a page always reaches someone at once.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /v1/users/{id}/notification-rules/{urgency} (the `SetNotificationRule` operationId).
+	SetNotificationRuleWithResponse(ctx context.Context, id ID, urgency Urgency, body SetNotificationRuleJSONRequestBody, reqEditors ...RequestEditorFn) (*SetNotificationRuleResponse, error)
 
 	// CreatePasswordLinkWithResponse Create a link to set a user's password
 	//
@@ -10483,6 +10776,150 @@ func (r ListUserMembershipsResponse) ContentType() string {
 	return ""
 }
 
+type ListNotificationRulesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *NotificationRuleList
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *Problem
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListNotificationRulesResponse) GetJSON200() *NotificationRuleList {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r ListNotificationRulesResponse) GetApplicationproblemJSON404() *Problem {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r ListNotificationRulesResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListNotificationRulesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListNotificationRulesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListNotificationRulesResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ResetNotificationRuleResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *Problem
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r ResetNotificationRuleResponse) GetApplicationproblemJSON404() *Problem {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r ResetNotificationRuleResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ResetNotificationRuleResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ResetNotificationRuleResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ResetNotificationRuleResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type SetNotificationRuleResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *NotificationRule
+	// ApplicationproblemJSON400 the response for an HTTP 400 `application/problem+json` response
+	ApplicationproblemJSON400 *Problem
+	// ApplicationproblemJSON404 the response for an HTTP 404 `application/problem+json` response
+	ApplicationproblemJSON404 *Problem
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r SetNotificationRuleResponse) GetJSON200() *NotificationRule {
+	return r.JSON200
+}
+
+// GetApplicationproblemJSON400 returns the response for an HTTP 400 `application/problem+json` response
+func (r SetNotificationRuleResponse) GetApplicationproblemJSON400() *Problem {
+	return r.ApplicationproblemJSON400
+}
+
+// GetApplicationproblemJSON404 returns the response for an HTTP 404 `application/problem+json` response
+func (r SetNotificationRuleResponse) GetApplicationproblemJSON404() *Problem {
+	return r.ApplicationproblemJSON404
+}
+
+// GetBody returns the raw response body bytes
+func (r SetNotificationRuleResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r SetNotificationRuleResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r SetNotificationRuleResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r SetNotificationRuleResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type CreatePasswordLinkResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -11707,6 +12144,64 @@ func (c *ClientWithResponses) ListUserMembershipsWithResponse(ctx context.Contex
 		return nil, err
 	}
 	return ParseListUserMembershipsResponse(rsp)
+}
+
+// ListNotificationRulesWithResponse How a person is paged, for each urgency
+//
+// Always lists both urgencies. A person who hasn't set their own steps for an urgency gets the default (`custom` is false), worked out from their working contact methods: pushes at once, everything else 2 minutes later, or everything at once when they have no push.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /v1/users/{id}/notification-rules (the `ListNotificationRules` operationId).
+func (c *ClientWithResponses) ListNotificationRulesWithResponse(ctx context.Context, id ID, reqEditors ...RequestEditorFn) (*ListNotificationRulesResponse, error) {
+	rsp, err := c.ListNotificationRules(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListNotificationRulesResponse(rsp)
+}
+
+// ResetNotificationRuleWithResponse Go back to the default for an urgency
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /v1/users/{id}/notification-rules/{urgency} (the `ResetNotificationRule` operationId).
+func (c *ClientWithResponses) ResetNotificationRuleWithResponse(ctx context.Context, id ID, urgency Urgency, reqEditors ...RequestEditorFn) (*ResetNotificationRuleResponse, error) {
+	rsp, err := c.ResetNotificationRule(ctx, id, urgency, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseResetNotificationRuleResponse(rsp)
+}
+
+// SetNotificationRuleWithBodyWithResponse Set how a person is paged for an urgency
+//
+// Replaces all of the urgency's steps. A page starts every step whose delay has passed, counted from when the person was paged, and acknowledging or resolving the incident cancels the steps still waiting. One step must have a delay of 0, so a page always reaches someone at once.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /v1/users/{id}/notification-rules/{urgency} (the `SetNotificationRule` operationId).
+func (c *ClientWithResponses) SetNotificationRuleWithBodyWithResponse(ctx context.Context, id ID, urgency Urgency, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetNotificationRuleResponse, error) {
+	rsp, err := c.SetNotificationRuleWithBody(ctx, id, urgency, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSetNotificationRuleResponse(rsp)
+}
+
+// SetNotificationRuleWithResponse Set how a person is paged for an urgency
+//
+// Replaces all of the urgency's steps. A page starts every step whose delay has passed, counted from when the person was paged, and acknowledging or resolving the incident cancels the steps still waiting. One step must have a delay of 0, so a page always reaches someone at once.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /v1/users/{id}/notification-rules/{urgency} (the `SetNotificationRule` operationId).
+func (c *ClientWithResponses) SetNotificationRuleWithResponse(ctx context.Context, id ID, urgency Urgency, body SetNotificationRuleJSONRequestBody, reqEditors ...RequestEditorFn) (*SetNotificationRuleResponse, error) {
+	rsp, err := c.SetNotificationRule(ctx, id, urgency, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSetNotificationRuleResponse(rsp)
 }
 
 // CreatePasswordLinkWithResponse Create a link to set a user's password
@@ -14084,6 +14579,108 @@ func ParseListUserMembershipsResponse(rsp *http.Response) (*ListUserMembershipsR
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListNotificationRulesResponse parses an HTTP response from a ListNotificationRulesWithResponse call
+func ParseListNotificationRulesResponse(rsp *http.Response) (*ListNotificationRulesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListNotificationRulesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest NotificationRuleList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseResetNotificationRuleResponse parses an HTTP response from a ResetNotificationRuleWithResponse call
+func ParseResetNotificationRuleResponse(rsp *http.Response) (*ResetNotificationRuleResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ResetNotificationRuleResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON404 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseSetNotificationRuleResponse parses an HTTP response from a SetNotificationRuleWithResponse call
+func ParseSetNotificationRuleResponse(rsp *http.Response) (*SetNotificationRuleResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &SetNotificationRuleResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest NotificationRule
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Problem
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.ApplicationproblemJSON400 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest Problem

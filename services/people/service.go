@@ -1,10 +1,14 @@
 package people
 
 import (
+	"cmp"
 	"context"
+	"errors"
 	"fmt"
+	"slices"
 	"time"
 
+	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/murphyhq/server"
@@ -14,6 +18,11 @@ import (
 )
 
 type Repository interface {
+	Store
+	ReplaceNotificationRule(ctx context.Context, rule *murphy.NotificationRule, at time.Time) error
+}
+
+type Store interface {
 	CreateUser(ctx context.Context, user *murphy.User) error
 	GetUser(ctx context.Context, id string) (*murphy.User, error)
 	ListUsers(ctx context.Context, before string, limit int) ([]*murphy.User, error)
@@ -39,6 +48,8 @@ type Repository interface {
 	TeamNames(ctx context.Context, ids []string) (map[string]string, error)
 	ActiveUsers(ctx context.Context, ids []string) ([]string, error)
 	ListMembershipsOfUser(ctx context.Context, userID string) ([]*murphy.TeamMembership, error)
+	ListNotificationRules(ctx context.Context, userID string) ([]*murphy.NotificationRule, error)
+	DeleteNotificationRule(ctx context.Context, userID string, urgency murphy.Urgency) error
 }
 
 type Service struct {
@@ -494,6 +505,133 @@ func (s *Service) TeamRolesOf(ctx context.Context, userID string) (_ map[string]
 		roles[membership.GetTeamId()] = membership.GetRole()
 	}
 	return roles, nil
+}
+
+const (
+	maxNotificationSteps = 10
+	maxNotificationDelay = time.Hour
+	defaultFollowUpDelay = 2 * time.Minute
+)
+
+var urgencies = []murphy.Urgency{murphy.Urgency_URGENCY_HIGH, murphy.Urgency_URGENCY_LOW}
+
+func (s *Service) NotificationRules(ctx context.Context, userID string) (_ []*murphy.NotificationRule, err error) {
+	ctx, span := tracer.Span(ctx)
+	ctx = span.Set(ctx, telemetry.WithField("user.id", userID))
+	defer span.End(&err)
+
+	_, methods, err := s.ListContactMethods(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	custom, err := s.repo.ListNotificationRules(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("list notification rules: %w", err)
+	}
+	rules := make([]*murphy.NotificationRule, len(urgencies))
+	for i, urgency := range urgencies {
+		rules[i] = DefaultNotificationRule(userID, urgency, methods)
+		for _, rule := range custom {
+			if rule.GetUrgency() == urgency {
+				rules[i] = rule
+			}
+		}
+	}
+	return rules, nil
+}
+
+func (s *Service) SetNotificationRule(ctx context.Context, in *murphy.NotificationRule) (_ *murphy.NotificationRule, err error) {
+	ctx, span := tracer.Span(ctx)
+	ctx = span.Set(ctx, telemetry.WithField("user.id", in.GetUserId()))
+	defer span.End(&err)
+
+	_, methods, err := s.ListContactMethods(ctx, in.GetUserId())
+	if err != nil {
+		return nil, err
+	}
+	rule := &murphy.NotificationRule{UserId: in.GetUserId(), Urgency: in.GetUrgency(), Steps: in.GetSteps(), Custom: true}
+	slices.SortStableFunc(rule.Steps, func(a, b *murphy.NotificationStep) int {
+		return cmp.Compare(a.GetDelay().AsDuration(), b.GetDelay().AsDuration())
+	})
+	if err := validRule(rule, methods); err != nil {
+		return nil, err
+	}
+	if err := s.repo.ReplaceNotificationRule(ctx, rule, time.Now().UTC()); err != nil {
+		return nil, fmt.Errorf("replace notification rule: %w", err)
+	}
+	return rule, nil
+}
+
+func (s *Service) ResetNotificationRule(ctx context.Context, userID string, urgency murphy.Urgency) (err error) {
+	ctx, span := tracer.Span(ctx)
+	ctx = span.Set(ctx, telemetry.WithField("user.id", userID))
+	defer span.End(&err)
+
+	if _, err := s.GetUser(ctx, userID); err != nil {
+		return err
+	}
+	if err := s.repo.DeleteNotificationRule(ctx, userID, urgency); err != nil {
+		return fmt.Errorf("reset notification rule: %w", err)
+	}
+	return nil
+}
+
+func DefaultNotificationRule(userID string, urgency murphy.Urgency, methods []*murphy.ContactMethod) *murphy.NotificationRule {
+	working := slices.DeleteFunc(slices.Clone(methods), func(method *murphy.ContactMethod) bool { return method.GetDisabledAt() != nil })
+	hasPush := slices.ContainsFunc(working, func(method *murphy.ContactMethod) bool {
+		return method.GetType() == murphy.ContactMethodType_CONTACT_METHOD_TYPE_PUSH
+	})
+	rule := &murphy.NotificationRule{UserId: userID, Urgency: urgency}
+	for _, method := range working {
+		delay := time.Duration(0)
+		if hasPush && method.GetType() != murphy.ContactMethodType_CONTACT_METHOD_TYPE_PUSH {
+			delay = defaultFollowUpDelay
+		}
+		rule.Steps = append(rule.Steps, &murphy.NotificationStep{ContactMethodId: method.GetId(), Delay: durationpb.New(delay)})
+	}
+	slices.SortStableFunc(rule.Steps, func(a, b *murphy.NotificationStep) int {
+		return cmp.Compare(a.GetDelay().AsDuration(), b.GetDelay().AsDuration())
+	})
+	return rule
+}
+
+func validRule(rule *murphy.NotificationRule, methods []*murphy.ContactMethod) error {
+	var errs []error
+	if !slices.Contains(urgencies, rule.GetUrgency()) {
+		errs = append(errs, &murphy.FieldError{Field: "urgency", Reason: "must be high or low"})
+	}
+	steps := rule.GetSteps()
+	if len(steps) == 0 || len(steps) > maxNotificationSteps {
+		errs = append(errs, &murphy.FieldError{Field: "steps", Reason: fmt.Sprintf("must have between 1 and %d steps", maxNotificationSteps)})
+	}
+	if len(steps) > 0 && steps[0].GetDelay().AsDuration() != 0 {
+		errs = append(errs, &murphy.FieldError{Field: "steps", Reason: "must reach you at once: one step needs a delay of 0, so a page is never only on its way"})
+	}
+	owned := map[string]*murphy.ContactMethod{}
+	for _, method := range methods {
+		owned[method.GetId()] = method
+	}
+	seen := map[string]bool{}
+	for i, step := range steps {
+		field := fmt.Sprintf("steps[%d]", i)
+		delay := step.GetDelay().AsDuration()
+		method, ok := owned[step.GetContactMethodId()]
+		switch {
+		case !ok:
+			errs = append(errs, &murphy.FieldError{Field: field + ".contact_method", Reason: "must be one of your contact methods"})
+		case method.GetDisabledAt() != nil:
+			errs = append(errs, &murphy.FieldError{Field: field + ".contact_method", Reason: "is disabled: " + method.GetDisabledReason()})
+		}
+		if delay < 0 || delay > maxNotificationDelay || delay%time.Second != 0 {
+			errs = append(errs, &murphy.FieldError{Field: field + ".delay_seconds", Reason: "must be whole seconds, from 0 to 3600"})
+		}
+		key := fmt.Sprintf("%s@%s", step.GetContactMethodId(), delay)
+		if seen[key] {
+			errs = append(errs, &murphy.FieldError{Field: field, Reason: "repeats an earlier step"})
+		}
+		seen[key] = true
+	}
+	return errors.Join(errs...)
 }
 
 func sendable(kind murphy.ContactMethodType) error {
