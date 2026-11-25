@@ -30,6 +30,12 @@ func seedSchedules(ctx context.Context, api *client.ClientWithResponses, teams, 
 			Name: "incident commanders", TimeZone: &malta, Teams: &[]client.Reference{{Id: teams["platform"]}, {Id: teams["payments"]}},
 			Layers: []client.Layer{{Name: new("weekly"), TurnLengthSeconds: week, StartsAt: rotationStart, Participants: []client.Reference{{Id: users["ana@murphy.test"]}, {Id: users["dee@murphy.test"]}}}},
 		},
+		{
+			Name: "support", TimeZone: &malta, Teams: &[]client.Reference{{Id: teams["platform"]}, {Id: teams["payments"]}},
+			Layers: []client.Layer{{Name: new("daily"), TurnLengthSeconds: day, StartsAt: rotationStart, Participants: []client.Reference{
+				{Id: users["ana@murphy.test"]}, {Id: users["bo@murphy.test"]}, {Id: users["cy@murphy.test"]}, {Id: users["dee@murphy.test"]},
+			}}},
+		},
 	}
 
 	existing, err := byName(func(cursor *string) ([]client.Schedule, string, error) {
