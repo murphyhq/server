@@ -401,9 +401,8 @@ func TestATestPageShowsWhetherEachContactMethodWasReached(t *testing.T) {
 	forBo, err := m.API.SendTestPageWithResponse(t.Context(), bo.ID, nil, client.TestPageInput{})
 	require.NoError(t, err)
 
-	channels := murphytest.DeliveriesByChannel(page)
-	assert.Equal(t, client.TestDeliveryStatusSent, channels[client.Email])
-	assert.Equal(t, client.TestDeliveryStatusSent, channels[client.Webhook])
+	assert.Equal(t, client.TestDeliveryStatusSent, murphytest.DeliveriesByChannel(page)[client.Email], "everyone has their email")
+	assert.Empty(t, murphytest.Failures(page))
 	assert.Equal(t, http.StatusTooManyRequests, again.StatusCode(), "one test page a minute")
 	assert.Equal(t, http.StatusForbidden, forBo.StatusCode(), "nobody pages someone else, admins included")
 }

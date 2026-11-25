@@ -30,3 +30,14 @@ func DeliveriesByChannel(page client.TestPage) map[client.ContactMethodType]clie
 	}
 	return statuses
 }
+
+func Failures(page client.TestPage) []string {
+	var failures []string
+	for _, delivery := range page.Deliveries {
+		if delivery.Status == client.TestDeliveryStatusFailed {
+			failures = append(failures, string(delivery.Channel)+": "+*delivery.Failure)
+		}
+	}
+	return failures
+}
+
