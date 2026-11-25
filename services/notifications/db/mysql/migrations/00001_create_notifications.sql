@@ -77,6 +77,6 @@ CREATE TABLE email_provider (
   secret VARCHAR(1024) NOT NULL,
   updated_at DATETIME(6) NOT NULL,
   CONSTRAINT email_provider_pkey PRIMARY KEY (singleton),
-  CONSTRAINT email_provider_singleton_check CHECK (singleton),
+  CONSTRAINT email_provider_singleton_check CHECK (singleton = TRUE),
   CONSTRAINT email_provider_type_check CHECK (type IN ('smtp'))
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
