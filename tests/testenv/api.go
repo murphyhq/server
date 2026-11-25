@@ -5,6 +5,7 @@ package testenv
 import (
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -32,21 +33,25 @@ func APIWith(t *testing.T, databases migrateapp.Settings) string {
 	server := httptest.NewUnstartedServer(nil)
 	publicURL := "http://" + server.Listener.Addr().String()
 	a, err := apiapp.New(t.Context(), apiapp.Settings{
-		CatalogDatabaseURL:    databases.CatalogDatabaseURL,
-		IncidentsDatabaseURL:  databases.IncidentsDatabaseURL,
-		PeopleDatabaseURL:     databases.PeopleDatabaseURL,
-		OnCallDatabaseURL:     databases.OnCallDatabaseURL,
-		EscalationDatabaseURL: databases.EscalationDatabaseURL,
-		IdempotencyStoreURL:   RedisURL(),
-		IntegrationKeySecrets: IntegrationKeySecrets,
-		WebhookPublicKeys:     WebhookPublicKey,
-		PublicURL:             publicURL,
-		OIDCIssuer:            IdentityProviderURL(),
-		OIDCClientID:          "murphy",
-		OIDCClientSecret:      "murphy-local-secret",
-		InitialAdminEmail:     "ana@murphy.test",
-		AllowPasswords:        true,
-		RateLimitStoreURL:     RedisURL(),
+		CatalogDatabaseURL:     databases.CatalogDatabaseURL,
+		IncidentsDatabaseURL:   databases.IncidentsDatabaseURL,
+		PeopleDatabaseURL:      databases.PeopleDatabaseURL,
+		OnCallDatabaseURL:      databases.OnCallDatabaseURL,
+		EscalationDatabaseURL:  databases.EscalationDatabaseURL,
+		IdempotencyStoreURL:    RedisURL(),
+		IntegrationKeySecrets:  IntegrationKeySecrets,
+		WebhookPublicKeys:      WebhookPublicKey,
+		PublicURL:              publicURL,
+		OIDCIssuer:             IdentityProviderURL(),
+		OIDCClientID:           "murphy",
+		OIDCClientSecret:       "murphy-local-secret",
+		BrowserSessionIdle:     time.Hour,
+		BrowserSessionAbsolute: time.Hour,
+		AppSessionIdle:         time.Hour,
+		AppSessionAbsolute:     time.Hour,
+		InitialAdminEmail:      "ana@murphy.test",
+		AllowPasswords:         true,
+		RateLimitStoreURL:      RedisURL(),
 	})
 	require.NoError(t, err)
 	t.Cleanup(a.Close)
