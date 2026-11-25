@@ -16,10 +16,10 @@ type seededUser struct {
 }
 
 var seededUsers = []seededUser{
-	{"Ana Costa", "ana@example.com", "Europe/Malta", map[string]client.TeamRole{"platform": client.Manager, "payments": client.Observer}},
-	{"Bo Lindqvist", "bo@example.com", "Europe/Stockholm", map[string]client.TeamRole{"platform": client.Responder}},
-	{"Cy Okafor", "cy@example.com", "Africa/Lagos", map[string]client.TeamRole{"payments": client.Responder}},
-	{"Dee Park", "dee@example.com", "America/New_York", map[string]client.TeamRole{"payments": client.Manager}},
+	{"Ana Costa", "ana@murphy.test", "Europe/Malta", map[string]client.TeamRole{"platform": client.Manager, "payments": client.Observer}},
+	{"Bo Lindqvist", "bo@murphy.test", "Europe/Stockholm", map[string]client.TeamRole{"platform": client.Responder}},
+	{"Cy Okafor", "cy@murphy.test", "Africa/Lagos", map[string]client.TeamRole{"payments": client.Responder}},
+	{"Dee Park", "dee@murphy.test", "America/New_York", map[string]client.TeamRole{"payments": client.Manager}},
 }
 
 func seedPeople(ctx context.Context, api *client.ClientWithResponses) (teams, users map[string]string, err error) {
@@ -55,8 +55,14 @@ func seedPeople(ctx context.Context, api *client.ClientWithResponses) (teams, us
 		return nil, nil, err
 	}
 	for _, user := range seededUsers {
-		if _, ok := users[user.email]; !ok {
-			created, err := api.CreateUserWithResponse(ctx, nil, client.UserInput{Name: user.name, Email: user.email, TimeZone: &user.timeZone})
+		input := client.UserInput{Name: user.name, Email: user.email, TimeZone: &user.timeZone}
+		if id, ok := users[user.email]; ok {
+			updated, err := api.UpdateUserWithResponse(ctx, id, input)
+			if err := expect(updated, err, http.StatusOK, "update user "+user.email); err != nil {
+				return nil, nil, err
+			}
+		} else {
+			created, err := api.CreateUserWithResponse(ctx, nil, input)
 			if err := expect(created, err, http.StatusCreated, "create user "+user.email); err != nil {
 				return nil, nil, err
 			}
