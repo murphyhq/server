@@ -39,14 +39,20 @@ DELETE FROM scheduled_messages
 WHERE id IN (sqlc.slice(ids));
 
 -- name: GetEmailProvider :one
-SELECT type, from_address, host, port, username, secret, updated_at
+SELECT type, from_address, host, port, username, secret, updated_at, status, problem, checked_at
 FROM email_provider;
 
 -- name: SetEmailProvider :exec
 INSERT INTO email_provider (type, from_address, host, port, username, secret, updated_at)
 VALUES (sqlc.arg(type), sqlc.arg(from_address), sqlc.arg(host), sqlc.arg(port), sqlc.arg(username), sqlc.arg(secret), sqlc.arg(updated_at))
 ON DUPLICATE KEY UPDATE type = VALUES(type), from_address = VALUES(from_address), host = VALUES(host), port = VALUES(port),
-  username = VALUES(username), secret = VALUES(secret), updated_at = VALUES(updated_at);
+  username = VALUES(username), secret = VALUES(secret), updated_at = VALUES(updated_at),
+  status = 'pending', problem = '', checked_at = NULL;
 
 -- name: DeleteEmailProvider :exec
 DELETE FROM email_provider;
+
+-- name: RecordEmailProviderCheck :execrows
+UPDATE email_provider
+SET status = sqlc.arg(status), problem = sqlc.arg(problem), checked_at = sqlc.arg(checked_at)
+WHERE updated_at = sqlc.arg(updated_at);

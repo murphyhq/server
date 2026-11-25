@@ -92,7 +92,7 @@ WITH handled AS (
 SELECT count(*) FROM handled;
 
 -- name: GetEmailProvider :one
-SELECT type, from_address, host, port, username, secret, updated_at
+SELECT type, from_address, host, port, username, secret, updated_at, status, problem, checked_at
 FROM email_provider;
 
 -- name: SetEmailProvider :exec
@@ -100,7 +100,13 @@ INSERT INTO email_provider (type, from_address, host, port, username, secret, up
 VALUES (@type, @from_address, @host, @port, @username, @secret, @updated_at)
 ON CONFLICT (singleton) DO UPDATE
 SET type = EXCLUDED.type, from_address = EXCLUDED.from_address, host = EXCLUDED.host, port = EXCLUDED.port,
-  username = EXCLUDED.username, secret = EXCLUDED.secret, updated_at = EXCLUDED.updated_at;
+  username = EXCLUDED.username, secret = EXCLUDED.secret, updated_at = EXCLUDED.updated_at,
+  status = 'pending', problem = '', checked_at = NULL;
 
 -- name: DeleteEmailProvider :exec
 DELETE FROM email_provider;
+
+-- name: RecordEmailProviderCheck :execrows
+UPDATE email_provider
+SET status = @status, problem = @problem, checked_at = @checked_at
+WHERE updated_at = @updated_at;

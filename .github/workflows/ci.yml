@@ -47,7 +47,7 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
-      - run: docker compose up -d --wait postgres mysql redis nats localstack webhook-receiver dex
+      - run: docker compose up -d --wait postgres mysql redis nats localstack webhook-receiver dex mailpit
       - run: go test -race -tags integration ./...
 
   stack:

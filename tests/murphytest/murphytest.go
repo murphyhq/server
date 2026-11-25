@@ -37,12 +37,15 @@ const (
 )
 
 var (
-	apiURL             = setting("MURPHY_TEST_API_URL", "http://localhost:8080")
-	ingestURL          = setting("MURPHY_TEST_INGEST_URL", "http://localhost:8081")
-	receiverURL        = setting("MURPHY_TEST_RECEIVER_URL", "http://localhost:8092")
-	receiverFromMurphy = setting("MURPHY_TEST_RECEIVER_URL_FROM_MURPHY", "http://webhook-receiver:8080")
-	identityProvider   = setting("MURPHY_TEST_IDENTITY_PROVIDER_URL", "http://localhost:5556/dex")
-	docsURL            = setting("MURPHY_TEST_DOCS_URL", "http://localhost:8090")
+	apiURL               = setting("MURPHY_TEST_API_URL", "http://localhost:8080")
+	ingestURL            = setting("MURPHY_TEST_INGEST_URL", "http://localhost:8081")
+	receiverURL          = setting("MURPHY_TEST_RECEIVER_URL", "http://localhost:8092")
+	receiverFromMurphy   = setting("MURPHY_TEST_RECEIVER_URL_FROM_MURPHY", "http://webhook-receiver:8080")
+	identityProvider     = setting("MURPHY_TEST_IDENTITY_PROVIDER_URL", "http://localhost:5556/dex")
+	docsURL              = setting("MURPHY_TEST_DOCS_URL", "http://localhost:8090")
+	mailpitURL           = setting("MURPHY_TEST_MAILPIT_URL", "http://localhost:8025")
+	MailServer           = setting("MURPHY_TEST_MAIL_SERVER", "localhost")
+	MailServerFromMurphy = setting("MURPHY_TEST_MAIL_SERVER_FROM_MURPHY", "mailpit")
 )
 
 const (

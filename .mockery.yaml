@@ -31,6 +31,8 @@ packages:
       Policies: {}
       OnCall: {}
       People: {}
+      Secrets: {}
+      EmailSender: {}
   github.com/murphyhq/server/services/people:
     config:
       dir: "{{.InterfaceDir}}"

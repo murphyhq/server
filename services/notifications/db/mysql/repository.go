@@ -76,6 +76,7 @@ func (r *Repository) GetEmailProvider(ctx context.Context) (_ *murphy.EmailProvi
 	return &murphy.EmailProvider{
 		Type: murphy.EmailProviderTypeFromText(row.Type), From: row.FromAddress, Host: row.Host, Port: row.Port,
 		Username: row.Username, Secret: row.Secret, UpdatedAt: timestamppb.New(row.UpdatedAt),
+		Status: murphy.EmailProviderStatusFromText(row.Status), Problem: row.Problem, CheckedAt: optionalTimestamp(row.CheckedAt),
 	}, nil
 }
 
@@ -87,6 +88,24 @@ func (r *Repository) SetEmailProvider(ctx context.Context, provider *murphy.Emai
 		Type: provider.GetType().Text(), FromAddress: provider.GetFrom(), Host: provider.GetHost(), Port: provider.GetPort(),
 		Username: provider.GetUsername(), Secret: provider.GetSecret(), UpdatedAt: provider.GetUpdatedAt().AsTime(),
 	}))
+}
+
+func (r *Repository) RecordEmailProviderCheck(ctx context.Context, provider *murphy.EmailProvider) (err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	checked := provider.GetCheckedAt().AsTime()
+	_, err = r.queries.RecordEmailProviderCheck(ctx, RecordEmailProviderCheckParams{
+		Status: provider.GetStatus().Text(), Problem: provider.GetProblem(), CheckedAt: &checked, UpdatedAt: provider.GetUpdatedAt().AsTime(),
+	})
+	return murphymysql.Error("email provider", err)
+}
+
+func optionalTimestamp(at *time.Time) *timestamppb.Timestamp {
+	if at == nil {
+		return nil
+	}
+	return timestamppb.New(*at)
 }
 
 func (r *Repository) DeleteEmailProvider(ctx context.Context) (err error) {

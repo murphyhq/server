@@ -26,6 +26,7 @@ type Engine[T Tx] interface {
 	GetEmailProvider(ctx context.Context) (*murphy.EmailProvider, error)
 	SetEmailProvider(ctx context.Context, provider *murphy.EmailProvider) error
 	DeleteEmailProvider(ctx context.Context) error
+	RecordEmailProviderCheck(ctx context.Context, provider *murphy.EmailProvider) error
 	Transaction(ctx context.Context, work func(tx T) error) error
 	Migrate(ctx context.Context) error
 	Ping(ctx context.Context) error

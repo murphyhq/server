@@ -44,6 +44,27 @@ func (e ContactMethodType) Valid() bool {
 	}
 }
 
+// Defines values for EmailProviderStatus.
+const (
+	Failing EmailProviderStatus = "failing"
+	Pending EmailProviderStatus = "pending"
+	Ready   EmailProviderStatus = "ready"
+)
+
+// Valid indicates whether the value is a known member of the EmailProviderStatus enum.
+func (e EmailProviderStatus) Valid() bool {
+	switch e {
+	case Failing:
+		return true
+	case Pending:
+		return true
+	case Ready:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for EmailProviderType.
 const (
 	Smtp EmailProviderType = "smtp"
@@ -363,7 +384,7 @@ type ContactMethod struct {
 	// Platform Push only. The phone's platform, which decides whether the push relay sends through Apple or Google.
 	Platform *PushPlatform `json:"platform,omitempty"`
 
-	// Type Murphy sends by webhook and push for now; contact methods of the other types are refused until it can send by them.
+	// Type Murphy sends by webhook, push and email for now; contact methods of the other types are refused until it can send by them. Email goes out once an admin has set up the email provider.
 	Type      ContactMethodType `json:"type"`
 	UpdatedAt time.Time         `json:"updated_at"`
 
@@ -379,7 +400,7 @@ type ContactMethodInput struct {
 	// Platform Push only. The phone's platform, which decides whether the push relay sends through Apple or Google.
 	Platform *PushPlatform `json:"platform,omitempty"`
 
-	// Type Murphy sends by webhook and push for now; contact methods of the other types are refused until it can send by them.
+	// Type Murphy sends by webhook, push and email for now; contact methods of the other types are refused until it can send by them. Email goes out once an admin has set up the email provider.
 	Type ContactMethodType `json:"type"`
 }
 
@@ -388,11 +409,14 @@ type ContactMethodList struct {
 	Items []ContactMethod `json:"items"`
 }
 
-// ContactMethodType Murphy sends by webhook and push for now; contact methods of the other types are refused until it can send by them.
+// ContactMethodType Murphy sends by webhook, push and email for now; contact methods of the other types are refused until it can send by them. Email goes out once an admin has set up the email provider.
 type ContactMethodType string
 
 // EmailProvider defines model for EmailProvider.
 type EmailProvider struct {
+	// CheckedAt When `notifier` last checked the provider.
+	CheckedAt *time.Time `json:"checked_at,omitempty"`
+
 	// From The sender, as in `Murphy <murphy@example.com>`.
 	From string `json:"from"`
 
@@ -402,14 +426,23 @@ type EmailProvider struct {
 	// Port Usually 587, where Murphy upgrades the connection with STARTTLS, or 465 for TLS from the start.
 	Port int32 `json:"port"`
 
-	// Secret Where Murphy reads the password, never the password itself, as `env://NAME`, `file:///path` or `aws-ssm:///name`. `notifier` reads it each time it sends.
-	Secret    string            `json:"secret"`
-	Type      EmailProviderType `json:"type"`
-	UpdatedAt time.Time         `json:"updated_at"`
+	// Problem Why the last check failed. Empty unless `status` is `failing`.
+	Problem string `json:"problem"`
+
+	// Secret Where Murphy reads the password, never the password itself, as `env://NAME`, `file:///path` or `aws-ssm:///name`. `notifier` reads it when it checks the provider, every minute, and only where the install allows (by default environment variables starting with `MURPHY_SECRET_`, files under `/run/secrets` and parameters under `/murphy/`).
+	Secret string `json:"secret"`
+
+	// Status `pending` until `notifier` has checked the provider since it was last saved. `notifier` checks it every minute by signing in to the mail server over TLS: `ready` when that worked, `failing` when it didn't, with the reason in `problem`. While failing, Murphy keeps sending with the last settings that worked, if any.
+	Status    EmailProviderStatus `json:"status"`
+	Type      EmailProviderType   `json:"type"`
+	UpdatedAt time.Time           `json:"updated_at"`
 
 	// Username Required with a secret.
 	Username string `json:"username"`
 }
+
+// EmailProviderStatus `pending` until `notifier` has checked the provider since it was last saved. `notifier` checks it every minute by signing in to the mail server over TLS: `ready` when that worked, `failing` when it didn't, with the reason in `problem`. While failing, Murphy keeps sending with the last settings that worked, if any.
+type EmailProviderStatus string
 
 // EmailProviderInput defines model for EmailProviderInput.
 type EmailProviderInput struct {
@@ -970,7 +1003,7 @@ type TimelineEscalation struct {
 
 // TimelineNotification A notification Murphy sent or failed to send. `notification_failed` without a contact method means the person had none.
 type TimelineNotification struct {
-	// Channel Murphy sends by webhook and push for now; contact methods of the other types are refused until it can send by them.
+	// Channel Murphy sends by webhook, push and email for now; contact methods of the other types are refused until it can send by them. Email goes out once an admin has set up the email provider.
 	Channel *ContactMethodType `json:"channel,omitempty"`
 
 	// ContactMethod Points at another resource.

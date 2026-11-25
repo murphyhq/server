@@ -76,7 +76,11 @@ CREATE TABLE email_provider (
   username VARCHAR(255) NOT NULL,
   secret VARCHAR(1024) NOT NULL,
   updated_at DATETIME(6) NOT NULL,
+  status VARCHAR(16) NOT NULL DEFAULT 'pending',
+  problem VARCHAR(1024) NOT NULL DEFAULT '',
+  checked_at DATETIME(6) NULL,
   CONSTRAINT email_provider_pkey PRIMARY KEY (singleton),
   CONSTRAINT email_provider_singleton_check CHECK (singleton = TRUE),
-  CONSTRAINT email_provider_type_check CHECK (type IN ('smtp'))
+  CONSTRAINT email_provider_type_check CHECK (type IN ('smtp')),
+  CONSTRAINT email_provider_status_check CHECK (status IN ('pending', 'ready', 'failing'))
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;

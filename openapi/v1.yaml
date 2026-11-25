@@ -1986,7 +1986,7 @@ components:
     ContactMethodType:
       type: string
       enum: [email, sms, voice, webhook, push]
-      description: Murphy sends by webhook and push for now; contact methods of the other types are refused until it can send by them.
+      description: Murphy sends by webhook, push and email for now; contact methods of the other types are refused until it can send by them. Email goes out once an admin has set up the email provider.
     ContactMethod:
       type: object
       required: [id, user, type, address, created_at, updated_at]
@@ -2044,7 +2044,7 @@ components:
       enum: [smtp]
     EmailProvider:
       type: object
-      required: [type, from, host, port, username, secret, updated_at]
+      required: [type, from, host, port, username, secret, updated_at, status, problem]
       properties:
         type:
           $ref: "#/components/schemas/EmailProviderType"
@@ -2065,10 +2065,21 @@ components:
           description: Required with a secret.
         secret:
           type: string
-          description: Where Murphy reads the password, never the password itself, as `env://NAME`, `file:///path` or `aws-ssm:///name`. `notifier` reads it each time it sends.
+          description: Where Murphy reads the password, never the password itself, as `env://NAME`, `file:///path` or `aws-ssm:///name`. `notifier` reads it when it checks the provider, every minute, and only where the install allows (by default environment variables starting with `MURPHY_SECRET_`, files under `/run/secrets` and parameters under `/murphy/`).
         updated_at:
           type: string
           format: date-time
+        status:
+          type: string
+          enum: [pending, ready, failing]
+          description: "`pending` until `notifier` has checked the provider since it was last saved. `notifier` checks it every minute by signing in to the mail server over TLS: `ready` when that worked, `failing` when it didn't, with the reason in `problem`. While failing, Murphy keeps sending with the last settings that worked, if any."
+        problem:
+          type: string
+          description: Why the last check failed. Empty unless `status` is `failing`.
+        checked_at:
+          type: string
+          format: date-time
+          description: When `notifier` last checked the provider.
     ContactMethodInput:
       type: object
       required: [type, address]

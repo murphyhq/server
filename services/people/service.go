@@ -498,8 +498,8 @@ func (s *Service) TeamRolesOf(ctx context.Context, userID string) (_ map[string]
 
 func sendable(kind murphy.ContactMethodType) error {
 	switch kind {
-	case murphy.ContactMethodType_CONTACT_METHOD_TYPE_EMAIL, murphy.ContactMethodType_CONTACT_METHOD_TYPE_SMS, murphy.ContactMethodType_CONTACT_METHOD_TYPE_VOICE:
-		return &murphy.FieldError{Field: "type", Reason: "can't be " + kind.Text() + " yet: Murphy can only send by webhook and push for now"}
+	case murphy.ContactMethodType_CONTACT_METHOD_TYPE_SMS, murphy.ContactMethodType_CONTACT_METHOD_TYPE_VOICE:
+		return &murphy.FieldError{Field: "type", Reason: "can't be " + kind.Text() + " yet: Murphy can only send by webhook, push and email for now"}
 	}
 	return nil
 }

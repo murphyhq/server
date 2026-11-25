@@ -25,6 +25,7 @@ type Repository interface {
 	GetEmailProvider(ctx context.Context) (*murphy.EmailProvider, error)
 	SetEmailProvider(ctx context.Context, provider *murphy.EmailProvider) error
 	DeleteEmailProvider(ctx context.Context) error
+	RecordEmailProviderCheck(ctx context.Context, provider *murphy.EmailProvider) error
 }
 
 type Policies interface {
@@ -333,6 +334,7 @@ func (s *Service) SetEmailProvider(ctx context.Context, in *murphy.EmailProvider
 	provider := &murphy.EmailProvider{
 		Type: in.GetType(), From: in.GetFrom(), Host: in.GetHost(), Port: in.GetPort(),
 		Username: in.GetUsername(), Secret: in.GetSecret(), UpdatedAt: murphy.Now(),
+		Status: murphy.EmailProviderStatus_EMAIL_PROVIDER_STATUS_PENDING,
 	}
 	if err := provider.Validate(); err != nil {
 		return nil, err

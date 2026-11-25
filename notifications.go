@@ -35,3 +35,11 @@ func (t EmailProviderType) Text() string {
 func EmailProviderTypeFromText(text string) EmailProviderType {
 	return enumFromText[EmailProviderType](EmailProviderType_value, "EMAIL_PROVIDER_TYPE_", text)
 }
+
+func (s EmailProviderStatus) Text() string {
+	return enumText(s, "EMAIL_PROVIDER_STATUS_")
+}
+
+func EmailProviderStatusFromText(text string) EmailProviderStatus {
+	return enumFromText[EmailProviderStatus](EmailProviderStatus_value, "EMAIL_PROVIDER_STATUS_", text)
+}

@@ -81,6 +81,12 @@ func WithWebhook(options ...WebhookOption) UserOption {
 	return func(s *userSpec) { s.webhooks = append(s.webhooks, options) }
 }
 
+func WithEmail() UserOption {
+	return func(s *userSpec) {
+		s.methods = append(s.methods, client.ContactMethodInput{Type: client.Email, Address: s.input.Email})
+	}
+}
+
 func WithPhone() UserOption {
 	return func(s *userSpec) { s.phones = append(s.phones, "device-"+uuid.NewV4().String()) }
 }
@@ -120,6 +126,10 @@ func (m *Murphy) User(options ...UserOption) *User {
 		user.phones = append(user.phones, &Phone{Token: added.JSON201.Address, receiver: m.Receiver()})
 	}
 	return user
+}
+
+func (u *User) Mailbox() *Mailbox {
+	return NewMailbox(u.m.t, u.Email)
 }
 
 func (u *User) Phone() *Phone {
