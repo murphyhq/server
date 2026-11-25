@@ -120,6 +120,52 @@ func (NotificationVerb) EnumDescriptor() ([]byte, []int) {
 	return file_murphy_v1_notifications_proto_rawDescGZIP(), []int{1}
 }
 
+type EmailProviderType int32
+
+const (
+	EmailProviderType_EMAIL_PROVIDER_TYPE_UNSPECIFIED EmailProviderType = 0
+	EmailProviderType_EMAIL_PROVIDER_TYPE_SMTP        EmailProviderType = 1
+)
+
+// Enum value maps for EmailProviderType.
+var (
+	EmailProviderType_name = map[int32]string{
+		0: "EMAIL_PROVIDER_TYPE_UNSPECIFIED",
+		1: "EMAIL_PROVIDER_TYPE_SMTP",
+	}
+	EmailProviderType_value = map[string]int32{
+		"EMAIL_PROVIDER_TYPE_UNSPECIFIED": 0,
+		"EMAIL_PROVIDER_TYPE_SMTP":        1,
+	}
+)
+
+func (x EmailProviderType) Enum() *EmailProviderType {
+	p := new(EmailProviderType)
+	*p = x
+	return p
+}
+
+func (x EmailProviderType) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (EmailProviderType) Descriptor() protoreflect.EnumDescriptor {
+	return file_murphy_v1_notifications_proto_enumTypes[2].Descriptor()
+}
+
+func (EmailProviderType) Type() protoreflect.EnumType {
+	return &file_murphy_v1_notifications_proto_enumTypes[2]
+}
+
+func (x EmailProviderType) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use EmailProviderType.Descriptor instead.
+func (EmailProviderType) EnumDescriptor() ([]byte, []int) {
+	return file_murphy_v1_notifications_proto_rawDescGZIP(), []int{2}
+}
+
 type Page struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
 	Id              string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -540,6 +586,98 @@ func (x *NotificationEvent) GetCurrent() *Notification {
 	return nil
 }
 
+type EmailProvider struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Type          EmailProviderType      `protobuf:"varint,1,opt,name=type,proto3,enum=murphy.v1.EmailProviderType" json:"type,omitempty"`
+	From          string                 `protobuf:"bytes,2,opt,name=from,proto3" json:"from,omitempty"`
+	Host          string                 `protobuf:"bytes,3,opt,name=host,proto3" json:"host,omitempty"`
+	Port          int32                  `protobuf:"varint,4,opt,name=port,proto3" json:"port,omitempty"`
+	Username      string                 `protobuf:"bytes,5,opt,name=username,proto3" json:"username,omitempty"`
+	Secret        string                 `protobuf:"bytes,6,opt,name=secret,proto3" json:"secret,omitempty"`
+	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EmailProvider) Reset() {
+	*x = EmailProvider{}
+	mi := &file_murphy_v1_notifications_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EmailProvider) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EmailProvider) ProtoMessage() {}
+
+func (x *EmailProvider) ProtoReflect() protoreflect.Message {
+	mi := &file_murphy_v1_notifications_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EmailProvider.ProtoReflect.Descriptor instead.
+func (*EmailProvider) Descriptor() ([]byte, []int) {
+	return file_murphy_v1_notifications_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *EmailProvider) GetType() EmailProviderType {
+	if x != nil {
+		return x.Type
+	}
+	return EmailProviderType_EMAIL_PROVIDER_TYPE_UNSPECIFIED
+}
+
+func (x *EmailProvider) GetFrom() string {
+	if x != nil {
+		return x.From
+	}
+	return ""
+}
+
+func (x *EmailProvider) GetHost() string {
+	if x != nil {
+		return x.Host
+	}
+	return ""
+}
+
+func (x *EmailProvider) GetPort() int32 {
+	if x != nil {
+		return x.Port
+	}
+	return 0
+}
+
+func (x *EmailProvider) GetUsername() string {
+	if x != nil {
+		return x.Username
+	}
+	return ""
+}
+
+func (x *EmailProvider) GetSecret() string {
+	if x != nil {
+		return x.Secret
+	}
+	return ""
+}
+
+func (x *EmailProvider) GetUpdatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return nil
+}
+
 var File_murphy_v1_notifications_proto protoreflect.FileDescriptor
 
 const file_murphy_v1_notifications_proto_rawDesc = "" +
@@ -582,7 +720,16 @@ const file_murphy_v1_notifications_proto_rawDesc = "" +
 	"\x11NotificationEvent\x12/\n" +
 	"\x04verb\x18\x01 \x01(\x0e2\x1b.murphy.v1.NotificationVerbR\x04verb\x123\n" +
 	"\bprevious\x18\x02 \x01(\v2\x17.murphy.v1.NotificationR\bprevious\x121\n" +
-	"\acurrent\x18\x03 \x01(\v2\x17.murphy.v1.NotificationR\acurrent*<\n" +
+	"\acurrent\x18\x03 \x01(\v2\x17.murphy.v1.NotificationR\acurrent\"\xec\x01\n" +
+	"\rEmailProvider\x120\n" +
+	"\x04type\x18\x01 \x01(\x0e2\x1c.murphy.v1.EmailProviderTypeR\x04type\x12\x12\n" +
+	"\x04from\x18\x02 \x01(\tR\x04from\x12\x12\n" +
+	"\x04host\x18\x03 \x01(\tR\x04host\x12\x12\n" +
+	"\x04port\x18\x04 \x01(\x05R\x04port\x12\x1a\n" +
+	"\busername\x18\x05 \x01(\tR\busername\x12\x16\n" +
+	"\x06secret\x18\x06 \x01(\tR\x06secret\x129\n" +
+	"\n" +
+	"updated_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt*<\n" +
 	"\bPageVerb\x12\x19\n" +
 	"\x15PAGE_VERB_UNSPECIFIED\x10\x00\x12\x15\n" +
 	"\x11PAGE_VERB_CREATED\x10\x01*\x8e\x01\n" +
@@ -590,7 +737,10 @@ const file_murphy_v1_notifications_proto_rawDesc = "" +
 	"\x1dNOTIFICATION_VERB_UNSPECIFIED\x10\x00\x12\x1d\n" +
 	"\x19NOTIFICATION_VERB_CREATED\x10\x01\x12\x1a\n" +
 	"\x16NOTIFICATION_VERB_SENT\x10\x02\x12\x1c\n" +
-	"\x18NOTIFICATION_VERB_FAILED\x10\x03B#Z!github.com/murphyhq/server;murphyb\x06proto3"
+	"\x18NOTIFICATION_VERB_FAILED\x10\x03*V\n" +
+	"\x11EmailProviderType\x12#\n" +
+	"\x1fEMAIL_PROVIDER_TYPE_UNSPECIFIED\x10\x00\x12\x1c\n" +
+	"\x18EMAIL_PROVIDER_TYPE_SMTP\x10\x01B#Z!github.com/murphyhq/server;murphyb\x06proto3"
 
 var (
 	file_murphy_v1_notifications_proto_rawDescOnce sync.Once
@@ -604,46 +754,50 @@ func file_murphy_v1_notifications_proto_rawDescGZIP() []byte {
 	return file_murphy_v1_notifications_proto_rawDescData
 }
 
-var file_murphy_v1_notifications_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_murphy_v1_notifications_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
+var file_murphy_v1_notifications_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
+var file_murphy_v1_notifications_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_murphy_v1_notifications_proto_goTypes = []any{
 	(PageVerb)(0),                 // 0: murphy.v1.PageVerb
 	(NotificationVerb)(0),         // 1: murphy.v1.NotificationVerb
-	(*Page)(nil),                  // 2: murphy.v1.Page
-	(*PageRecipient)(nil),         // 3: murphy.v1.PageRecipient
-	(*PageEvent)(nil),             // 4: murphy.v1.PageEvent
-	(*Notification)(nil),          // 5: murphy.v1.Notification
-	(*NotificationEvent)(nil),     // 6: murphy.v1.NotificationEvent
-	(*Incident)(nil),              // 7: murphy.v1.Incident
-	(*EscalationTarget)(nil),      // 8: murphy.v1.EscalationTarget
-	(*timestamppb.Timestamp)(nil), // 9: google.protobuf.Timestamp
-	(NotificationReason)(0),       // 10: murphy.v1.NotificationReason
-	(*ContactMethod)(nil),         // 11: murphy.v1.ContactMethod
+	(EmailProviderType)(0),        // 2: murphy.v1.EmailProviderType
+	(*Page)(nil),                  // 3: murphy.v1.Page
+	(*PageRecipient)(nil),         // 4: murphy.v1.PageRecipient
+	(*PageEvent)(nil),             // 5: murphy.v1.PageEvent
+	(*Notification)(nil),          // 6: murphy.v1.Notification
+	(*NotificationEvent)(nil),     // 7: murphy.v1.NotificationEvent
+	(*EmailProvider)(nil),         // 8: murphy.v1.EmailProvider
+	(*Incident)(nil),              // 9: murphy.v1.Incident
+	(*EscalationTarget)(nil),      // 10: murphy.v1.EscalationTarget
+	(*timestamppb.Timestamp)(nil), // 11: google.protobuf.Timestamp
+	(NotificationReason)(0),       // 12: murphy.v1.NotificationReason
+	(*ContactMethod)(nil),         // 13: murphy.v1.ContactMethod
 }
 var file_murphy_v1_notifications_proto_depIdxs = []int32{
-	7,  // 0: murphy.v1.Page.incident:type_name -> murphy.v1.Incident
-	3,  // 1: murphy.v1.Page.reached:type_name -> murphy.v1.PageRecipient
-	8,  // 2: murphy.v1.Page.unreached:type_name -> murphy.v1.EscalationTarget
-	9,  // 3: murphy.v1.Page.created_at:type_name -> google.protobuf.Timestamp
-	8,  // 4: murphy.v1.PageRecipient.via:type_name -> murphy.v1.EscalationTarget
+	9,  // 0: murphy.v1.Page.incident:type_name -> murphy.v1.Incident
+	4,  // 1: murphy.v1.Page.reached:type_name -> murphy.v1.PageRecipient
+	10, // 2: murphy.v1.Page.unreached:type_name -> murphy.v1.EscalationTarget
+	11, // 3: murphy.v1.Page.created_at:type_name -> google.protobuf.Timestamp
+	10, // 4: murphy.v1.PageRecipient.via:type_name -> murphy.v1.EscalationTarget
 	0,  // 5: murphy.v1.PageEvent.verb:type_name -> murphy.v1.PageVerb
-	2,  // 6: murphy.v1.PageEvent.previous:type_name -> murphy.v1.Page
-	2,  // 7: murphy.v1.PageEvent.current:type_name -> murphy.v1.Page
-	10, // 8: murphy.v1.Notification.reason:type_name -> murphy.v1.NotificationReason
-	7,  // 9: murphy.v1.Notification.incident:type_name -> murphy.v1.Incident
-	11, // 10: murphy.v1.Notification.contact_method:type_name -> murphy.v1.ContactMethod
-	8,  // 11: murphy.v1.Notification.via:type_name -> murphy.v1.EscalationTarget
-	9,  // 12: murphy.v1.Notification.created_at:type_name -> google.protobuf.Timestamp
-	9,  // 13: murphy.v1.Notification.sent_at:type_name -> google.protobuf.Timestamp
-	9,  // 14: murphy.v1.Notification.deadline:type_name -> google.protobuf.Timestamp
+	3,  // 6: murphy.v1.PageEvent.previous:type_name -> murphy.v1.Page
+	3,  // 7: murphy.v1.PageEvent.current:type_name -> murphy.v1.Page
+	12, // 8: murphy.v1.Notification.reason:type_name -> murphy.v1.NotificationReason
+	9,  // 9: murphy.v1.Notification.incident:type_name -> murphy.v1.Incident
+	13, // 10: murphy.v1.Notification.contact_method:type_name -> murphy.v1.ContactMethod
+	10, // 11: murphy.v1.Notification.via:type_name -> murphy.v1.EscalationTarget
+	11, // 12: murphy.v1.Notification.created_at:type_name -> google.protobuf.Timestamp
+	11, // 13: murphy.v1.Notification.sent_at:type_name -> google.protobuf.Timestamp
+	11, // 14: murphy.v1.Notification.deadline:type_name -> google.protobuf.Timestamp
 	1,  // 15: murphy.v1.NotificationEvent.verb:type_name -> murphy.v1.NotificationVerb
-	5,  // 16: murphy.v1.NotificationEvent.previous:type_name -> murphy.v1.Notification
-	5,  // 17: murphy.v1.NotificationEvent.current:type_name -> murphy.v1.Notification
-	18, // [18:18] is the sub-list for method output_type
-	18, // [18:18] is the sub-list for method input_type
-	18, // [18:18] is the sub-list for extension type_name
-	18, // [18:18] is the sub-list for extension extendee
-	0,  // [0:18] is the sub-list for field type_name
+	6,  // 16: murphy.v1.NotificationEvent.previous:type_name -> murphy.v1.Notification
+	6,  // 17: murphy.v1.NotificationEvent.current:type_name -> murphy.v1.Notification
+	2,  // 18: murphy.v1.EmailProvider.type:type_name -> murphy.v1.EmailProviderType
+	11, // 19: murphy.v1.EmailProvider.updated_at:type_name -> google.protobuf.Timestamp
+	20, // [20:20] is the sub-list for method output_type
+	20, // [20:20] is the sub-list for method input_type
+	20, // [20:20] is the sub-list for extension type_name
+	20, // [20:20] is the sub-list for extension extendee
+	0,  // [0:20] is the sub-list for field type_name
 }
 
 func init() { file_murphy_v1_notifications_proto_init() }
@@ -660,8 +814,8 @@ func file_murphy_v1_notifications_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_murphy_v1_notifications_proto_rawDesc), len(file_murphy_v1_notifications_proto_rawDesc)),
-			NumEnums:      2,
-			NumMessages:   5,
+			NumEnums:      3,
+			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

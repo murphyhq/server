@@ -12,6 +12,7 @@ import (
 	"github.com/murphyhq/server/services/catalog"
 	"github.com/murphyhq/server/services/escalation"
 	"github.com/murphyhq/server/services/incidents"
+	"github.com/murphyhq/server/services/notifications"
 	"github.com/murphyhq/server/services/oncall"
 	"github.com/murphyhq/server/services/people"
 )
@@ -22,6 +23,7 @@ type Server struct {
 	people        *people.Service
 	oncall        *oncall.Service
 	escalation    *escalation.Service
+	notifications *notifications.Service
 	publicKeys    []ed25519.PublicKey
 	auth          *people.Auth
 	secureCookies bool
@@ -33,6 +35,7 @@ type Services struct {
 	People         *people.Service
 	OnCall         *oncall.Service
 	Escalation     *escalation.Service
+	Notifications  *notifications.Service
 	PublicKeys     []ed25519.PublicKey
 	Auth           *people.Auth
 	SecureCookies  bool
@@ -48,7 +51,7 @@ func New(services Services, keys idempotency.Store) (http.Handler, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read access rules from the OpenAPI spec: %w", err)
 	}
-	strict := NewStrictHandlerWithOptions(&Server{catalog: services.Catalog, incidents: services.Incidents, people: services.People, oncall: services.OnCall, escalation: services.Escalation, publicKeys: services.PublicKeys, auth: services.Auth, secureCookies: services.SecureCookies}, nil, StrictHTTPServerOptions{
+	strict := NewStrictHandlerWithOptions(&Server{catalog: services.Catalog, incidents: services.Incidents, people: services.People, oncall: services.OnCall, escalation: services.Escalation, notifications: services.Notifications, publicKeys: services.PublicKeys, auth: services.Auth, secureCookies: services.SecureCookies}, nil, StrictHTTPServerOptions{
 		RequestErrorHandlerFunc:  httpserver.BadRequest,
 		ResponseErrorHandlerFunc: httpserver.WriteError,
 	})

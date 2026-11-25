@@ -8,6 +8,17 @@ import (
 	"time"
 )
 
+type EmailProvider struct {
+	Singleton   bool
+	Type        string
+	FromAddress string
+	Host        string
+	Port        int32
+	Username    string
+	Secret      string
+	UpdatedAt   time.Time
+}
+
 type HandledMessage struct {
 	ID        string
 	CreatedAt time.Time

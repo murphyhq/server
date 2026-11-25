@@ -5,6 +5,9 @@ import (
 	"embed"
 	"time"
 
+	"google.golang.org/protobuf/types/known/timestamppb"
+
+	"github.com/murphyhq/server"
 	murphymysql "github.com/murphyhq/server/internal/mysql"
 	"github.com/murphyhq/server/internal/tracer"
 )
@@ -60,4 +63,35 @@ func (r *Repository) PurgeHandledMessages(ctx context.Context, before time.Time)
 		return 0, murphymysql.Error("message", err)
 	}
 	return purged, nil
+}
+
+func (r *Repository) GetEmailProvider(ctx context.Context) (_ *murphy.EmailProvider, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	row, err := r.queries.GetEmailProvider(ctx)
+	if err != nil {
+		return nil, murphymysql.Error("email provider", err)
+	}
+	return &murphy.EmailProvider{
+		Type: murphy.EmailProviderTypeFromText(row.Type), From: row.FromAddress, Host: row.Host, Port: row.Port,
+		Username: row.Username, Secret: row.Secret, UpdatedAt: timestamppb.New(row.UpdatedAt),
+	}, nil
+}
+
+func (r *Repository) SetEmailProvider(ctx context.Context, provider *murphy.EmailProvider) (err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	return murphymysql.Error("email provider", r.queries.SetEmailProvider(ctx, SetEmailProviderParams{
+		Type: provider.GetType().Text(), FromAddress: provider.GetFrom(), Host: provider.GetHost(), Port: provider.GetPort(),
+		Username: provider.GetUsername(), Secret: provider.GetSecret(), UpdatedAt: provider.GetUpdatedAt().AsTime(),
+	}))
+}
+
+func (r *Repository) DeleteEmailProvider(ctx context.Context) (err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	return murphymysql.Error("email provider", r.queries.DeleteEmailProvider(ctx))
 }

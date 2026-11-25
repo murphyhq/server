@@ -253,3 +253,67 @@ func TestAnOutcomeWaitsUntilTheGonePhoneIsDisabled(t *testing.T) {
 	assert.Error(t, err, "so the broker redelivers it")
 	assert.Nil(t, d.recorded)
 }
+
+func smtpProvider() *murphy.EmailProvider {
+	return &murphy.EmailProvider{
+		Type: murphy.EmailProviderType_EMAIL_PROVIDER_TYPE_SMTP, From: "Murphy <murphy@example.com>", Host: "smtp.example.com", Port: 587,
+		Username: "murphy", Secret: "env://SMTP_PASSWORD",
+	}
+}
+
+func TestAnEmailProviderReadsItsSecretFromAReference(t *testing.T) {
+	d := newDomain(t)
+	var kept []string
+	d.repo.EXPECT().SetEmailProvider(mock.Anything, mock.Anything).RunAndReturn(func(_ context.Context, provider *murphy.EmailProvider) error {
+		kept = append(kept, provider.GetSecret())
+		return nil
+	})
+
+	for _, secret := range []string{"env://SMTP_PASSWORD", "file:///run/secrets/smtp", "aws-ssm:///murphy/smtp-password"} {
+		provider := smtpProvider()
+		provider.Secret = secret
+		_, err := d.service.SetEmailProvider(t.Context(), provider)
+		require.NoError(t, err)
+	}
+
+	assert.Equal(t, []string{"env://SMTP_PASSWORD", "file:///run/secrets/smtp", "aws-ssm:///murphy/smtp-password"}, kept)
+}
+
+func TestAnEmailProviderWithoutASecretNeedsNoUsername(t *testing.T) {
+	d := newDomain(t)
+	d.repo.EXPECT().SetEmailProvider(mock.Anything, mock.Anything).Return(nil)
+	provider := smtpProvider()
+	provider.Username, provider.Secret = "", ""
+
+	got, err := d.service.SetEmailProvider(t.Context(), provider)
+
+	require.NoError(t, err)
+	assert.WithinDuration(t, time.Now(), got.GetUpdatedAt().AsTime(), time.Minute)
+}
+
+func TestAnInvalidEmailProviderIsRefusedAndNotKept(t *testing.T) {
+	cases := map[string]func(*murphy.EmailProvider){
+		"no type":                       func(p *murphy.EmailProvider) { p.Type = murphy.EmailProviderType_EMAIL_PROVIDER_TYPE_UNSPECIFIED },
+		"a sender that isn't an email":  func(p *murphy.EmailProvider) { p.From = "Murphy" },
+		"no host":                       func(p *murphy.EmailProvider) { p.Host = "" },
+		"no port":                       func(p *murphy.EmailProvider) { p.Port = 0 },
+		"a port too high":               func(p *murphy.EmailProvider) { p.Port = 65536 },
+		"the password itself":           func(p *murphy.EmailProvider) { p.Secret = "hunter2" },
+		"an unknown secret store":       func(p *murphy.EmailProvider) { p.Secret = "vault://murphy/smtp" },
+		"an env reference with a path":  func(p *murphy.EmailProvider) { p.Secret = "env://SMTP/PASSWORD" },
+		"a file reference without path": func(p *murphy.EmailProvider) { p.Secret = "file://" },
+		"a secret without a username":   func(p *murphy.EmailProvider) { p.Username = "" },
+	}
+	for name, change := range cases {
+		t.Run(name, func(t *testing.T) {
+			d := newDomain(t)
+			provider := smtpProvider()
+			change(provider)
+
+			_, err := d.service.SetEmailProvider(t.Context(), provider)
+
+			require.ErrorIs(t, err, murphy.ErrInvalid)
+			d.repo.AssertNotCalled(t, "SetEmailProvider", mock.Anything, mock.Anything)
+		})
+	}
+}

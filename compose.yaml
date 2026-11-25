@@ -250,6 +250,7 @@ services:
       MURPHY_PEOPLE_DATABASE_URL: postgres://murphy:murphy@postgres:5432/people?sslmode=disable
       MURPHY_ONCALL_DATABASE_URL: postgres://murphy:murphy@postgres:5432/oncall?sslmode=disable
       MURPHY_ESCALATION_DATABASE_URL: postgres://murphy:murphy@postgres:5432/escalation?sslmode=disable
+      MURPHY_NOTIFICATIONS_DATABASE_URL: postgres://murphy:murphy@postgres:5432/notifications?sslmode=disable
       MURPHY_IDEMPOTENCY_STORE_URL: redis://redis:6379/0
       MURPHY_INTEGRATION_KEY_SECRETS: *integration-key-secrets
       MURPHY_WEBHOOK_PUBLIC_KEYS: *webhook-public-keys

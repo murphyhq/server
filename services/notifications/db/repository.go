@@ -23,6 +23,9 @@ type Engine[T Tx] interface {
 	RecipientsOf(ctx context.Context, incidentID string) ([]string, error)
 	DeleteMessages(ctx context.Context, ids []string) error
 	PurgeHandledMessages(ctx context.Context, before time.Time) (int64, error)
+	GetEmailProvider(ctx context.Context) (*murphy.EmailProvider, error)
+	SetEmailProvider(ctx context.Context, provider *murphy.EmailProvider) error
+	DeleteEmailProvider(ctx context.Context) error
 	Transaction(ctx context.Context, work func(tx T) error) error
 	Migrate(ctx context.Context) error
 	Ping(ctx context.Context) error

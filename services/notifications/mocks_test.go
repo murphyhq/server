@@ -315,6 +315,57 @@ func (_c *MockRepository_ClaimDueMessages_Call) RunAndReturn(run func(ctx contex
 	return _c
 }
 
+// DeleteEmailProvider provides a mock function for the type MockRepository
+func (_mock *MockRepository) DeleteEmailProvider(ctx context.Context) error {
+	ret := _mock.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteEmailProvider")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context) error); ok {
+		r0 = returnFunc(ctx)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockRepository_DeleteEmailProvider_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteEmailProvider'
+type MockRepository_DeleteEmailProvider_Call struct {
+	*mock.Call
+}
+
+// DeleteEmailProvider is a helper method to define mock.On call
+//   - ctx context.Context
+func (_e *MockRepository_Expecter) DeleteEmailProvider(ctx any) *MockRepository_DeleteEmailProvider_Call {
+	return &MockRepository_DeleteEmailProvider_Call{Call: _e.mock.On("DeleteEmailProvider", ctx)}
+}
+
+func (_c *MockRepository_DeleteEmailProvider_Call) Run(run func(ctx context.Context)) *MockRepository_DeleteEmailProvider_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_DeleteEmailProvider_Call) Return(err error) *MockRepository_DeleteEmailProvider_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockRepository_DeleteEmailProvider_Call) RunAndReturn(run func(ctx context.Context) error) *MockRepository_DeleteEmailProvider_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // DeleteMessages provides a mock function for the type MockRepository
 func (_mock *MockRepository) DeleteMessages(ctx context.Context, ids []string) error {
 	ret := _mock.Called(ctx, ids)
@@ -368,6 +419,68 @@ func (_c *MockRepository_DeleteMessages_Call) Return(err error) *MockRepository_
 }
 
 func (_c *MockRepository_DeleteMessages_Call) RunAndReturn(run func(ctx context.Context, ids []string) error) *MockRepository_DeleteMessages_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetEmailProvider provides a mock function for the type MockRepository
+func (_mock *MockRepository) GetEmailProvider(ctx context.Context) (*murphy.EmailProvider, error) {
+	ret := _mock.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetEmailProvider")
+	}
+
+	var r0 *murphy.EmailProvider
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context) (*murphy.EmailProvider, error)); ok {
+		return returnFunc(ctx)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context) *murphy.EmailProvider); ok {
+		r0 = returnFunc(ctx)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*murphy.EmailProvider)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = returnFunc(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockRepository_GetEmailProvider_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetEmailProvider'
+type MockRepository_GetEmailProvider_Call struct {
+	*mock.Call
+}
+
+// GetEmailProvider is a helper method to define mock.On call
+//   - ctx context.Context
+func (_e *MockRepository_Expecter) GetEmailProvider(ctx any) *MockRepository_GetEmailProvider_Call {
+	return &MockRepository_GetEmailProvider_Call{Call: _e.mock.On("GetEmailProvider", ctx)}
+}
+
+func (_c *MockRepository_GetEmailProvider_Call) Run(run func(ctx context.Context)) *MockRepository_GetEmailProvider_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_GetEmailProvider_Call) Return(emailProvider *murphy.EmailProvider, err error) *MockRepository_GetEmailProvider_Call {
+	_c.Call.Return(emailProvider, err)
+	return _c
+}
+
+func (_c *MockRepository_GetEmailProvider_Call) RunAndReturn(run func(ctx context.Context) (*murphy.EmailProvider, error)) *MockRepository_GetEmailProvider_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -568,6 +681,63 @@ func (_c *MockRepository_Record_Call) Return(recorded bool, err error) *MockRepo
 }
 
 func (_c *MockRepository_Record_Call) RunAndReturn(run func(ctx context.Context, change *notifications.Change) (bool, error)) *MockRepository_Record_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SetEmailProvider provides a mock function for the type MockRepository
+func (_mock *MockRepository) SetEmailProvider(ctx context.Context, provider *murphy.EmailProvider) error {
+	ret := _mock.Called(ctx, provider)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetEmailProvider")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *murphy.EmailProvider) error); ok {
+		r0 = returnFunc(ctx, provider)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockRepository_SetEmailProvider_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SetEmailProvider'
+type MockRepository_SetEmailProvider_Call struct {
+	*mock.Call
+}
+
+// SetEmailProvider is a helper method to define mock.On call
+//   - ctx context.Context
+//   - provider *murphy.EmailProvider
+func (_e *MockRepository_Expecter) SetEmailProvider(ctx any, provider any) *MockRepository_SetEmailProvider_Call {
+	return &MockRepository_SetEmailProvider_Call{Call: _e.mock.On("SetEmailProvider", ctx, provider)}
+}
+
+func (_c *MockRepository_SetEmailProvider_Call) Run(run func(ctx context.Context, provider *murphy.EmailProvider)) *MockRepository_SetEmailProvider_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *murphy.EmailProvider
+		if args[1] != nil {
+			arg1 = args[1].(*murphy.EmailProvider)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_SetEmailProvider_Call) Return(err error) *MockRepository_SetEmailProvider_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockRepository_SetEmailProvider_Call) RunAndReturn(run func(ctx context.Context, provider *murphy.EmailProvider) error) *MockRepository_SetEmailProvider_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -66,3 +66,18 @@ enum NotificationVerb {
   NOTIFICATION_VERB_SENT = 2;
   NOTIFICATION_VERB_FAILED = 3;
 }
+
+message EmailProvider {
+  EmailProviderType type = 1;
+  string from = 2;
+  string host = 3;
+  int32 port = 4;
+  string username = 5;
+  string secret = 6;
+  google.protobuf.Timestamp updated_at = 7;
+}
+
+enum EmailProviderType {
+  EMAIL_PROVIDER_TYPE_UNSPECIFIED = 0;
+  EMAIL_PROVIDER_TYPE_SMTP = 1;
+}

@@ -66,3 +66,17 @@ CREATE TABLE scheduled_messages (
 );
 
 CREATE INDEX scheduled_messages_due_at_id_idx ON scheduled_messages (due_at, id);
+
+CREATE TABLE email_provider (
+  singleton boolean NOT NULL DEFAULT true,
+  type text NOT NULL,
+  from_address text NOT NULL,
+  host text NOT NULL,
+  port integer NOT NULL,
+  username text NOT NULL,
+  secret text NOT NULL,
+  updated_at timestamptz NOT NULL,
+  CONSTRAINT email_provider_pkey PRIMARY KEY (singleton),
+  CONSTRAINT email_provider_singleton_check CHECK (singleton),
+  CONSTRAINT email_provider_type_check CHECK (type IN ('smtp'))
+);
