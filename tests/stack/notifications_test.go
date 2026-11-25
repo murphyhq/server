@@ -54,7 +54,7 @@ func TestAPageReachesAPhoneThroughTheRelay(t *testing.T) {
 
 func TestAPhoneWhoseTokenIsGoneIsDisabledAndNotTriedAgain(t *testing.T) {
 	m := murphytest.New(t)
-	ana := m.User(murphytest.WithGonePhone())
+	ana := m.User(murphytest.WithGonePhone(), murphytest.WithoutEmail())
 	service := m.Service(murphytest.Pages(ana.Target()))
 	reason := "the phone is no longer registered for pushes, so it's disabled until the app registers again"
 
