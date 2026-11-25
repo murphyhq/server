@@ -11,6 +11,7 @@ import (
 
 type Tx interface {
 	CreateUser(ctx context.Context, user *murphy.User) error
+	CreateContactMethod(ctx context.Context, method *murphy.ContactMethod) error
 	CreateIdentity(ctx context.Context, identity *murphy.Identity) error
 	AdminExists(ctx context.Context) (bool, error)
 	SetUserRole(ctx context.Context, id string, role murphy.UserRole, at time.Time) error
@@ -109,11 +110,27 @@ func (r *Repository[T]) CreateUserWithIdentity(ctx context.Context, user *murphy
 	defer span.End(&err)
 
 	return r.Transaction(ctx, func(tx T) error {
-		if err := tx.CreateUser(ctx, user); err != nil {
+		if err := createUser(ctx, tx, user); err != nil {
 			return err
 		}
 		return tx.CreateIdentity(ctx, identity)
 	})
+}
+
+func (r *Repository[T]) CreateUser(ctx context.Context, user *murphy.User) (err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	return r.Transaction(ctx, func(tx T) error {
+		return createUser(ctx, tx, user)
+	})
+}
+
+func createUser[T Tx](ctx context.Context, tx T, user *murphy.User) error {
+	if err := tx.CreateUser(ctx, user); err != nil {
+		return err
+	}
+	return tx.CreateContactMethod(ctx, user.EmailContactMethod())
 }
 
 func (r *Repository[T]) ClaimFirstAdmin(ctx context.Context, userID string, now time.Time) (claimed bool, err error) {

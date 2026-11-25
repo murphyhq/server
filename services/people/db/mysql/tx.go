@@ -60,3 +60,10 @@ func (t *Tx) DiscardOneTimeCodesOfUser(ctx context.Context, userID string, at ti
 	_, err = t.queries.DiscardOneTimeCodesOfUser(ctx, DiscardOneTimeCodesOfUserParams{UsedAt: &at, UpdatedAt: at, UserID: userID})
 	return murphymysql.Error("one-time code", err)
 }
+
+func (t *Tx) CreateContactMethod(ctx context.Context, method *murphy.ContactMethod) (err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	return insertContactMethod(ctx, t.queries, method)
+}

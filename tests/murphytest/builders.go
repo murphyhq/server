@@ -1,6 +1,7 @@
 package murphytest
 
 import (
+	"net/http"
 	"time"
 	"uuid"
 
@@ -68,6 +69,8 @@ type userSpec struct {
 	methods  []client.ContactMethodInput
 	webhooks [][]WebhookOption
 	phones   []string
+
+	withoutEmail bool
 }
 
 func Deactivated() UserOption {
@@ -81,10 +84,8 @@ func WithWebhook(options ...WebhookOption) UserOption {
 	return func(s *userSpec) { s.webhooks = append(s.webhooks, options) }
 }
 
-func WithEmail() UserOption {
-	return func(s *userSpec) {
-		s.methods = append(s.methods, client.ContactMethodInput{Type: client.Email, Address: s.input.Email})
-	}
+func WithoutEmail() UserOption {
+	return func(s *userSpec) { s.withoutEmail = true }
 }
 
 func WithPhone() UserOption {
@@ -105,6 +106,9 @@ func (m *Murphy) User(options ...UserOption) *User {
 	created, err := m.API.CreateUserWithResponse(m.t.Context(), nil, spec.input)
 	m.created(created, err, "create a user")
 	user := &User{ID: created.JSON201.Id, Name: spec.input.Name, Email: spec.input.Email, m: m}
+	if spec.withoutEmail {
+		user.removeContactMethods()
+	}
 	for _, options := range spec.webhooks {
 		hook := m.Receiver().Webhook(options...)
 		spec.methods = append(spec.methods, client.ContactMethodInput{Type: client.Webhook, Address: hook.Address})
@@ -126,6 +130,23 @@ func (m *Murphy) User(options ...UserOption) *User {
 		user.phones = append(user.phones, &Phone{Token: added.JSON201.Address, receiver: m.Receiver()})
 	}
 	return user
+}
+
+func (u *User) removeContactMethods() {
+	u.m.t.Helper()
+	methods, err := u.m.API.ListContactMethodsWithResponse(u.m.t.Context(), u.ID)
+	u.m.ok(methods, err, "list contact methods")
+	for _, method := range methods.JSON200.Items {
+		removed, err := u.m.API.DeleteContactMethodWithResponse(u.m.t.Context(), method.Id)
+		u.m.expect(removed, err, http.StatusNoContent, "remove a contact method")
+	}
+}
+
+func (u *User) ContactMethods() []client.ContactMethod {
+	u.m.t.Helper()
+	methods, err := u.m.API.ListContactMethodsWithResponse(u.m.t.Context(), u.ID)
+	u.m.ok(methods, err, "list contact methods")
+	return methods.JSON200.Items
 }
 
 func (u *User) Mailbox() *Mailbox {

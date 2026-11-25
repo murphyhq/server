@@ -33,6 +33,20 @@ func Run(t *testing.T, open func(t *testing.T) Storage) {
 		assert.Equal(t, user.GetStatus(), got.GetStatus())
 	})
 
+	t.Run("stores a new user with an email contact method for their address", func(t *testing.T) {
+		repo := open(t)
+		ana, bo := newUser("ana@example.com"), newUser("bo@example.com")
+
+		require.NoError(t, repo.CreateUser(t.Context(), ana))
+		require.NoError(t, repo.CreateUserWithIdentity(t.Context(), bo, newIdentity(bo, "bo-at-the-provider")))
+		methods, err := repo.ListContactMethodsOfUsers(t.Context(), []string{ana.GetId(), bo.GetId()})
+
+		require.NoError(t, err)
+		require.Len(t, methods, 2)
+		assert.Equal(t, []string{"ana@example.com", "bo@example.com"}, []string{methods[0].GetAddress(), methods[1].GetAddress()})
+		assert.Equal(t, murphy.ContactMethodType_CONTACT_METHOD_TYPE_EMAIL, methods[0].GetType())
+	})
+
 	t.Run("hands a sign-in out once", func(t *testing.T) {
 		repo := open(t)
 		now := time.Now().UTC()
@@ -371,19 +385,19 @@ func Run(t *testing.T, open func(t *testing.T) Storage) {
 		for _, user := range []*murphy.User{ana, bo, cy} {
 			require.NoError(t, repo.CreateUser(t.Context(), user))
 		}
-		anaHook, anaEmail, boHook, cyHook := newContactMethod(ana, murphy.ContactMethodType_CONTACT_METHOD_TYPE_WEBHOOK), newContactMethod(ana, murphy.ContactMethodType_CONTACT_METHOD_TYPE_EMAIL), newContactMethod(bo, murphy.ContactMethodType_CONTACT_METHOD_TYPE_WEBHOOK), newContactMethod(cy, murphy.ContactMethodType_CONTACT_METHOD_TYPE_WEBHOOK)
-		for _, method := range []*murphy.ContactMethod{anaHook, anaEmail, boHook, cyHook} {
+		anaHook, boHook, cyHook := newContactMethod(ana, murphy.ContactMethodType_CONTACT_METHOD_TYPE_WEBHOOK), newContactMethod(bo, murphy.ContactMethodType_CONTACT_METHOD_TYPE_WEBHOOK), newContactMethod(cy, murphy.ContactMethodType_CONTACT_METHOD_TYPE_WEBHOOK)
+		for _, method := range []*murphy.ContactMethod{anaHook, boHook, cyHook} {
 			require.NoError(t, repo.CreateContactMethod(t.Context(), method))
 		}
 
 		methods, err := repo.ListContactMethodsOfUsers(t.Context(), []string{ana.GetId(), bo.GetId(), murphy.NewID()})
 
 		require.NoError(t, err)
-		ids := make([]string, len(methods))
+		addresses := make([]string, len(methods))
 		for i, method := range methods {
-			ids[i] = method.GetId()
+			addresses[i] = method.GetAddress()
 		}
-		assert.ElementsMatch(t, []string{anaHook.GetId(), anaEmail.GetId(), boHook.GetId()}, ids)
+		assert.ElementsMatch(t, []string{"ana@example.com", anaHook.GetAddress(), "bo@example.com", boHook.GetAddress()}, addresses)
 	})
 
 	t.Run("keeps a disabled contact method with why, but never hands it out for paging", func(t *testing.T) {
@@ -403,11 +417,14 @@ func Run(t *testing.T, open func(t *testing.T) Storage) {
 		assert.Equal(t, "gone", got.GetDisabledReason())
 		listed, err := repo.ListContactMethods(t.Context(), ana.GetId())
 		require.NoError(t, err)
-		assert.Len(t, listed, 2, "the person still sees it")
+		assert.Len(t, listed, 3, "the person still sees it, next to their email and the working one")
 		paging, err := repo.ListContactMethodsOfUsers(t.Context(), []string{ana.GetId()})
 		require.NoError(t, err)
-		require.Len(t, paging, 1)
-		assert.Equal(t, working.GetId(), paging[0].GetId())
+		addresses := make([]string, len(paging))
+		for i, method := range paging {
+			addresses[i] = method.GetAddress()
+		}
+		assert.ElementsMatch(t, []string{"ana@example.com", working.GetAddress()}, addresses)
 	})
 
 	t.Run("disabling leaves a contact method alone once its address has changed", func(t *testing.T) {

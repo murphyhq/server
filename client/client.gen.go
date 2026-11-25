@@ -455,7 +455,7 @@ type EmailProviderInput struct {
 	// Port Usually 587, where Murphy upgrades the connection with STARTTLS, or 465 for TLS from the start.
 	Port int32 `json:"port"`
 
-	// Secret Where Murphy reads the password, never the password itself, as `env://NAME`, `file:///path` or `aws-ssm:///name`. `notifier` reads it each time it sends.
+	// Secret Where Murphy reads the password, never the password itself, as `env://NAME`, `file:///path` or `aws-ssm:///name`. `notifier` reads it when it checks the provider, every minute, and only where the install allows.
 	Secret *string           `json:"secret,omitempty"`
 	Type   EmailProviderType `json:"type"`
 

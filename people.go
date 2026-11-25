@@ -142,3 +142,10 @@ func (p PushPlatform) Text() string {
 func PushPlatformFromText(text string) PushPlatform {
 	return enumFromText[PushPlatform](PushPlatform_value, "PUSH_PLATFORM_", text)
 }
+
+func (u *User) EmailContactMethod() *ContactMethod {
+	return &ContactMethod{
+		Id: NewID(), UserId: u.GetId(), Type: ContactMethodType_CONTACT_METHOD_TYPE_EMAIL, Address: u.GetEmail(),
+		CreatedAt: u.GetCreatedAt(), UpdatedAt: u.GetCreatedAt(),
+	}
+}
