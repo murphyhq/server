@@ -2,7 +2,7 @@ openapi: 3.0.3
 info:
   title: Murphy relay
   version: v1
-  description: Delivers a Murphy install's pages to the official app as push notifications, through APNs and FCM. Pushes carry no incident data, only where the app should look.
+  description: Delivers a Murphy install's notifications on its behalf, today as pushes to the official app through APNs and FCM. Every notification says what happened and what it's about; pushes carry no incident data, only where the app should look.
 servers:
   - url: http://localhost:8093
     description: Local development
@@ -60,32 +60,45 @@ components:
     Platform:
       type: string
       enum: [ios, android]
+    Event:
+      type: string
+      enum: [paged, acknowledged, resolved, test]
+      description: "What happened, for every kind of notification the relay delivers. `test` is a test page someone sent to their own contact methods."
+    Subject:
+      type: object
+      additionalProperties: false
+      required: [type, id]
+      description: What a notification is about. The relay passes it on without reading it, and the app decides what to fetch from the server.
+      properties:
+        type:
+          type: string
+          enum: [incident, test]
+        id:
+          type: string
     PushInput:
       type: object
       additionalProperties: false
-      required: [id, platform, token, event, server]
+      required: [id, event, subject, server, platform, token]
+      description: A notification, delivered as a push. `id`, `event`, `subject`, `server` and `traceparent` are what every kind of notification carries; `platform` and `token` say where a push goes.
       properties:
         id:
           type: string
-          description: The ID of the notification this push delivers. Retries use the same ID.
+          description: The ID of the notification this delivers. Retries use the same ID.
+        event:
+          $ref: "#/components/schemas/Event"
+        subject:
+          $ref: "#/components/schemas/Subject"
+        server:
+          type: string
+          description: The Murphy server the app should fetch the subject from.
+        traceparent:
+          type: string
+          description: The W3C trace context of the notification's trace. The relay sends it to the phone so the app can continue the trace.
         platform:
           $ref: "#/components/schemas/Platform"
         token:
           type: string
           description: The push token iOS or Android gave the app.
-        event:
-          type: string
-          enum: [paged, acknowledged, resolved, test]
-          description: "`test` is a test page someone sent to their own phone: it carries no incident, and is delivered like a page so it sounds the same."
-        server:
-          type: string
-          description: The Murphy server the app should fetch the incident from.
-        incident_id:
-          type: string
-          description: Present for every event except `test`.
-        traceparent:
-          type: string
-          description: The W3C trace context of the notification's trace. The relay sends it to the phone so the app can continue the trace.
     Push:
       type: object
       required: [id, status]

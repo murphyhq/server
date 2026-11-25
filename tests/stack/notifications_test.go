@@ -49,7 +49,8 @@ func TestAPageReachesAPhoneThroughTheRelay(t *testing.T) {
 	push := ana.Phone().WaitForPushes(1)[0]
 	assert.Equal(t, "ios", push.Platform)
 	assert.Equal(t, "paged", push.Event)
-	assert.Equal(t, incident.ID, push.IncidentID)
+	assert.Equal(t, "incident", push.Subject.Type)
+	assert.Equal(t, incident.ID, push.Subject.ID)
 	assert.Equal(t, m.APIURL(), push.Server)
 }
 

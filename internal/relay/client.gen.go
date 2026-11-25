@@ -14,6 +14,30 @@ import (
 	"strings"
 )
 
+// Defines values for Event.
+const (
+	EventAcknowledged Event = "acknowledged"
+	EventPaged        Event = "paged"
+	EventResolved     Event = "resolved"
+	EventTest         Event = "test"
+)
+
+// Valid indicates whether the value is a known member of the Event enum.
+func (e Event) Valid() bool {
+	switch e {
+	case EventAcknowledged:
+		return true
+	case EventPaged:
+		return true
+	case EventResolved:
+		return true
+	case EventTest:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for Platform.
 const (
 	Android Platform = "android"
@@ -50,29 +74,26 @@ func (e PushStatus) Valid() bool {
 	}
 }
 
-// Defines values for PushInputEvent.
+// Defines values for SubjectType.
 const (
-	Acknowledged PushInputEvent = "acknowledged"
-	Paged        PushInputEvent = "paged"
-	Resolved     PushInputEvent = "resolved"
-	Test         PushInputEvent = "test"
+	SubjectTypeIncident SubjectType = "incident"
+	SubjectTypeTest     SubjectType = "test"
 )
 
-// Valid indicates whether the value is a known member of the PushInputEvent enum.
-func (e PushInputEvent) Valid() bool {
+// Valid indicates whether the value is a known member of the SubjectType enum.
+func (e SubjectType) Valid() bool {
 	switch e {
-	case Acknowledged:
+	case SubjectTypeIncident:
 		return true
-	case Paged:
-		return true
-	case Resolved:
-		return true
-	case Test:
+	case SubjectTypeTest:
 		return true
 	default:
 		return false
 	}
 }
+
+// Event What happened, for every kind of notification the relay delivers. `test` is a test page someone sent to their own contact methods.
+type Event string
 
 // Platform defines model for Platform.
 type Platform string
@@ -98,20 +119,20 @@ type Push struct {
 // PushStatus `duplicate` when a push with this `id` was already sent.
 type PushStatus string
 
-// PushInput defines model for PushInput.
+// PushInput A notification, delivered as a push. `id`, `event`, `subject`, `server` and `traceparent` are what every kind of notification carries; `platform` and `token` say where a push goes.
 type PushInput struct {
-	// Event `test` is a test page someone sent to their own phone: it carries no incident, and is delivered like a page so it sounds the same.
-	Event PushInputEvent `json:"event"`
+	// Event What happened, for every kind of notification the relay delivers. `test` is a test page someone sent to their own contact methods.
+	Event Event `json:"event"`
 
-	// Id The ID of the notification this push delivers. Retries use the same ID.
-	Id string `json:"id"`
+	// Id The ID of the notification this delivers. Retries use the same ID.
+	Id       string   `json:"id"`
+	Platform Platform `json:"platform"`
 
-	// IncidentId Present for every event except `test`.
-	IncidentId *string  `json:"incident_id,omitempty"`
-	Platform   Platform `json:"platform"`
-
-	// Server The Murphy server the app should fetch the incident from.
+	// Server The Murphy server the app should fetch the subject from.
 	Server string `json:"server"`
+
+	// Subject What a notification is about. The relay passes it on without reading it, and the app decides what to fetch from the server.
+	Subject Subject `json:"subject"`
 
 	// Token The push token iOS or Android gave the app.
 	Token string `json:"token"`
@@ -120,8 +141,14 @@ type PushInput struct {
 	Traceparent *string `json:"traceparent,omitempty"`
 }
 
-// PushInputEvent `test` is a test page someone sent to their own phone: it carries no incident, and is delivered like a page so it sounds the same.
-type PushInputEvent string
+// Subject What a notification is about. The relay passes it on without reading it, and the app decides what to fetch from the server.
+type Subject struct {
+	Id   string      `json:"id"`
+	Type SubjectType `json:"type"`
+}
+
+// SubjectType defines model for Subject.Type.
+type SubjectType string
 
 // SendPushJSONRequestBody defines body for SendPush for application/json ContentType.
 type SendPushJSONRequestBody = PushInput
