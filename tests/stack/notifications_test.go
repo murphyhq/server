@@ -54,7 +54,7 @@ func TestAPageReachesAPhoneThroughTheRelay(t *testing.T) {
 
 func TestAPhoneWhoseTokenIsGoneIsDisabledAndNotTriedAgain(t *testing.T) {
 	m := murphytest.New(t)
-	ana := m.User(murphytest.WithGonePhone())
+	ana := m.User(murphytest.WithGonePhone(), murphytest.WithoutEmail())
 	service := m.Service(murphytest.Pages(ana.Target()))
 	reason := "the phone is no longer registered for pushes, so it's disabled until the app registers again"
 
@@ -150,7 +150,7 @@ func TestARefusedWebhookFailsAtOnce(t *testing.T) {
 
 func TestSomeonePagedWithoutContactMethodsIsOnTheTimeline(t *testing.T) {
 	m := murphytest.New(t)
-	ana := m.User()
+	ana := m.User(murphytest.WithoutEmail())
 	service := m.Service(murphytest.Pages(ana.Target()))
 
 	incident := service.Fire("disk-full")
@@ -216,7 +216,7 @@ func TestWebhooksCarryASignatureFromEveryKeyDuringARotation(t *testing.T) {
 
 func TestTheTimelineSaysWhoWasPagedAndHow(t *testing.T) {
 	m := murphytest.New(t)
-	ana := m.User(murphytest.WithWebhook())
+	ana := m.User(murphytest.WithWebhook(), murphytest.WithoutEmail())
 	service := m.Service(murphytest.Pages(ana.Target()))
 
 	incident := service.Fire("disk-full")
@@ -237,10 +237,21 @@ func TestAContactMethodMurphyCantSendToYetIsRefused(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, created.StatusCode())
 }
 
+func TestSomeoneNewCanBeReachedAtTheirEmail(t *testing.T) {
+	m := murphytest.New(t)
+
+	ana := m.User()
+
+	methods := ana.ContactMethods()
+	require.Len(t, methods, 1)
+	assert.Equal(t, client.Email, methods[0].Type)
+	assert.Equal(t, ana.Email, methods[0].Address)
+}
+
 func TestAPageReachesSomeoneByEmail(t *testing.T) {
 	m := murphytest.New(t)
 	m.EmailThroughMailpit()
-	ana := m.User(murphytest.WithEmail())
+	ana := m.User()
 	service := m.Service(murphytest.Pages(ana.Target()))
 
 	incident := service.Fire("disk-full")

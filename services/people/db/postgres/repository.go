@@ -112,7 +112,11 @@ func (r *Repository) CreateContactMethod(ctx context.Context, method *murphy.Con
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
-	return murphypostgres.Error("contact method", r.queries.CreateContactMethod(ctx, CreateContactMethodParams{
+	return insertContactMethod(ctx, r.queries, method)
+}
+
+func insertContactMethod(ctx context.Context, queries *Queries, method *murphy.ContactMethod) error {
+	return murphypostgres.Error("contact method", queries.CreateContactMethod(ctx, CreateContactMethodParams{
 		ID: method.GetId(), UserID: method.GetUserId(), Type: method.GetType().Text(), Address: method.GetAddress(),
 		PushPlatform: pushPlatform(method), CreatedAt: method.GetCreatedAt().AsTime(), UpdatedAt: method.GetUpdatedAt().AsTime(),
 	}))

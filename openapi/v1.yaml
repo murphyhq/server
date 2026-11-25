@@ -2038,7 +2038,7 @@ components:
           description: Required with a secret.
         secret:
           type: string
-          description: Where Murphy reads the password, never the password itself, as `env://NAME`, `file:///path` or `aws-ssm:///name`. `notifier` reads it each time it sends.
+          description: Where Murphy reads the password, never the password itself, as `env://NAME`, `file:///path` or `aws-ssm:///name`. `notifier` reads it when it checks the provider, every minute, and only where the install allows.
     EmailProviderType:
       type: string
       enum: [smtp]
