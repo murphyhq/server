@@ -239,7 +239,7 @@ func requestWithAppHeaders(t *testing.T, headers map[string]string) {
 func attributeValues(attributes []attribute.KeyValue) map[string]string {
 	values := map[string]string{}
 	for _, kv := range attributes {
-		values[string(kv.Key)] = kv.Value.Emit()
+		values[string(kv.Key)] = kv.Value.String()
 	}
 	return values
 }
