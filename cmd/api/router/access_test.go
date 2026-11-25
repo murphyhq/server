@@ -451,12 +451,28 @@ func TestAScheduleManagerManagesItsOverrides(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestAResponderDoesntManageOverrides(t *testing.T) {
+func TestAResponderCoversForOthersWithOverrides(t *testing.T) {
 	i := newInstall(t)
+	cy := i.access.caller(t.Context(), i.member("cy", platform, murphy.TeamRole_TEAM_ROLE_RESPONDER))
 
-	err := i.access.allows(t.Context(), i.access.caller(t.Context(), i.member("cy", platform, murphy.TeamRole_TEAM_ROLE_RESPONDER)), "overrides:manage", []string{override})
+	created := i.access.allows(t.Context(), cy, "overrides:create", []string{shared})
+	removed := i.access.allows(t.Context(), cy, "overrides:manage", []string{override})
+	edited := i.access.allows(t.Context(), cy, "schedules:manage", []string{shared})
 
-	assert.ErrorIs(t, err, murphy.ErrForbidden)
+	assert.NoError(t, created)
+	assert.NoError(t, removed)
+	assert.ErrorIs(t, edited, murphy.ErrForbidden, "the rotation itself stays with managers")
+}
+
+func TestAnObserverDoesntTouchOverrides(t *testing.T) {
+	i := newInstall(t)
+	cy := i.access.caller(t.Context(), i.member("cy", platform, murphy.TeamRole_TEAM_ROLE_OBSERVER))
+
+	created := i.access.allows(t.Context(), cy, "overrides:create", []string{shared})
+	removed := i.access.allows(t.Context(), cy, "overrides:manage", []string{override})
+
+	assert.ErrorIs(t, created, murphy.ErrForbidden)
+	assert.ErrorIs(t, removed, murphy.ErrForbidden)
 }
 
 func TestAMissingOverrideIsNotFound(t *testing.T) {
