@@ -176,7 +176,11 @@ func (s *Service) notificationOutcome(ctx context.Context, messageID string, not
 	)
 	defer span.End(&err)
 
-	return s.record(ctx, &Change{MessageID: messageID, IncidentID: notification.GetIncident().GetId(), Decision: NotificationOutcome(notification, failed)})
+	decision := NotificationOutcome(notification, failed)
+	if decision == nil {
+		return nil
+	}
+	return s.record(ctx, &Change{MessageID: messageID, IncidentID: notification.GetIncident().GetId(), Decision: decision})
 }
 
 func (s *Service) Acknowledge(ctx context.Context, id, actorID string) (_ *murphy.Incident, err error) {

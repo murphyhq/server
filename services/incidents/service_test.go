@@ -313,3 +313,17 @@ func TestATimerForAnIncidentThatIsGoneOnlyMarksItsMessage(t *testing.T) {
 
 	assert.Equal(t, &incidents.Change{MessageID: "message-1"}, f.recorded)
 }
+
+func TestADeliveredFollowUpIsNotWrittenAnywhere(t *testing.T) {
+	repo := NewMockRepository(t)
+	service := incidents.New(repo, nil, nil)
+	told := &murphy.Notification{
+		Id: murphy.NewID(), Reason: murphy.NotificationReason_NOTIFICATION_REASON_ACKNOWLEDGED, Incident: &murphy.Incident{Id: murphy.NewID()},
+		ContactMethod: &murphy.ContactMethod{Type: murphy.ContactMethodType_CONTACT_METHOD_TYPE_WEBHOOK},
+	}
+
+	err := service.NotificationSent(t.Context(), murphy.NewID(), told)
+
+	require.NoError(t, err)
+	repo.AssertNotCalled(t, "Record", mock.Anything, mock.Anything)
+}

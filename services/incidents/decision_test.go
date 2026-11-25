@@ -245,6 +245,25 @@ func TestANotificationOutcomeGoesOnTheTimeline(t *testing.T) {
 	assert.Equal(t, notification.GetContactMethod().GetId(), entry.GetNotification().GetContactMethodId())
 }
 
+func TestTellingSomeoneItWasAcknowledgedOrResolvedStaysOffTheTimelineUnlessItFails(t *testing.T) {
+	notification := func(reason murphy.NotificationReason) *murphy.Notification {
+		return &murphy.Notification{
+			Id: murphy.NewID(), Reason: reason, Incident: &murphy.Incident{Id: murphy.NewID()}, UserId: ana,
+			ContactMethod: &murphy.ContactMethod{Id: murphy.NewID(), Type: murphy.ContactMethodType_CONTACT_METHOD_TYPE_WEBHOOK}, Failure: "the receiver answered 503",
+		}
+	}
+
+	acknowledged := incidents.NotificationOutcome(notification(murphy.NotificationReason_NOTIFICATION_REASON_ACKNOWLEDGED), false)
+	resolved := incidents.NotificationOutcome(notification(murphy.NotificationReason_NOTIFICATION_REASON_RESOLVED), false)
+	failed := incidents.NotificationOutcome(notification(murphy.NotificationReason_NOTIFICATION_REASON_RESOLVED), true)
+	paged := incidents.NotificationOutcome(notification(murphy.NotificationReason_NOTIFICATION_REASON_PAGED), false)
+
+	assert.Nil(t, acknowledged)
+	assert.Nil(t, resolved)
+	assert.Equal(t, []murphy.TimelineEntryType{murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_NOTIFICATION_FAILED}, entries(failed), "a follow-up that couldn't be delivered is worth knowing")
+	assert.Equal(t, []murphy.TimelineEntryType{murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_NOTIFIED}, entries(paged), "who a page reached always stays")
+}
+
 func named(userID string) string {
 	return map[string]string{"ana": "Ana", "bo": "Bo", "cy": "Cy"}[userID]
 }
