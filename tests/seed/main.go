@@ -49,6 +49,9 @@ func run(ctx context.Context) error {
 	if err := seedWebhooks(ctx, api, users, s.WebhookURL); err != nil {
 		return err
 	}
+	if err := seedEmail(ctx, api, s.MailServer); err != nil {
+		return err
+	}
 	schedules, err := seedSchedules(ctx, api, teams, users)
 	if err != nil {
 		return err
@@ -62,9 +65,6 @@ func run(ctx context.Context) error {
 		return err
 	}
 	if err := seedIncidents(ctx, s.IngestURL, keys); err != nil {
-		return err
-	}
-	if err := seedEmail(ctx, api, s.MailServer); err != nil {
 		return err
 	}
 	return seedDogfood(ctx, api, policies["platform"], s.Dogfood)
