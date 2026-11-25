@@ -42,19 +42,19 @@ type IncidentResponders interface {
 }
 
 type rule struct {
-	adminOnly bool
-	anyone    bool
-	evenAdmin bool
-	check     func(a *access, ctx context.Context, c caller, id string) error
-	owner     func(a *access, ctx context.Context, id string) ([]string, error)
-	covers    bool
+	adminOnly   bool
+	anyone      bool
+	bindsAdmins bool
+	check       func(a *access, ctx context.Context, c caller, id string) error
+	owner       func(a *access, ctx context.Context, id string) ([]string, error)
+	covers      bool
 }
 
 var rules = map[string]rule{
 	"sessions:own":        {anyone: true},
 	"install:manage":      {adminOnly: true},
 	"users:self":          {check: (*access).isSelf},
-	"users:only-self":     {check: (*access).isOnlySelf, evenAdmin: true},
+	"users:only-self":     {check: (*access).isOnlySelf, bindsAdmins: true},
 	"contact-methods:own": {check: (*access).ownsContactMethod},
 	"incidents:respond":   {check: (*access).respondsTo},
 	"teams:manage":        {owner: (*access).theTeam},
@@ -95,11 +95,8 @@ func requireAccess(a *access) MiddlewareFunc {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			current := sessionFrom(r.Context())
-			grants := a.grants[r.Pattern]
-			if current != nil && current.role == murphy.UserRole_USER_ROLE_ADMIN {
-				grants = slices.DeleteFunc(slices.Clone(grants), func(g grant) bool { return !rules[g.scope].evenAdmin })
-			}
-			if current == nil || len(grants) == 0 {
+			grants := a.grantsFor(current, r.Pattern)
+			if len(grants) == 0 {
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -121,6 +118,17 @@ func requireAccess(a *access) MiddlewareFunc {
 			}
 			next.ServeHTTP(w, r)
 		})
+	}
+}
+
+func (a *access) grantsFor(current *currentSession, pattern string) []grant {
+	switch {
+	case current == nil:
+		return nil
+	case current.role == murphy.UserRole_USER_ROLE_ADMIN:
+		return slices.DeleteFunc(slices.Clone(a.grants[pattern]), func(g grant) bool { return !rules[g.scope].bindsAdmins })
+	default:
+		return a.grants[pattern]
 	}
 }
 
