@@ -81,7 +81,7 @@ func ExpireTimer(incident *murphy.Incident, timer *murphy.Timer, policy *murphy.
 }
 
 func RecordPage(incident *murphy.Incident, page *murphy.Page, policy *murphy.EscalationPolicy, now *timestamppb.Timestamp) *Decision {
-	timeline := pageEntries(incident, page, now)
+	timeline := pageEntries(incident, page, murphy.Or(page.GetCreatedAt(), now))
 	current := incident.GetEscalationLevel() == page.GetEscalationLevel() && incident.GetEscalationRound() == page.GetEscalationRound()
 	if len(page.GetReached()) > 0 || !Escalating(incident) || policy == nil || !current {
 		return &Decision{Timeline: timeline}
