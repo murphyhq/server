@@ -15,21 +15,21 @@ type Secrets interface {
 }
 
 type EmailSender interface {
-	Use(ctx context.Context, provider *murphy.EmailProvider, password string) error
+	Use(ctx context.Context, provider *murphy.EmailProvider, secret string) error
 	Stop()
 }
 
-type Email struct {
+type EmailCheck struct {
 	repo    Repository
 	secrets Secrets
 	sender  EmailSender
 }
 
-func NewEmail(repo Repository, secrets Secrets, sender EmailSender) *Email {
-	return &Email{repo: repo, secrets: secrets, sender: sender}
+func NewEmailCheck(repo Repository, secrets Secrets, sender EmailSender) *EmailCheck {
+	return &EmailCheck{repo: repo, secrets: secrets, sender: sender}
 }
 
-func (e *Email) Refresh(ctx context.Context) (err error) {
+func (e *EmailCheck) Run(ctx context.Context) (err error) {
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
@@ -42,7 +42,7 @@ func (e *Email) Refresh(ctx context.Context) (err error) {
 		return fmt.Errorf("get email provider: %w", err)
 	}
 	provider.Status, provider.Problem, provider.CheckedAt = murphy.EmailProviderStatus_EMAIL_PROVIDER_STATUS_READY, "", murphy.Now()
-	if problem := e.use(ctx, provider); problem != nil {
+	if problem := e.try(ctx, provider); problem != nil {
 		provider.Status, provider.Problem = murphy.EmailProviderStatus_EMAIL_PROVIDER_STATUS_FAILING, problem.Error()
 		span.Set(ctx, telemetry.WithField("email_provider.problem", provider.GetProblem()))
 	}
@@ -52,14 +52,14 @@ func (e *Email) Refresh(ctx context.Context) (err error) {
 	return nil
 }
 
-func (e *Email) use(ctx context.Context, provider *murphy.EmailProvider) error {
-	var password string
+func (e *EmailCheck) try(ctx context.Context, provider *murphy.EmailProvider) error {
+	var secret string
 	if provider.GetSecret() != "" {
 		read, err := e.secrets.Read(ctx, provider.GetSecret())
 		if err != nil {
-			return fmt.Errorf("couldn't read the password: %w", err)
+			return fmt.Errorf("couldn't read the secret: %w", err)
 		}
-		password = read
+		secret = read
 	}
-	return e.sender.Use(ctx, provider, password)
+	return e.sender.Use(ctx, provider, secret)
 }

@@ -56,13 +56,13 @@ type Settings struct {
 }
 
 type App struct {
-	Ready         []lifecycle.Check
-	subscription  messaging.Subscription
-	notifications *notifications.Service
-	sender        *notifications.Sender
-	email         *notifications.Email
-	emailInterval time.Duration
-	resources     lifecycle.Resources
+	Ready              []lifecycle.Check
+	subscription       messaging.Subscription
+	notifications      *notifications.Service
+	sender             *notifications.Sender
+	emailCheck         *notifications.EmailCheck
+	emailCheckInterval time.Duration
+	resources          lifecycle.Resources
 }
 
 func New(ctx context.Context, s Settings) (_ *App, err error) {
@@ -138,8 +138,8 @@ func New(ctx context.Context, s Settings) (_ *App, err error) {
 	peopleService := people.New(peopleStorage)
 	a.notifications = notifications.New(notificationsStorage, escalation.New(escalationStorage, nil, nil, nil, 0), oncall.New(oncallStorage, peopleService), peopleService)
 	a.sender = notifications.NewSender(messaging.NewPublisher(topic), providers)
-	a.email = notifications.NewEmail(notificationsStorage, reader, emails)
-	a.emailInterval = s.EmailCheckInterval
+	a.emailCheck = notifications.NewEmailCheck(notificationsStorage, reader, emails)
+	a.emailCheckInterval = s.EmailCheckInterval
 	a.Ready = a.resources.Checks()
 	return a, nil
 }
@@ -197,10 +197,10 @@ func (a *App) Run(ctx context.Context) error {
 		messaging.Runner(a.subscription, "notifier", handlers.New(a.notifications, a.sender)),
 		lifecycle.Every(purgeInterval, a.notifications.PurgeHandledMessages),
 		func(ctx context.Context) error {
-			if err := a.email.Refresh(ctx); err != nil {
+			if err := a.emailCheck.Run(ctx); err != nil {
 				logger.Warn(ctx, "email provider check failed", telemetry.WithError(err))
 			}
-			return lifecycle.Every(a.emailInterval, a.email.Refresh)(ctx)
+			return lifecycle.Every(a.emailCheckInterval, a.emailCheck.Run)(ctx)
 		},
 	)
 }

@@ -15,7 +15,7 @@ import (
 )
 
 type emailSetup struct {
-	email    *notifications.Email
+	check    *notifications.EmailCheck
 	repo     *MockRepository
 	secrets  *MockSecrets
 	sender   *MockEmailSender
@@ -24,7 +24,7 @@ type emailSetup struct {
 
 func newEmailSetup(t *testing.T, provider *murphy.EmailProvider) *emailSetup {
 	e := &emailSetup{repo: NewMockRepository(t), secrets: NewMockSecrets(t), sender: NewMockEmailSender(t)}
-	e.email = notifications.NewEmail(e.repo, e.secrets, e.sender)
+	e.check = notifications.NewEmailCheck(e.repo, e.secrets, e.sender)
 	e.repo.EXPECT().GetEmailProvider(mock.Anything).Return(provider, nil).Once()
 	e.repo.EXPECT().RecordEmailProviderCheck(mock.Anything, mock.Anything).RunAndReturn(func(_ context.Context, checked *murphy.EmailProvider) error {
 		e.recorded = checked
@@ -38,7 +38,7 @@ func TestAProviderThatSignsInIsReady(t *testing.T) {
 	e.secrets.EXPECT().Read(mock.Anything, "env://SMTP_PASSWORD").Return("hunter2", nil).Once()
 	e.sender.EXPECT().Use(mock.Anything, mock.Anything, "hunter2").Return(nil).Once()
 
-	require.NoError(t, e.email.Refresh(t.Context()))
+	require.NoError(t, e.check.Run(t.Context()))
 
 	assert.Equal(t, murphy.EmailProviderStatus_EMAIL_PROVIDER_STATUS_READY, e.recorded.GetStatus())
 	assert.Empty(t, e.recorded.GetProblem())
@@ -49,10 +49,10 @@ func TestAPasswordThatCantBeReadFailsTheProviderWithoutTryingIt(t *testing.T) {
 	e := newEmailSetup(t, smtpProvider())
 	e.secrets.EXPECT().Read(mock.Anything, mock.Anything).Return("", errors.Join(secrets.ErrMissing, errors.New("SMTP_PASSWORD isn't set"))).Once()
 
-	require.NoError(t, e.email.Refresh(t.Context()))
+	require.NoError(t, e.check.Run(t.Context()))
 
 	assert.Equal(t, murphy.EmailProviderStatus_EMAIL_PROVIDER_STATUS_FAILING, e.recorded.GetStatus())
-	assert.Contains(t, e.recorded.GetProblem(), "couldn't read the password")
+	assert.Contains(t, e.recorded.GetProblem(), "couldn't read the secret")
 	assert.Contains(t, e.recorded.GetProblem(), "SMTP_PASSWORD isn't set")
 }
 
@@ -61,7 +61,7 @@ func TestAMailServerThatRefusesTheSignInFailsTheProvider(t *testing.T) {
 	e.secrets.EXPECT().Read(mock.Anything, mock.Anything).Return("wrong", nil).Once()
 	e.sender.EXPECT().Use(mock.Anything, mock.Anything, "wrong").Return(errors.New("sign in to the mail server: 535 authentication failed")).Once()
 
-	require.NoError(t, e.email.Refresh(t.Context()))
+	require.NoError(t, e.check.Run(t.Context()))
 
 	assert.Equal(t, murphy.EmailProviderStatus_EMAIL_PROVIDER_STATUS_FAILING, e.recorded.GetStatus())
 	assert.Equal(t, "sign in to the mail server: 535 authentication failed", e.recorded.GetProblem())
@@ -72,7 +72,7 @@ func TestWithoutAProviderNothingIsSent(t *testing.T) {
 	repo.EXPECT().GetEmailProvider(mock.Anything).Return(nil, &murphy.NotFoundError{Entity: "email provider"}).Once()
 	sender.EXPECT().Stop().Once()
 
-	err := notifications.NewEmail(repo, NewMockSecrets(t), sender).Refresh(t.Context())
+	err := notifications.NewEmailCheck(repo, NewMockSecrets(t), sender).Run(t.Context())
 
 	require.NoError(t, err)
 }

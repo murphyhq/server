@@ -20,10 +20,10 @@ import (
 
 type Emails struct {
 	roots  *x509.CertPool
-	active atomic.Pointer[sender]
+	active atomic.Pointer[transport]
 }
 
-type sender struct {
+type transport struct {
 	server smtp.Server
 	from   *mail.Address
 }
@@ -34,7 +34,7 @@ func New(roots *x509.CertPool) *Emails {
 	return &Emails{roots: roots}
 }
 
-func (e *Emails) Use(ctx context.Context, provider *murphy.EmailProvider, password string) (err error) {
+func (e *Emails) Use(ctx context.Context, provider *murphy.EmailProvider, secret string) (err error) {
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
@@ -42,8 +42,8 @@ func (e *Emails) Use(ctx context.Context, provider *murphy.EmailProvider, passwo
 	if err != nil {
 		return fmt.Errorf("the sender %q isn't an email address", provider.GetFrom())
 	}
-	next := &sender{from: from, server: smtp.Server{
-		Host: provider.GetHost(), Port: int(provider.GetPort()), Username: provider.GetUsername(), Password: password, Roots: e.roots,
+	next := &transport{from: from, server: smtp.Server{
+		Host: provider.GetHost(), Port: int(provider.GetPort()), Username: provider.GetUsername(), Password: secret, Roots: e.roots,
 	}}
 	if err := next.server.Check(ctx); err != nil {
 		e.active.CompareAndSwap(nil, next)

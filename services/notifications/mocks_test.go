@@ -185,8 +185,8 @@ func (_c *MockEmailSender_Stop_Call) RunAndReturn(run func()) *MockEmailSender_S
 }
 
 // Use provides a mock function for the type MockEmailSender
-func (_mock *MockEmailSender) Use(ctx context.Context, provider *murphy.EmailProvider, password string) error {
-	ret := _mock.Called(ctx, provider, password)
+func (_mock *MockEmailSender) Use(ctx context.Context, provider *murphy.EmailProvider, secret string) error {
+	ret := _mock.Called(ctx, provider, secret)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Use")
@@ -194,7 +194,7 @@ func (_mock *MockEmailSender) Use(ctx context.Context, provider *murphy.EmailPro
 
 	var r0 error
 	if returnFunc, ok := ret.Get(0).(func(context.Context, *murphy.EmailProvider, string) error); ok {
-		r0 = returnFunc(ctx, provider, password)
+		r0 = returnFunc(ctx, provider, secret)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -209,12 +209,12 @@ type MockEmailSender_Use_Call struct {
 // Use is a helper method to define mock.On call
 //   - ctx context.Context
 //   - provider *murphy.EmailProvider
-//   - password string
-func (_e *MockEmailSender_Expecter) Use(ctx any, provider any, password any) *MockEmailSender_Use_Call {
-	return &MockEmailSender_Use_Call{Call: _e.mock.On("Use", ctx, provider, password)}
+//   - secret string
+func (_e *MockEmailSender_Expecter) Use(ctx any, provider any, secret any) *MockEmailSender_Use_Call {
+	return &MockEmailSender_Use_Call{Call: _e.mock.On("Use", ctx, provider, secret)}
 }
 
-func (_c *MockEmailSender_Use_Call) Run(run func(ctx context.Context, provider *murphy.EmailProvider, password string)) *MockEmailSender_Use_Call {
+func (_c *MockEmailSender_Use_Call) Run(run func(ctx context.Context, provider *murphy.EmailProvider, secret string)) *MockEmailSender_Use_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -242,7 +242,7 @@ func (_c *MockEmailSender_Use_Call) Return(err error) *MockEmailSender_Use_Call 
 	return _c
 }
 
-func (_c *MockEmailSender_Use_Call) RunAndReturn(run func(ctx context.Context, provider *murphy.EmailProvider, password string) error) *MockEmailSender_Use_Call {
+func (_c *MockEmailSender_Use_Call) RunAndReturn(run func(ctx context.Context, provider *murphy.EmailProvider, secret string) error) *MockEmailSender_Use_Call {
 	_c.Call.Return(run)
 	return _c
 }
