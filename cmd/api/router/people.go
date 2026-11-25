@@ -235,4 +235,3 @@ func toNotificationRule(rule *murphy.NotificationRule) NotificationRule {
 	}
 	return out
 }
-
