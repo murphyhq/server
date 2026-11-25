@@ -30,7 +30,6 @@ type Engine[T Tx] interface {
 	GetIncident(ctx context.Context, id string) (*murphy.Incident, error)
 	ListIncidents(ctx context.Context, filter incidents.Filter, before string, limit int) ([]*murphy.Incident, error)
 	ListTimeline(ctx context.Context, incidentID string) ([]*murphy.TimelineEntry, error)
-	ListTimelineOfType(ctx context.Context, incidentID string, kind murphy.TimelineEntryType) ([]*murphy.TimelineEntry, error)
 	PolicyOfIncident(ctx context.Context, id, userID string) (policyID string, paged bool, err error)
 	LatestFiringAt(ctx context.Context, incidentID string) (time.Time, error)
 	OpenInstances(ctx context.Context, incidentID string) ([]string, error)

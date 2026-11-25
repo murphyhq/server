@@ -295,14 +295,12 @@ func TestAcknowledgingRetriesAfterAConcurrentChange(t *testing.T) {
 	assert.Equal(t, murphy.IncidentStatus_INCIDENT_STATUS_ACKNOWLEDGED, acknowledged.GetStatus())
 }
 
-func TestAcknowledgingAnAcknowledgedIncidentReadsOnlyItsAcknowledgements(t *testing.T) {
+func TestAcknowledgingAnAcknowledgedIncidentRecordsWhoDidIt(t *testing.T) {
 	f := setup(t)
 	repo := NewMockRepository(t)
 	f.service = incidents.New(repo, nil, nil)
 	id := murphy.NewID()
 	repo.EXPECT().GetIncident(mock.Anything, id).Return(&murphy.Incident{Id: id, Status: murphy.IncidentStatus_INCIDENT_STATUS_ACKNOWLEDGED, Version: 3}, nil).Once()
-	repo.EXPECT().ListTimelineOfType(mock.Anything, id, murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_ACKNOWLEDGED).
-		Return([]*murphy.TimelineEntry{{Type: murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_ACKNOWLEDGED, ActorUserId: ana}}, nil).Once()
 	var recorded *incidents.Change
 	repo.EXPECT().Record(mock.Anything, mock.Anything).RunAndReturn(func(_ context.Context, change *incidents.Change) (bool, error) {
 		recorded = change

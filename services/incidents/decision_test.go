@@ -202,7 +202,7 @@ func TestAnEmptyPageForALevelAlreadyLeftOnlyRecordsIt(t *testing.T) {
 }
 
 func TestAcknowledgingCancelsTimersAndAnnouncesIt(t *testing.T) {
-	decision := incidents.AcknowledgeIncident(incidentAt(1, 1), ana, nil, murphy.Now())
+	decision := incidents.AcknowledgeIncident(incidentAt(1, 1), ana, murphy.Now())
 
 	assert.Equal(t, murphy.IncidentStatus_INCIDENT_STATUS_ACKNOWLEDGED, decision.Incident.GetStatus())
 	assert.NotNil(t, decision.Incident.GetAcknowledgedAt())
@@ -211,28 +211,23 @@ func TestAcknowledgingCancelsTimersAndAnnouncesIt(t *testing.T) {
 	assert.Equal(t, murphy.IncidentStatus_INCIDENT_STATUS_TRIGGERED, decision.Announce[0].Previous.GetStatus())
 }
 
-func TestAcknowledgingTwiceOrResolvingTwiceDecidesNothing(t *testing.T) {
-	acknowledged := incidentAt(1, 1)
-	acknowledged.Status = murphy.IncidentStatus_INCIDENT_STATUS_ACKNOWLEDGED
-	byAna := []*murphy.TimelineEntry{{Type: murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_ACKNOWLEDGED, ActorUserId: ana}}
+func TestAResolvedIncidentCantBeAcknowledgedOrResolvedAgain(t *testing.T) {
 	resolved := incidentAt(1, 1)
 	resolved.Status = murphy.IncidentStatus_INCIDENT_STATUS_RESOLVED
 
-	assert.Nil(t, incidents.AcknowledgeIncident(acknowledged, ana, byAna, murphy.Now()))
-	assert.Nil(t, incidents.AcknowledgeIncident(resolved, bo, nil, murphy.Now()))
+	assert.Nil(t, incidents.AcknowledgeIncident(resolved, ana, murphy.Now()))
 	assert.Nil(t, incidents.ResolveIncident(resolved, ana, murphy.Now()))
 }
 
-func TestSomeoneElseAcknowledgingOnlyAddsThemToTheTimeline(t *testing.T) {
+func TestAcknowledgingAnAcknowledgedIncidentOnlyAddsToTheTimeline(t *testing.T) {
 	acknowledged := incidentAt(1, 1)
 	acknowledged.Status, acknowledged.AcknowledgedAt = murphy.IncidentStatus_INCIDENT_STATUS_ACKNOWLEDGED, murphy.Now()
 	first := acknowledged.GetAcknowledgedAt()
-	byAna := []*murphy.TimelineEntry{{Type: murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_ACKNOWLEDGED, ActorUserId: ana}}
 
-	decision := incidents.AcknowledgeIncident(acknowledged, bo, byAna, murphy.Now())
+	decision := incidents.AcknowledgeIncident(acknowledged, ana, murphy.Now())
 
 	assert.Equal(t, []murphy.TimelineEntryType{murphy.TimelineEntryType_TIMELINE_ENTRY_TYPE_ACKNOWLEDGED}, entries(decision))
-	assert.Equal(t, bo, decision.Timeline[0].GetActorUserId())
+	assert.Equal(t, ana, decision.Timeline[0].GetActorUserId())
 	assert.Empty(t, decision.Announce, "nobody is told again")
 	assert.False(t, decision.CancelTimers)
 	assert.Equal(t, murphy.IncidentStatus_INCIDENT_STATUS_ACKNOWLEDGED, decision.Incident.GetStatus())
@@ -240,7 +235,7 @@ func TestSomeoneElseAcknowledgingOnlyAddsThemToTheTimeline(t *testing.T) {
 }
 
 func TestWhoAcknowledgesOrResolvesGoesOnTheTimeline(t *testing.T) {
-	acknowledged := incidents.AcknowledgeIncident(incidentAt(1, 1), ana, nil, murphy.Now())
+	acknowledged := incidents.AcknowledgeIncident(incidentAt(1, 1), ana, murphy.Now())
 	resolved := incidents.ResolveIncident(incidentAt(1, 1), ana, murphy.Now())
 
 	assert.Equal(t, ana, acknowledged.Timeline[0].GetActorUserId())

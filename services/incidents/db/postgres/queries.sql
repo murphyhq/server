@@ -55,12 +55,6 @@ FROM timeline_entries
 WHERE incident_id = @incident_id
 ORDER BY id;
 
--- name: ListTimelineOfType :many
-SELECT id, details
-FROM timeline_entries
-WHERE incident_id = @incident_id AND type = @type
-ORDER BY id;
-
 -- name: LatestFiringAt :one
 SELECT COALESCE(max(received_at), 'epoch'::timestamptz)::timestamptz AS received_at
 FROM alerts

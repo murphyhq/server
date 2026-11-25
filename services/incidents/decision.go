@@ -92,7 +92,7 @@ func RecordPage(incident *murphy.Incident, page *murphy.Page, policy *murphy.Esc
 	return decision
 }
 
-func AcknowledgeIncident(incident *murphy.Incident, actorID string, acknowledgements []*murphy.TimelineEntry, now *timestamppb.Timestamp) *Decision {
+func AcknowledgeIncident(incident *murphy.Incident, actorID string, now *timestamppb.Timestamp) *Decision {
 	switch incident.GetStatus() {
 	case murphy.IncidentStatus_INCIDENT_STATUS_TRIGGERED:
 		decision, previous := change(incident, now)
@@ -102,9 +102,6 @@ func AcknowledgeIncident(incident *murphy.Incident, actorID string, acknowledgem
 		decision.Timeline = []*murphy.TimelineEntry{acknowledgement(incident, actorID, now)}
 		return decision
 	case murphy.IncidentStatus_INCIDENT_STATUS_ACKNOWLEDGED:
-		if slices.ContainsFunc(acknowledgements, func(entry *murphy.TimelineEntry) bool { return entry.GetActorUserId() == actorID }) {
-			return nil
-		}
 		decision, _ := change(incident, now)
 		decision.Timeline = []*murphy.TimelineEntry{acknowledgement(incident, actorID, now)}
 		return decision
