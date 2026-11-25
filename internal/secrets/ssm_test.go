@@ -3,6 +3,7 @@
 package secrets_test
 
 import (
+	"context"
 	"os"
 	"testing"
 
@@ -37,7 +38,10 @@ func put(t *testing.T, store *ssm.Client, name, value string) string {
 	t.Helper()
 	_, err := store.PutParameter(t.Context(), &ssm.PutParameterInput{Name: sdkaws.String(name), Value: sdkaws.String(value), Type: types.ParameterTypeSecureString, Overwrite: sdkaws.Bool(true)})
 	require.NoError(t, err)
-	t.Cleanup(func() { _, _ = store.DeleteParameter(t.Context(), &ssm.DeleteParameterInput{Name: sdkaws.String(name)}) })
+	t.Cleanup(func() {
+		_, err := store.DeleteParameter(context.Background(), &ssm.DeleteParameterInput{Name: sdkaws.String(name)})
+		require.NoError(t, err)
+	})
 	return name
 }
 
