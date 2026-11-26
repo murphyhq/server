@@ -53,9 +53,6 @@ func (p *Pushes) Send(ctx context.Context, notification *murphy.Notification) (e
 	case http.StatusUnauthorized:
 		return &notifications.RefusedError{Reason: "the push relay doesn't accept this install's key"}
 	case http.StatusBadRequest:
-		if notification.GetReason() == murphy.NotificationReason_NOTIFICATION_REASON_TEST {
-			return &notifications.RefusedError{Reason: "the push relay doesn't accept test pages yet"}
-		}
 		return &notifications.RefusedError{Reason: "the push relay refused the push"}
 	default:
 		return fmt.Errorf("the push relay answered %s", response.Status)
