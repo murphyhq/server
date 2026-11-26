@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/murphyhq/server"
@@ -65,20 +64,21 @@ func relayDue(ctx context.Context, source string, messages ScheduledMessages, pu
 		return false, err
 	}
 	published := make([]bool, len(due))
-	var group errgroup.Group
-	group.SetLimit(max(1, settings.Publishers))
+	pool := NewPool(max(1, settings.Publishers))
 	for i, message := range due {
-		group.Go(func() error {
+		if !pool.Acquire(ctx) {
+			break
+		}
+		pool.Go(func() {
 			if err := relayOne(ctx, source, publisher, message); err != nil {
 				logger.Warn(ctx, "a due message will be published again once its claim expires",
 					telemetry.WithField("message.id", message.ID), telemetry.WithError(err))
-				return nil
+				return
 			}
 			published[i] = true
-			return nil
 		})
 	}
-	_ = group.Wait()
+	pool.Wait()
 	sent := make([]string, 0, len(due))
 	for i, message := range due {
 		if published[i] {
