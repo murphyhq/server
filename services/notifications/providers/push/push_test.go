@@ -57,7 +57,7 @@ func TestAPushCarriesTheEventTheServerAndTheIncidentOnly(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, map[string]any{
-		"id": "notification-1", "platform": "ios", "token": "apns-token", "event": "paged", "server": "https://murphy.example.com",
+		"id": "notification-1", "platform": "ios", "token": "apns-token", "category": "page", "server": "https://murphy.example.com",
 		"subject": map[string]any{"type": "incident", "id": "incident-1"}, "authorization": "Bearer mik_install-key",
 	}, answer.received, "no incident title or other incident data")
 }
@@ -70,7 +70,7 @@ func TestATestPagePushIsAboutTheTestPage(t *testing.T) {
 	err := pushesThrough(t, answer).Send(t.Context(), test)
 
 	require.NoError(t, err)
-	assert.Equal(t, "test", answer.received["event"])
+	assert.Equal(t, "test", answer.received["category"])
 	assert.Equal(t, map[string]any{"type": "test", "id": "test-1"}, answer.received["subject"])
 }
 
@@ -92,13 +92,14 @@ func TestAPushCarriesTheTraceToThePhone(t *testing.T) {
 	assert.True(t, strings.HasPrefix(answer.received["traceparent"].(string), "00-"+span.SpanContext().TraceID().String()+"-"), "the phone continues the page's trace")
 }
 
-func TestAnAcknowledgementIsPushedAsOne(t *testing.T) {
+func TestAnAcknowledgementIsPushedAsAnUpdateAboutTheIncident(t *testing.T) {
 	answer := &relayAnswer{status: http.StatusOK}
 
 	err := pushesThrough(t, answer).Send(t.Context(), notification(murphy.NotificationReason_NOTIFICATION_REASON_ACKNOWLEDGED))
 
 	require.NoError(t, err)
-	assert.Equal(t, "acknowledged", answer.received["event"])
+	assert.Equal(t, "update", answer.received["category"])
+	assert.Equal(t, map[string]any{"type": "incident", "id": "incident-1"}, answer.received["subject"], "it replaces the page on the lock screen")
 }
 
 func TestAPhoneTheRelayForgotFailsForGood(t *testing.T) {

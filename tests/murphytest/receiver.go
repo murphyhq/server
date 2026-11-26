@@ -108,7 +108,7 @@ type ReceivedPush struct {
 	ID       string `json:"id"`
 	Platform string `json:"platform"`
 	Token    string `json:"token"`
-	Event    string `json:"event"`
+	Category string `json:"category"`
 	Server   string `json:"server"`
 	Subject  struct {
 		Type string `json:"type"`

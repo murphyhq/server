@@ -2,7 +2,7 @@ openapi: 3.0.3
 info:
   title: Murphy relay
   version: v1
-  description: Delivers a Murphy install's notifications on its behalf, today as pushes to the official app through APNs and FCM. Every notification says what happened and what it's about; pushes carry no incident data, only where the app should look.
+  description: Delivers a Murphy install's notifications on its behalf, today as pushes to the official app through APNs and FCM. Every notification says how it's shown and what it's about; pushes carry no incident data and no words from the install, only where the app should look.
 servers:
   - url: http://localhost:8093
     description: Local development
@@ -60,10 +60,10 @@ components:
     Platform:
       type: string
       enum: [ios, android]
-    Event:
+    Category:
       type: string
-      enum: [paged, acknowledged, resolved, test]
-      description: "What happened, for every kind of notification the relay delivers. `test` is a test page someone sent to their own contact methods."
+      enum: [page, update, test]
+      description: "How the notification is shown, in the relay's own words: `page` asks for attention now, `update` is news about something the person was paged for or is on call for, and `test` is a test page someone sent to their own contact methods. The relay never carries words from the install; the app shows what it fetches from the server instead, and the relay's words when it can't."
     Subject:
       type: object
       additionalProperties: false
@@ -72,20 +72,21 @@ components:
       properties:
         type:
           type: string
-          enum: [incident, test]
+          pattern: "^[a-z][a-z_]{0,31}$"
+          description: The kind of thing, such as `incident` or `test`. It's never shown; the app uses it to know what to fetch.
         id:
           type: string
     PushInput:
       type: object
       additionalProperties: false
-      required: [id, event, subject, server, platform, token]
-      description: A notification, delivered as a push. `id`, `event`, `subject`, `server` and `traceparent` are what every kind of notification carries; `platform` and `token` say where a push goes.
+      required: [id, category, subject, server, platform, token]
+      description: A notification, delivered as a push. `id`, `category`, `subject`, `server` and `traceparent` are what every kind of notification carries; `platform` and `token` say where a push goes.
       properties:
         id:
           type: string
           description: The ID of the notification this delivers. Retries use the same ID.
-        event:
-          $ref: "#/components/schemas/Event"
+        category:
+          $ref: "#/components/schemas/Category"
         subject:
           $ref: "#/components/schemas/Subject"
         server:
