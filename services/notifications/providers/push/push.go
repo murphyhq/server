@@ -31,11 +31,11 @@ func (p *Pushes) Send(ctx context.Context, notification *murphy.Notification) (e
 		Id:       notification.GetId(),
 		Platform: relay.Platform(notification.GetContactMethod().GetPushPlatform().Text()),
 		Token:    notification.GetContactMethod().GetAddress(),
-		Event:    eventOf(notification.GetReason()),
+		Category: categoryOf(notification.GetReason()),
 		Server:   p.server,
 	}
 	kind, id := notifications.SubjectOf(notification)
-	body.Subject = relay.Subject{Type: relay.SubjectType(kind), Id: id}
+	body.Subject = relay.Subject{Type: kind, Id: id}
 	if traceparent := tracer.Inject(ctx)["traceparent"]; traceparent != "" {
 		body.Traceparent = &traceparent
 	}
@@ -59,15 +59,13 @@ func (p *Pushes) Send(ctx context.Context, notification *murphy.Notification) (e
 	}
 }
 
-func eventOf(reason murphy.NotificationReason) relay.Event {
+func categoryOf(reason murphy.NotificationReason) relay.Category {
 	switch reason {
-	case murphy.NotificationReason_NOTIFICATION_REASON_ACKNOWLEDGED:
-		return relay.EventAcknowledged
-	case murphy.NotificationReason_NOTIFICATION_REASON_RESOLVED:
-		return relay.EventResolved
+	case murphy.NotificationReason_NOTIFICATION_REASON_ACKNOWLEDGED, murphy.NotificationReason_NOTIFICATION_REASON_RESOLVED:
+		return relay.Update
 	case murphy.NotificationReason_NOTIFICATION_REASON_TEST:
-		return relay.EventTest
+		return relay.Test
 	default:
-		return relay.EventPaged
+		return relay.Page
 	}
 }

@@ -14,24 +14,21 @@ import (
 	"strings"
 )
 
-// Defines values for Event.
+// Defines values for Category.
 const (
-	EventAcknowledged Event = "acknowledged"
-	EventPaged        Event = "paged"
-	EventResolved     Event = "resolved"
-	EventTest         Event = "test"
+	Page   Category = "page"
+	Test   Category = "test"
+	Update Category = "update"
 )
 
-// Valid indicates whether the value is a known member of the Event enum.
-func (e Event) Valid() bool {
+// Valid indicates whether the value is a known member of the Category enum.
+func (e Category) Valid() bool {
 	switch e {
-	case EventAcknowledged:
+	case Page:
 		return true
-	case EventPaged:
+	case Test:
 		return true
-	case EventResolved:
-		return true
-	case EventTest:
+	case Update:
 		return true
 	default:
 		return false
@@ -74,26 +71,8 @@ func (e PushStatus) Valid() bool {
 	}
 }
 
-// Defines values for SubjectType.
-const (
-	SubjectTypeIncident SubjectType = "incident"
-	SubjectTypeTest     SubjectType = "test"
-)
-
-// Valid indicates whether the value is a known member of the SubjectType enum.
-func (e SubjectType) Valid() bool {
-	switch e {
-	case SubjectTypeIncident:
-		return true
-	case SubjectTypeTest:
-		return true
-	default:
-		return false
-	}
-}
-
-// Event What happened, for every kind of notification the relay delivers. `test` is a test page someone sent to their own contact methods.
-type Event string
+// Category How the notification is shown, in the relay's own words: `page` asks for attention now, `update` is news about something the person was paged for or is on call for, and `test` is a test page someone sent to their own contact methods. The relay never carries words from the install; the app shows what it fetches from the server instead, and the relay's words when it can't.
+type Category string
 
 // Platform defines model for Platform.
 type Platform string
@@ -119,10 +98,10 @@ type Push struct {
 // PushStatus `duplicate` when a push with this `id` was already sent.
 type PushStatus string
 
-// PushInput A notification, delivered as a push. `id`, `event`, `subject`, `server` and `traceparent` are what every kind of notification carries; `platform` and `token` say where a push goes.
+// PushInput A notification, delivered as a push. `id`, `category`, `subject`, `server` and `traceparent` are what every kind of notification carries; `platform` and `token` say where a push goes.
 type PushInput struct {
-	// Event What happened, for every kind of notification the relay delivers. `test` is a test page someone sent to their own contact methods.
-	Event Event `json:"event"`
+	// Category How the notification is shown, in the relay's own words: `page` asks for attention now, `update` is news about something the person was paged for or is on call for, and `test` is a test page someone sent to their own contact methods. The relay never carries words from the install; the app shows what it fetches from the server instead, and the relay's words when it can't.
+	Category Category `json:"category"`
 
 	// Id The ID of the notification this delivers. Retries use the same ID.
 	Id       string   `json:"id"`
@@ -143,12 +122,11 @@ type PushInput struct {
 
 // Subject What a notification is about. The relay passes it on without reading it, and the app decides what to fetch from the server.
 type Subject struct {
-	Id   string      `json:"id"`
-	Type SubjectType `json:"type"`
-}
+	Id string `json:"id"`
 
-// SubjectType defines model for Subject.Type.
-type SubjectType string
+	// Type The kind of thing, such as `incident` or `test`. It's never shown; the app uses it to know what to fetch.
+	Type string `json:"type"`
+}
 
 // SendPushJSONRequestBody defines body for SendPush for application/json ContentType.
 type SendPushJSONRequestBody = PushInput
