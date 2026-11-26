@@ -130,8 +130,3 @@ SELECT id, contact_method_id, channel, status, failure, created_at
 FROM notifications
 WHERE subject = 'test' AND subject_id = @test_id AND user_id = @user_id
 ORDER BY id;
-
--- name: CountTestsSince :one
-SELECT count(DISTINCT subject_id)
-FROM notifications
-WHERE user_id = @user_id AND subject = 'test' AND created_at > @since;

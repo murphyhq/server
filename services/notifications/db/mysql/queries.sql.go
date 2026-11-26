@@ -56,24 +56,6 @@ func (q *Queries) ClaimMessages(ctx context.Context, arg ClaimMessagesParams) er
 	return err
 }
 
-const countTestsSince = `-- name: CountTestsSince :one
-SELECT count(DISTINCT subject_id)
-FROM notifications
-WHERE user_id = ? AND subject = 'test' AND created_at > ?
-`
-
-type CountTestsSinceParams struct {
-	UserID string
-	Since  time.Time
-}
-
-func (q *Queries) CountTestsSince(ctx context.Context, arg CountTestsSinceParams) (int64, error) {
-	row := q.db.QueryRowContext(ctx, countTestsSince, arg.UserID, arg.Since)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
-}
-
 const createPage = `-- name: CreatePage :exec
 INSERT INTO pages (id, incident_id, escalation_level, escalation_round, created_at)
 VALUES (?, ?, ?, ?, ?)

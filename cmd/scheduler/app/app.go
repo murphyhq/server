@@ -55,7 +55,7 @@ func New(ctx context.Context, s Settings) (_ *App, err error) {
 	publisher := messaging.NewPublisher(topic)
 	a.relays = []func(context.Context) error{
 		messaging.Relay("incidents", incidents.New(storage, nil, nil), publisher, s.Relay),
-		messaging.Relay("notifications", notifications.New(notificationsStorage, nil, nil, nil), publisher, s.Relay),
+		messaging.Relay("notifications", notifications.New(notificationsStorage, nil, nil, nil, nil), publisher, s.Relay),
 	}
 	a.Ready = a.resources.Checks()
 	return a, nil

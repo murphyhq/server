@@ -50,8 +50,6 @@ CREATE TABLE notifications (
 
 CREATE INDEX notifications_subject_subject_id_idx ON notifications (subject, subject_id);
 
-CREATE INDEX notifications_user_id_subject_created_at_idx ON notifications (user_id, subject, created_at);
-
 CREATE TABLE handled_messages (
   id CHAR(36) NOT NULL,
   created_at DATETIME(6) NOT NULL,

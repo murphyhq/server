@@ -27,7 +27,6 @@ type Repository interface {
 	DeleteEmailProvider(ctx context.Context) error
 	RecordEmailProviderCheck(ctx context.Context, provider *murphy.EmailProvider) error
 	GetTestPage(ctx context.Context, id, userID string) (*TestPage, error)
-	TestsSince(ctx context.Context, userID string, since time.Time) (int, error)
 }
 
 type Policies interface {
@@ -43,6 +42,10 @@ type People interface {
 	ContactMethodsOfUsers(ctx context.Context, userIDs []string) (map[string][]*murphy.ContactMethod, error)
 	NotificationRulesOfUsers(ctx context.Context, userIDs []string, urgency murphy.Urgency) (map[string]*murphy.NotificationRule, error)
 	DisableContactMethod(ctx context.Context, method *murphy.ContactMethod, reason string, at time.Time) error
+}
+
+type Limiter interface {
+	Hit(ctx context.Context, key string, window time.Duration) (int64, error)
 }
 
 type Change struct {
@@ -72,11 +75,12 @@ type Service struct {
 	policies Policies
 	oncall   OnCall
 	people   People
+	limiter  Limiter
 	versions sync.Map
 }
 
-func New(repo Repository, policies Policies, oncall OnCall, people People) *Service {
-	return &Service{repo: repo, policies: policies, oncall: oncall, people: people}
+func New(repo Repository, policies Policies, oncall OnCall, people People, limiter Limiter) *Service {
+	return &Service{repo: repo, policies: policies, oncall: oncall, people: people, limiter: limiter}
 }
 
 func (s *Service) IncidentEscalated(ctx context.Context, messageID string, incident *murphy.Incident) (err error) {
@@ -239,16 +243,16 @@ func (s *Service) SendTestPage(ctx context.Context, userID, contactMethodID stri
 	ctx = span.Set(ctx, telemetry.WithField("user.id", userID))
 	defer span.End(&err)
 
-	recent, err := s.repo.TestsSince(ctx, userID, time.Now().Add(-TestPageInterval))
-	if err != nil {
-		return nil, fmt.Errorf("count recent test pages: %w", err)
-	}
-	if recent > 0 {
-		return nil, fmt.Errorf("%w: a test page was sent less than a minute ago", murphy.ErrTooManyAttempts)
-	}
 	methods, err := s.testedMethods(ctx, userID, contactMethodID)
 	if err != nil {
 		return nil, err
+	}
+	sent, err := s.limiter.Hit(ctx, "test-page:"+userID, TestPageInterval)
+	if err != nil {
+		return nil, fmt.Errorf("count recent test pages: %w", err)
+	}
+	if sent > 1 {
+		return nil, fmt.Errorf("%w: a test page was sent less than a minute ago", murphy.ErrTooManyAttempts)
 	}
 	now := murphy.Now()
 	page := &TestPage{ID: murphy.NewID(), UserID: userID, CreatedAt: now.AsTime()}

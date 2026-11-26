@@ -143,11 +143,3 @@ func (r *Repository) GetTestPage(ctx context.Context, id, userID string) (_ *not
 	}
 	return page, nil
 }
-
-func (r *Repository) TestsSince(ctx context.Context, userID string, since time.Time) (_ int, err error) {
-	ctx, span := tracer.Span(ctx)
-	defer span.End(&err)
-
-	count, err := r.queries.CountTestsSince(ctx, CountTestsSinceParams{UserID: userID, Since: since})
-	return int(count), murphymysql.Error("test page", err)
-}

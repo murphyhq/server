@@ -178,8 +178,6 @@ func Run(t *testing.T, open func(t *testing.T) notifications.Repository) {
 		page, err := repo.GetTestPage(t.Context(), test, ana)
 		require.NoError(t, err)
 		_, someoneElse := repo.GetTestPage(t.Context(), test, murphy.NewID())
-		recent, err := repo.TestsSince(t.Context(), ana, time.Now().Add(-time.Minute))
-		require.NoError(t, err)
 
 		require.Len(t, page.Deliveries, 2)
 		assert.Equal(t, notifications.DeliveryPending, page.Deliveries[0].Status)
@@ -187,7 +185,6 @@ func Run(t *testing.T, open func(t *testing.T) notifications.Repository) {
 		assert.Equal(t, "Murphy has no email provider", page.Deliveries[1].Failure)
 		assert.Equal(t, murphy.ContactMethodType_CONTACT_METHOD_TYPE_EMAIL, page.Deliveries[1].Channel)
 		assert.ErrorIs(t, someoneElse, murphy.ErrNotFound, "a test page belongs to the person who sent it")
-		assert.Equal(t, 1, recent, "one test, however many deliveries")
 	})
 
 	t.Run("records an outcome once per message", func(t *testing.T) {

@@ -27,6 +27,7 @@ const (
 type domain struct {
 	service    *notifications.Service
 	repo       *MockRepository
+	limiter    *MockLimiter
 	policy     *murphy.EscalationPolicy
 	onCall     map[string]string
 	active     map[string]bool
@@ -48,10 +49,11 @@ func contactMethod(user string, kind murphy.ContactMethodType) *murphy.ContactMe
 
 func newDomain(t *testing.T) *domain {
 	t.Helper()
-	repo, policies, oncall, people := NewMockRepository(t), NewMockPolicies(t), NewMockOnCall(t), NewMockPeople(t)
+	repo, policies, oncall, people, limiter := NewMockRepository(t), NewMockPolicies(t), NewMockOnCall(t), NewMockPeople(t), NewMockLimiter(t)
 	d := &domain{
-		service: notifications.New(repo, policies, oncall, people),
+		service: notifications.New(repo, policies, oncall, people, limiter),
 		repo:    repo,
+		limiter: limiter,
 		people:  people,
 		policy: &murphy.EscalationPolicy{Id: murphy.NewID(), Version: 3, Levels: []*murphy.EscalationLevel{{
 			Delay: durationpb.New(5 * time.Minute),
@@ -373,7 +375,7 @@ func TestAnInvalidEmailProviderIsRefusedAndNotKept(t *testing.T) {
 
 func TestATestPageReachesEveryContactMethodOnceAndAtOnce(t *testing.T) {
 	d := newDomain(t)
-	d.repo.EXPECT().TestsSince(mock.Anything, ana, mock.Anything).Return(0, nil).Once()
+	d.limiter.EXPECT().Hit(mock.Anything, "test-page:"+ana, notifications.TestPageInterval).Return(1, nil).Once()
 	d.delays[d.methods[ana][1].GetId()] = 2 * time.Minute
 
 	page, err := d.service.SendTestPage(t.Context(), ana, "")
@@ -393,7 +395,7 @@ func TestATestPageReachesEveryContactMethodOnceAndAtOnce(t *testing.T) {
 
 func TestATestPageCanTryOneContactMethod(t *testing.T) {
 	d := newDomain(t)
-	d.repo.EXPECT().TestsSince(mock.Anything, ana, mock.Anything).Return(0, nil).Once()
+	d.limiter.EXPECT().Hit(mock.Anything, "test-page:"+ana, notifications.TestPageInterval).Return(1, nil).Once()
 	email := d.methods[ana][1]
 
 	page, err := d.service.SendTestPage(t.Context(), ana, email.GetId())
@@ -405,17 +407,17 @@ func TestATestPageCanTryOneContactMethod(t *testing.T) {
 
 func TestATestPageToSomeoneElsesContactMethodIsRefused(t *testing.T) {
 	d := newDomain(t)
-	d.repo.EXPECT().TestsSince(mock.Anything, ana, mock.Anything).Return(0, nil).Once()
 
 	_, err := d.service.SendTestPage(t.Context(), ana, d.methods[bo][0].GetId())
 
 	assert.ErrorIs(t, err, murphy.ErrInvalid)
 	assert.Nil(t, d.recorded, "nothing is sent")
+	d.limiter.AssertNotCalled(t, "Hit", mock.Anything, mock.Anything, mock.Anything)
 }
 
 func TestAnotherTestPageWithinAMinuteIsRefused(t *testing.T) {
 	d := newDomain(t)
-	d.repo.EXPECT().TestsSince(mock.Anything, ana, mock.Anything).Return(1, nil).Once()
+	d.limiter.EXPECT().Hit(mock.Anything, "test-page:"+ana, notifications.TestPageInterval).Return(2, nil).Once()
 
 	_, err := d.service.SendTestPage(t.Context(), ana, "")
 

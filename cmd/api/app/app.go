@@ -50,7 +50,7 @@ type Settings struct {
 	OIDCClientID             string         `env:"OIDC_CLIENT_ID"`
 	OIDCClientSecret         string         `env:"OIDC_CLIENT_SECRET"`
 	AllowPasswords           bool           `env:"ALLOW_PASSWORDS"`
-	RateLimitStoreURL        string         `env:"RATE_LIMIT_STORE_URL"`
+	RateLimitStoreURL        string         `env:"RATE_LIMIT_STORE_URL" required:"true"`
 	TrustedProxies           []netip.Prefix `env:"TRUSTED_PROXIES"`
 	BrowserSessionIdle       time.Duration  `env:"BROWSER_SESSION_IDLE_TIMEOUT" default:"24h"`
 	BrowserSessionAbsolute   time.Duration  `env:"BROWSER_SESSION_ABSOLUTE_TIMEOUT" default:"720h"`
@@ -134,23 +134,15 @@ func New(ctx context.Context, s Settings) (_ *App, err error) {
 	if err != nil {
 		return nil, err
 	}
-	passwords := provider == nil || s.AllowPasswords
-	var limiter people.Limiter
-	if passwords {
-		if s.RateLimitStoreURL == "" {
-			return nil, errors.New("MURPHY_RATE_LIMIT_STORE_URL: required when people sign in with passwords")
-		}
-		store, err := ratelimitstore.Open(ctx, s.RateLimitStoreURL)
-		if err != nil {
-			return nil, fmt.Errorf("MURPHY_RATE_LIMIT_STORE_URL: %w", err)
-		}
-		a.resources.Add(func() { _ = store.Close() }, store.Ping)
-		limiter = store
+	limits, err := ratelimitstore.Open(ctx, s.RateLimitStoreURL)
+	if err != nil {
+		return nil, fmt.Errorf("MURPHY_RATE_LIMIT_STORE_URL: %w", err)
 	}
+	a.resources.Add(func() { _ = limits.Close() }, limits.Ping)
 
 	catalogService := catalog.New(catalogStorage, keyring)
 	peopleService := people.New(peopleStorage)
-	auth := people.NewAuth(peopleStorage, provider, limiter, people.AuthSettings{
+	auth := people.NewAuth(peopleStorage, provider, limits, people.AuthSettings{
 		BrowserSessions:      people.SessionTimeouts{Idle: s.BrowserSessionIdle, Absolute: s.BrowserSessionAbsolute},
 		AppSessions:          people.SessionTimeouts{Idle: s.AppSessionIdle, Absolute: s.AppSessionAbsolute},
 		InitialAdminEmail:    s.InitialAdminEmail,
@@ -158,7 +150,7 @@ func New(ctx context.Context, s Settings) (_ *App, err error) {
 		PublicURL:            s.PublicURL,
 		AppScheme:            s.AppScheme,
 		AllowedEmailDomains:  s.AllowedEmailDomains,
-		PasswordsAllowed:     passwords,
+		PasswordsAllowed:     provider == nil || s.AllowPasswords,
 		InitialAdminPassword: s.InitialAdminPassword,
 	})
 	oncallService := oncall.New(oncallStorage, peopleService)
@@ -170,7 +162,7 @@ func New(ctx context.Context, s Settings) (_ *App, err error) {
 		People:         peopleService,
 		OnCall:         oncallService,
 		Escalation:     escalationService,
-		Notifications:  notifications.New(notificationsStorage, escalationService, oncallService, peopleService),
+		Notifications:  notifications.New(notificationsStorage, escalationService, oncallService, peopleService, limits),
 		PublicKeys:     publicKeys,
 		Auth:           auth,
 		SecureCookies:  strings.HasPrefix(s.PublicURL, "https://"),
