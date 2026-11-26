@@ -62,7 +62,7 @@ Stack tests run against the whole stack from `docker compose --profile murphy up
 go test -tags stack ./tests/stack/...
 ```
 
-Load tests run against the same stack. `MURPHY_LOAD_PROFILE` picks the traffic, and CI runs every profile after every merge:
+Load tests run against the same stack. `MURPHY_LOAD_PROFILE` picks the traffic. CI runs `smoke` after every merge to `main`, and the other profiles nightly:
 
 | Profile | Traffic per scenario | Scenarios |
 |---|---|---|
