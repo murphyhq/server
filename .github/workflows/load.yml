@@ -3,6 +3,8 @@ name: load
 on:
   push:
     branches: [main]
+  schedule:
+    - cron: "0 6 * * *"
   workflow_dispatch:
     inputs:
       profile:
@@ -26,7 +28,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        profile: ${{ fromJSON((inputs.profile && inputs.profile != 'all') && format('["{0}"]', inputs.profile) || '["smoke","load","stress","sustained"]') }}
+        profile: ${{ fromJSON((inputs.profile && inputs.profile != 'all') && format('["{0}"]', inputs.profile) || (github.event_name == 'schedule' && '["load","stress","sustained"]' || '["smoke"]')) }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
