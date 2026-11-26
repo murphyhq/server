@@ -40,10 +40,36 @@ jobs:
         run: docker compose --profile murphy up -d --wait --wait-timeout 600 --scale seed=0
       - name: Seed example data and the Grafana dogfood setup
         run: docker compose --profile murphy run --rm seed
+      - name: Record the runner
+        run: |
+          mkdir -p "$MURPHY_LOAD_REPORT_DIR/runner"
+          {
+            echo "cpus: $(nproc)"
+            grep MemTotal /proc/meminfo
+            lscpu | grep -E "Model name|^CPU\(s\)"
+          } > "$MURPHY_LOAD_REPORT_DIR/runner/runner.txt"
+        env:
+          MURPHY_LOAD_REPORT_DIR: ${{ runner.temp }}/load-reports
+      - name: Sample every container's CPU and memory during the run
+        run: |
+          mkdir -p "$MURPHY_LOAD_REPORT_DIR/runner"
+          (
+            while true; do
+              date -u +%FT%TZ
+              docker stats --no-stream --format '{{.Name}} {{.CPUPerc}} {{.MemUsage}}'
+              sleep 10
+            done
+          ) > "$MURPHY_LOAD_REPORT_DIR/runner/containers.txt" 2>&1 &
+          echo "$!" > "$RUNNER_TEMP/sampler.pid"
+        env:
+          MURPHY_LOAD_REPORT_DIR: ${{ runner.temp }}/load-reports
       - run: go test -tags load -count=1 -timeout 60m -v ./tests/load/...
         env:
           MURPHY_LOAD_PROFILE: ${{ matrix.profile }}
           MURPHY_LOAD_REPORT_DIR: ${{ runner.temp }}/load-reports
+      - if: always()
+        name: Stop the sampler
+        run: kill "$(cat "$RUNNER_TEMP/sampler.pid")" 2>/dev/null || true
       - if: always()
         uses: actions/upload-artifact@v7
         with:
