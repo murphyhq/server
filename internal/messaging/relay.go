@@ -30,6 +30,7 @@ type RelaySettings struct {
 	PollInterval time.Duration `env:"POLL_INTERVAL" default:"50ms"`
 	BatchSize    int           `env:"BATCH_SIZE" default:"100"`
 	ClaimLease   time.Duration `env:"CLAIM_LEASE" default:"30s"`
+	Publishers   int           `env:"PUBLISHERS" default:"16"`
 }
 
 func Relay(source string, messages ScheduledMessages, publisher *Publisher, settings RelaySettings) func(context.Context) error {
@@ -62,14 +63,27 @@ func relayDue(ctx context.Context, source string, messages ScheduledMessages, pu
 	if err != nil || len(due) == 0 {
 		return false, err
 	}
-	sent := make([]string, 0, len(due))
-	for _, message := range due {
-		if err := relayOne(ctx, source, publisher, message); err != nil {
-			logger.Warn(ctx, "a due message will be published again once its claim expires",
-				telemetry.WithField("message.id", message.ID), telemetry.WithError(err))
-			continue
+	published := make([]bool, len(due))
+	pool := NewPool(max(1, settings.Publishers))
+	for i, message := range due {
+		if !pool.Acquire(ctx) {
+			break
 		}
-		sent = append(sent, message.ID)
+		pool.Go(func() {
+			if err := relayOne(ctx, source, publisher, message); err != nil {
+				logger.Warn(ctx, "a due message will be published again once its claim expires",
+					telemetry.WithField("message.id", message.ID), telemetry.WithError(err))
+				return
+			}
+			published[i] = true
+		})
+	}
+	pool.Wait()
+	sent := make([]string, 0, len(due))
+	for i, message := range due {
+		if published[i] {
+			sent = append(sent, message.ID)
+		}
 	}
 	if err := messages.MessagesSent(ctx, sent); err != nil {
 		return false, err
