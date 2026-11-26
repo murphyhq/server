@@ -24,7 +24,7 @@ import (
 
 type relayAnswer struct {
 	status   int
-	received map[string]string
+	received map[string]any
 }
 
 func pushesThrough(t *testing.T, answer *relayAnswer) *push.Pushes {
@@ -56,10 +56,22 @@ func TestAPushCarriesTheEventTheServerAndTheIncidentOnly(t *testing.T) {
 	err := pushesThrough(t, answer).Send(t.Context(), notification(murphy.NotificationReason_NOTIFICATION_REASON_PAGED))
 
 	require.NoError(t, err)
-	assert.Equal(t, map[string]string{
+	assert.Equal(t, map[string]any{
 		"id": "notification-1", "platform": "ios", "token": "apns-token", "event": "paged", "server": "https://murphy.example.com",
-		"incident_id": "incident-1", "authorization": "Bearer mik_install-key",
+		"subject": map[string]any{"type": "incident", "id": "incident-1"}, "authorization": "Bearer mik_install-key",
 	}, answer.received, "no incident title or other incident data")
+}
+
+func TestATestPagePushIsAboutTheTestPage(t *testing.T) {
+	answer := &relayAnswer{status: http.StatusOK}
+	test := notification(murphy.NotificationReason_NOTIFICATION_REASON_TEST)
+	test.Incident, test.TestId = nil, "test-1"
+
+	err := pushesThrough(t, answer).Send(t.Context(), test)
+
+	require.NoError(t, err)
+	assert.Equal(t, "test", answer.received["event"])
+	assert.Equal(t, map[string]any{"type": "test", "id": "test-1"}, answer.received["subject"])
 }
 
 func TestAPushCarriesTheTraceToThePhone(t *testing.T) {
@@ -77,7 +89,7 @@ func TestAPushCarriesTheTraceToThePhone(t *testing.T) {
 	err := pushesThrough(t, answer).Send(ctx, notification(murphy.NotificationReason_NOTIFICATION_REASON_PAGED))
 
 	require.NoError(t, err)
-	assert.True(t, strings.HasPrefix(answer.received["traceparent"], "00-"+span.SpanContext().TraceID().String()+"-"), "the phone continues the page's trace")
+	assert.True(t, strings.HasPrefix(answer.received["traceparent"].(string), "00-"+span.SpanContext().TraceID().String()+"-"), "the phone continues the page's trace")
 }
 
 func TestAnAcknowledgementIsPushedAsOne(t *testing.T) {

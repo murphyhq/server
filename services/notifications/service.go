@@ -26,6 +26,7 @@ type Repository interface {
 	SetEmailProvider(ctx context.Context, provider *murphy.EmailProvider) error
 	DeleteEmailProvider(ctx context.Context) error
 	RecordEmailProviderCheck(ctx context.Context, provider *murphy.EmailProvider) error
+	GetTestPage(ctx context.Context, id, userID string) (*TestPage, error)
 }
 
 type Policies interface {
@@ -41,6 +42,10 @@ type People interface {
 	ContactMethodsOfUsers(ctx context.Context, userIDs []string) (map[string][]*murphy.ContactMethod, error)
 	NotificationRulesOfUsers(ctx context.Context, userIDs []string, urgency murphy.Urgency) (map[string]*murphy.NotificationRule, error)
 	DisableContactMethod(ctx context.Context, method *murphy.ContactMethod, reason string, at time.Time) error
+}
+
+type Limiter interface {
+	Hit(ctx context.Context, key string, window time.Duration) (int64, error)
 }
 
 type Change struct {
@@ -62,6 +67,7 @@ type ScheduledMessage struct {
 const (
 	HandledRetention = 7 * 24 * time.Hour
 	FollowUpDeadline = 5 * time.Minute
+	TestPageInterval = time.Minute
 )
 
 type Service struct {
@@ -69,11 +75,12 @@ type Service struct {
 	policies Policies
 	oncall   OnCall
 	people   People
+	limiter  Limiter
 	versions sync.Map
 }
 
-func New(repo Repository, policies Policies, oncall OnCall, people People) *Service {
-	return &Service{repo: repo, policies: policies, oncall: oncall, people: people}
+func New(repo Repository, policies Policies, oncall OnCall, people People, limiter Limiter) *Service {
+	return &Service{repo: repo, policies: policies, oncall: oncall, people: people, limiter: limiter}
 }
 
 func (s *Service) IncidentEscalated(ctx context.Context, messageID string, incident *murphy.Incident) (err error) {
@@ -229,6 +236,80 @@ func (s *Service) outcome(ctx context.Context, messageID string, notification *m
 		}
 	}
 	return s.record(ctx, &Change{MessageID: messageID, Outcome: notification})
+}
+
+func (s *Service) SendTestPage(ctx context.Context, userID, contactMethodID string) (_ *TestPage, err error) {
+	ctx, span := tracer.Span(ctx)
+	ctx = span.Set(ctx, telemetry.WithField("user.id", userID))
+	defer span.End(&err)
+
+	methods, err := s.testedMethods(ctx, userID, contactMethodID)
+	if err != nil {
+		return nil, err
+	}
+	sent, err := s.limiter.Hit(ctx, "test-page:"+userID, TestPageInterval)
+	if err != nil {
+		return nil, fmt.Errorf("count recent test pages: %w", err)
+	}
+	if sent > 1 {
+		return nil, fmt.Errorf("%w: a test page was sent less than a minute ago", murphy.ErrTooManyAttempts)
+	}
+	now := murphy.Now()
+	page := &TestPage{ID: murphy.NewID(), UserID: userID, CreatedAt: now.AsTime()}
+	deadline := timestamppb.New(now.AsTime().Add(FollowUpDeadline))
+	created := make([]*murphy.Notification, len(methods))
+	for i, method := range methods {
+		created[i] = newNotification(nil, murphy.NotificationReason_NOTIFICATION_REASON_TEST, method, now, deadline)
+		created[i].TestId = page.ID
+		page.Deliveries = append(page.Deliveries, &TestDelivery{ContactMethodID: method.GetId(), Channel: method.GetType(), Status: DeliveryPending})
+	}
+	messages, err := notificationsCreated(ctx, created)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.record(ctx, &Change{Notifications: created, Messages: messages}); err != nil {
+		return nil, err
+	}
+	return page, nil
+}
+
+func (s *Service) testedMethods(ctx context.Context, userID, contactMethodID string) ([]*murphy.ContactMethod, error) {
+	rules, err := s.people.NotificationRulesOfUsers(ctx, []string{userID}, murphy.Urgency_URGENCY_HIGH)
+	if err != nil {
+		return nil, fmt.Errorf("find how to reach you: %w", err)
+	}
+	var methods []*murphy.ContactMethod
+	seen := map[string]bool{}
+	for _, step := range rules[userID].GetSteps() {
+		method := step.GetContactMethod()
+		if seen[method.GetId()] || (contactMethodID != "" && method.GetId() != contactMethodID) {
+			continue
+		}
+		seen[method.GetId()] = true
+		methods = append(methods, method)
+	}
+	if len(methods) == 0 && contactMethodID != "" {
+		return nil, &murphy.FieldError{Field: "contact_method", Reason: "must be one of your working contact methods, in your steps for high urgency"}
+	}
+	if len(methods) == 0 {
+		return nil, &murphy.FieldError{Field: "steps", Reason: "reach you nowhere: add a contact method first"}
+	}
+	return methods, nil
+}
+
+func (s *Service) TestPage(ctx context.Context, userID, id string) (_ *TestPage, err error) {
+	ctx, span := tracer.Span(ctx)
+	ctx = span.Set(ctx, telemetry.WithField("user.id", userID))
+	defer span.End(&err)
+
+	if err := murphy.LookupID("test page", id); err != nil {
+		return nil, err
+	}
+	page, err := s.repo.GetTestPage(ctx, id, userID)
+	if err != nil {
+		return nil, fmt.Errorf("get test page: %w", err)
+	}
+	return page, nil
 }
 
 func (s *Service) record(ctx context.Context, change *Change) error {

@@ -96,13 +96,15 @@ components:
           $ref: "#/components/schemas/WebhookData"
     WebhookType:
       type: string
-      enum: [incident.paged, incident.acknowledged, incident.resolved]
+      enum: [incident.paged, incident.acknowledged, incident.resolved, test.page]
+      description: "`test.page` is a test someone sent to check their contact methods reach them; it carries no incident."
     WebhookData:
       type: object
-      required: [incident, user, contact_method]
+      required: [user, contact_method]
       properties:
         incident:
           $ref: "#/components/schemas/WebhookIncident"
+          description: Present for every type except `test.page`.
         user:
           $ref: "#/components/schemas/Reference"
         contact_method:

@@ -28,7 +28,8 @@ CREATE INDEX page_recipients_incident_id_user_id_idx ON page_recipients (inciden
 
 CREATE TABLE notifications (
   id CHAR(36) NOT NULL,
-  incident_id CHAR(36) NOT NULL,
+  subject VARCHAR(16) NOT NULL,
+  subject_id CHAR(36) NOT NULL,
   page_id CHAR(36),
   user_id CHAR(36) NOT NULL,
   contact_method_id CHAR(36) NOT NULL,
@@ -42,11 +43,12 @@ CREATE TABLE notifications (
   CONSTRAINT notifications_pkey PRIMARY KEY (id),
   CONSTRAINT notifications_page_id_fkey FOREIGN KEY (page_id) REFERENCES pages (id) ON DELETE CASCADE,
   CONSTRAINT notifications_channel_check CHECK (channel IN ('email', 'sms', 'voice', 'webhook', 'push')),
-  CONSTRAINT notifications_reason_check CHECK (reason IN ('paged', 'acknowledged', 'resolved')),
+  CONSTRAINT notifications_reason_check CHECK (reason IN ('paged', 'acknowledged', 'resolved', 'test')),
+  CONSTRAINT notifications_subject_check CHECK (subject IN ('incident', 'test')),
   CONSTRAINT notifications_status_check CHECK (status IN ('created', 'sent', 'failed', 'cancelled'))
 ) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
 
-CREATE INDEX notifications_incident_id_idx ON notifications (incident_id);
+CREATE INDEX notifications_subject_subject_id_idx ON notifications (subject, subject_id);
 
 CREATE TABLE handled_messages (
   id CHAR(36) NOT NULL,

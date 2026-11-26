@@ -79,9 +79,14 @@ func isTimeout(err error) bool {
 }
 
 func payload(notification *murphy.Notification, at time.Time) Webhook {
+	if notification.GetReason() == murphy.NotificationReason_NOTIFICATION_REASON_TEST {
+		return Webhook{Type: TestPage, Timestamp: at, Data: WebhookData{
+			User: Reference{Id: notification.GetUserId()}, ContactMethod: Reference{Id: notification.GetContactMethod().GetId()},
+		}}
+	}
 	incident := notification.GetIncident()
 	data := WebhookData{
-		Incident: WebhookIncident{
+		Incident: &WebhookIncident{
 			Id:        incident.GetId(),
 			Number:    incident.GetNumber(),
 			Service:   Reference{Id: incident.GetServiceId()},

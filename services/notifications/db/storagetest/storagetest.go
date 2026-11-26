@@ -160,6 +160,33 @@ func Run(t *testing.T, open func(t *testing.T) notifications.Repository) {
 		}
 	})
 
+	t.Run("keeps a test page's deliveries for the person who sent it, and counts their tests", func(t *testing.T) {
+		repo := open(t)
+		ana, test := murphy.NewID(), murphy.NewID()
+		hook, inbox := newNotification(nil, nil, ana), newNotification(nil, nil, ana)
+		inbox.ContactMethod.Type = murphy.ContactMethodType_CONTACT_METHOD_TYPE_EMAIL
+		for _, delivery := range []*murphy.Notification{hook, inbox} {
+			delivery.Reason, delivery.TestId = murphy.NotificationReason_NOTIFICATION_REASON_TEST, test
+		}
+		_, err := repo.Record(t.Context(), &notifications.Change{Notifications: []*murphy.Notification{hook, inbox}})
+		require.NoError(t, err)
+		failed := copyOf(inbox)
+		failed.TestId, failed.Failure = test, "Murphy has no email provider"
+		_, err = repo.Record(t.Context(), &notifications.Change{MessageID: murphy.NewID(), Outcome: failed})
+		require.NoError(t, err)
+
+		page, err := repo.GetTestPage(t.Context(), test, ana)
+		require.NoError(t, err)
+		_, someoneElse := repo.GetTestPage(t.Context(), test, murphy.NewID())
+
+		require.Len(t, page.Deliveries, 2)
+		assert.Equal(t, notifications.DeliveryPending, page.Deliveries[0].Status)
+		assert.Equal(t, notifications.DeliveryFailed, page.Deliveries[1].Status)
+		assert.Equal(t, "Murphy has no email provider", page.Deliveries[1].Failure)
+		assert.Equal(t, murphy.ContactMethodType_CONTACT_METHOD_TYPE_EMAIL, page.Deliveries[1].Channel)
+		assert.ErrorIs(t, someoneElse, murphy.ErrNotFound, "a test page belongs to the person who sent it")
+	})
+
 	t.Run("records an outcome once per message", func(t *testing.T) {
 		repo := open(t)
 		incident := &murphy.Incident{Id: murphy.NewID()}

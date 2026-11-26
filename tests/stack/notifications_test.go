@@ -49,7 +49,8 @@ func TestAPageReachesAPhoneThroughTheRelay(t *testing.T) {
 	push := ana.Phone().WaitForPushes(1)[0]
 	assert.Equal(t, "ios", push.Platform)
 	assert.Equal(t, "paged", push.Event)
-	assert.Equal(t, incident.ID, push.IncidentID)
+	assert.Equal(t, "incident", push.Subject.Type)
+	assert.Equal(t, incident.ID, push.Subject.ID)
 	assert.Equal(t, m.APIURL(), push.Server)
 }
 
@@ -267,7 +268,7 @@ func TestAPasswordOutsideWhatTheInstallAllowsFailsTheEmailProvider(t *testing.T)
 
 	m.SetEmailProvider(murphytest.Mailpit("env://SMTP_PASSWORD"))
 
-	failing := m.WaitForEmailProvider(client.Failing)
+	failing := m.WaitForEmailProvider(client.EmailProviderStatusFailing)
 	assert.Contains(t, failing.Problem, "only variables starting with MURPHY_SECRET_")
 }
 
@@ -289,7 +290,7 @@ func TestAnAdminSetsAndRemovesTheEmailProvider(t *testing.T) {
 	assert.Equal(t, set.JSON200.UpdatedAt, read.JSON200.UpdatedAt)
 	assert.Equal(t, "smtp.example.com", read.JSON200.Host)
 	assert.Equal(t, "env://SMTP_PASSWORD", read.JSON200.Secret)
-	assert.Equal(t, client.Pending, set.JSON200.Status, "notifier hasn't checked it yet")
+	assert.Equal(t, client.EmailProviderStatusPending, set.JSON200.Status, "notifier hasn't checked it yet")
 	assert.Equal(t, http.StatusNoContent, removed.StatusCode())
 	assert.Equal(t, http.StatusNotFound, gone.StatusCode())
 }
@@ -384,4 +385,24 @@ func TestAcknowledgingStopsTheStepsStillWaiting(t *testing.T) {
 	told := ana.Mailbox().WaitForMail(1)
 	assert.True(t, strings.HasPrefix(told[0].Subject, "[Murphy] Acknowledged:"), "only the acknowledgement reaches her by email: %s", told[0].Subject)
 	ana.Mailbox().GetsNoMoreFor(1, 15*time.Second)
+}
+
+func TestATestPageShowsWhetherEachContactMethodWasReached(t *testing.T) {
+	m := murphytest.New(t)
+	m.EmailThroughMailpit()
+	bo := m.Member(murphytest.Bo)
+
+	sent, err := bo.API.SendTestPageWithResponse(t.Context(), nil, client.TestPageInput{})
+	require.NoError(t, err)
+	require.Equal(t, http.StatusAccepted, sent.StatusCode())
+	page := bo.WaitForTestPage(sent.JSON202.Id)
+	again, err := bo.API.SendTestPageWithResponse(t.Context(), nil, client.TestPageInput{})
+	require.NoError(t, err)
+	someoneElses, err := m.API.GetTestPageWithResponse(t.Context(), sent.JSON202.Id)
+	require.NoError(t, err)
+
+	assert.Equal(t, client.TestDeliveryStatusSent, murphytest.DeliveriesByChannel(page)[client.Email], "everyone has their email")
+	assert.Empty(t, murphytest.Failures(page))
+	assert.Equal(t, http.StatusTooManyRequests, again.StatusCode(), "one test page a minute")
+	assert.Equal(t, http.StatusNotFound, someoneElses.StatusCode(), "a test page is only its sender's, admins included")
 }

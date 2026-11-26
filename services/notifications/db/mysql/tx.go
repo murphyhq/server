@@ -47,15 +47,16 @@ func (t *Tx) CreateNotifications(ctx context.Context, created []*murphy.Notifica
 	ctx, span := tracer.Span(ctx)
 	defer span.End(&err)
 
-	rows := murphymysql.Rows{Name: "CreateNotifications", Table: "notifications", Columns: []string{"id", "incident_id", "page_id", "user_id", "contact_method_id", "channel", "reason", "status", "created_at", "updated_at"}}
+	rows := murphymysql.Rows{Name: "CreateNotifications", Table: "notifications", Columns: []string{"id", "subject", "subject_id", "page_id", "user_id", "contact_method_id", "channel", "reason", "status", "created_at", "updated_at"}}
 	for _, notification := range created {
 		var page *string
 		if id := notification.GetPageId(); id != "" {
 			page = &id
 		}
 		at := notification.GetCreatedAt().AsTime()
+		subject, subjectID := notifications.SubjectOf(notification)
 		rows.Values = append(rows.Values, []any{
-			notification.GetId(), notification.GetIncident().GetId(), page, notification.GetUserId(), notification.GetContactMethod().GetId(),
+			notification.GetId(), subject, subjectID, page, notification.GetUserId(), notification.GetContactMethod().GetId(),
 			notification.GetContactMethod().GetType().Text(), notification.GetReason().Text(), "created", at, at,
 		})
 	}

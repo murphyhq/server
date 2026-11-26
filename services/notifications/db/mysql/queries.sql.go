@@ -160,6 +160,57 @@ func (q *Queries) GetEmailProvider(ctx context.Context) (GetEmailProviderRow, er
 	return i, err
 }
 
+const listTestNotifications = `-- name: ListTestNotifications :many
+SELECT id, contact_method_id, channel, status, failure, created_at
+FROM notifications
+WHERE subject = 'test' AND subject_id = ? AND user_id = ?
+ORDER BY id
+`
+
+type ListTestNotificationsParams struct {
+	TestID string
+	UserID string
+}
+
+type ListTestNotificationsRow struct {
+	ID              string
+	ContactMethodID string
+	Channel         string
+	Status          string
+	Failure         *string
+	CreatedAt       time.Time
+}
+
+func (q *Queries) ListTestNotifications(ctx context.Context, arg ListTestNotificationsParams) ([]ListTestNotificationsRow, error) {
+	rows, err := q.db.QueryContext(ctx, listTestNotifications, arg.TestID, arg.UserID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListTestNotificationsRow
+	for rows.Next() {
+		var i ListTestNotificationsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ContactMethodID,
+			&i.Channel,
+			&i.Status,
+			&i.Failure,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const lockDueMessages = `-- name: LockDueMessages :many
 SELECT id, due_at, envelope
 FROM scheduled_messages

@@ -33,6 +33,7 @@ packages:
       People: {}
       Secrets: {}
       EmailSender: {}
+      Limiter: {}
   github.com/murphyhq/server/services/people:
     config:
       dir: "{{.InterfaceDir}}"

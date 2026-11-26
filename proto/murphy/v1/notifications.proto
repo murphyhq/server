@@ -53,6 +53,7 @@ message Notification {
   google.protobuf.Timestamp deadline = 13;
   bool contact_method_gone = 14;
   google.protobuf.Timestamp due_at = 15;
+  string test_id = 16;
 }
 
 message NotificationEvent {

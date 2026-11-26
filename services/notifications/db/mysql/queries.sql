@@ -66,3 +66,9 @@ DELETE FROM email_provider;
 UPDATE email_provider
 SET status = sqlc.arg(status), problem = sqlc.arg(problem), checked_at = sqlc.arg(checked_at)
 WHERE updated_at = sqlc.arg(updated_at);
+
+-- name: ListTestNotifications :many
+SELECT id, contact_method_id, channel, status, failure, created_at
+FROM notifications
+WHERE subject = 'test' AND subject_id = sqlc.arg(test_id) AND user_id = sqlc.arg(user_id)
+ORDER BY id;

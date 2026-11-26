@@ -72,3 +72,15 @@ func TestWithoutAProviderAnEmailFailsAtOnce(t *testing.T) {
 	require.ErrorAs(t, err, &refused)
 	assert.Equal(t, "Murphy has no email provider", refused.Reason)
 }
+
+func TestATestPageSaysWhatItIs(t *testing.T) {
+	test := page("", murphy.NotificationReason_NOTIFICATION_REASON_TEST)
+	test.Incident = nil
+
+	message, subject := read(t, test)
+
+	body, err := io.ReadAll(message.Body)
+	require.NoError(t, err)
+	assert.Equal(t, "[Murphy] Test page", subject)
+	assert.Contains(t, string(body), "Murphy can reach you at this address")
+}

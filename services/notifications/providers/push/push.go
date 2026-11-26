@@ -28,13 +28,14 @@ func (p *Pushes) Send(ctx context.Context, notification *murphy.Notification) (e
 	defer span.End(&err)
 
 	body := relay.SendPushJSONRequestBody{
-		Id:         notification.GetId(),
-		Platform:   relay.Platform(notification.GetContactMethod().GetPushPlatform().Text()),
-		Token:      notification.GetContactMethod().GetAddress(),
-		Event:      eventOf(notification.GetReason()),
-		Server:     p.server,
-		IncidentId: notification.GetIncident().GetId(),
+		Id:       notification.GetId(),
+		Platform: relay.Platform(notification.GetContactMethod().GetPushPlatform().Text()),
+		Token:    notification.GetContactMethod().GetAddress(),
+		Event:    eventOf(notification.GetReason()),
+		Server:   p.server,
 	}
+	kind, id := notifications.SubjectOf(notification)
+	body.Subject = relay.Subject{Type: relay.SubjectType(kind), Id: id}
 	if traceparent := tracer.Inject(ctx)["traceparent"]; traceparent != "" {
 		body.Traceparent = &traceparent
 	}
@@ -58,13 +59,15 @@ func (p *Pushes) Send(ctx context.Context, notification *murphy.Notification) (e
 	}
 }
 
-func eventOf(reason murphy.NotificationReason) relay.PushInputEvent {
+func eventOf(reason murphy.NotificationReason) relay.Event {
 	switch reason {
 	case murphy.NotificationReason_NOTIFICATION_REASON_ACKNOWLEDGED:
-		return relay.Acknowledged
+		return relay.EventAcknowledged
 	case murphy.NotificationReason_NOTIFICATION_REASON_RESOLVED:
-		return relay.Resolved
+		return relay.EventResolved
+	case murphy.NotificationReason_NOTIFICATION_REASON_TEST:
+		return relay.EventTest
 	default:
-		return relay.Paged
+		return relay.EventPaged
 	}
 }

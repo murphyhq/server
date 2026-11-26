@@ -23,6 +23,7 @@ type Tx interface {
 
 type Engine[T Tx] interface {
 	RecipientsOf(ctx context.Context, incidentID string) ([]string, error)
+	GetTestPage(ctx context.Context, id, userID string) (*notifications.TestPage, error)
 	DeleteMessages(ctx context.Context, ids []string) error
 	PurgeHandledMessages(ctx context.Context, before time.Time) (int64, error)
 	GetEmailProvider(ctx context.Context) (*murphy.EmailProvider, error)

@@ -77,6 +77,7 @@ const (
 	NotificationReason_NOTIFICATION_REASON_PAGED        NotificationReason = 1
 	NotificationReason_NOTIFICATION_REASON_ACKNOWLEDGED NotificationReason = 2
 	NotificationReason_NOTIFICATION_REASON_RESOLVED     NotificationReason = 3
+	NotificationReason_NOTIFICATION_REASON_TEST         NotificationReason = 4
 )
 
 // Enum value maps for NotificationReason.
@@ -86,12 +87,14 @@ var (
 		1: "NOTIFICATION_REASON_PAGED",
 		2: "NOTIFICATION_REASON_ACKNOWLEDGED",
 		3: "NOTIFICATION_REASON_RESOLVED",
+		4: "NOTIFICATION_REASON_TEST",
 	}
 	NotificationReason_value = map[string]int32{
 		"NOTIFICATION_REASON_UNSPECIFIED":  0,
 		"NOTIFICATION_REASON_PAGED":        1,
 		"NOTIFICATION_REASON_ACKNOWLEDGED": 2,
 		"NOTIFICATION_REASON_RESOLVED":     3,
+		"NOTIFICATION_REASON_TEST":         4,
 	}
 )
 
@@ -130,12 +133,13 @@ const file_murphy_v1_shared_proto_rawDesc = "" +
 	"\aUrgency\x12\x17\n" +
 	"\x13URGENCY_UNSPECIFIED\x10\x00\x12\x10\n" +
 	"\fURGENCY_HIGH\x10\x01\x12\x0f\n" +
-	"\vURGENCY_LOW\x10\x02*\xa0\x01\n" +
+	"\vURGENCY_LOW\x10\x02*\xbe\x01\n" +
 	"\x12NotificationReason\x12#\n" +
 	"\x1fNOTIFICATION_REASON_UNSPECIFIED\x10\x00\x12\x1d\n" +
 	"\x19NOTIFICATION_REASON_PAGED\x10\x01\x12$\n" +
 	" NOTIFICATION_REASON_ACKNOWLEDGED\x10\x02\x12 \n" +
-	"\x1cNOTIFICATION_REASON_RESOLVED\x10\x03B#Z!github.com/murphyhq/server;murphyb\x06proto3"
+	"\x1cNOTIFICATION_REASON_RESOLVED\x10\x03\x12\x1c\n" +
+	"\x18NOTIFICATION_REASON_TEST\x10\x04B#Z!github.com/murphyhq/server;murphyb\x06proto3"
 
 var (
 	file_murphy_v1_shared_proto_rawDescOnce sync.Once

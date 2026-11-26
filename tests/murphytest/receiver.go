@@ -105,12 +105,15 @@ type Phone struct {
 }
 
 type ReceivedPush struct {
-	ID         string `json:"id"`
-	Platform   string `json:"platform"`
-	Token      string `json:"token"`
-	Event      string `json:"event"`
-	Server     string `json:"server"`
-	IncidentID string `json:"incident_id"`
+	ID       string `json:"id"`
+	Platform string `json:"platform"`
+	Token    string `json:"token"`
+	Event    string `json:"event"`
+	Server   string `json:"server"`
+	Subject  struct {
+		Type string `json:"type"`
+		ID   string `json:"id"`
+	} `json:"subject"`
 }
 
 func (p *Phone) pushes() *wiremock.Request {

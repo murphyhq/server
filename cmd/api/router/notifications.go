@@ -5,6 +5,7 @@ import (
 
 	"github.com/murphyhq/server"
 	"github.com/murphyhq/server/internal/tracer"
+	"github.com/murphyhq/server/services/notifications"
 )
 
 func (s *Server) GetEmailProvider(ctx context.Context, _ GetEmailProviderRequestObject) (_ GetEmailProviderResponseObject, err error) {
@@ -52,6 +53,44 @@ func toEmailProvider(provider *murphy.EmailProvider) EmailProvider {
 	if at := provider.GetCheckedAt(); at != nil {
 		checked := at.AsTime()
 		out.CheckedAt = &checked
+	}
+	return out
+}
+
+func (s *Server) SendTestPage(ctx context.Context, request SendTestPageRequestObject) (_ SendTestPageResponseObject, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	var contactMethod string
+	if request.Body != nil && request.Body.ContactMethod != nil {
+		contactMethod = request.Body.ContactMethod.Id
+	}
+	page, err := s.notifications.SendTestPage(ctx, sessionFrom(ctx).session.GetUserId(), contactMethod)
+	if err != nil {
+		return nil, err
+	}
+	return SendTestPage202JSONResponse(toTestPage(page)), nil
+}
+
+func (s *Server) GetTestPage(ctx context.Context, request GetTestPageRequestObject) (_ GetTestPageResponseObject, err error) {
+	ctx, span := tracer.Span(ctx)
+	defer span.End(&err)
+
+	page, err := s.notifications.TestPage(ctx, sessionFrom(ctx).session.GetUserId(), request.Id)
+	if err != nil {
+		return nil, err
+	}
+	return GetTestPage200JSONResponse(toTestPage(page)), nil
+}
+
+func toTestPage(page *notifications.TestPage) TestPage {
+	out := TestPage{Id: page.ID, CreatedAt: page.CreatedAt, Deliveries: make([]TestDelivery, len(page.Deliveries))}
+	for i, delivery := range page.Deliveries {
+		out.Deliveries[i] = TestDelivery{ContactMethod: ref(delivery.ContactMethodID), Channel: ContactMethodType(delivery.Channel.Text()), Status: TestDeliveryStatus(delivery.Status)}
+		if delivery.Failure != "" {
+			failure := delivery.Failure
+			out.Deliveries[i].Failure = &failure
+		}
 	}
 	return out
 }

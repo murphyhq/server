@@ -16,8 +16,8 @@ INSERT INTO page_recipients (id, page_id, incident_id, user_id, via_type, via_id
 SELECT unnest(@ids::uuid[]), @page_id::uuid, @incident_id::uuid, unnest(@user_ids::uuid[]), unnest(@via_types::text[]), unnest(@via_ids::uuid[]), @created_at::timestamptz;
 
 -- name: CreateNotifications :exec
-INSERT INTO notifications (id, incident_id, page_id, user_id, contact_method_id, channel, reason, status, created_at, updated_at)
-SELECT unnest(@ids::uuid[]), @incident_id::uuid, sqlc.narg(page_id)::uuid, unnest(@user_ids::uuid[]), unnest(@contact_method_ids::uuid[]), unnest(@channels::text[]), @reason::text, 'created', @created_at::timestamptz, @created_at::timestamptz;
+INSERT INTO notifications (id, subject, subject_id, page_id, user_id, contact_method_id, channel, reason, status, created_at, updated_at)
+SELECT unnest(@ids::uuid[]), @subject::text, @subject_id::uuid, sqlc.narg(page_id)::uuid, unnest(@user_ids::uuid[]), unnest(@contact_method_ids::uuid[]), unnest(@channels::text[]), @reason::text, 'created', @created_at::timestamptz, @created_at::timestamptz;
 
 -- name: UpdateNotificationOutcome :exec
 UPDATE notifications
@@ -94,8 +94,8 @@ WITH handled AS (
   SELECT unnest(@recipient_ids::uuid[]), page.id, @incident_id::uuid, unnest(@recipient_user_ids::uuid[]), unnest(@recipient_via_types::text[]), unnest(@recipient_via_ids::uuid[]), @created_at::timestamptz
   FROM page
 ), created AS (
-  INSERT INTO notifications (id, incident_id, page_id, user_id, contact_method_id, channel, reason, status, created_at, updated_at)
-  SELECT unnest(@notification_ids::uuid[]), @incident_id::uuid, page.id, unnest(@notification_user_ids::uuid[]), unnest(@contact_method_ids::uuid[]), unnest(@channels::text[]), 'paged', 'created', @created_at::timestamptz, @created_at::timestamptz
+  INSERT INTO notifications (id, subject, subject_id, page_id, user_id, contact_method_id, channel, reason, status, created_at, updated_at)
+  SELECT unnest(@notification_ids::uuid[]), 'incident', @incident_id::uuid, page.id, unnest(@notification_user_ids::uuid[]), unnest(@contact_method_ids::uuid[]), unnest(@channels::text[]), 'paged', 'created', @created_at::timestamptz, @created_at::timestamptz
   FROM page
 ), scheduled AS (
   INSERT INTO scheduled_messages (id, due_at, envelope, created_at, waiting_incident_id, waiting_notification_id)
@@ -124,3 +124,9 @@ DELETE FROM email_provider;
 UPDATE email_provider
 SET status = @status, problem = @problem, checked_at = @checked_at
 WHERE updated_at = @updated_at;
+
+-- name: ListTestNotifications :many
+SELECT id, contact_method_id, channel, status, failure, created_at
+FROM notifications
+WHERE subject = 'test' AND subject_id = @test_id AND user_id = @user_id
+ORDER BY id;
